@@ -5,12 +5,7 @@ import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
-    HomeIcon,
-    TruckIcon,
-    MoneyIcon,
-    TagIcon,
-    StoreIcon,
-    InfoIcon,
+    TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -238,18 +233,18 @@ export function CheckoutPageClient() {
     useEffect(() => {
         let active = true
         if (!partnerId) return
-        ;(async () => {
-            const config = await getPartnerDeliveryConfigAction(partnerId)
-            if (!active || !config.success) return
-            setDeliveryPlanEnabled(config.capability.deliveryEnabled)
-            setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
-            if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
-                setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
-            } else if (selectedAddressId) {
-                // Se entrega habilitada e tem endereço, default para entrega
-                setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
-            }
-        })()
+            ; (async () => {
+                const config = await getPartnerDeliveryConfigAction(partnerId)
+                if (!active || !config.success) return
+                setDeliveryPlanEnabled(config.capability.deliveryEnabled)
+                setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
+                if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
+                    setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
+                } else if (selectedAddressId) {
+                    // Se entrega habilitada e tem endereço, default para entrega
+                    setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
+                }
+            })()
         return () => { active = false }
     }, [partnerId])
 
@@ -284,8 +279,8 @@ export function CheckoutPageClient() {
                 if (defaultAddress) {
                     const addressStr = buildAddressString(defaultAddress)
                     setSelectedAddressId(defaultAddress.id)
-                    setFormData(prev => ({ 
-                        ...prev, 
+                    setFormData(prev => ({
+                        ...prev,
                         deliveryAddress: addressStr,
                         // Se houver endereço e a loja permitir entrega (verificado no outro effect), 
                         // o deliveryType será atualizado lá.

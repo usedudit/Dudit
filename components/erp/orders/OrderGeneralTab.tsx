@@ -96,6 +96,7 @@ interface OrderGeneralTabProps {
     deliveryMethodOptions: any[]
     deliveryStatusOptions: any[]
 
+    isQuickMode?: boolean
     fieldErrors?: Set<string>
     setFieldErrors?: React.Dispatch<React.SetStateAction<Set<string>>>
 }
@@ -114,7 +115,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     setCouponCode, onApplyCoupon, onOpenDiscount, onOpenShipping,
     setOrderDate, setSalesChannel, setDeliveryMethod, setFinanceAccountId, setDeliveryStatus, onCreateAccount, handleSaveOrder,
     salesChannelOptions, deliveryMethodOptions, deliveryStatusOptions,
-    fieldErrors, setFieldErrors
+    fieldErrors, setFieldErrors,
+    isQuickMode = false
 }) => {
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
