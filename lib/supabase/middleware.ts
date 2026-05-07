@@ -274,7 +274,7 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
-  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart"]
+  const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned"]
   const isPost = request.method === "POST"
   const isAction = request.headers.has("Next-Action")
   const needsAuthCheck = isPost || isAction || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
@@ -310,7 +310,7 @@ export async function middleware(request: NextRequest) {
 
       // Verifica usuário apenas para proteger rotas ERP
       try {
-        const protectedPrefixes = ["/erp", "/perfil", "/pedidos", "/select-erp", "/ddt-admin"]
+        const protectedPrefixes = ["/erp", "/perfil", "/pedidos", "/select-erp", "/ddt-admin", "/banned"]
         const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix))
 
         // FAST-FAIL: If it's a protected route and there are NO supabase cookies at all, 
@@ -329,6 +329,38 @@ export async function middleware(request: NextRequest) {
           console.log(`[MIDDLEWARE] Injected x-user-id for ${pathname}`)
           requestHeaders.set("x-user-id", user.id)
           requestHeaders.set("x-user-email", user.email || "")
+
+          // ================================================================
+          // BAN CHECK: Verifica se o usuário está banido antes de permitir acesso
+          // ================================================================
+          if (pathname !== "/banned") {
+            const { data: profile } = await supabase
+              .from("user_profiles")
+              .select("banned_at, banned_until")
+              .eq("user_id", user.id)
+              .maybeSingle()
+
+            if (profile?.banned_at) {
+              // Ban com expiração E já expirou → auto-clear
+              if (profile.banned_until && new Date(profile.banned_until) < new Date()) {
+                await supabase
+                  .from("user_profiles")
+                  .update({
+                    banned_at: null,
+                    banned_until: null,
+                    banned_reason: null,
+                    banned_by: null,
+                  })
+                  .eq("user_id", user.id)
+                // Ban expirado e limpo, segue normal
+              } else {
+                // Ativamente banido (permanente ou ainda não expirou)
+                console.log(`[MIDDLEWARE] User ${user.id} is BANNED — redirecting to /banned`)
+                const bannedUrl = new URL("/banned", request.url)
+                return NextResponse.redirect(bannedUrl)
+              }
+            }
+          }
 
           // Re-create the response to inject the new requestHeaders downstream
           const oldResponse = response

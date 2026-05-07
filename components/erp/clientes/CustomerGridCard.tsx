@@ -13,6 +13,10 @@ interface CustomerGridCardProps {
     onEdit: () => void
     onDelete: () => void
     onDetails: () => void
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const CustomerGridCard = React.memo(
@@ -22,7 +26,10 @@ const CustomerGridCard = React.memo(
         onSelect,
         onEdit,
         onDelete,
-        onDetails
+        onDetails,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: CustomerGridCardProps) => {
 
         return (
@@ -33,6 +40,9 @@ const CustomerGridCard = React.memo(
                 transition={{ duration: 0.2 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onDetails}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Avatar do Cliente */}

@@ -6,9 +6,8 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
 import { getERPCustomersPageAction, type ERPCustomerListCursor } from "@/app/actions/erp/customers"
-import { useQueryClient } from "@tanstack/react-query"
-import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityPage } from "@/hooks/use-entity-page"
 
 // Components
 import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal } from "@/components/reusable"
@@ -91,69 +90,62 @@ export default function CustomersPage({
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
 
-    // State
-    const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const queryKey = useMemo(() => ["erp", "customers", partnerId] as const, [partnerId])
+
+    // ── Entity Page Hook (URL state + cache + infinite list) ──────────
+    const entityPage = useEntityPage<any, any, ERPCustomerListCursor>({
+        entityType: 'customers',
+        partnerId,
+        queryKey,
+        initialItems: initialCustomers,
+        initialNextCursor,
+        initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getERPCustomersPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
+        getDetailFn: async (_id: string) => null,
+        listToDetail: (item: any) => item,
+    })
+
+    const {
+        items: rawCustomers, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading: isQueryLoading,
+        entityState, openEntity, closeEntity, isViewing, isCreating: isCreatingEntity, isEditing: isEditingEntity,
+        currentEntity,
+        cache, getPrefetchProps,
+        search, setSearch, debouncedSearch,
+        afterMutation,
+    } = entityPage
+
+    // Sidebar reset → close entity view
+    useEffect(() => {
+        const handleReset = () => closeEntity()
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [closeEntity])
+
+    // ── UI State (non-URL) ────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Bloqueado">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
-    const [ui, setUi] = useState<{ pageState: "list" | "details" | "form"; selectedId: string | null }>({
-        pageState: "list",
-        selectedId: null
-    })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [confirmations, setConfirmations] = useState({ bulkDelete: false, bulkInactive: false })
     const [isProcessingBulk, setIsProcessingBulk] = useState(false)
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
     const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
 
-    const queryClient = useQueryClient()
-
-    const queryKey = useMemo(
-        () => ["erp", "customers", partnerId] as const,
-        [partnerId],
-    )
     const observerTarget = useRef<HTMLDivElement>(null)
-
-    const {
-        items: rawCustomers,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-        isFetching,
-        isLoading: isQueryLoading,
-        isError: customersError,
-    } = useInfiniteList<any, ERPCustomerListCursor>({
-        queryKey,
-        initialPage: {
-            items: initialCustomers,
-            nextCursor: initialNextCursor,
-            hasMore: initialHasMore,
-        },
-        fetchFn: async ({ cursor }) => {
-            const res = await getERPCustomersPageAction(partnerId, {
-                cursor,
-                limit: 100,
-            })
-            if (!res.success) throw new Error(res.error || "Erro ao carregar clientes.")
-            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
-    })
 
     const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
-
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300)
-        return () => clearTimeout(t)
-    }, [search])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -276,10 +268,13 @@ export default function CustomersPage({
     const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
     const paginated = filteredCustomers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
+    // selectedCustomer derived from entityPage.currentEntity or list fallback
     const selectedCustomer = useMemo(() => {
-        if (!ui.selectedId) return null
-        return filteredCustomers.find(c => c.originalId === ui.selectedId) || null
-    }, [ui.selectedId, filteredCustomers])
+        if (!entityState.entityId) return null
+        // currentEntity comes from cache or list-to-detail mapping
+        if (currentEntity) return currentEntity
+        return filteredCustomers.find(c => c.originalId === entityState.entityId) || null
+    }, [entityState.entityId, currentEntity, filteredCustomers])
 
     useEffect(() => {
         if (page === totalPages && hasNextPage && !isFetchingNextPage) {
@@ -288,19 +283,13 @@ export default function CustomersPage({
     }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
-    const hasCustomers = (rawCustomers?.length || 0) > 0 || isFetching
+    const hasCustomers = (rawCustomers?.length || 0) > 0
 
-    // Handlers
-    const handleAddCustomer = () => setUi({ pageState: "form", selectedId: null })
-    const handleEditCustomer = (customer: Customer) => {
-        setUi({ pageState: "form", selectedId: customer.originalId })
-    }
-    const handleDetailsCustomer = (customer: Customer) => {
-        setUi({ pageState: "details", selectedId: customer.originalId })
-    }
-    const handleDeleteCustomer = (customer: Customer) => {
-        setCustomerToDelete(customer)
-    }
+    // Handlers (URL-driven)
+    const handleAddCustomer = () => openEntity('create')
+    const handleEditCustomer = (customer: Customer) => openEntity('edit', customer.originalId)
+    const handleDetailsCustomer = (customer: Customer) => openEntity('view', customer.originalId)
+    const handleDeleteCustomer = (customer: Customer) => setCustomerToDelete(customer)
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -320,15 +309,15 @@ export default function CustomersPage({
         setIsDeletingCustomer(true)
         const result = await deleteCustomersInBatchAction([customerToDelete.originalId])
         if (result.success) {
-            queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
+            afterMutation()
             toast({ title: "Excluído com sucesso" })
             setSelection((p) => {
                 const nextIds = new Set(p.ids)
                 nextIds.delete(customerToDelete.originalId)
                 return { ...p, ids: nextIds }
             })
-            if (ui.selectedId === customerToDelete.originalId) {
-                setUi({ pageState: "list", selectedId: null })
+            if (entityState.entityId === customerToDelete.originalId) {
+                closeEntity()
             }
             setCustomerToDelete(null)
         } else {
@@ -345,7 +334,7 @@ export default function CustomersPage({
         if (action === "delete") {
             const result = await deleteCustomersInBatchAction(ids)
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
+                afterMutation()
                 toast({ title: "Excluído com sucesso" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -355,7 +344,7 @@ export default function CustomersPage({
             const allInactive = (rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.is_active === false)
             const result = await toggleCustomersStatusAction(ids, allInactive)
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
+                afterMutation()
                 toast({ title: "Status atualizado" })
             } else {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
@@ -369,24 +358,24 @@ export default function CustomersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {ui.pageState === "form" ? (
+                {(isCreatingEntity || isEditingEntity) ? (
                     <NewCustomerPage
                         key="form"
                         partnerId={partnerId}
-                        customerId={ui.selectedId || undefined}
-                        onBack={() => setUi({ pageState: "list", selectedId: null })}
+                        customerId={entityState.entityId || undefined}
+                        onBack={() => closeEntity()}
                         onSuccess={(msg) => {
                             toast({ title: "Sucesso", description: msg })
-                            queryClient.invalidateQueries({ queryKey: ['erp', 'customers', partnerId] })
-                            setUi({ pageState: "list", selectedId: null })
+                            afterMutation()
+                            closeEntity()
                         }}
                         onError={(msg) => toast({ title: "Erro", description: msg, variant: "destructive" })}
                     />
-                ) : ui.pageState === "details" && selectedCustomer ? (
+                ) : isViewing && selectedCustomer ? (
                     <CustomerDetailPage
                         key="details"
                         customer={selectedCustomer}
-                        onBack={() => setUi({ pageState: "list", selectedId: null })}
+                        onBack={() => closeEntity()}
                         onEdit={handleEditCustomer}
                     />
                 ) : (
@@ -452,20 +441,6 @@ export default function CustomersPage({
                                         <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
                                             <ThreeDotsLoader />
                                         </FadeIn>
-                                    ) : customersError && !hasCustomers ? (
-                                        <FadeIn key="error-state" className="w-full h-full flex items-center justify-center min-h-[500px]">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/clientes/naoencontrado.png"
-                                                imageAlt="Erro ao carregar"
-                                                title="Erro ao carregar clientes"
-                                                subtitle="Não foi possível carregar seus clientes. Tente novamente."
-                                                itemButton={{
-                                                    text: "Tentar Novamente",
-                                                    action: () => window.location.reload(),
-                                                }}
-                                            />
-                                        </FadeIn>
                                     ) : !hasCustomers ? (
                                         <FadeIn key="empty-no-data" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                             <IconPlaceholder
@@ -502,11 +477,14 @@ export default function CustomersPage({
                                         >
                                             {isMobile ? (
                                                 <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                    {paginated.map((c: Customer) => (
+                                                    {paginated.map((c: Customer) => {
+                                                        const prefetch = getPrefetchProps(c.originalId)
+                                                        return (
                                                         <div
                                                             key={c.originalId}
                                                             className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
                                                             onClick={() => handleDetailsCustomer(c)}
+                                                            onTouchStart={prefetch.onTouchStart}
                                                         >
                                                             <UserProfileImage
                                                                 fullName={c.name || "Cliente"}
@@ -542,11 +520,14 @@ export default function CustomersPage({
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : viewMode === "grid" ? (
                                                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {paginated.map((c: Customer) => (
+                                                    {paginated.map((c: Customer) => {
+                                                        const prefetch = getPrefetchProps(c.originalId)
+                                                        return (
                                                         <CustomerGridCard
                                                             key={c.originalId}
                                                             customer={c}
@@ -555,8 +536,12 @@ export default function CustomersPage({
                                                             onDetails={() => handleDetailsCustomer(c)}
                                                             onEdit={() => handleEditCustomer(c)}
                                                             onDelete={() => handleDeleteCustomer(c)}
+                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                            onPrefetchTouchStart={prefetch.onTouchStart}
                                                         />
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="w-full overflow-hidden rounded-xl relative">
@@ -612,7 +597,9 @@ export default function CustomersPage({
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {paginated.map((c: Customer) => (
+                                                                {paginated.map((c: Customer) => {
+                                                                    const prefetch = getPrefetchProps(c.originalId)
+                                                                    return (
                                                                     <CustomerListItem
                                                                         key={c.originalId}
                                                                         customer={c}
@@ -622,8 +609,12 @@ export default function CustomersPage({
                                                                         onEdit={handleEditCustomer}
                                                                         onDelete={handleDeleteCustomer}
                                                                         onDetails={handleDetailsCustomer}
+                                                                        onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                        onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                        onPrefetchTouchStart={prefetch.onTouchStart}
                                                                     />
-                                                                ))}
+                                                                    )
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>

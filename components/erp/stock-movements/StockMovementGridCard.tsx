@@ -11,6 +11,10 @@ interface StockMovementGridCardProps {
     onSelect?: (id: string) => void
     onUndo: (id: string) => void
     onDetails: (id: string) => void
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const StockMovementGridCard = React.memo(
@@ -19,7 +23,10 @@ const StockMovementGridCard = React.memo(
         selected,
         onSelect,
         onUndo,
-        onDetails
+        onDetails,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: StockMovementGridCardProps) => {
 
         return (
@@ -30,6 +37,9 @@ const StockMovementGridCard = React.memo(
                 transition={{ duration: 0.2 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={() => onDetails(movement.id)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Movement Icon */}

@@ -21,6 +21,10 @@ interface CustomerListItemProps {
   onEdit: (customer: any) => void
   onDelete: (customer: any) => void
   onDetails: (customer: any) => void
+  /** Prefetch handlers for hover/touch-based entity preloading */
+  onPrefetchMouseEnter?: () => void
+  onPrefetchMouseLeave?: () => void
+  onPrefetchTouchStart?: () => void
 }
 
 const CustomerListItem = React.memo(
@@ -32,6 +36,9 @@ const CustomerListItem = React.memo(
     onEdit,
     onDelete,
     onDetails,
+    onPrefetchMouseEnter,
+    onPrefetchMouseLeave,
+    onPrefetchTouchStart,
   }: CustomerListItemProps) => {
 
     const renderCellContent = (colId: string) => {
@@ -125,6 +132,9 @@ const CustomerListItem = React.memo(
         animate={{ opacity: 1 }}
         className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
         onClick={() => onDetails(customer)}
+        onMouseEnter={onPrefetchMouseEnter}
+        onMouseLeave={onPrefetchMouseLeave}
+        onTouchStart={onPrefetchTouchStart}
       >
         <td
           className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"

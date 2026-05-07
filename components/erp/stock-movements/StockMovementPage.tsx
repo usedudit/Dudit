@@ -23,8 +23,8 @@ import StockMovementGridCard from './StockMovementGridCard';
 import { undoStockMovementAction, undoBatchStockMovementsAction, getStockMovementDetails, getERPStockMovementsPageAction, type ERPStockMovementListCursor } from '@/app/actions/erp/stock-movements';
 import { useNotification } from '@/hooks/use-notification';
 import { useMediaQuery } from '@/components/erp/hooks';
-import { useInfiniteList } from '@/hooks/use-infinite-list';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
+import { useEntityPage } from '@/hooks/use-entity-page';
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -60,15 +60,48 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     const { error: notifyError, success: notifySuccess } = useNotification();
     const isMobile = useMediaQuery("(max-width: 768px)");
 
-    // State
-    const [isCreating, setIsCreating] = useState(false);
-    const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
-    const [detailedMovement, setDetailedMovement] = useState<any | null>(null);
-    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId] as const, [partnerId]);
 
+    // ── Entity Page Hook (URL state + cache + infinite list) ──────────
+    const entityPage = useEntityPage<any, any, ERPStockMovementListCursor>({
+        entityType: 'stock-movements',
+        partnerId,
+        queryKey,
+        initialItems: initialMovements,
+        initialNextCursor,
+        initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getERPStockMovementsPageAction(partnerId, { cursor, limit: 100 })
+            if (!res.success) throw new Error(res.error || 'Erro ao carregar movimentações.')
+            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: useCallback((m: any) => String(m?.id || ''), []),
+        getDetailFn: async (id: string) => {
+            const res = await getStockMovementDetails(id)
+            if (res.success && res.data) return res.data
+            return null
+        },
+        listToDetail: (item: any) => item,
+    })
+
+    const {
+        items: loadedMovements, fetchNextPage, hasNextPage, isFetchingNextPage,
+        entityState, openEntity, closeEntity, isViewing, isCreating: isCreatingEntity,
+        currentEntity, isLoadingDetail,
+        cache, getPrefetchProps,
+        search: searchTerm, setSearch: setSearchTerm, debouncedSearch,
+        afterMutation,
+    } = entityPage
+
+    // Sidebar reset → close entity view
+    useEffect(() => {
+        const handleReset = () => closeEntity()
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [closeEntity])
+
+    // ── UI State (non-URL) ────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<TabType>('all');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
     const [viewMode, setViewModeState] = useState<'grid' | 'list'>(isMobile ? 'grid' : 'list');
     const [filters, setFilters] = useState<{
@@ -87,25 +120,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     const [undoReason, setUndoReason] = useState('');
     const [isUndoing, setIsUndoing] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
-
-    // Selection state
     const [selection, setSelection] = useState({ ids: new Set<string>() });
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
-
     const observerTarget = useRef<HTMLDivElement>(null);
-    const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId] as const, [partnerId]);
-    const { items: loadedMovements, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<any, ERPStockMovementListCursor>({
-        queryKey,
-        initialPage: { items: initialMovements, nextCursor: initialNextCursor, hasMore: initialHasMore },
-        fetchFn: async ({ cursor }) => {
-            const res = await getERPStockMovementsPageAction(partnerId, { cursor, limit: 100 })
-            if (!res.success) throw new Error(res.error || 'Erro ao carregar movimentações.')
-            return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: useCallback((m: any) => String(m?.id || ''), []),
-    });
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return;
@@ -122,7 +141,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         checkScroll();
         window.addEventListener("resize", checkScroll);
         return () => window.removeEventListener("resize", checkScroll);
-    }, [checkScroll, viewMode, initialMovements]);
+    }, [checkScroll, viewMode, loadedMovements]);
 
     const filterSections: FilterSectionConfig[] = [
         { id: "datePeriod", title: "Data da movimentação", type: "date-period" },
@@ -138,30 +157,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         filters.movement_type.length > 0 || isDatePeriodFilterActive(filters.datePeriod);
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
-    const handleViewDetails = async (id: string) => {
-        setSelectedMovementId(id);
-        setDetailedMovement(null);
-        setIsDetailLoading(true);
-        try {
-            const res = await getStockMovementDetails(id);
-            if (res.success) {
-                setDetailedMovement(res.data);
-            } else {
-                notifyError(res.error || "Erro ao carregar detalhes");
-            }
-        } catch (err) {
-            notifyError("Erro de conexão ao carregar detalhes");
-        } finally {
-            setIsDetailLoading(false);
-        }
-    };
+    // ── Entity Navigation (instant via cache) ───────────────────────
+    const handleViewDetails = useCallback((id: string) => {
+        openEntity('view', id);
+    }, [openEntity]);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
 
     const handleUndoClick = (id: string) => {
         setUndoingId(id);
@@ -175,6 +175,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         try {
             const res = await undoStockMovementAction(undoingId, undoReason);
             if (res.success) {
+                afterMutation(undoingId);
                 notifySuccess('Movimentação desfeita com sucesso.');
             } else {
                 notifyError(res.error || 'Erro ao desfazer.');
@@ -195,6 +196,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         try {
             const res = await undoBatchStockMovementsAction(ids, undoReason);
             if (res.success) {
+                afterMutation();
                 notifySuccess(`${ids.length} movimentações desfeitas com sucesso.`);
                 setSelection({ ids: new Set() });
             } else {
@@ -357,23 +359,20 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
 
     return (
         <AnimatePresence mode="wait">
-            {isCreating ? (
+            {isCreatingEntity ? (
                 <CreateStockMovement
                     key="create"
-                    onBack={() => setIsCreating(false)}
-                    onSuccess={() => { setIsCreating(false); }}
+                    onBack={closeEntity}
+                    onSuccess={() => { afterMutation(); closeEntity(); }}
                 />
-            ) : selectedMovementId ? (
+            ) : isViewing && entityState.entityId ? (
                 <StockMovementDetailPage
                     key="detail"
-                    movement={isDetailLoading
+                    movement={isLoadingDetail
                         ? null
-                        : (detailedMovement?.id === selectedMovementId ? detailedMovement : (formattedMovements.find(m => m.id === selectedMovementId) || null))}
-                    isLoading={isDetailLoading}
-                    onBack={() => {
-                        setSelectedMovementId(null);
-                        setDetailedMovement(null);
-                    }}
+                        : (currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null)}
+                    isLoading={isLoadingDetail}
+                    onBack={closeEntity}
                 />
             ) : (
                 <FadeIn
@@ -406,7 +405,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                     <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
                                 </Button>
 
-                                <Button onClick={() => setIsCreating(true)}>
+                                <Button onClick={() => openEntity('create')}>
                                     <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
                                     Nova Movimentação
                                 </Button>
@@ -420,7 +419,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                             onSearchChange={setSearchTerm}
                             onOpenFilter={() => setModals(prev => ({ ...prev, filter: true }))}
                             onExport={() => { }}
-                            onAddMovement={() => setIsCreating(true)}
+                            onAddMovement={() => openEntity('create')}
                             filters={filters}
                             setFilters={setFilters}
                             viewMode={viewMode}
@@ -443,7 +442,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                             subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Sua história de movimentações aparecerá aqui."}
                                             itemButton={!isFiltered ? {
                                                 text: "Nova Movimentação",
-                                                action: () => setIsCreating(true),
+                                                action: () => openEntity('create'),
                                             } : {
                                                 text: "Limpar Filtros",
                                                 action: handleClearFilters,
@@ -459,48 +458,60 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                         >
                                             {isMobile ? (
                                                 <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                    {paginatedMovements.map((mov) => (
-                                                        <div
-                                                            key={mov.id}
-                                                            className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
-                                                            onClick={() => handleViewDetails(mov.id)}
-                                                        >
-                                                            <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center">
-                                                                <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
-                                                            </div>
+                                                    {paginatedMovements.map((mov) => {
+                                                        const prefetch = getPrefetchProps(mov.id)
+                                                        return (
+                                                            <div
+                                                                key={mov.id}
+                                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
+                                                                onClick={() => handleViewDetails(mov.id)}
+                                                                onMouseEnter={prefetch.onMouseEnter}
+                                                                onMouseLeave={prefetch.onMouseLeave}
+                                                                onTouchStart={prefetch.onTouchStart}
+                                                            >
+                                                                <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center">
+                                                                    <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
+                                                                </div>
 
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start mb-0.5">
-                                                                    <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.displayId}</h3>
-                                                                    <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
-                                                                        {mov.type === 'in' ? 'Entrada' : 'Saída'}
-                                                                    </Badge>
-                                                                </div>
-                                                                <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">
-                                                                    {mov.items_count} {mov.items_count === 1 ? 'item' : 'itens'} • {mov.reason}
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-md">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
-                                                                    <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
-                                                                        <Checkbox checked={selection.ids.has(mov.id)} onChange={() => handleSelectRow(mov.id)} />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.displayId}</h3>
+                                                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
+                                                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">
+                                                                        {mov.items_count} {mov.items_count === 1 ? 'item' : 'itens'} • {mov.reason}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 text-md">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
+                                                                        <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
+                                                                            <Checkbox checked={selection.ids.has(mov.id)} onChange={() => handleSelectRow(mov.id)} />
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : viewMode === 'grid' ? (
                                                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                    {paginatedMovements.map((mov) => (
-                                                        <StockMovementGridCard
-                                                            key={mov.id}
-                                                            movement={mov}
-                                                            selected={selection.ids.has(mov.id)}
-                                                            onSelect={handleSelectRow}
-                                                            onUndo={handleUndoClick}
-                                                            onDetails={handleViewDetails}
-                                                        />
-                                                    ))}
+                                                    {paginatedMovements.map((mov) => {
+                                                        const prefetch = getPrefetchProps(mov.id)
+                                                        return (
+                                                            <StockMovementGridCard
+                                                                key={mov.id}
+                                                                movement={mov}
+                                                                selected={selection.ids.has(mov.id)}
+                                                                onSelect={handleSelectRow}
+                                                                onUndo={handleUndoClick}
+                                                                onDetails={handleViewDetails}
+                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                            />
+                                                        )
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="w-full overflow-hidden rounded-xl relative">
@@ -558,17 +569,23 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {paginatedMovements.map((mov) => (
-                                                                    <StockMovementListItem
-                                                                        key={mov.id}
-                                                                        movement={mov}
-                                                                        columns={columns}
-                                                                        selected={selection.ids.has(mov.id)}
-                                                                        onSelect={handleSelectRow}
-                                                                        onUndo={handleUndoClick}
-                                                                        onDetails={handleViewDetails}
-                                                                    />
-                                                                ))}
+                                                                {paginatedMovements.map((mov) => {
+                                                                    const prefetch = getPrefetchProps(mov.id)
+                                                                    return (
+                                                                        <StockMovementListItem
+                                                                            key={mov.id}
+                                                                            movement={mov}
+                                                                            columns={columns}
+                                                                            selected={selection.ids.has(mov.id)}
+                                                                            onSelect={handleSelectRow}
+                                                                            onUndo={handleUndoClick}
+                                                                            onDetails={handleViewDetails}
+                                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                            onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                        />
+                                                                    )
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>

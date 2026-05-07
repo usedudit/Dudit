@@ -1392,7 +1392,7 @@ export default function CreateTransactionPage({
                             {(recurringModeEnabled && (enableRecurrence || isRecurringTemplateEdit)) && (
                                 <>
                                     <InfoCard
-                                        color="gray"
+                                        color="orange"
                                         message={isRecurringTemplateEdit
                                             ? "Alterações passam a valer para ocorrências futuras. Pagamentos já confirmados não são alterados."
                                             : "A data de vencimento acima é a primeira ocorrência. As próximas datas aparecem em A pagar/A receber e seguem a frequência abaixo."}
@@ -1421,7 +1421,7 @@ export default function CreateTransactionPage({
                                             }
                                         />
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                                         {isRecurringTemplateEdit && (
                                             <DatePicker
                                                 label="Data inicial (1ª ocorrência)"
@@ -1471,7 +1471,7 @@ export default function CreateTransactionPage({
                                 <>
                                     <InfoCard
                                         message={`Todas as parcelas serão geradas na hora (Total de ${installmentsCount}x, a cada ${installmentFrequencyLabel(installmentFrequency, installmentInterval)}).`}
-                                        color="gray"
+                                        color="orange"
                                         className="mb-6"
                                     />
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1602,7 +1602,7 @@ export default function CreateTransactionPage({
                             {isSalesOrigin && isEditMode && (
                                 <InfoCard
                                     message="Transações de venda não permitem edição do meio de pagamento."
-                                    color="gray"
+                                    color="orange"
                                     className="mt-2"
                                 />
                             )}

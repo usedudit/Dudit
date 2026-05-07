@@ -22,6 +22,10 @@ interface StockMovementListItemProps {
     showCheckbox?: boolean
     /** Quando false, oculta a coluna de ações (ex.: parcelas no detalhe da transação). */
     showActions?: boolean
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const StockMovementListItem = React.memo(
@@ -34,6 +38,9 @@ const StockMovementListItem = React.memo(
         onDetails,
         showCheckbox = true,
         showActions = true,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: StockMovementListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -150,6 +157,9 @@ const StockMovementListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetails(movement.id)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 {showCheckbox && (
                     <td
