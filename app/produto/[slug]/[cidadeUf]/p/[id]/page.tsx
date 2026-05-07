@@ -115,7 +115,7 @@ export default async function ProductDetailsPage({
   // --- MÁGICA DE SEO (Canonical Redirect) ---
   const correctUrl = getProductUrl(product)
   const currentPath = `/produto/${currentSlug}/${currentCidadeUf}/p/${id}`
-  
+
   // Bugfix: Evita downgrade de slug informativo para 'vitrine' genérico (ou 'brasil')
   // Se a URL atual já tem uma cidade e o sistema quer mandar para o genérico, ignoramos o redirect.
   const isCurrentlyDetailed = currentCidadeUf !== 'vitrine' && currentCidadeUf !== 'brasil'

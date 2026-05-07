@@ -314,7 +314,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id")
+    .select("user_id, business_info")
     .eq("id", partnerId)
     .single()
 
@@ -334,7 +334,14 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
     if (updateData.cnpj === "") updateData.cnpj = null
   }
-  if (data.businessInfo !== undefined) updateData.business_info = normalizeBusinessInfo(data.businessInfo)
+  if (data.businessInfo !== undefined) {
+    const existingInfo = normalizeBusinessInfo(partnerCheck?.business_info)
+    const newInfo = normalizeBusinessInfo(data.businessInfo)
+    updateData.business_info = {
+      ...newInfo,
+      mode: existingInfo.mode // Never trust the frontend for mode changes on update
+    }
+  }
   if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (sanitizedPhone !== undefined) {
     if (sanitizedPhone) {

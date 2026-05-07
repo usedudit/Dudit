@@ -21,6 +21,10 @@ interface ServiceListItemProps {
     onDuplicate: (service: any) => void
     onDelete: (service: any) => void
     onDetails: (service: any) => void
+    /** Prefetch handlers for hover/touch-based entity preloading */
+    onPrefetchMouseEnter?: () => void
+    onPrefetchMouseLeave?: () => void
+    onPrefetchTouchStart?: () => void
 }
 
 const ServiceListItem = React.memo(
@@ -33,6 +37,9 @@ const ServiceListItem = React.memo(
         onDuplicate,
         onDelete,
         onDetails,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: ServiceListItemProps) => {
 
         const formatCurrency = (value: number) => {
@@ -131,6 +138,9 @@ const ServiceListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetails(service)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <td
                     className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"

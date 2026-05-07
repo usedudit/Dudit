@@ -1,36 +1,30 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { useQueryClient } from "@tanstack/react-query"
 import { getERPServicesPageAction, type ERPServiceListCursor } from "@/app/actions/erp/servicos"
-import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { usePermissions } from "@/lib/permission-context"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 
 // Actions
 import {
-    createServiceAction,
-    updateServiceAction,
     deleteServiceAction,
     deleteServicesInBatchAction,
     toggleServicesStatusAction,
     getServiceWithDetailsAction,
-    batchUpdateServicesAction,
-    duplicateServiceAction
 } from "@/app/actions/erp/servicos"
 
 // Components
 import { Button, IconPlaceholder, Checkbox } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
 import AlertModal from "@/components/reusable/AlertModal"
-import DefaultModal from "@/components/reusable/DefaultModal"
 
 // New Component Imports
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -43,9 +37,6 @@ import { AddServicePage } from "./AddServicePage"
 // Icons
 import {
     PlusIcon,
-    ExportFileIcon,
-    Settings2Icon,
-    UploadIcon,
     ArrowUpDownIcon,
     TrashIcon,
     CheckCircleIcon,
@@ -152,42 +143,66 @@ export default function ServicesPage({
     initialHasMore,
     partnerId,
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; }) {
-    const router = useRouter()
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
+    const { planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
 
-    const queryClient = useQueryClient()
     const servicesQueryKey = useMemo(() => ['erp', 'services', partnerId] as const, [partnerId])
 
-    const observerTarget = useRef<HTMLDivElement>(null)
-    const {
-        items: effectiveBaseServices,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-    } = useInfiniteList<any, ERPServiceListCursor>({
+    // ── Entity Page Hook (URL state + cache + infinite list) ──────────
+    const entityPage = useEntityPage<any, any, ERPServiceListCursor>({
+        entityType: 'services',
+        partnerId,
         queryKey: servicesQueryKey,
-        initialPage: { items: initialServices, nextCursor: initialNextCursor, hasMore: initialHasMore },
-        fetchFn: async ({ cursor }) => {
+        initialItems: initialServices,
+        initialNextCursor,
+        initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
             const res = await getERPServicesPageAction(partnerId, { cursor, limit: 100 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar serviços.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((s: any) => String(s?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            const res = await getServiceWithDetailsAction(id)
+            if (res.success && (res as any).product) return (res as any).product
+            return null
+        },
+        listToDetail: (item: any) => item,
     })
 
-    // State
-    const [data, setData] = useState<{ services: any[], search: string, debouncedSearch: string, page: number }>({ services: effectiveBaseServices, search: "", debouncedSearch: "", page: 1 })
+    const {
+        items: effectiveBaseServices, fetchNextPage, hasNextPage, isFetchingNextPage,
+        entityState, openEntity, closeEntity, isViewing, isEditing, isCreating, isDuplicating,
+        currentEntity, isLoadingDetail,
+        cache, getPrefetchProps,
+        search, setSearch, debouncedSearch,
+        afterMutation, queryClient,
+    } = entityPage
 
+    const observerTarget = useRef<HTMLDivElement>(null)
+
+    // ── Local services state (for optimistic updates after mutations) ──
+    const [services, setServices] = useState<any[]>(effectiveBaseServices)
+
+    // Sync local services when query data changes
     const prevServicesRef = useRef(effectiveBaseServices)
     useEffect(() => {
         if (prevServicesRef.current !== effectiveBaseServices) {
-            setData(prev => ({ ...prev, services: effectiveBaseServices }))
+            setServices(effectiveBaseServices)
             prevServicesRef.current = effectiveBaseServices
         }
     }, [effectiveBaseServices])
+
+    // Sidebar reset → close entity view
+    useEffect(() => {
+        const handleReset = () => closeEntity()
+        window.addEventListener('erp-sidebar-reset', handleReset)
+        return () => window.removeEventListener('erp-sidebar-reset', handleReset)
+    }, [closeEntity])
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -198,14 +213,38 @@ export default function ServicesPage({
         threshold: 0,
     })
 
-    const [selection, setSelection] = useState({ ids: new Set<string>(), service: null as any, delete: null as any, duplicate: null as any, loadingDetails: false })
+    // ── Derived: Map entityState action to AddServicePage mode ────────
+    const formMode = useMemo((): "add" | "edit" | "details" | "duplicate" | null => {
+        if (!entityState.isOpen) return null
+        switch (entityState.action) {
+            case 'view': return 'details'
+            case 'edit': return 'edit'
+            case 'create': return 'add'
+            case 'duplicate': return 'duplicate'
+            default: return null
+        }
+    }, [entityState])
+
+    // ── Derived: Service for form (from cache, with duplicate transform) ─
+    const formService = useMemo(() => {
+        if (!entityState.isOpen) return null
+        if (entityState.action === 'create') return null
+        if (!currentEntity) return null
+        if (isDuplicating) {
+            const sku = generateSKUBase(currentEntity.name ? `${currentEntity.name} Copy` : undefined)
+            return { ...currentEntity, id: undefined, sku, images: currentEntity.images || [] }
+        }
+        return currentEntity
+    }, [entityState, currentEntity, isDuplicating])
+
+    // ── UI State (non-URL) ────────────────────────────────────────────
+    const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as any })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [activeTab, setActiveTab] = useState<"all" | "active" | "inactive">("all")
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
-    const [ui, setUi] = useState<{ formMode: "edit" | "duplicate" | "details" | "add" | null; pageState: string; isSaving?: boolean }>({ formMode: null, pageState: "list" })
     const [confirmations, setConfirmations] = useState({
         delete: false,
         inactivate: false,
@@ -219,14 +258,14 @@ export default function ServicesPage({
     const containerRef = useRef<HTMLDivElement>(null)
     const tableContainerRef = useRef<HTMLDivElement>(null)
 
-    const hasServices = data.services.length > 0
+    const hasServices = services.length > 0
     const hasActiveFilters =
         filters.categories.length > 0 ||
         filters.status.length > 0 ||
         !!filters.priceRange.min ||
         !!filters.priceRange.max
 
-    const isFiltered = data.search.length > 0 || hasActiveFilters
+    const isFiltered = search.length > 0 || hasActiveFilters
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -245,16 +284,11 @@ export default function ServicesPage({
         return () => {
             window.removeEventListener("resize", checkScroll)
         }
-    }, [checkScroll, effectiveViewMode, data.services])
-
-    useEffect(() => {
-        const t = setTimeout(() => setData((p) => ({ ...p, debouncedSearch: p.search })), 300)
-        return () => clearTimeout(t)
-    }, [data.search])
+    }, [checkScroll, effectiveViewMode, services])
 
     const filteredServices = useMemo(() => {
-        return data.services.filter((s) => {
-            const term = data.debouncedSearch.toLowerCase()
+        return services.filter((s) => {
+            const term = debouncedSearch.toLowerCase()
             const minPrice = filters.priceRange.min ? Number.parseFloat(filters.priceRange.min) : 0
             const maxPrice = filters.priceRange.max ? Number.parseFloat(filters.priceRange.max) : Number.POSITIVE_INFINITY
 
@@ -274,7 +308,7 @@ export default function ServicesPage({
                 s.price <= maxPrice
             )
         })
-    }, [data.services, data.debouncedSearch, filters, activeTab])
+    }, [services, debouncedSearch, filters, activeTab])
 
     const sortedServices = useMemo(() => {
         if (!sortConfig) return filteredServices
@@ -313,9 +347,10 @@ export default function ServicesPage({
         })
     }, [filteredServices, sortConfig])
 
+    const [page, setPage] = useState(1)
     const paginated = useMemo(() =>
-        sortedServices.slice((data.page - 1) * itemsPerPage, data.page * itemsPerPage),
-        [sortedServices, data.page, itemsPerPage])
+        sortedServices.slice((page - 1) * itemsPerPage, page * itemsPerPage),
+        [sortedServices, page, itemsPerPage])
 
     // --- Handlers ---
 
@@ -327,45 +362,23 @@ export default function ServicesPage({
         })
     }, [])
 
-    const openServiceForm = useCallback(async (service: any, mode: "edit" | "details" | "duplicate" | "add") => {
-        setSelection((s) => ({ ...s, service, loadingDetails: true }))
-        setUi((u) => ({ ...u, formMode: mode as any, pageState: "form" }))
-
-        if (service && mode !== "add") {
-            const res = await getServiceWithDetailsAction(service.id)
-            if (res.success && (res as any).product) {
-                setSelection((s) => ({ ...s, service: (res as any).product, loadingDetails: false }))
-            } else {
-                toast({ title: "Erro", description: (res as any).error || "Erro ao carregar detalhes", variant: "destructive" })
-                setSelection((s) => ({ ...s, loadingDetails: false }))
-            }
-        }
-    }, [toast])
-
+    // ── Entity Navigation (instant via cache) ───────────────────────
     const handleEditService = useCallback((service: any) => {
-        openServiceForm(service, "edit")
-    }, [openServiceForm])
+        openEntity('edit', service.id)
+    }, [openEntity])
 
     const handleDetailsService = useCallback((service: any) => {
-        openServiceForm(service, "details")
-    }, [openServiceForm])
+        openEntity('view', service.id)
+    }, [openEntity])
+
+    const handleDuplicateService = useCallback((service: any) => {
+        openEntity('duplicate', service.id)
+    }, [openEntity])
 
     const handleDeleteService = useCallback((service: any) => {
         setSelection((s) => ({ ...s, delete: service }))
         setConfirmations((c) => ({ ...c, delete: true }))
     }, [])
-
-    const handleDuplicateService = useCallback(async (service: any) => {
-        setActionModal({ open: true, text: "Duplicando serviço..." })
-        const res = await duplicateServiceAction(service.id)
-        if (res.success) {
-            toast({ title: "Serviço duplicado com sucesso" })
-            queryClient.invalidateQueries({ queryKey: servicesQueryKey })
-        } else {
-            toast({ title: "Erro", description: (res as any).error || "Erro ao duplicar", variant: "destructive" })
-        }
-        setActionModal({ open: false, text: "" })
-    }, [queryClient, servicesQueryKey, toast])
 
     const confirmDelete = async () => {
         if (selection.delete) {
@@ -374,8 +387,8 @@ export default function ServicesPage({
             const result = await deleteServiceAction(deleteId)
             setActionModal({ open: false, text: "" })
             if (result.success) {
-                queryClient.invalidateQueries({ queryKey: servicesQueryKey })
-                setData((p) => ({ ...p, services: p.services.filter((prod) => prod.id !== deleteId) }))
+                afterMutation(deleteId)
+                setServices((p) => p.filter((prod) => prod.id !== deleteId))
                 toast({ title: "Excluído" })
             } else {
                 toast({
@@ -401,25 +414,24 @@ export default function ServicesPage({
                     variant: "destructive",
                 })
             } else {
-                queryClient.invalidateQueries({ queryKey: servicesQueryKey })
+                afterMutation()
                 const idSet = new Set(ids)
-                setData((p) => ({ ...p, services: p.services.filter((prod) => !idSet.has(prod.id)) }))
+                setServices((p) => p.filter((prod) => !idSet.has(prod.id)))
                 toast({ title: "Excluídos" })
             }
             setConfirmations((p) => ({ ...p, bulkDelete: false }))
         } else {
             setActionModal({ open: true, text: "Atualizando status..." })
-            const allInactive = data.services.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
+            const allInactive = services.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
             await toggleServicesStatusAction(ids, allInactive)
-            queryClient.invalidateQueries({ queryKey: servicesQueryKey })
+            afterMutation()
             setActionModal({ open: false, text: "" })
             const idSet = new Set(ids)
-            setData((p) => ({
-                ...p,
-                services: p.services.map((prod) =>
+            setServices((p) =>
+                p.map((prod) =>
                     idSet.has(prod.id) ? { ...prod, is_active: allInactive } : prod
                 ),
-            }))
+            )
             setConfirmations((p) => ({ ...p, bulkInactive: false }))
             toast({ title: "Atualizado" })
         }
@@ -427,37 +439,43 @@ export default function ServicesPage({
     }
 
     const handleAddFirstService = useCallback(() => {
-        setSelection(s => ({ ...s, service: null, loadingDetails: false }))
-        setUi(u => ({ ...u, formMode: "add", pageState: "form" }))
-    }, [])
+        openEntity('create')
+    }, [openEntity])
 
     const handleClearFilters = useCallback(() => {
-        setData(p => ({ ...p, search: "", debouncedSearch: "" }))
+        setSearch("")
         setFilters(INITIAL_FILTERS)
-    }, [])
+    }, [setSearch])
+
+    // ── onClose handler for AddServicePage (after save) ──────────────
+    const handleFormClose = useCallback(() => {
+        if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
+        afterMutation(entityState.entityId || undefined)
+        closeEntity()
+    }, [entityState.entityId, cache, afterMutation, closeEntity])
 
     const selectedProds = useMemo(() =>
-        data.services.filter((p) => selection.ids.has(p.id)),
-        [data.services, selection.ids])
+        services.filter((p) => selection.ids.has(p.id)),
+        [services, selection.ids])
 
     return (
         <>
             <AnimatePresence mode="wait">
-                {ui.pageState === "form" ? (
+                {entityState.isOpen && formMode ? (
                     <AddServicePage
                         key="form"
-                        mode={ui.formMode as any}
-                        setMode={(m) => setUi((u) => ({ ...u, formMode: m }))}
-                        service={selection.service}
-                        onBack={() => setUi((u) => ({ ...u, pageState: "list", formMode: null }))}
+                        mode={formMode as any}
+                        setMode={(m) => {
+                            // Map AddServicePage mode changes to URL updates
+                            if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                            else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                        }}
+                        service={formService}
+                        onBack={closeEntity}
                         partnerId={partnerId}
                         storeId={selectedStore?.id}
-                        isLoadingDetails={selection.loadingDetails}
-                        onClose={() => {
-                            setUi((u) => ({ ...u, pageState: "list", formMode: null }))
-                            queryClient.invalidateQueries({ queryKey: servicesQueryKey })
-                            // To correctly re-fetch we would reset the list state. For now just invalidating.
-                        }}
+                        isLoadingDetails={isLoadingDetail}
+                        onClose={handleFormClose}
                     />
                 ) : (
                     <FadeIn
@@ -502,8 +520,8 @@ export default function ServicesPage({
                                 <ServicePageControls
                                     activeTab={activeTab}
                                     setActiveTab={setActiveTab}
-                                    search={data.search}
-                                    onSearchChange={(val) => setData((p) => ({ ...p, search: val }))}
+                                    search={search}
+                                    onSearchChange={setSearch}
                                     onOpenFilter={() => { }}
                                     onOpenImport={() => { }}
                                     onOpenExport={() => { }}
@@ -539,30 +557,42 @@ export default function ServicesPage({
                                             <FadeIn key={effectiveViewMode} className="w-full">
                                                 {effectiveViewMode === "grid" ? (
                                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                        {paginated.map((service) => (
-                                                            <ServiceGridCard
-                                                                key={service.id}
-                                                                service={service}
-                                                                selected={selection.ids.has(service.id)}
-                                                                onSelect={() => handleSelectRow(service.id)}
-                                                                onEdit={() => handleEditService(service)}
-                                                                onDuplicate={() => handleDuplicateService(service)}
-                                                                onDelete={() => handleDeleteService(service)}
-                                                                onDetails={() => handleDetailsService(service)}
-                                                            />
-                                                        ))}
+                                                        {paginated.map((service) => {
+                                                            const prefetch = getPrefetchProps(service.id)
+                                                            return (
+                                                                <ServiceGridCard
+                                                                    key={service.id}
+                                                                    service={service}
+                                                                    selected={selection.ids.has(service.id)}
+                                                                    onSelect={() => handleSelectRow(service.id)}
+                                                                    onEdit={() => handleEditService(service)}
+                                                                    onDuplicate={() => handleDuplicateService(service)}
+                                                                    onDelete={() => handleDeleteService(service)}
+                                                                    onDetails={() => handleDetailsService(service)}
+                                                                    onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                    onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                    onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                />
+                                                            )
+                                                        })}
                                                     </div>
                                                 ) : isTabletOrMobile ? (
                                                     <div className="w-full">
-                                                        {paginated.map((service) => (
-                                                            <ServiceMobileItem
-                                                                key={service.id}
-                                                                service={service}
-                                                                onClick={handleDetailsService}
-                                                                isSelected={selection.ids.has(service.id)}
-                                                                onSelect={handleSelectRow}
-                                                            />
-                                                        ))}
+                                                        {paginated.map((service) => {
+                                                            const prefetch = getPrefetchProps(service.id)
+                                                            return (
+                                                                <ServiceMobileItem
+                                                                    key={service.id}
+                                                                    service={service}
+                                                                    onClick={handleDetailsService}
+                                                                    isSelected={selection.ids.has(service.id)}
+                                                                    onSelect={handleSelectRow}
+                                                                    onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                    onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                    onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                />
+                                                            )
+                                                        })}
                                                     </div>
                                                 ) : (
                                                     <div className="w-full overflow-hidden rounded-xl relative">
@@ -618,19 +648,25 @@ export default function ServicesPage({
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
-                                                                    {paginated.map((service) => (
-                                                                        <ServiceListItem
-                                                                            key={service.id}
-                                                                            service={service}
-                                                                            columns={FIXED_COLUMNS}
-                                                                            selected={selection.ids.has(service.id)}
-                                                                            onSelect={handleSelectRow}
-                                                                            onEdit={handleEditService}
-                                                                            onDuplicate={handleDuplicateService}
-                                                                            onDelete={handleDeleteService}
-                                                                            onDetails={handleDetailsService}
-                                                                        />
-                                                                    ))}
+                                                                    {paginated.map((service) => {
+                                                                        const prefetch = getPrefetchProps(service.id)
+                                                                        return (
+                                                                            <ServiceListItem
+                                                                                key={service.id}
+                                                                                service={service}
+                                                                                columns={FIXED_COLUMNS}
+                                                                                selected={selection.ids.has(service.id)}
+                                                                                onSelect={handleSelectRow}
+                                                                                onEdit={handleEditService}
+                                                                                onDuplicate={handleDuplicateService}
+                                                                                onDelete={handleDeleteService}
+                                                                                onDetails={handleDetailsService}
+                                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                            />
+                                                                        )
+                                                                    })}
                                                                 </tbody>
                                                             </table>
                                                         </div>
@@ -654,7 +690,7 @@ export default function ServicesPage({
                 )}
             </AnimatePresence>
 
-            {selection.ids.size > 0 && ui.pageState === "list" && (
+            {selection.ids.size > 0 && !entityState.isOpen && (
                 <FloatingActionBar
                     selectedCount={selection.ids.size}
                     onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}

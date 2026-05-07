@@ -5,12 +5,7 @@ import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
-    HomeIcon,
-    TruckIcon,
-    MoneyIcon,
-    TagIcon,
-    StoreIcon,
-    InfoIcon,
+    TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon,
 } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
@@ -238,15 +233,18 @@ export function CheckoutPageClient() {
     useEffect(() => {
         let active = true
         if (!partnerId) return
-        ;(async () => {
-            const config = await getPartnerDeliveryConfigAction(partnerId)
-            if (!active || !config.success) return
-            setDeliveryPlanEnabled(config.capability.deliveryEnabled)
-            setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
-            if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
-                setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
-            }
-        })()
+            ; (async () => {
+                const config = await getPartnerDeliveryConfigAction(partnerId)
+                if (!active || !config.success) return
+                setDeliveryPlanEnabled(config.capability.deliveryEnabled)
+                setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
+                if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
+                    setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
+                } else if (selectedAddressId) {
+                    // Se entrega habilitada e tem endereço, default para entrega
+                    setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
+                }
+            })()
         return () => { active = false }
     }, [partnerId])
 
@@ -279,8 +277,14 @@ export function CheckoutPageClient() {
                 setUserAddresses(result.addresses as UserAddress[])
                 const defaultAddress = (result.addresses as UserAddress[]).find((a: UserAddress) => a.is_default)
                 if (defaultAddress) {
+                    const addressStr = buildAddressString(defaultAddress)
                     setSelectedAddressId(defaultAddress.id)
-                    setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(defaultAddress) }))
+                    setFormData(prev => ({
+                        ...prev,
+                        deliveryAddress: addressStr,
+                        // Se houver endereço e a loja permitir entrega (verificado no outro effect), 
+                        // o deliveryType será atualizado lá.
+                    }))
                 }
             }
         } catch (err) {
@@ -906,7 +910,7 @@ export function CheckoutPageClient() {
                                                                 <div className="flex flex-col justify-center">
                                                                     <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
                                                                     <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(partnerInfo.address)}</p>
-                                                                    {preparationEstimate && (
+                                                                    {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
                                                                         <p className="text-xs text-brand-inactive-text mt-1">
                                                                             Pronto em {preparationEstimate.readyInMinutes} minutos • Retirar a partir de {pickupStartLabel}
                                                                         </p>
@@ -1238,8 +1242,8 @@ export function CheckoutPageClient() {
                                         )}
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
-                                            <span className={isPickup ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : formatCurrency(deliveryFee)}
+                                            <span className={(isPickup || (deliveryFee === 0 && hasFreeDeliveryCoupon)) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : (deliveryFee > 0 ? formatCurrency(deliveryFee) : (hasFreeDeliveryCoupon ? "Grátis" : "A combinar"))}
                                             </span>
                                         </div>
                                         {!isPickup && deliveryBreakdown && (
@@ -1249,7 +1253,7 @@ export function CheckoutPageClient() {
                                                 <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>
                                             </div>
                                         )}
-                                        {isPickup && preparationEstimate && (
+                                        {isPickup && preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
                                             <div className="text-xs text-brand-inactive-text">
                                                 Retirada entre {pickupStartLabel} e {pickupEndLabel}
                                             </div>

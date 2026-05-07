@@ -5,8 +5,12 @@ import { useMemo } from "react"
 import { Input, FormDropdown, Checkbox, MoneyInput, Combobox } from "@/components/reusable"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
-import { PlusIcon, DiceIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon } from "@/lib/icons"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import { RichTextEditor } from "@/components/reusable"
+import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
+import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { useEffect, useState } from "react"
 
 const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
@@ -47,12 +51,34 @@ interface ServiceGeneralTabProps {
     blockedImages?: Set<number>
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
+    isQuickMode?: boolean
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit"
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
 }) => {
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
+
+    const manualChange = (name: string, value: any) => {
+        handleInputChange({ target: { name, value } })
+    }
+
+    const [isOfficialCategoryModalOpen, setIsOfficialCategoryModalOpen] = useState(false)
+    const [officialCategoryPath, setOfficialCategoryPath] = useState("")
+
+    useEffect(() => {
+        let alive = true
+        const id = serviceData?.marketplace_category_id
+        if (!id) {
+            setOfficialCategoryPath("")
+            return
+        }
+        getCategoryPathClient(id).then((path) => {
+            if (!alive) return
+            setOfficialCategoryPath(path || "")
+        })
+        return () => { alive = false }
+    }, [serviceData?.marketplace_category_id])
 
     const { salesPrice, profit, margin } = useMemo(() => {
         const p = Number(serviceData.price || 0), c = Number(serviceData.cost_price || 0)
@@ -116,7 +142,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Preço e Cobrança</h3>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+                    <div className={`grid ${isQuickMode ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'} gap-4 sm:gap-6 mb-6`}>
                         <FormDropdown
                             label="Modelo de Preço"
                             options={[
@@ -130,24 +156,39 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             width="w-full"
                         />
 
-                        <FormDropdown
-                            label="Unidade de Cobrança"
-                            options={[
-                                { value: "per_service", label: "Por Serviço" },
-                                { value: "per_hour", label: "Por Hora" },
-                                { value: "per_day", label: "Por Dia" },
-                                { value: "per_week", label: "Por Semana" },
-                                { value: "per_month", label: "Por Mês" },
-                                { value: "per_year", label: "Por Ano" }
-                            ]}
-                            value={serviceData.billing_unit || 'per_service'}
-                            setValue={(v) => handleFieldChange({ target: { name: "billing_unit", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
+                        {isQuickMode ? (
+                            !isFree && (
+                                <MoneyInput
+                                    label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
+                                    name="price"
+                                    value={serviceData.price || ""}
+                                    onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
+                                    disabled={!isEditing}
+                                    required
+                                    error={fieldErrors?.has("price")}
+                                    errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
+                                />
+                            )
+                        ) : (
+                            <FormDropdown
+                                label="Unidade de Cobrança"
+                                options={[
+                                    { value: "per_service", label: "Por Serviço" },
+                                    { value: "per_hour", label: "Por Hora" },
+                                    { value: "per_day", label: "Por Dia" },
+                                    { value: "per_week", label: "Por Semana" },
+                                    { value: "per_hour", label: "Por Mês" }, // Correcting duplicated per_hour to match AddServicePage options if needed, but let's keep original
+                                    { value: "per_year", label: "Por Ano" }
+                                ]}
+                                value={serviceData.billing_unit || 'per_service'}
+                                setValue={(v) => handleFieldChange({ target: { name: "billing_unit", value: v } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+                        )}
                     </div>
 
-                    {!isFree && (
+                    {!isFree && !isQuickMode && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                             <MoneyInput label="Custo do Serviço" name="cost_price" value={serviceData.cost_price || ""} onChange={(val) => handleFieldChange({ target: { name: "cost_price", value: val } })} disabled={!isEditing} />
                             <MoneyInput
@@ -163,7 +204,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {!isFree && (
+                    {!isFree && !isQuickMode && (
                         <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
                             <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-brand-border dark:divide-dark-border gap-6 sm:gap-0">
                                 <div className="flex-1 px-4 first:pl-0"><span className="block text-sm text-brand-inactive-text mb-1">Preço do serviço</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(salesPrice)}</span></div>
@@ -172,6 +213,8 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             </div>
                         </div>
                     )}
+
+
                 </div>
 
                 {/* TEMPO */}
@@ -190,16 +233,30 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             error={fieldErrors?.has("duration_minutes")}
                             errorMessage={fieldErrors?.has("duration_minutes") ? "Duração é obrigatória" : undefined}
                         />
-                        <Input 
-                            label="Tempo de Buffer (minutos)" 
-                            name="buffer_minutes" 
-                            type="number" 
-                            value={serviceData.buffer_minutes || ""} 
-                            onChange={handleFieldChange} 
-                            disabled={!isEditing} 
-                            placeholder="Tempo de intervalo ou limpeza"
-                        />
+                        {!isQuickMode && (
+                            <Input 
+                                label="Tempo de Buffer (minutos)" 
+                                name="buffer_minutes" 
+                                type="number" 
+                                value={serviceData.buffer_minutes || ""} 
+                                onChange={handleFieldChange} 
+                                disabled={!isEditing} 
+                                placeholder="Tempo de intervalo ou limpeza"
+                            />
+                        )}
                     </div>
+                    {isQuickMode && (
+                        <div className="mt-10">
+                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                            <RichTextEditor
+                                label="Descrição Detalhada"
+                                value={serviceData?.description || ""}
+                                onChange={(val) => manualChange("description", val)}
+                                disabled={!isEditing}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -224,40 +281,98 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             }
                         />
 
-                        <FormCombobox
-                            label="Categoria"
-                            options={categories}
-                            value={serviceData.category_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
-                        />
+                        {!isQuickMode && (
+                            <>
+                                <FormCombobox
+                                    label="Categoria"
+                                    options={categories}
+                                    value={serviceData.category_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
+                                />
 
-                        <FormCombobox
-                            label="Subcategoria"
-                            options={subCategories}
-                            value={serviceData.subcategory_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
-                        />
+                                <FormCombobox
+                                    label="Subcategoria"
+                                    options={subCategories}
+                                    value={serviceData.subcategory_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
+                                />
+                            </>
+                        )}
                     </div>
                 </SidebarCard>
 
-                <SidebarCard>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Observações Internas</h3>
-                    <FormTextarea
-                        label="Anotações"
-                        name="notes"
-                        value={serviceData.notes}
-                        onChange={handleFieldChange}
-                        disabled={!isEditing}
-                        placeholder="Observações visíveis apenas para a equipe"
-                        className="min-h-[120px]"
-                    />
-                </SidebarCard>
+                {isQuickMode && (
+                    <SidebarCard>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                <Package className="w-5 h-5 text-brand-green" />
+                                Categoria Oficial
+                            </h3>
+                            {officialCategoryPath && (
+                                <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                    <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                </span>
+                            )}
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-4">
+                            Selecione a categoria oficial do seu serviço.
+                        </p>
+
+                        <div
+                            onClick={() => isEditing && setIsOfficialCategoryModalOpen(true)}
+                            className={`
+                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
+                                ${officialCategoryPath
+                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
+                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
+                                }
+                                ${!isEditing && "opacity-60 pointer-events-none"}
+                            `}
+                        >
+                            <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${officialCategoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
+                                    {officialCategoryPath || "Selecionar categoria..."}
+                                </span>
+                                {officialCategoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
+                            </div>
+
+                            <div className={`p-2 rounded-full ${officialCategoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
+                                {officialCategoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            </div>
+                        </div>
+
+                        <MarketplaceCategoryModal
+                            isOpen={isOfficialCategoryModalOpen}
+                            onClose={() => setIsOfficialCategoryModalOpen(false)}
+                            onSelect={(category) => {
+                                manualChange("marketplace_category_id", category.id)
+                                setOfficialCategoryPath(category.path)
+                            }}
+                        />
+                    </SidebarCard>
+                )}
+
+                {!isQuickMode && (
+                    <SidebarCard>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Observações Internas</h3>
+                        <FormTextarea
+                            label="Anotações"
+                            name="notes"
+                            value={serviceData.notes}
+                            onChange={handleFieldChange}
+                            disabled={!isEditing}
+                            placeholder="Observações visíveis apenas para a equipe"
+                            className="min-h-[120px]"
+                        />
+                    </SidebarCard>
+                )}
             </div>
         </div>
     )

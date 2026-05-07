@@ -24,6 +24,8 @@ import { ServiceResourcesTab } from "./ServiceResourcesTab"
 import { ServiceStaffTab } from "./ServiceStaffTab"
 import { ServiceMarketplaceTab } from "./ServiceMarketplaceTab"
 
+import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
+
 const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes"])
 const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service"])
 
@@ -38,7 +40,7 @@ const getEmptyService = () => ({
     price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_url: "",
-    is_active: true, show_in_marketplace: false, highlight_service: false,
+    is_active: true, show_in_marketplace: true, highlight_service: false,
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
     notes: ""
@@ -74,7 +76,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
-    const { businessInfo } = usePermissions()
+    const { businessInfo: contextBusinessInfo } = usePermissions()
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const isQuick = isQuickMode(businessInfo)
 
     const partnerId = propPartnerId || selectedStore?.partner_id || ""
     const storeId = propStoreId || selectedStore?.id || ""
@@ -483,21 +487,23 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                 </div>
 
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">
-                                            Dados gerais
-                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                        </TabsTrigger>
-                                        <TabsTrigger value="resources" disabled={isLoadingDetails}>
-                                            Itens e Recursos
-                                        </TabsTrigger>
-                                        <TabsTrigger value="staff" disabled={isLoadingDetails}>
-                                            Profissionais
-                                        </TabsTrigger>
-                                        <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
-                                            Marketplace
-                                        </TabsTrigger>
-                                    </TabsList>
+                                    {!isQuick && (
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">
+                                                Dados gerais
+                                                {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                            <TabsTrigger value="resources" disabled={isLoadingDetails}>
+                                                Itens e Recursos
+                                            </TabsTrigger>
+                                            <TabsTrigger value="staff" disabled={isLoadingDetails}>
+                                                Profissionais
+                                            </TabsTrigger>
+                                            <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
+                                                Marketplace
+                                            </TabsTrigger>
+                                        </TabsList>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -515,6 +521,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             fieldErrors={fieldErrors} onFieldChange={handleFieldChange}
                                             mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages}
+                                            isQuickMode={isQuick}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />

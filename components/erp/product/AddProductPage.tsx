@@ -136,7 +136,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
         if (!isQuick) return initialProductState
         return {
             ...initialProductState,
-            show_in_marketplace: false,
+            show_in_marketplace: true,
             is_highlighted: false,
         }
     }, [initialProductState, isQuick])
@@ -522,7 +522,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 isActive: d.is_active,
                 isOnPromotion: !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
-                showInMarketplace: isQuick ? false : !!d.show_in_marketplace, // Ensure boolean
+                showInMarketplace: !!d.show_in_marketplace, // Ensure boolean
                 requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
                 primaryImageIndex: 0,
@@ -742,11 +742,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {getTabErrorCount("variations") > 0 && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                             </span>
                                         </TabsTrigger>
-                                        <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
-                                            Fornecedores
-                                            {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                        </TabsTrigger>
-                                        {productData.show_in_marketplace && (
+                                        {!isQuick && (
+                                            <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
+                                                Fornecedores
+                                                {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                        )}
+                                        {!isQuick && productData.show_in_marketplace && (
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                 Marketplace
                                                 {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}

@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
     {
         icon: HomeIcon,
         label: "Início",
-        href: "/erp/home",
+        href: "/erp/inicio",
     },
     {
         icon: GridIcon,
@@ -247,7 +247,7 @@ export function ERPSidebar() {
                 if (item.label === "Serviços" && !sellsServices) return null;
                 if (isQuick) {
                     // Quick mode navigation: simplified, no advanced modules
-                    const allowed = new Set(["Dashboard", "Vendas", "Produtos", "Serviços", "Configurações"])
+                    const allowed = new Set(["Início", "Vendas", "Produtos", "Serviços", "Configurações"])
                     if (!allowed.has(item.label)) return null
                     // Strip submenus in quick mode to avoid exposing deep routes
                     if (item.submenu) {

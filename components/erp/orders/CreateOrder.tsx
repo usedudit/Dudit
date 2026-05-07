@@ -21,9 +21,10 @@ import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
-    createFinanceAccountAction,
     getFinanceAccountsAction,
+    createFinanceAccountAction,
 } from "@/app/actions/erp/finance-accounts"
+import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -133,6 +134,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
+
+    const { businessInfo: contextBusinessInfo } = usePermissions()
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const isQuick = isQuickMode(businessInfo)
 
     // --- State ---
     const [isLoadingData, setIsLoadingData] = useState(!!editOrderId)
@@ -1088,10 +1093,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
                                     )}
-                                    <TabsTrigger value="observations">
-                                        Observações
-                                        {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
-                                    </TabsTrigger>
+                                    {!isQuick && (
+                                        <TabsTrigger value="observations">
+                                            Observações
+                                            {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                    )}
                                 </TabsList>
                             </div>
                         </div>
@@ -1169,6 +1176,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             setIsAccountModalOpen(true)
                                         }}
                                         handleSaveOrder={handleOpenPaymentModal}
+                                        isQuickMode={isQuick}
                                         salesChannelOptions={salesChannelOptions}
                                         deliveryMethodOptions={deliveryMethodOptions}
                                         deliveryStatusOptions={deliveryStatusOptions}

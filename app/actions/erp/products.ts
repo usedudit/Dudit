@@ -294,9 +294,9 @@ export async function createProductComprehensiveAction(data: {
         const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
         const isQuick = businessInfo.mode === "quick"
 
-        // Quick mode: enforce marketplace options off (server-side)
+        // Quick mode: enforce marketplace options (server-side)
         if (isQuick) {
-            data.showInMarketplace = false
+            if (data.showInMarketplace === undefined) data.showInMarketplace = true
             data.subcategoryId = null
             data.featured = false
         }
@@ -571,7 +571,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             const isQuick = businessInfo.mode === "quick"
 
             if (isQuick) {
-                data.showInMarketplace = false
+                if (data.showInMarketplace === undefined) data.showInMarketplace = true
                 data.subcategoryId = undefined
                 data.featured = false
             }

@@ -13,6 +13,7 @@ import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generat
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 const getBrasiliaTime = () => new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString()
 
@@ -101,13 +102,12 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         if (!user) return errorResponse("Não autenticado")
 
         let finalPartnerId = data.partnerId
+        const ctx = await getCurrentPartnerContext(user)
         if (!finalPartnerId) {
-            const ctx = await getCurrentPartnerContext(user)
             if (ctx?.partnerId) finalPartnerId = ctx.partnerId
             else throw new Error("Acesso negado: ID do Parceiro não pôde ser resolvido.")
         }
 
-        // await requireMinimumPlan(finalPartnerId, "crescer")
         await requirePartnerAccessWithPermission(finalPartnerId, "services", "create", user)
 
         let finalStoreId = data.storeId
@@ -119,8 +119,10 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
 
         const supabase = await getSupabaseServerClient()
         const sku = data.sku?.trim() || generateSKUBase(data.name)
+        const businessInfo = normalizeBusinessInfo(ctx?.businessInfo)
+        const isQuick = businessInfo.mode === "quick"
 
-        const serviceData = {
+        const serviceData: any = {
             partner_id: finalPartnerId,
             store_id: finalStoreId,
             name: data.name,
@@ -137,8 +139,11 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             duration_minutes: data.duration_minutes || data.durationMinutes || 60,
             buffer_minutes: data.buffer_minutes || data.bufferMinutes || 0,
             service_type: data.service_type || data.serviceType || 'in_person',
-            show_in_marketplace: data.show_in_marketplace || data.showInMarketplace || false,
+            show_in_marketplace: isQuick
+                ? (data.show_in_marketplace !== undefined ? data.show_in_marketplace : (data.showInMarketplace !== undefined ? data.showInMarketplace : true))
+                : (data.show_in_marketplace || data.showInMarketplace || false),
             highlight_service: data.highlight_service || data.highlightService || false,
+            marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,
             tags: data.tags || [],
             notes: data.notes || null,
             video_url: data.video_url || data.videoUrl || null,
@@ -239,6 +244,8 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.isActive !== undefined) payload.is_active = data.isActive
         if (data.is_active !== undefined) payload.is_active = data.is_active
         if (data.images !== undefined) payload.images = data.images
+        if (data.marketplace_category_id !== undefined) payload.marketplace_category_id = data.marketplace_category_id
+        if (data.marketplaceCategoryId !== undefined) payload.marketplace_category_id = data.marketplaceCategoryId
 
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)

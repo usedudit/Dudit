@@ -225,6 +225,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 availabilityUnit: item.products?.availability_unit || "Minutos",
             }))
 
+    const getDeliveryLabel = (partnerData: any) => {
+        const settings = partnerData.deliverySettings
+        if (!settings) return "A combinar"
+        if (settings.is_delivery_enabled === false) return "Apenas retirada"
+        const fee = Number(settings.base_fee || 0)
+        return fee > 0 ? formatCurrency(fee) : "Grátis"
+    }
+
     const multiplePartners = Object.keys(itemsByPartner).length > 1
 
     return (
@@ -366,7 +374,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                         value={itemQty}
                                                                                         onChange={(val) => updateQty(item.id, val, itemQty)}
                                                                                         disabled={loading === item.id}
-                                                                                        size="sm"
                                                                                     />
                                                                                     <span className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item) * itemQty)}</span>
                                                                                 </div>
@@ -431,9 +438,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                     <span className="text-brand-inactive-text">Total dos itens</span>
                                                                     <span className="font-semibold">{formatCurrency(partnerSelectedTotal)}</span>
                                                                 </div>
-                                                                <div className="flex justify-between items-center text-sm">
+                                                                 <div className="flex justify-between items-center text-sm">
                                                                     <span className="text-brand-inactive-text">Entrega</span>
-                                                                    <span className="text-brand-green font-semibold">Grátis</span>
+                                                                    <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
                                                                 </div>
                                                                 <div className="h-[1px] bg-gray-100 w-full" />
                                                                 <div className="flex justify-between items-center text-base font-bold text-brand-dark">
@@ -492,7 +499,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 </div>
                                                                 <div className="flex justify-between items-center text-sm font-medium">
                                                                     <span className="text-brand-inactive-text">Entrega</span>
-                                                                    <span className="text-brand-green font-semibold">Grátis</span>
+                                                                    <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
                                                                 </div>
                                                                 <div className="h-[1px] bg-gray-100 w-full" />
                                                                 <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">

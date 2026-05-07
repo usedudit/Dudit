@@ -34,7 +34,8 @@ async function _getMarketplaceProductBase(id: string) {
         id, store_name, store_description, rating, user_id, 
         store_image_url, max_installments, interest_rate_percent,
         mp_user_id, mp_public_key, opening_hours,
-        addresses(city, state)
+        addresses(city, state),
+        payment_methods(*)
       )
     `)
     .eq("id", id)
