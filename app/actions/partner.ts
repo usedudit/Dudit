@@ -116,7 +116,9 @@ export async function createPartnerAction(data: CreatePartnerData) {
           insertData.latitude = coords.lat
           insertData.longitude = coords.lng
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("[createPartnerAction] Geocoding failed:", e)
+      }
     }
 
     const { data: partner, error: partnerError } = await supabaseAdmin
@@ -326,7 +328,9 @@ export async function updatePartnerAction(
         updateData.latitude = coords.lat
         updateData.longitude = coords.lng
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("[updatePartnerAction] Geocoding failed:", e)
+    }
   }
 
   const { error } = await supabase.from("partners").update(updateData).eq("id", partnerId)

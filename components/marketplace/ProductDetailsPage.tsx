@@ -14,15 +14,13 @@ import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator }
 import { formatCurrency } from "@/lib/utils";
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
-import dynamic from "next/dynamic"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
-import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
-import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
 
 interface ProductDetailsPageClientProps {
   product: any
@@ -120,9 +118,7 @@ export function ProductDetailsPageClient({
   const [showQuantityModal, setShowQuantityModal] = useState(false)
   const [customQuantity, setCustomQuantity] = useState("")
   const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
-  const [deliveryFeeValue, setDeliveryFeeValue] = useState<number | null>(null)
-  const [deliveryQuoteError, setDeliveryQuoteError] = useState<string | null>(null)
-  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false)
+
 
   const galleryContainerRef = useRef<HTMLDivElement>(null)
   const reviewsRef = useRef<HTMLDivElement>(null)
@@ -260,26 +256,7 @@ export function ProductDetailsPageClient({
     }
   }, [partner.id])
 
-  // Fetch Delivery Quote
-  useEffect(() => {
-    if (userProfile?.address && partner.id) {
-      setIsCalculatingShipping(true)
-      quoteDeliveryFeeAction({
-        partnerId: partner.id,
-        destinationAddress: userProfile.address
-      }).then((res: any) => {
-        if (res.success) {
-          setDeliveryFeeValue(res.fee)
-          setDeliveryQuoteError(null)
-        } else {
-          setDeliveryQuoteError(res.error)
-          setDeliveryFeeValue(null)
-        }
-      }).finally(() => {
-        setIsCalculatingShipping(false)
-      })
-    }
-  }, [userProfile?.address, partner.id])
+
 
   const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
     products: [{
@@ -606,15 +583,10 @@ export function ProductDetailsPageClient({
                   )}
                 </div>
                 <div className="text-right">
-                  {isCalculatingShipping ? (
-                    <p className="text-xs text-brand-inactive-text">Calculando...</p>
-                  ) : deliveryFeeValue !== null ? (
-                    <p className="text-sm font-bold text-brand-dark">{deliveryFeeValue === 0 ? "Grátis" : formatMoney(deliveryFeeValue)}</p>
-                  ) : deliveryQuoteError ? (
-                    <p className="text-xs text-red-500 font-medium">Não disponível para este endereço</p>
-                  ) : (
-                    <p className="text-sm font-bold text-brand-dark">A combinar</p>
-                  )}
+                  {(() => {
+                    const fee = Number(deliveryConfig?.settings?.baseFee || 0)
+                    return <p className={`text-sm font-bold ${fee > 0 ? "text-brand-dark" : "text-brand-green"}`}>{fee > 0 ? formatMoney(fee) : "Grátis"}</p>
+                  })()}
                 </div>
               </div>
             )}

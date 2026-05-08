@@ -236,11 +236,6 @@ export function CheckoutPageClient() {
         if (sessionData) {
             setFormData(prev => ({ ...prev, paymentMethod: partnerInfo.paymentMethods?.[0] || "cash" }))
             setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
-
-            // Inicializa taxa de entrega com o que veio do carrinho (base fee)
-            if (sessionData.deliverySettings) {
-                setDeliveryFee(Number(sessionData.deliverySettings.base_fee || 0))
-            }
         }
     }, [sessionData])
 
@@ -253,16 +248,8 @@ export function CheckoutPageClient() {
                 setDeliveryPlanEnabled(config.capability.deliveryEnabled)
                 setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
                 setDeliverySettings(config.settings)
-                // Atualiza o deliveryFee com o baseFee real do servidor
-                const serverBaseFee = Number(config.settings.baseFee || 0)
-                if (serverBaseFee > 0 && !isPickup) {
-                    setDeliveryFee(serverBaseFee)
-                }
                 if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
                     setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
-                } else if (selectedAddressId) {
-                    // Se entrega habilitada e tem endereço, default para entrega
-                    setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
                 }
             })()
         return () => { active = false }
@@ -408,6 +395,13 @@ export function CheckoutPageClient() {
     const isPickup = formData.deliveryType === "pickup"
     const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
 
+    // Auto-switch to delivery mode when user has a saved address AND delivery is enabled
+    useEffect(() => {
+        if (canUseDelivery && selectedAddressId && formData.deliveryAddress) {
+            setFormData((prev) => prev.deliveryType === "pickup" ? { ...prev, deliveryType: "delivery" } : prev)
+        }
+    }, [canUseDelivery, selectedAddressId, formData.deliveryAddress])
+
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
     const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
     const checkoutTotalWithDelivery = checkoutBaseTotal + (isPickup ? 0 : deliveryFee)
@@ -457,9 +451,7 @@ export function CheckoutPageClient() {
     useEffect(() => {
         let active = true
         if (!partnerId || isPickup || !formData.deliveryAddress || !canUseDelivery) {
-            // Se não for entrega ou não tiver endereço, volta para o base_fee ou 0
-            const baseFee = Number(sessionData?.deliverySettings?.base_fee || deliverySettings?.baseFee || 0)
-            setDeliveryFee(isPickup ? 0 : baseFee)
+            setDeliveryFee(0)
             setDeliveryDistanceKm(null)
             setDeliveryBreakdown(null)
             setDeliveryQuoteLoading(false)
@@ -484,8 +476,8 @@ export function CheckoutPageClient() {
                 })
             } else {
                 setDeliveryError(quote.error)
-                // Mantém o base_fee como fallback em caso de erro na cotação detalhada
-                const baseFee = Number(sessionData?.deliverySettings?.base_fee || deliverySettings?.baseFee || 0)
+                // Fallback to baseFee from server config
+                const baseFee = Number(deliverySettings?.baseFee || 0)
                 setDeliveryFee(baseFee)
                 setDeliveryDistanceKm(null)
                 setDeliveryBreakdown(null)
