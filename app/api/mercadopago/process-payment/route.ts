@@ -554,6 +554,7 @@ async function handler(request: NextRequest) {
     const successResponse = {
       success: true,
       orderId: newOrder.id,
+      orderNumber: newOrder.order_number,
       paymentStatus: paymentStatus === "approved" ? "approved" : paymentStatus,
       paymentMethod: paymentFormData.payment_method_id,
       pixData: pixData,

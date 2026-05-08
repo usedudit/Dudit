@@ -75,6 +75,8 @@ export function PaymentWrapper({
     const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect">(
         useMercadoPago && !initialPixData && !initialBoletoData ? "brick" : (initialPixData ? "pix" : initialBoletoData ? "boleto" : "success")
     )
+    const [actualOrderId, setActualOrderId] = useState<string | null>(null)
+    const [actualOrderNumber, setActualOrderNumber] = useState<string | null>(null)
     const [fatalError, setFatalError] = useState<string | null>(null)
     const [pixData, setPixData] = useState(initialPixData)
     const [boletoData, setBoletoData] = useState(initialBoletoData)
@@ -297,6 +299,9 @@ export function PaymentWrapper({
                 },
             })
 
+            if (responseData.orderId) setActualOrderId(responseData.orderId)
+            if (responseData.orderNumber) setActualOrderNumber(responseData.orderNumber)
+
             const status = responseData.paymentStatus || responseData.status
             const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
 
@@ -427,8 +432,8 @@ export function PaymentWrapper({
                     </Link>
                     {!paymentConfirmed && (
                         <div className="flex items-center text-sm font-medium text-white tracking-wide">
-                            {orderNumber && !orderNumber.includes('temp') ? (
-                                <>Pedido #{orderNumber}</>
+                            {(actualOrderNumber || orderNumber) && !(actualOrderNumber || orderNumber)?.includes('temp') ? (
+                                <>Pedido #{actualOrderNumber || orderNumber}</>
                             ) : (
                                 <>Pedido em {sellerName || "Loja"}</>
                             )}
@@ -669,7 +674,7 @@ export function PaymentWrapper({
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/HappyDino.png"
                                     imageAlt="Sucesso"
-                                    title={`Pedido Confirmado! #${orderNumber || orderId.slice(0, 8)}`}
+                                    title={`Pedido Confirmado! #${actualOrderNumber || actualOrderId?.slice(0, 8) || (orderNumber && !orderNumber.includes('temp') ? orderNumber : orderId.slice(0, 8))}`}
                                     subtitle="O vendedor já foi notificado e está preparando tudo para você. Não se preocupe, o Dino te avisa quando o pedido sair para entrega!"
                                 />
                             </div>

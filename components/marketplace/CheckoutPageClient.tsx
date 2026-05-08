@@ -768,7 +768,11 @@ export function CheckoutPageClient() {
                         deliveryFee: isPickup ? 0 : deliveryFee,
                     },
                     sellerName: sessionData?.partnerInfo?.store_name || "Loja",
-                    mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || ""
+                    mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || "",
+                    useMercadoPago: true,
+                    partnerId: partnerId,
+                    userEmail: userEmail,
+                    userName: userName
                 })
                 setShowPixModal(true)
                 setIsLoading(false)

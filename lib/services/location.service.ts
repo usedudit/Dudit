@@ -88,9 +88,46 @@ export function buildBoundingBox(center: LocationPoint, radiusKm: number) {
 }
 
 export async function geocodeAddress(address: string): Promise<GeocodeResult> {
-    const query = String(address || "").trim()
-    if (!query) return null
+  const raw = String(address || "").trim()
+  if (!raw) return null
 
+  // Nominatim free-text search fails when the query contains a Brazilian CEP
+  // (e.g. "17783-124" or "01304000") or dashes between city/state ("Lucélia - SP").
+  // Sanitize: strip CEP, normalize dashes, remove "BR"/"Brazil" noise.
+  function sanitize(addr: string): string {
+    return addr
+      .replace(/\b\d{5}-?\d{3}\b/g, "")   // strip CEP patterns (XXXXX-XXX or XXXXXXXX)
+      .replace(/\s*-\s*/g, ", ")            // "Lucélia - SP" => "Lucélia, SP"
+      .replace(/,\s*BR\b/gi, "")            // strip trailing ", BR"
+      .replace(/,\s*Brazil\b/gi, "")        // strip trailing ", Brazil"
+      .replace(/,\s*,/g, ",")              // collapse empty segments
+      .replace(/\s{2,}/g, " ")             // collapse whitespace
+      .replace(/,\s*$/g, "")              // strip trailing comma
+      .trim()
+  }
+
+  const query = sanitize(raw)
+  if (!query) return null
+
+  const result = await _geocodeFetch(query)
+  if (result) return result
+
+  // Fallback: retry without the street number (Nominatim is more flexible with just street + city)
+  const simplified = query
+    .replace(/,\s*\d+\s*,/, ",")          // remove ", 286," style numbers
+    .replace(/,\s*S\/N\s*,/i, ",")        // remove ", S/N,"
+    .replace(/,\s*,/g, ",")
+    .trim()
+
+  if (simplified !== query) {
+    console.log(`[Geocode] Retrying with simplified: "${simplified}"`)
+    return _geocodeFetch(simplified)
+  }
+
+  return null
+}
+
+async function _geocodeFetch(query: string): Promise<GeocodeResult> {
     const params = new URLSearchParams({
         q: query,
         format: "jsonv2",
