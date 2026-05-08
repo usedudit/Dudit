@@ -191,6 +191,8 @@ interface ItemCardProps {
             store_avatar?: string
             latitude?: number | null
             longitude?: number | null
+            distance_km?: number | null
+            distance_km_formatted?: string | null
         }
     }
     userCoords?: { lat: number; lng: number } | null
