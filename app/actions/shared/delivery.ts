@@ -2,6 +2,7 @@
 
 import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { calculateDeliveryFee, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
@@ -29,7 +30,7 @@ function mapRuleRow(row: any): DeliveryFeeRule {
 }
 
 export async function getPartnerDeliveryConfigAction(partnerId: string) {
-  const supabase = await getSupabaseServerClient()
+  const supabase = getAdminClient()
   const plan = await getPartnerPlan(partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
 
@@ -133,7 +134,7 @@ export async function quoteDeliveryFeeAction(input: {
   currentTimeIso?: string
   freeDeliveryCoupon?: boolean
 }) {
-  const supabase = await getSupabaseServerClient()
+  const supabase = getAdminClient()
 
   const plan = await getPartnerPlan(input.partnerId)
   const capability = resolveDeliveryPlanCapability(plan.slug)
