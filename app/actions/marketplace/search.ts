@@ -258,7 +258,7 @@ async function _searchMarketplaceInternal(
                 promises.push(
                     supabase.from("products").select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
-                        partners(id, store_name, store_image_url, addresses(city, state)),
+                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
                     .in("id", produtosIds)
@@ -270,7 +270,7 @@ async function _searchMarketplaceInternal(
                 promises.push(
                     supabase.from("services").select(`
                         id, name, description, price, images, rating, category, created_at,
-                        partners(id, store_name, store_image_url, addresses(city, state))
+                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
                     `)
                     .in("id", servicosIds)
                     .eq("is_active", true)
@@ -279,7 +279,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, rating, created_at, addresses(city, state)
+                        id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)
                     `).in("id", lojasIds)
                 )
             }
@@ -300,6 +300,7 @@ async function _searchMarketplaceInternal(
                         partners: {
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                            latitude: item.latitude, longitude: item.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                         }, created_at: item.created_at
                     }
@@ -309,6 +310,7 @@ async function _searchMarketplaceInternal(
                 const partner = rawPartner ? {
                     ...rawPartner,
                     store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                     city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                 } : null
 
@@ -382,7 +384,7 @@ async function searchMarketplacePostgresFTS(
 
     try {
         if (type === 'tudo' || type === 'vitrines') {
-            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, rating, addresses(city, state)`).eq("is_active", true)
+            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)`).eq("is_active", true)
             let reqJoined = req
             if (qRaw) {
                 let orFilter = `store_name.ilike.%${qRaw}%,store_description.ilike.%${qRaw}%,store_name.ilike.%${qClean}%`
@@ -405,6 +407,7 @@ async function searchMarketplacePostgresFTS(
                     partners: {
                         id: item.id, store_name: item.store_name,
                         store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                        latitude: item.latitude, longitude: item.longitude,
                         city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                     }
                 })))
@@ -414,7 +417,7 @@ async function searchMarketplacePostgresFTS(
         if (type === 'tudo' || type === 'produtos') {
             let req = supabase.from("products").select(`
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
-                partners(id, store_name, store_image_url, addresses(city, state)),
+                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
             `).eq("is_active", true).eq("show_in_marketplace", true)
             let reqJoined = req
@@ -430,6 +433,7 @@ async function searchMarketplacePostgresFTS(
                     const partner = rawPartner ? {
                         ...rawPartner,
                         store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                        latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                         city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                     } : null
                     const variantFallback = extractFirstVariantFallback((item as any).product_variants, Number(item.price))
@@ -442,7 +446,7 @@ async function searchMarketplacePostgresFTS(
         if (type === 'tudo' || type === 'servicos') {
             let req = supabase.from("services").select(`
                 id, name, description, price, images, rating, category, created_at,
-                partners(id, store_name, store_image_url, addresses(city, state))
+                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
             `).eq("is_active", true)
             let reqJoined = req
             if (qRaw) {
@@ -457,6 +461,7 @@ async function searchMarketplacePostgresFTS(
                     const partner = rawPartner ? {
                         ...rawPartner,
                         store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                        latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                         city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                     } : null
                     return { ...item, itemType: 'servico', partners: partner }

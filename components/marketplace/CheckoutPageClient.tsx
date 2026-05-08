@@ -27,6 +27,7 @@ import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payme
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 
 interface ProductItem {
     id: string
@@ -227,6 +228,8 @@ export function CheckoutPageClient() {
         timeAdjustmentTotal: number
     } | null>(null)
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
+    const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
+    const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
 
 
     useEffect(() => {
@@ -250,12 +253,38 @@ export function CheckoutPageClient() {
                 setDeliveryPlanEnabled(config.capability.deliveryEnabled)
                 setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
                 setDeliverySettings(config.settings)
+                // Atualiza o deliveryFee com o baseFee real do servidor
+                const serverBaseFee = Number(config.settings.baseFee || 0)
+                if (serverBaseFee > 0 && !isPickup) {
+                    setDeliveryFee(serverBaseFee)
+                }
                 if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
                     setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
                 } else if (selectedAddressId) {
                     // Se entrega habilitada e tem endereço, default para entrega
                     setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
                 }
+            })()
+        return () => { active = false }
+    }, [partnerId])
+
+    // Carrega métodos de pagamento reais do vendedor
+    useEffect(() => {
+        let active = true
+        if (!partnerId) return
+        setStorefrontMethodsLoading(true)
+            ; (async () => {
+                const result = await getStorefrontPaymentMethodsAction(partnerId)
+                if (!active) return
+                if (result.success && result.methods.length > 0) {
+                    setStorefrontMethods(result.methods)
+                    // Se o método atual não está entre os disponíveis, seleciona o primeiro
+                    const availableTypes = result.methods.map((m) => m.type)
+                    if (!availableTypes.includes(formData.paymentMethod as any)) {
+                        setFormData((prev) => ({ ...prev, paymentMethod: result.methods[0].type, installments: 1 }))
+                    }
+                }
+                setStorefrontMethodsLoading(false)
             })()
         return () => { active = false }
     }, [partnerId])
@@ -389,12 +418,22 @@ export function CheckoutPageClient() {
         cash: "Dinheiro",
         other: "Outros",
     }
-    const paymentMethods = (partnerInfo.paymentMethods?.length ? partnerInfo.paymentMethods : ["cash", "pix"])
-        .map((method: string) => ({
-            value: method,
-            label: paymentTypeLabelMap[method] || method,
+    // Usa métodos reais carregados do servidor; fallback para a sessão apenas durante o loading
+    const paymentMethods = storefrontMethods.length > 0
+        ? storefrontMethods.map((m) => ({
+            value: m.type,
+            label: paymentTypeLabelMap[m.type] || m.type,
         }))
+        : (partnerInfo.paymentMethods?.length ? partnerInfo.paymentMethods : ["cash", "pix"])
+            .map((method: any) => {
+                const type = typeof method === "string" ? method : (method?.type || method?.payment_type || "cash")
+                return {
+                    value: type,
+                    label: paymentTypeLabelMap[type] || type,
+                }
+            })
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+    const selectedStorefrontMethod = storefrontMethods.find((m) => m.type === formData.paymentMethod) || null
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
         paymentOption === "traditional" &&
@@ -583,9 +622,9 @@ export function CheckoutPageClient() {
     ) : null
     const shouldShowInstallments = paymentOption === "traditional"
         && formData.paymentMethod === "credit_card"
-        && Number(paymentPreview?.maxInstallments || 1) > 1
+        && (Number(paymentPreview?.maxInstallments || selectedStorefrontMethod?.maxInstallments || 1) > 1)
     const disableCheckoutSubmit = isLoading
-        || (paymentOption === "traditional" && (paymentPreviewLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
+        || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
         || (!isPickup && (deliveryQuoteLoading || !!deliveryError))
 
     const getCouponCountLabel = (count: number) => {
@@ -1256,8 +1295,19 @@ export function CheckoutPageClient() {
                                         )}
                                         <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                                             <span>Entrega</span>
-                                            <span className={(isPickup || (deliveryFee === 0 && hasFreeDeliveryCoupon)) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                                {isPickup ? "Grátis" : deliveryQuoteLoading ? "Calculando..." : (deliveryFee > 0 ? formatCurrency(deliveryFee) : (hasFreeDeliveryCoupon ? "Grátis" : (deliveryError || !formData.deliveryAddress ? "A combinar" : "Grátis")))}
+                                            <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                                                {isPickup
+                                                    ? "Grátis"
+                                                    : deliveryQuoteLoading
+                                                        ? "Calculando..."
+                                                        : deliveryFee > 0
+                                                            ? formatCurrency(deliveryFee)
+                                                            : hasFreeDeliveryCoupon
+                                                                ? "Grátis"
+                                                                : !canUseDelivery || deliveryError || !formData.deliveryAddress
+                                                                    ? "A combinar"
+                                                                    : "Grátis"
+                                                }
                                             </span>
                                         </div>
                                         {!isPickup && deliveryBreakdown && (

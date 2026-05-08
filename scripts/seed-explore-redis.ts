@@ -79,7 +79,7 @@ async function seedRedis() {
         .from("products")
         .select(`
             id, name, description, price, promotional_price, images, rating, category, created_at,
-            partners(id, store_name, store_image_url, addresses(city, state)),
+            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("is_active", true)
@@ -91,6 +91,7 @@ async function seedRedis() {
             const partner = rawPartner ? {
                 ...rawPartner,
                 store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                 city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
             } : null
             const variantFallback = extractFirstVariantFallback((item as any).product_variants)
@@ -119,7 +120,7 @@ async function seedRedis() {
         .from("services")
         .select(`
             id, name, description, price, images, rating, category, created_at,
-            partners(id, store_name, store_image_url, addresses(city, state))
+            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
         `)
         .eq("is_active", true)
 
@@ -129,6 +130,7 @@ async function seedRedis() {
             const partner = rawPartner ? {
                 ...rawPartner,
                 store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                 city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
             } : null
             
@@ -150,7 +152,7 @@ async function seedRedis() {
     console.log("Buscando Vitrines...")
     const { data: vitrines } = await supabase
         .from("partners")
-        .select(`id, store_name, store_description, store_image_url, rating, created_at, addresses(city, state)`)
+        .select(`id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)`)
         .eq("is_active", true)
 
     if (vitrines) {
@@ -162,6 +164,7 @@ async function seedRedis() {
                 partners: {
                     id: item.id, store_name: item.store_name,
                     store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    latitude: item.latitude, longitude: item.longitude,
                     city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                 }
             }

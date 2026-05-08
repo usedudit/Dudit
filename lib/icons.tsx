@@ -11,6 +11,7 @@ import {
     Notification01Icon,
     DeliveryBox01Icon,
     ShoppingCart01Icon,
+    Shield01Icon,
     Tag01Icon,
     User03Icon,
     UserMultiple02Icon,
@@ -187,6 +188,7 @@ export const SaveIcon = CreateIcon(FloppyDiskIcon)
 export const UploadIcon = CreateIcon(ImageUploadIcon)
 export const ExportFileIcon = CreateIcon(FileUploadIcon)
 export const TrendingUpIcon = CreateIcon(AnalyticsIcon)
+export const ShieldIcon = CreateIcon(Shield01Icon)
 
 // ============================
 // STATUS / FEEDBACK
