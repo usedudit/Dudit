@@ -20,13 +20,14 @@ import { TwoFactorView } from "./TwoFactorView"
 interface UserProfilePageProps {
     userId: string
     profile: any
+    addresses: any[]
     initialFullName?: string
     email: string
     hasPassword: boolean
     authProvider: string
 }
 
-export function UserProfilePage({ userId, profile, initialFullName, email, hasPassword, authProvider }: UserProfilePageProps) {
+export function UserProfilePage({ userId, profile, addresses: initialAddresses, initialFullName, email, hasPassword, authProvider }: UserProfilePageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -58,6 +59,7 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
+    const [userAddresses, setUserAddresses] = useState<any[]>(initialAddresses || [])
     const [error, setError] = useState<string | null>(null)
     const [editing, setEditing] = useState<Record<EditField, boolean>>({
         name: false, cpf: false, phone: false, password: false, address: false,
@@ -388,15 +390,16 @@ export function UserProfilePage({ userId, profile, initialFullName, email, hasPa
                             <AddressView
                                 key="address"
                                 navigate={navigate}
-                                addressData={addressData}
-                                setAddressData={setAddressData}
-                                editing={editing}
-                                setEdit={setEdit}
+                                userId={userId}
+                                addresses={userAddresses}
+                                setAddresses={setUserAddresses}
                                 isLoading={isLoading}
+                                setIsLoading={setIsLoading}
                                 error={error}
+                                setError={setError}
                                 success={success}
-                                handleSaveAddress={handleSaveAddress}
-                                formattedAddress={formattedAddress}
+                                setSuccess={setSuccess}
+                                clearMessages={clearMessages}
                             />
                         )}
                         {currentView === "seguranca" && (

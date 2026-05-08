@@ -438,11 +438,18 @@ export async function updatePartnerAction(partnerId: string, data: any) {
 
     // GEOCODING: atualiza latitude/longitude no partner baseado no novo endereço
     if (addressData.street && addressData.city) {
-      const addressString = `${addressData.street}, ${addressData.number || ''}, ${addressData.city} - ${addressData.state || ''}, Brazil, ${addressData.zip_code || ''}`
+      const addressString = [
+        addressData.street, addressData.number,
+        addressData.city, addressData.state
+      ].filter(Boolean).join(", ")
       try {
         const coords = await geocodeAddress(addressString)
         if (coords) {
           await supabase.from('partners').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', partnerId)
+          // Also persist coordinates to the addresses record
+          if (currentAddress) {
+            await supabase.from('addresses').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', currentAddress.id)
+          }
         }
       } catch (e) {
         console.error("Geocoding exception:", e)

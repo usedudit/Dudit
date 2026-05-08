@@ -8,14 +8,15 @@ export default async function ProfilePage() {
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
 
-  const [profileResponse, addressResponse, passwordInfo] = await Promise.all([
+  const [profileResponse, addressesResponse, passwordInfo] = await Promise.all([
     supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }).limit(5),
     getPasswordSecurityInfo(),
   ])
 
   const profile = profileResponse.data
-  const address = addressResponse.data
+  const addresses = addressesResponse.data || []
+  const defaultAddress = addresses[0] || null
 
   // Decrypt CPF for display if it exists
   let decryptedCpf = ""
@@ -32,13 +33,14 @@ export default async function ProfilePage() {
   const profileForClient = profile ? {
     ...profile,
     cpf: decryptedCpf,
-    ...address,
-  } : (address ? { user_id: user.id, ...address } : null)
+    ...defaultAddress,
+  } : (defaultAddress ? { user_id: user.id, ...defaultAddress } : null)
 
   return (
     <UserProfilePage
       userId={user.id}
       profile={profileForClient}
+      addresses={addresses}
       initialFullName={profile?.full_name || user.user_metadata?.full_name}
       email={user.email!}
       hasPassword={passwordInfo.hasPassword}

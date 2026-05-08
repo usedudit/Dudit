@@ -109,19 +109,39 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
   const query = sanitize(raw)
   if (!query) return null
 
+  // Attempt 1: full sanitized query
   const result = await _geocodeFetch(query)
   if (result) return result
 
-  // Fallback: retry without the street number (Nominatim is more flexible with just street + city)
-  const simplified = query
+  // Attempt 2: retry without the street number (Nominatim is more flexible with just street + city)
+  const withoutNumber = query
     .replace(/,\s*\d+\s*,/, ",")          // remove ", 286," style numbers
     .replace(/,\s*S\/N\s*,/i, ",")        // remove ", S/N,"
     .replace(/,\s*,/g, ",")
     .trim()
 
-  if (simplified !== query) {
-    console.log(`[Geocode] Retrying with simplified: "${simplified}"`)
-    return _geocodeFetch(simplified)
+  if (withoutNumber !== query) {
+    console.log(`[Geocode] Retry without number: "${withoutNumber}"`)
+    const r2 = await _geocodeFetch(withoutNumber)
+    if (r2) return r2
+  }
+
+  // Attempt 3: strip the neighborhood segment (e.g. "Lado Sul" confuses Nominatim)
+  // Pattern: "Street, Neighborhood, City, State" → "Street, City, State"
+  const parts = (withoutNumber || query).split(",").map(s => s.trim()).filter(Boolean)
+  if (parts.length >= 4) {
+    // Remove the segment right after the street (index 1 = neighborhood)
+    const withoutNeighborhood = [parts[0], ...parts.slice(2)].join(", ")
+    console.log(`[Geocode] Retry without neighborhood: "${withoutNeighborhood}"`)
+    const r3 = await _geocodeFetch(withoutNeighborhood)
+    if (r3) return r3
+  }
+
+  // Attempt 4: just city + state (last resort)
+  if (parts.length >= 2) {
+    const cityState = parts.slice(-2).join(", ")
+    console.log(`[Geocode] Retry with city+state only: "${cityState}"`)
+    return _geocodeFetch(cityState)
   }
 
   return null

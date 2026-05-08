@@ -69,7 +69,7 @@ export async function updateProfileAction(data: {
   const supabase = await getSupabaseServerClient()
   const supabaseAdmin = getAdminClient()
 
-  const { createAddressAction } = await import("./shared/addresses")
+
 
   const sanitizedData = {
     fullName: data.fullName ? sanitizeInput(data.fullName, 100) : undefined,
@@ -182,22 +182,44 @@ export async function updateProfileAction(data: {
 
   // Se houver dados de endereço, criar/atualizar através da tabela addresses
   if (sanitizedData.street || sanitizedData.city) {
-    const addressResult = await createAddressAction({
-      entityId: userId,
-      entityType: "user",
-      zipCode: sanitizedData.zipCode || "",
-      street: sanitizedData.street || "",
-      number: sanitizedData.number || "",
-      complement: sanitizedData.complement,
-      neighborhood: sanitizedData.neighborhood || "",
-      city: sanitizedData.city || "",
-      state: sanitizedData.state || "",
-      isDefault: true,
-      csrf_token: data.csrf_token,
-    })
+    const { createAddressAction, updateAddressAction, getAddressesAction } = await import("./shared/addresses")
 
-    if (addressResult.error) {
-      return { error: "Erro ao atualizar endereço" }
+    // Check if user already has a default address → update it instead of duplicating
+    const existingAddresses = await getAddressesAction(userId, "user")
+    const defaultAddress = existingAddresses?.addresses?.find((a: any) => a.is_default) || existingAddresses?.addresses?.[0]
+
+    if (defaultAddress) {
+      const addressResult = await updateAddressAction({
+        addressId: defaultAddress.id,
+        entityId: userId,
+        entityType: "user",
+        zipCode: sanitizedData.zipCode || "",
+        street: sanitizedData.street || "",
+        number: sanitizedData.number || "",
+        complement: sanitizedData.complement,
+        neighborhood: sanitizedData.neighborhood || "",
+        city: sanitizedData.city || "",
+        state: sanitizedData.state || "",
+        isDefault: true,
+        csrf_token: data.csrf_token,
+      })
+      if (addressResult.error) return { error: "Erro ao atualizar endereço" }
+    } else {
+      const addressResult = await createAddressAction({
+        entityId: userId,
+        entityType: "user",
+        zipCode: sanitizedData.zipCode || "",
+        street: sanitizedData.street || "",
+        number: sanitizedData.number || "",
+        complement: sanitizedData.complement,
+        neighborhood: sanitizedData.neighborhood || "",
+        city: sanitizedData.city || "",
+        state: sanitizedData.state || "",
+        isDefault: true,
+        addressType: "casa",
+        csrf_token: data.csrf_token,
+      })
+      if (addressResult.error) return { error: "Erro ao atualizar endereço" }
     }
   }
 

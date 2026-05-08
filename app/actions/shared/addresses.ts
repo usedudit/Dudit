@@ -196,6 +196,18 @@ export async function createAddressAction(data: {
     await supabase.from("addresses").update({ is_default: false }).match(whereClause)
   }
 
+  // Enforce max 5 addresses per user
+  if (data.entityType === "user") {
+    const { count } = await supabase
+      .from("addresses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", data.entityId)
+
+    if (count != null && count >= 5) {
+      return { error: "Limite de 5 endereços atingido. Remova um endereço antes de adicionar outro." }
+    }
+  }
+
   // Insert novo endereço
   const { data: address, error } = await supabase
     .from("addresses")
@@ -214,6 +226,105 @@ export async function createAddressAction(data: {
   }
 
   // Limpa Cache
+  await revalidateAddresses(data.entityType, data.entityId)
+
+  return { success: true, address }
+}
+
+export async function updateAddressAction(data: {
+  addressId: string
+  entityId: string
+  entityType: AddressType
+  zipCode?: string
+  street?: string
+  number?: string
+  complement?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  country?: string
+  addressType?: string
+  isDefault?: boolean
+  csrf_token?: string
+}) {
+  await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+
+  const { requireCSRF, extractCSRFTokenFromObject } = await import(
+    "@/lib/security/csrf-action-wrapper"
+  )
+  const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
+  const csrfValidation = await requireCSRF(csrfToken)
+  if (!csrfValidation.valid) return { error: csrfValidation.error }
+
+  const user = await requireUser()
+  await verifyEntityOwnership(user.id, data.entityId, data.entityType)
+
+  const supabase = await getSupabaseServerClient()
+
+  const updateData: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (data.zipCode !== undefined) updateData.zip_code = data.zipCode
+  if (data.street !== undefined) updateData.street = data.street
+  if (data.number !== undefined) updateData.number = data.number
+  if (data.complement !== undefined) updateData.complement = data.complement || null
+  if (data.neighborhood !== undefined) updateData.neighborhood = data.neighborhood
+  if (data.city !== undefined) updateData.city = data.city
+  if (data.state !== undefined) updateData.state = data.state
+  if (data.country !== undefined) updateData.country = data.country
+  if (data.addressType !== undefined) updateData.address_type = data.addressType
+
+  // Geocode the updated address
+  const street = data.street ?? ""
+  const city = data.city ?? ""
+  if (street || city) {
+    const fullAddressString = [
+      data.street, data.number, data.neighborhood,
+      data.city, data.state, data.country || "BR"
+    ].filter(Boolean).join(", ")
+
+    try {
+      const coords = await geocodeAddress(fullAddressString)
+      if (coords) {
+        updateData.latitude = coords.lat
+        updateData.longitude = coords.lng
+      }
+    } catch (e) {
+      console.error("Geocoding failed for address update:", fullAddressString, e)
+    }
+  }
+
+  // Handle is_default change
+  if (data.isDefault) {
+    const whereClause: any = {}
+    if (data.entityType === "user") whereClause.user_id = data.entityId
+    else if (data.entityType === "partner") whereClause.partner_id = data.entityId
+    else if (data.entityType === "supplier") whereClause.supplier_id = data.entityId
+    else if (data.entityType === "customer") whereClause.customer_id = data.entityId
+    else if (data.entityType === "store") whereClause.store_id = data.entityId
+
+    await supabase.from("addresses").update({ is_default: false }).match(whereClause)
+    updateData.is_default = true
+  }
+
+  const { data: address, error } = await supabase
+    .from("addresses")
+    .update(updateData)
+    .eq("id", data.addressId)
+    .select()
+    .single()
+
+  if (error) return { error: error.message }
+
+  // Keep partner coordinates synchronized
+  if (data.entityType === "partner" && updateData.latitude != null && updateData.longitude != null) {
+    await supabase
+      .from("partners")
+      .update({ latitude: updateData.latitude, longitude: updateData.longitude })
+      .eq("id", data.entityId)
+  }
+
   await revalidateAddresses(data.entityType, data.entityId)
 
   return { success: true, address }
