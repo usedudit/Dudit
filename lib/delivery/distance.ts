@@ -44,7 +44,7 @@ function haversineKm(a: Coords, b: Coords): number {
  * the Mapbox Geocoding API. Returns null when no match is found or the call
  * fails.
  */
-async function geocodeAddress(address: string): Promise<Coords | null> {
+export async function geocodeAddress(address: string): Promise<Coords | null> {
   if (!MAPBOX_TOKEN) return null
   const trimmed = (address || "").trim()
   if (!trimmed) return null

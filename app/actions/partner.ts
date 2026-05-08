@@ -102,8 +102,21 @@ export async function createPartnerAction(data: CreatePartnerData) {
       opening_hours: data.openingHours || defaultOpeningHours,
       store_image_url: data.storeImageUrl,
       offering_type: data.offeringType,
-      sells_products: data.offeringType === "products" || data.offeringType === "both",
       provides_services: data.offeringType === "services" || data.offeringType === "both",
+      latitude: null as number | null,
+      longitude: null as number | null,
+    }
+
+    if (data.city || data.street || data.zipCode) {
+      const fullAddressString = [data.street, data.number, data.neighborhood, data.city, data.state, "BR"].filter(Boolean).join(", ")
+      try {
+        const { geocodeAddress } = await import("@/lib/delivery/distance")
+        const coords = await geocodeAddress(fullAddressString)
+        if (coords) {
+          insertData.latitude = coords.lat
+          insertData.longitude = coords.lng
+        }
+      } catch (e) {}
     }
 
     const { data: partner, error: partnerError } = await supabaseAdmin
@@ -246,8 +259,9 @@ export async function updatePartnerAction(
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id")
+    .select("user_id, addresses(street, number, neighborhood, city, state)")
     .eq("id", partnerId)
+    .eq("addresses.is_default", true)
     .single()
 
   if (!partnerCheck || partnerCheck.user_id !== currentUser.id) {
@@ -294,6 +308,27 @@ export async function updatePartnerAction(
   if (data.inscricaoEstadual !== undefined) updateData.inscricao_estadual = data.inscricaoEstadual
   if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
+
+  if (hasAddressData) {
+    const currentAddr = (partnerCheck?.addresses as any)?.[0] || {}
+    const fullAddressString = [
+      data.street ?? currentAddr.street,
+      data.number ?? currentAddr.number,
+      data.neighborhood ?? currentAddr.neighborhood,
+      data.city ?? currentAddr.city,
+      data.state ?? currentAddr.state,
+      "BR"
+    ].filter(Boolean).join(", ")
+    
+    try {
+      const { geocodeAddress } = await import("@/lib/delivery/distance")
+      const coords = await geocodeAddress(fullAddressString)
+      if (coords) {
+        updateData.latitude = coords.lat
+        updateData.longitude = coords.lng
+      }
+    } catch (e) {}
+  }
 
   const { error } = await supabase.from("partners").update(updateData).eq("id", partnerId)
 

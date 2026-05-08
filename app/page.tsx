@@ -75,6 +75,8 @@ export default async function HomePage() {
   const userProfile = sessionData?.profile
     ? {
       full_name: sessionData.profile.full_name,
+      latitude: sessionData.profile.latitude,
+      longitude: sessionData.profile.longitude,
       address: sessionData.profile.city
         ? `${sessionData.profile.city} - ${sessionData.profile.state}`
         : null,

@@ -143,6 +143,27 @@ export async function createAddressAction(data: {
     is_default: data.isDefault || false,
   }
 
+  // 1.5 Geocode the address before saving
+  const fullAddressString = [
+    data.street,
+    data.number,
+    data.neighborhood,
+    data.city,
+    data.state,
+    data.country || "BR"
+  ].filter(Boolean).join(", ")
+
+  try {
+    const { geocodeAddress } = await import("@/lib/delivery/distance")
+    const coords = await geocodeAddress(fullAddressString)
+    if (coords) {
+      insertData.latitude = coords.lat
+      insertData.longitude = coords.lng
+    }
+  } catch (e) {
+    console.error("Geocoding failed for address:", fullAddressString, e)
+  }
+
   // Add entity reference
   if (data.entityType === "user") {
     insertData.user_id = data.entityId

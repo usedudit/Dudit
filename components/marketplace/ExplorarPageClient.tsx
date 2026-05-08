@@ -413,7 +413,10 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                                                         </Link>
                                                     )
                                                 }
-                                                return <ItemCard key={item.id} product={item as any} />
+                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                    : null
+                                                return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
                                             })}
 
                                             {/* INFINITE SCROLL LOADER */}

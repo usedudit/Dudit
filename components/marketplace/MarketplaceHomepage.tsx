@@ -65,6 +65,7 @@ export default function MarketplaceHome({ products = [], user, userProfile, cart
           title="Seus queridinhos estão aqui"
           products={recentProducts}
           seeMoreLink="/explorar"
+          userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
         />
       )}
 
@@ -73,6 +74,7 @@ export default function MarketplaceHome({ products = [], user, userProfile, cart
           title="Viu e ainda não levou?"
           products={alsoLikeProducts}
           seeMoreLink="/explorar"
+          userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
         />
       )}
 
