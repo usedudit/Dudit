@@ -4,8 +4,8 @@ import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/auth
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { calculateDeliveryFee, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
-import { calculateRouteDistanceKm } from "@/lib/delivery/distance"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
+import { calculateAddressDistance } from "@/lib/services/location.service"
 
 function mapSettingsRow(row: any): DeliverySettings {
   return {
@@ -175,7 +175,7 @@ export async function quoteDeliveryFeeAction(input: {
       return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
     }
 
-    const calculatedDistance = await calculateRouteDistanceKm(originAddress, input.destinationAddress)
+    const calculatedDistance = await calculateAddressDistance(originAddress, input.destinationAddress)
     if (calculatedDistance == null) {
       return { success: false as const, error: "Não foi possível calcular a distância de entrega." }
     }

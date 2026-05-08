@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from "react"
 import { OptimizedMapbox } from "./OptimizedMapbox"
 import { PartnerBottomSheet } from "./PartnerBottomSheet"
-import { getPartnersInBoundsAction, geocodeMissingPartnersAction, BoundingBox } from "@/app/actions/marketplace/map"
+import { getPartnersInBoundsAction, BoundingBox } from "@/app/actions/marketplace/map"
 import { Search, Map as MapIcon } from "lucide-react"
 
 interface MapPageClientProps {
@@ -49,20 +49,6 @@ export function MapPageClient({ initialUserLocation }: MapPageClientProps) {
     setCurrentBounds(bounds)
     
     if (isInitialLoad) {
-      // Background fallback para legados
-      geocodeMissingPartnersAction().then((res) => {
-         if (res.processed && res.processed > 0) {
-           // Refetch silente se geocodificou novos items legados
-           getPartnersInBoundsAction(bounds, 200).then((v) => {
-             if (v.success && v.data) {
-                const cacheKey = getCacheKey(bounds)
-                cacheRef.current.set(cacheKey, v.data)
-                setPartners(v.data)
-             }
-           })
-         }
-      })
-
       fetchPartners(bounds)
       return
     }

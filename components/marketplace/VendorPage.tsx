@@ -177,21 +177,7 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
                 let finalLat = lat
                 let finalLng = lng
 
-                // Se lat/lng estiverem vazios ou inválidos, tenta buscar as coordenadas pelo endereço (Geocoding)
-                if ((!finalLat || !finalLng || isNaN(Number(finalLat))) && address) {
-                    try {
-                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&limit=1`
-                        const res = await fetch(geocodeUrl)
-                        const data = await res.json()
-                        if (data.features && data.features.length > 0) {
-                            [finalLng, finalLat] = data.features[0].center
-                        }
-                    } catch (err) {
-                        console.warn("Geocoding failed:", err)
-                    }
-                }
-
-                // Se ainda não tivermos coordenadas, cancelamos (evita mostrar SP aleatório)
+                // Never geocode during page rendering; coordinates must already be persisted.
                 if (!finalLat || !finalLng || isNaN(Number(finalLat))) {
                     setIsMapping(false)
                     return

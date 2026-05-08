@@ -7,10 +7,6 @@ import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
-import { calculateHaversineDistance, formatDistance } from "@/lib/utils/geo";
-
-// Cache for user location to avoid repeated prompts in the same session
-let cachedUserLocation: { lat: number; lng: number } | null = null;
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -202,64 +198,7 @@ interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
   const imageUrl = getProductImageUrl(product.images)
-  const [distance, setDistance] = useState<string | null>(null)
-
-  useEffect(() => {
-    const calculateAndSetDistance = (userLat: number, userLng: number) => {
-      if (product.partners?.latitude && product.partners?.longitude) {
-        const dist = calculateHaversineDistance(
-          userLat,
-          userLng,
-          product.partners.latitude,
-          product.partners.longitude
-        )
-        setDistance(formatDistance(dist))
-      } else {
-        setDistance(null)
-      }
-    }
-
-    const detectLocation = () => {
-      // 1. Prioritize coordinates from props (user address)
-      if (userCoords?.lat && userCoords?.lng) {
-        calculateAndSetDistance(userCoords.lat, userCoords.lng)
-        return
-      }
-
-      // 2. Fallback to session cache
-      if (cachedUserLocation) {
-        calculateAndSetDistance(cachedUserLocation.lat, cachedUserLocation.lng)
-        return
-      }
-
-      // 3. Fallback to localStorage
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('user_coords') : null
-      if (stored) {
-        try {
-          const coords = JSON.parse(stored)
-          cachedUserLocation = coords
-          calculateAndSetDistance(coords.lat, coords.lng)
-          return
-        } catch (e) {}
-      }
-
-      // 4. Last resort: Browser geolocation
-      if (typeof window !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-            cachedUserLocation = coords
-            localStorage.setItem('user_coords', JSON.stringify(coords))
-            calculateAndSetDistance(coords.lat, coords.lng)
-          },
-          () => {},
-          { timeout: 5000 }
-        )
-      }
-    }
-
-    detectLocation()
-  }, [userCoords, product.partners?.latitude, product.partners?.longitude])
+  const distance = product.partners?.distance_km_formatted || null
 
   return (
     <div

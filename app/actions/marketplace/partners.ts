@@ -14,6 +14,7 @@ import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { geocodeAddress } from "@/lib/services/location.service"
 
 // --- CLIENTES ---
 
@@ -435,21 +436,16 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       });
     }
 
-    // GEOCODING: Atualiza a Latiude e Longitude no partner baseada no novo endereço
+    // GEOCODING: atualiza latitude/longitude no partner baseado no novo endereço
     if (addressData.street && addressData.city) {
       const addressString = `${addressData.street}, ${addressData.number || ''}, ${addressData.city} - ${addressData.state || ''}, Brazil, ${addressData.zip_code || ''}`
-      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-      if (mapboxToken) {
-        try {
-          const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`)
-          const geocodeData: any = await res.json()
-          if (geocodeData.features && geocodeData.features.length > 0) {
-            const [lng, lat] = geocodeData.features[0].center
-            await supabase.from('partners').update({ latitude: lat, longitude: lng }).eq('id', partnerId)
-          }
-        } catch (e) {
-          console.error("Geocoding exception:", e)
+      try {
+        const coords = await geocodeAddress(addressString)
+        if (coords) {
+          await supabase.from('partners').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', partnerId)
         }
+      } catch (e) {
+        console.error("Geocoding exception:", e)
       }
     }
   }
@@ -583,17 +579,12 @@ export async function registerPartner(data: any) {
       // GEOCODING AUTOMATICO PARA NOVOS REGISTROS
       if (data.street && data.city) {
         const addressString = `${data.street}, ${data.number || ''}, ${data.city} - ${data.state || ''}, Brazil, ${data.zipCode || ''}`
-        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-        if (mapboxToken) {
-          try {
-            const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`)
-            const geocodeData: any = await res.json()
-            if (geocodeData.features && geocodeData.features.length > 0) {
-              const [lng, lat] = geocodeData.features[0].center
-              await supabaseAdmin.from('partners').update({ latitude: lat, longitude: lng }).eq('id', newPartner.id)
-            }
-          } catch(e) { console.error("Geocoding failed on register", e) }
-        }
+        try {
+          const coords = await geocodeAddress(addressString)
+          if (coords) {
+            await supabaseAdmin.from('partners').update({ latitude: coords.lat, longitude: coords.lng }).eq('id', newPartner.id)
+          }
+        } catch(e) { console.error("Geocoding failed on register", e) }
       }
     }
 

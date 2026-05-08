@@ -8,6 +8,9 @@ import { redis } from "@/lib/redis"
 // Funções Helpers
 import { cache } from "react"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
+import { getCurrentUser } from "@/lib/auth/server-user"
+import { getUserSessionData } from "@/lib/data/user"
+import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -31,7 +34,15 @@ export const searchMarketplaceDirect = cache(async (
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ) => {
     const { results } = await _searchMarketplaceCore(query, type, limits)
-    return results
+    const user = await getCurrentUser()
+    if (!user) return results
+
+    const sessionData = await getUserSessionData(user.id)
+    const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
+      ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+      : null
+
+    return enrichMarketplaceDistance(results || [], coords)
 })
 
 export type MarketplaceListCursor = { createdAt: string; id: string }
@@ -65,8 +76,15 @@ export const searchMarketplace = async (
         lastId,
     })
 
+    const user = await getCurrentUser()
+    const sessionData = user ? await getUserSessionData(user.id) : null
+    const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
+      ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+      : null
+    const resultsWithDistance = enrichMarketplaceDistance(results || [], coords)
+
     // Normalize pagination response to the app-wide standard.
-    const items = results || []
+    const items = resultsWithDistance || []
     const last = items[items.length - 1]
     const nextCursor: MarketplaceListCursor | null =
         last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null

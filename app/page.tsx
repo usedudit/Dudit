@@ -7,6 +7,7 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
+import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 
 export const metadata: Metadata = {
   title: "Dudit | Encontre produtos e serviços na sua cidade",
@@ -40,13 +41,16 @@ async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
   console.log(`[SSR] Home (Feed Payload) | START`)
 
   const products = await getCachedHomeProducts()
+  const productsWithDistance = enrichMarketplaceDistance(products || [], userProfile?.latitude && userProfile?.longitude
+    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+    : null)
 
   const tEnd = performance.now()
   console.log(`[SSR] Home (Feed Payload) | END | Time: ${(tEnd - t0).toFixed(2)}ms`)
 
   return (
     <MarketplaceHome
-      products={products}
+      products={productsWithDistance}
       user={user}
       userProfile={userProfile}
       cartCount={cartCount}

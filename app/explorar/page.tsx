@@ -6,6 +6,7 @@ import { parseMarketplaceType } from "@/lib/types/marketplace"
 import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
+import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }): Promise<Metadata> {
     const resolvedParams = await searchParams
@@ -57,12 +58,19 @@ export default async function ExplorarPage({
 
     const cartCount = sessionData?.cartCount || 0
 
+    const productsWithDistance = enrichMarketplaceDistance(
+        products || [],
+        userProfile?.latitude && userProfile?.longitude
+            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+            : null,
+    )
+
     return (
         <div className="bg-white min-h-screen font-sans text-[#003d32] flex flex-col pt-[110px] lg:pt-[108px]">
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
             <ExplorarPageClient
-                initialResults={products}
+                initialResults={productsWithDistance}
                 query={query}
                 type={type}
                 userProfile={userProfile}

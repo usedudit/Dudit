@@ -9,6 +9,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { UnosendService } from "@/lib/services/unosend.service"
 import { syncToExploreRedis } from "@/lib/redis-sync"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { geocodeAddress } from "@/lib/services/location.service"
 
 // --- Interfaces Atualizadas ---
 
@@ -110,7 +111,6 @@ export async function createPartnerAction(data: CreatePartnerData) {
     if (data.city || data.street || data.zipCode) {
       const fullAddressString = [data.street, data.number, data.neighborhood, data.city, data.state, "BR"].filter(Boolean).join(", ")
       try {
-        const { geocodeAddress } = await import("@/lib/delivery/distance")
         const coords = await geocodeAddress(fullAddressString)
         if (coords) {
           insertData.latitude = coords.lat
@@ -321,7 +321,6 @@ export async function updatePartnerAction(
     ].filter(Boolean).join(", ")
     
     try {
-      const { geocodeAddress } = await import("@/lib/delivery/distance")
       const coords = await geocodeAddress(fullAddressString)
       if (coords) {
         updateData.latitude = coords.lat

@@ -9,6 +9,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
 import { getAdminClient } from "@/lib/supabase/admin"
+import { geocodeAddress } from "@/lib/services/location.service"
 
 // Tipos para endereços consolidados
 type AddressType = "user" | "partner" | "supplier" | "customer" | "store"
@@ -154,7 +155,6 @@ export async function createAddressAction(data: {
   ].filter(Boolean).join(", ")
 
   try {
-    const { geocodeAddress } = await import("@/lib/delivery/distance")
     const coords = await geocodeAddress(fullAddressString)
     if (coords) {
       insertData.latitude = coords.lat
@@ -204,6 +204,14 @@ export async function createAddressAction(data: {
     .single()
 
   if (error) return { error: error.message }
+
+  // Keep partner coordinates synchronized for marketplace/map queries.
+  if (data.entityType === "partner" && insertData.latitude != null && insertData.longitude != null) {
+    await supabase
+      .from("partners")
+      .update({ latitude: insertData.latitude, longitude: insertData.longitude })
+      .eq("id", data.entityId)
+  }
 
   // Limpa Cache
   await revalidateAddresses(data.entityType, data.entityId)

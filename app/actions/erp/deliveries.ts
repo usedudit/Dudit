@@ -4,6 +4,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requirePartnerRouteAccess, requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
+import {
+  calculateDistance,
+  estimateDeliveryTime,
+  geocodeAddress,
+} from "@/lib/services/location.service"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -25,8 +30,6 @@ type CreateDeliveryPayload = {
   startedAt: string
   notes?: string
 }
-
-type Coordinate = { lat: number; lon: number }
 
 const DEFAULT_PAGE_SIZE = 100
 const ACTIVE_DELIVERY_STATUSES = ["pending", "not_sent", "preparing", "sent", "pickup_available"] as const
@@ -155,37 +158,6 @@ function formatAddress(orderLike: any) {
     .filter(Boolean)
     .join(" ")
     .trim()
-}
-
-async function geocodeAddress(address: string): Promise<Coordinate | null> {
-  const query = encodeURIComponent(address)
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "DuditERP/1.0 (delivery-mvp)" },
-      next: { revalidate: 3600 },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    const first = Array.isArray(data) ? data[0] : null
-    if (!first?.lat || !first?.lon) return null
-    return { lat: Number(first.lat), lon: Number(first.lon) }
-  } catch {
-    return null
-  }
-}
-
-async function resolveRouteEstimate(origin: Coordinate, destination: Coordinate) {
-  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}?overview=false`
-  const res = await fetch(osrmUrl, { next: { revalidate: 60 } })
-  if (!res.ok) throw new Error("Falha ao calcular rota no OSRM.")
-  const payload = await res.json()
-  const route = payload?.routes?.[0]
-  if (!route) throw new Error("Rota não encontrada para este endereço.")
-  return {
-    distanceKm: Number(route.distance || 0) / 1000,
-    durationMinutes: Math.round(Number(route.duration || 0) / 60),
-  }
 }
 
 export async function fetchDeliveryOrderBucketAction(partnerId: string) {
@@ -360,9 +332,8 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
       ])
 
       if (originCoords && destinationCoords) {
-        const estimate = await resolveRouteEstimate(originCoords, destinationCoords)
-        distanceKm = Number(estimate.distanceKm.toFixed(2))
-        estimatedDurationMinutes = estimate.durationMinutes
+        distanceKm = Number(calculateDistance(originCoords, destinationCoords).toFixed(2))
+        estimatedDurationMinutes = estimateDeliveryTime(distanceKm)
       }
     } catch (err) {
       console.warn("[createERPDeliveryAction] geocoding/route failed, proceeding without estimates:", err)

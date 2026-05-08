@@ -65,19 +65,7 @@ export function OptimizedMapbox({
         let finalLat = initialLat
         let finalLng = initialLng
 
-        // Geocoding reverso caso tenha endereço
-        if (address && !address.startsWith(" - ") && address.length > 5) {
-          try {
-            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&limit=1&country=BR`
-            const res = await fetch(geocodeUrl)
-            const data = await res.json()
-            if (data.features && data.features.length > 0) {
-              [finalLng, finalLat] = data.features[0].center
-            }
-          } catch (err) {
-            console.warn("Geocoding failed:", err)
-          }
-        }
+        // Never geocode during map rendering; only use persisted coordinates.
 
         // Carrega assets do mapbox
         if (!document.getElementById("mapbox-gl-css")) {
@@ -155,30 +143,12 @@ export function OptimizedMapbox({
       }
     })
 
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-    
     // Adiciona marcadores novos
     partners.forEach(async (partner) => {
       if (!markersRef.current[partner.id]) {
         let finalLat = partner.latitude
         let finalLng = partner.longitude
-
-        // FALLBACK FRONTAL: Se a latitude vier vazia (banco legado sem coord), usa a API do mapbox como a página do Vendor faz!
-        const tokenStr = token || ""
-        if ((!finalLat || !finalLng) && (partner as any).address_display && tokenStr) {
-           try {
-              const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent((partner as any).address_display)}.json?access_token=${tokenStr}&limit=1&country=BR`)
-              const data = await res.json()
-              if (data.features && data.features.length > 0) {
-                 finalLng = data.features[0].center[0]
-                 finalLat = data.features[0].center[1]
-
-                 // Update in background if possible? For now just show it!
-              }
-           } catch(e) { }
-        }
-
-        if (!finalLat || !finalLng) return // Se não achou na net tbm, ignora o pino.
+        if (!finalLat || !finalLng) return // ignore markers without persisted coordinates.
 
         // Criar elemento de Marker DOM customizado
         const el = document.createElement("div")

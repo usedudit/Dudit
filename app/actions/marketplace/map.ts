@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { geocodeAddress } from "@/lib/services/location.service"
 
 export interface BoundingBox {
   minLat: number
@@ -95,19 +96,10 @@ export async function getPartnersInBoundsAction(bounds: BoundingBox, limit: numb
   }
 }
 
-/**
- * Função utilitária (Server Action) para inicializar geocoding em parceiros antigos.
- * Se houver algum parceiro sem latitude/longitude (legado), ela usa o token mapbox público
- * (que é seguro no servidor pois existe tbm) para geocodificar seu endereço e salvar.
- */
 export async function geocodeMissingPartnersAction() {
   try {
-    console.log("[DEBUG MAP] Starting auto-geocode background task...")
-    // Usamos admin client para poder ler e escrever partners ignorando RLS
+    console.log("[DEBUG MAP] Starting legacy partner geocode task...")
     const supabaseAdmin = getAdminClient()
-    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-
-    if (!mapboxToken) return { success: false, error: "No Mapbox token" }
 
     // Pega até 50 parceiros sem coordenada para não estourar o limite de geocoding
     const { data: partners, error } = await supabaseAdmin
@@ -131,25 +123,20 @@ export async function geocodeMissingPartnersAction() {
       const addressRecord: any = Array.isArray(p.addresses) ? p.addresses[0] : p.addresses
       if (addressRecord && addressRecord.city && addressRecord.street) {
         const addressString = `${addressRecord.street}, ${addressRecord.number || ''}, ${addressRecord.city} - ${addressRecord.state || ''}, Brazil, ${addressRecord.zip_code || ''}`
-        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressString)}.json?access_token=${mapboxToken}&limit=1&country=BR`
-        
         console.log(`[DEBUG MAP] Geocoding attempt for ${p.id} with address: ${addressString}`)
         
         try {
-          const res = await fetch(geocodeUrl)
-          const geocodeData: any = await res.json()
-          
-          if (geocodeData.features && geocodeData.features.length > 0) {
-            const [lng, lat] = geocodeData.features[0].center
+          const coords = await geocodeAddress(addressString)
+          if (coords) {
             // Atualiza partner usando Supabase Service Role
-            await supabaseAdmin.from("partners").update({ latitude: lat, longitude: lng }).eq("id", p.id)
+            await supabaseAdmin.from("partners").update({ latitude: coords.lat, longitude: coords.lng }).eq("id", p.id)
             successCount++
-            console.log(`[DEBUG MAP] Geocoded ${p.id} successfully to [${lat}, ${lng}].`)
+            console.log(`[DEBUG MAP] Geocoded ${p.id} successfully to [${coords.lat}, ${coords.lng}].`)
           } else {
-            console.log(`[DEBUG MAP] No Mapbox features returned for ${addressString}`)
+            console.log(`[DEBUG MAP] No coordinates returned for ${addressString}`)
           }
         } catch (e) {
-          console.error("Geocoding mapbox err:", e)
+          console.error("Geocoding err:", e)
         }
       } else {
         console.log(`[DEBUG MAP] Partner ${p.id} has no full address (record=${JSON.stringify(addressRecord)})`)
