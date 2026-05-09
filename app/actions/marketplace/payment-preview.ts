@@ -8,39 +8,40 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
 export async function previewMarketplacePaymentAction(input: {
   partnerId: string
-  paymentMethod: string
+  paymentMethodId: string
   originalAmount: number
   installmentNumber?: number
 }) {
   await requireUser()
 
   const supabase = await getSupabaseServerClient()
-  const chosenType = toCanonicalPaymentType(input.paymentMethod)
-  const bestMethod = await pickBestPaymentMethod(
-    supabase as any,
-    chosenType,
-    input.partnerId,
-    { preferDefault: true },
-  )
+  
+  const { data: method, error } = await supabase
+    .from("payment_methods")
+    .select("id, partner_id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
+    .eq("id", input.paymentMethodId)
+    .single()
 
-  if (!bestMethod?.id) {
-    return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
+  if (error || !method) {
+    return { success: false as const, error: "Nenhum método de pagamento ativo foi encontrado para o método selecionado." }
   }
+  
+  const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
 
   const { data: fees } = await supabase
     .from("payment_method_installment_fees")
     .select("installment_number, fee_percent")
-    .eq("payment_method_id", bestMethod.id)
+    .eq("payment_method_id", method.id)
 
   const result = calculatePaymentAmounts({
     originalAmount: Math.max(0, Number(input.originalAmount || 0)),
     installmentNumber: Math.max(1, Number(input.installmentNumber || 1)),
     paymentMethod: {
-      feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
-      feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
-      feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
-      discountPercent: Number(bestMethod.discount_percent || 0),
-      maxInstallments: Number(bestMethod.max_installments || 1),
+      feePercent: Number(method.fee_percent || 0),
+      feeFixed: Number(method.fee_fixed || 0),
+      feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+      discountPercent: Number(method.discount_percent || 0),
+      maxInstallments: Number(method.max_installments || 1),
       installmentFees: (fees || []).map((row: any) => ({
         installmentNumber: Number(row.installment_number || 1),
         feePercent: Number(row.fee_percent || 0),
@@ -48,7 +49,7 @@ export async function previewMarketplacePaymentAction(input: {
     },
   })
 
-  const maxInst = Math.max(1, Number(bestMethod.max_installments || 1))
+  const maxInst = Math.max(1, Number(method.max_installments || 1))
   const installmentOptions = []
   
   if (chosenType === "credit_card" && maxInst > 1) {
@@ -57,11 +58,11 @@ export async function previewMarketplacePaymentAction(input: {
         originalAmount: Math.max(0, Number(input.originalAmount || 0)),
         installmentNumber: i,
         paymentMethod: {
-          feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
-          feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
-          feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
-          discountPercent: Number(bestMethod.discount_percent || 0),
-          maxInstallments: Number(bestMethod.max_installments || 1),
+          feePercent: Number(method.fee_percent || 0),
+          feeFixed: Number(method.fee_fixed || 0),
+          feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+          discountPercent: Number(method.discount_percent || 0),
+          maxInstallments: Number(method.max_installments || 1),
           installmentFees: (fees || []).map((row: any) => ({
             installmentNumber: Number(row.installment_number || 1),
             feePercent: Number(row.fee_percent || 0),
@@ -80,10 +81,10 @@ export async function previewMarketplacePaymentAction(input: {
 
   return {
     success: true as const,
-    methodId: String(bestMethod.id),
-    methodName: String(bestMethod.name || ""),
+    methodId: String(method.id),
+    methodName: String(method.name || ""),
     methodType: chosenType,
-    maxInstallments: Math.max(1, Number(bestMethod.max_installments || 1)),
+    maxInstallments: Math.max(1, Number(method.max_installments || 1)),
     installmentOptions,
     ...result,
   }

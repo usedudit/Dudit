@@ -230,6 +230,8 @@ export function CheckoutPageClient() {
         installments: 1,
     })
 
+
+
     const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">("traditional")
     const [paymentPreview, setPaymentPreview] = useState<MarketplacePaymentPreview | null>(null)
     const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false)
@@ -246,6 +248,12 @@ export function CheckoutPageClient() {
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
+
+    useEffect(() => {
+        if (storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
+            setFormData(prev => ({ ...prev, paymentMethod: storefrontMethods[0].id }))
+        }
+    }, [storefrontMethods, formData.paymentMethod])
 
 
     useEffect(() => {
@@ -431,7 +439,7 @@ export function CheckoutPageClient() {
     // Usa métodos reais carregados do servidor; fallback para a sessão apenas durante o loading
     const paymentMethods = storefrontMethods.length > 0
         ? storefrontMethods.map((m) => ({
-            value: m.type,
+            value: m.id,
             label: paymentTypeLabelMap[m.type] || m.type,
         }))
         : (partnerInfo.paymentMethods?.length ? partnerInfo.paymentMethods : ["cash", "pix"])
@@ -443,7 +451,7 @@ export function CheckoutPageClient() {
                 }
             })
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
-    const selectedStorefrontMethod = storefrontMethods.find((m) => m.type === formData.paymentMethod) || null
+    const selectedStorefrontMethod = storefrontMethods.find((m) => m.id === formData.paymentMethod) || null
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
         paymentOption === "traditional" &&
@@ -524,7 +532,7 @@ export function CheckoutPageClient() {
         const timer = window.setTimeout(async () => {
             const result = await previewMarketplacePaymentAction({
                 partnerId,
-                paymentMethod: formData.paymentMethod,
+                paymentMethodId: formData.paymentMethod,
                 originalAmount: checkoutTotalWithDelivery,
                 installmentNumber: Math.max(1, Number(formData.installments || 1)),
             })
@@ -629,7 +637,7 @@ export function CheckoutPageClient() {
         </Tooltip>
     ) : null
     const shouldShowInstallments = paymentOption === "traditional"
-        && formData.paymentMethod === "credit_card"
+        && selectedStorefrontMethod?.type === "credit_card"
         && (Number(paymentPreview?.maxInstallments || selectedStorefrontMethod?.maxInstallments || 1) > 1)
     const disableCheckoutSubmit = isLoading
         || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))

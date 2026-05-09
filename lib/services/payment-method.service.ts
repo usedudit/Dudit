@@ -25,7 +25,7 @@ export async function pickBestPaymentMethod(
     const canonicalType = toCanonicalPaymentType(type)
     const { data, error } = await supabase
         .from("payment_methods")
-        .select("id, partner_id, type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id")
+        .select("id, partner_id, type, is_active, discount_percent, fee_percent, fee_fixed, priority, is_default, name, default_finance_account_id, max_installments, fee_bearer")
         .eq("partner_id", partnerId)
         .eq("type", canonicalType)
         .eq("is_active", true)
