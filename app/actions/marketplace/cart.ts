@@ -587,9 +587,20 @@ export async function checkoutCartAction(
   totalAmount = pricingResult.finalTotal
   couponDiscountAmount = pricingResult.couponDiscountAmount
 
-  const chosenType = toCanonicalPaymentType(paymentMethod)
-  const bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
-  if (!bestMethod) {
+  let bestMethod: any = null
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
+  if (isUuid && !useMercadoPago) {
+    const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", paymentMethod).single()
+    bestMethod = methodData
+  }
+  
+  const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
+
+  if (!bestMethod && !useMercadoPago) {
+    bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
+  }
+
+  if (!bestMethod && !useMercadoPago) {
     return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
   }
 

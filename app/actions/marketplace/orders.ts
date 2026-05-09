@@ -209,6 +209,25 @@ export async function createOrderAction(data: {
 
   const paymentIsMp = String(data.paymentMethod || "").toLowerCase().includes("mercado pago")
   let financeAccountId: string | null = null
+  
+  let bestMethod: any = null
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.paymentMethod)
+  if (isUuid && !paymentIsMp) {
+    const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", data.paymentMethod).single()
+    bestMethod = methodData
+  }
+  
+  const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || data.paymentMethod)
+
+  if (!bestMethod && !paymentIsMp) {
+    bestMethod = await pickBestPaymentMethod(
+      supabase as any,
+      chosenType,
+      data.partnerId,
+      { preferDefault: true },
+    )
+  }
+
   if (paymentIsMp) {
     financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
       getAdminClient(),
@@ -216,37 +235,25 @@ export async function createOrderAction(data: {
       true,
     )
   } else {
-    const bestMethod = await pickBestPaymentMethod(
-      supabase as any,
-      toCanonicalPaymentType(data.paymentMethod),
-      data.partnerId,
-      { preferDefault: true },
-    )
     financeAccountId = bestMethod?.default_finance_account_id || null
   }
 
   let paymentAwareTotal = finalTotal
-  const chosenType = toCanonicalPaymentType(data.paymentMethod)
-  const bestMethodForPricing = await pickBestPaymentMethod(
-    supabase as any,
-    chosenType,
-    data.partnerId,
-    { preferDefault: true },
-  )
-  if (bestMethodForPricing?.id) {
+
+  if (bestMethod?.id && !paymentIsMp) {
     const { data: fees } = await supabase
       .from("payment_method_installment_fees")
       .select("installment_number, fee_percent")
-      .eq("payment_method_id", bestMethodForPricing.id)
+      .eq("payment_method_id", bestMethod.id)
     const calc = calculatePaymentAmounts({
       originalAmount: finalTotal,
       installmentNumber: Math.max(1, Number(data.installments || 1)),
       paymentMethod: {
-        feePercent: Number(bestMethodForPricing.fee_percent || bestMethodForPricing.percentage_rate || 0),
-        feeFixed: Number(bestMethodForPricing.fee_fixed || bestMethodForPricing.fixed_amount || 0),
-        feeBearer: (bestMethodForPricing.fee_bearer || "merchant") as "merchant" | "customer",
-        discountPercent: Number(bestMethodForPricing.discount_percent || 0),
-        maxInstallments: Number(bestMethodForPricing.max_installments || 1),
+        feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
+        feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
+        feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
+        discountPercent: Number(bestMethod.discount_percent || 0),
+        maxInstallments: Number(bestMethod.max_installments || 1),
         installmentFees: (fees || []).map((row: any) => ({
           installmentNumber: Number(row.installment_number || 1),
           feePercent: Number(row.fee_percent || 0),
@@ -289,12 +296,12 @@ export async function createOrderAction(data: {
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
     payment_method: data.paymentMethod,
-    payment_breakdown: paymentIsMp || !bestMethodForPricing?.id
+    payment_breakdown: paymentIsMp || !bestMethod?.id
       ? []
       : [{
         method: chosenType,
         amount: paymentAwareTotal,
-        paymentMethodId: bestMethodForPricing.id,
+        paymentMethodId: bestMethod.id,
         installmentNumber: Math.max(1, Number(data.installments || 1)),
       }],
     payment_provider: data.paymentMethod,
