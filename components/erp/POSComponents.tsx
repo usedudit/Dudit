@@ -17,7 +17,7 @@ export const ReceiptScallopEdge = () => (
     </div>
 );
 
-export const Numpad = ({ onInput, onDelete }: { onInput: (key: string) => void, onDelete: () => void }) => {
+export const Numpad = ({ onInput, onDelete, disabled }: { onInput: (key: string) => void, onDelete: () => void, disabled?: boolean }) => {
     return (
         <div className="w-full max-w-[360px] mx-auto mt-6">
             <div className="grid grid-cols-3 gap-4">
