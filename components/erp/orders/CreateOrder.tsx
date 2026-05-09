@@ -129,7 +129,7 @@ function normalizeCustomerForCard(customer: any) {
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { planSlug } = usePermissions()
+    const { planSlug, role } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
@@ -160,6 +160,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [salesChannel, setSalesChannel] = useState("Manual")
     const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>("pickup")
     const [paymentStatus, setPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
+    const [originalDeliveryStatus, setOriginalDeliveryStatus] = useState('not_sent')
     const [deliveryStatus, setDeliveryStatus] = useState('not_sent')
     const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState("")
     const [deliveryDate, setDeliveryDate] = useState(formatLocalISODate(new Date()))
@@ -268,6 +269,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const primaryActionLabel = editOrderId ? "Salvar" : "Finalizar Venda"
     const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
+    const isMarketplaceOrder = Boolean(editOrderId && salesChannel === "Loja Online")
 
     const normalizeSalesChannel = useCallback((value?: string | null) => {
         if (!value) return "Manual"
@@ -345,6 +347,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOriginalPaymentMethod(order.payment_method || "Não informado")
                 setOriginalPaymentBreakdown(loadedPaymentBreakdown)
                 setDeliveryStatus(order.delivery_status || "not_sent")
+                setOriginalDeliveryStatus(order.delivery_status || "not_sent")
                 setDeliveryDate(order.created_at.split('T')[0])
                 setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
                 setFinanceAccountId(order.finance_account_id || "")
@@ -1182,6 +1185,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         deliveryStatusOptions={deliveryStatusOptions}
                                         fieldErrors={fieldErrors}
                                         setFieldErrors={setFieldErrors}
+                                        isMarketplaceOrder={isMarketplaceOrder}
                                     />
                                 </div>
                             </FadeIn>
@@ -1218,6 +1222,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         setCity={setCity}
                                         setUf={setUf}
                                         setNoNumber={setNoNumber}
+                                        isMarketplaceOrder={isMarketplaceOrder}
+                                        originalDeliveryStatus={originalDeliveryStatus}
                                     />
                                 </div>
                             </FadeIn>
@@ -1333,7 +1339,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
-                            lockPaymentCompletion={Boolean(editOrderId && remainingAmount > 0.009)}
+                            lockPaymentCompletion={Boolean(editOrderId && remainingAmount > 0.009 && !isMarketplaceOrder)}
+                            isMarketplaceOrder={isMarketplaceOrder}
+                            role={role}
+                            originalPaymentMethod={originalPaymentMethod}
                             onConfirm={handleConfirmPayment}
                         />
                     )}

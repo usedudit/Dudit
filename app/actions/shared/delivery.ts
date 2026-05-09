@@ -6,7 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { calculateDeliveryFee, type DeliveryFeeRule, type DeliverySettings } from "@/lib/delivery/fee"
 import { resolveDeliveryPlanCapability } from "@/lib/delivery/plan"
-import { calculateAddressDistance } from "@/lib/services/location.service"
+import { calculateDistance, geocodeAddress } from "@/lib/services/location.service"
 
 function mapSettingsRow(row: any): DeliverySettings {
   return {
@@ -146,11 +146,9 @@ export async function quoteDeliveryFeeAction(input: {
     supabase.from("delivery_settings").select("*").eq("partner_id", input.partnerId).maybeSingle(),
     supabase.from("delivery_fee_rules").select("*").eq("partner_id", input.partnerId).eq("is_active", true).order("start_time"),
     supabase
-      .from("stores")
-      .select("street, number, city, state, zip_code")
-      .eq("partner_id", input.partnerId)
-      .order("created_at", { ascending: true })
-      .limit(1)
+      .from("partners")
+      .select("latitude, longitude")
+      .eq("id", input.partnerId)
       .maybeSingle(),
   ])
 
@@ -166,21 +164,25 @@ export async function quoteDeliveryFeeAction(input: {
 
   let distanceKm = 0
   if (shouldCalculateDistance) {
-    const originAddress = [
-      [store?.street, store?.number].filter(Boolean).join(", "),
-      [store?.city, store?.state].filter(Boolean).join(", "),
-      store?.zip_code || "",
-    ].filter(Boolean).join(" ")
+    let originCoords = null;
+    if (store?.latitude && store?.longitude) {
+       originCoords = { lat: store.latitude, lng: store.longitude };
+    }
 
-    if (!originAddress) {
+    if (!originCoords) {
       return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
     }
 
-    const calculatedDistance = await calculateAddressDistance(originAddress, input.destinationAddress)
-    if (calculatedDistance == null) {
+    const destinationCoords = await geocodeAddress(input.destinationAddress)
+    if (!destinationCoords) {
+      return { success: false as const, error: "Não foi possível encontrar as coordenadas do seu endereço para entrega." }
+    }
+
+    const calculatedDistance = calculateDistance(originCoords, destinationCoords)
+    if (calculatedDistance == null || Number.isNaN(calculatedDistance)) {
       return { success: false as const, error: "Não foi possível calcular a distância de entrega." }
     }
-    distanceKm = calculatedDistance
+    distanceKm = Number(calculatedDistance.toFixed(2))
   }
 
   const rules = capability.advancedEnabled ? (rulesRows || []).map(mapRuleRow) : []

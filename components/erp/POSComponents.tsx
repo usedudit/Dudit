@@ -22,7 +22,7 @@ export const Numpad = ({ onInput, onDelete }: { onInput: (key: string) => void, 
         <div className="w-full max-w-[360px] mx-auto mt-6">
             <div className="grid grid-cols-3 gap-4">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                    <button
+                    <button disabled={disabled}
                         key={n}
                         onClick={() => onInput(n.toString())}
                         className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
@@ -30,19 +30,19 @@ export const Numpad = ({ onInput, onDelete }: { onInput: (key: string) => void, 
                         {n}
                     </button>
                 ))}
-                <button
+                <button disabled={disabled}
                     onClick={() => onInput('.')}
                     className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border pb-3 active:scale-95 transform duration-100"
                 >
                     .
                 </button>
-                <button
+                <button disabled={disabled}
                     onClick={() => onInput('0')}
                     className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
                 >
                     0
                 </button>
-                <button
+                <button disabled={disabled}
                     onClick={onDelete}
                     className="h-16 md:h-[74px] rounded-[22px] flex items-center justify-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-transparent active:scale-95 transform duration-100"
                 >
@@ -53,12 +53,12 @@ export const Numpad = ({ onInput, onDelete }: { onInput: (key: string) => void, 
     );
 };
 
-export const PaymentMethodCard = ({ icon: Icon, label, onClick }: { icon: any, label: string, onClick: () => void }) => (
-    <button
+export const PaymentMethodCard = ({ icon: Icon, label, onClick, disabled }: { icon: any, label: string, onClick: () => void, disabled?: boolean }) => (
+    <button disabled={disabled}
         onClick={onClick}
-        className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors group"
+        className={`flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group ${disabled ? 'opacity-50 pointer-events-none bg-gray-50 dark:bg-dark-border/10' : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
     >
-        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center group-hover:bg-white dark:group-hover:bg-dark-surface transition-colors">
+        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${disabled ? 'bg-gray-200 dark:bg-dark-border/30' : 'bg-gray-100 dark:bg-dark-border/50 group-hover:bg-white dark:group-hover:bg-dark-surface'}`}>
             <Icon size={20} className="text-brand-dark dark:text-dark-heading md:w-6 md:h-6" />
         </div>
         <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>

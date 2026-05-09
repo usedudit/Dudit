@@ -7,7 +7,7 @@ import {
     MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
     TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon,
 } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip } from "@/components/reusable"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
@@ -39,6 +39,15 @@ interface ProductItem {
     availabilityValue?: number
     availabilityUnit?: string
 }
+
+const AVAILABLE_BRANDS = [
+    { id: "visa", name: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
+    { id: "mastercard", name: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
+    { id: "elo", name: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
+    { id: "american_express", name: "Amex", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
+    { id: "hipercard", name: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
+    { id: "diners", name: "Diners", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
+]
 
 export interface CheckoutSessionData {
     source: "cart" | "product" | "service"
@@ -1100,44 +1109,62 @@ export function CheckoutPageClient() {
                                                                     transition={{ duration: 0.2 }}
                                                                     className="mb-6"
                                                                 >
-                                                                    <Label className="mb-2 block">Selecione o método</Label>
-                                                                    <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value, installments: 1 })}>
-                                                                        <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {paymentMethods.map((method: any) => (
-                                                                                <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
+                                                                    <Label className="mb-3 block">Selecione o método</Label>
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                                                        {paymentMethods.map((method: any) => (
+                                                                            <ListItem
+                                                                                key={method.value}
+                                                                                title={method.label}
+                                                                                className={`px-4 py-3 gap-4 ${formData.paymentMethod === method.value ? "border-brand-green dark:border-brand-green bg-brand-green/5" : ""}`}
+                                                                                onClick={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
+                                                                                right={
+                                                                                    <RadioButton
+                                                                                        name="paymentMethod"
+                                                                                        value={method.value}
+                                                                                        checked={formData.paymentMethod === method.value}
+                                                                                        onChange={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
+                                                                                    />
+                                                                                }
+                                                                            />
+                                                                        ))}
+                                                                    </div>
                                                                     {selectedStorefrontMethod?.cardBrand && (
-                                                                        <div className="mt-2 text-[13px] text-brand-inactive-text">
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">Bandeiras aceitas:</span> {selectedStorefrontMethod.cardBrand.split(',').map(b => b.charAt(0).toUpperCase() + b.slice(1).replace('_', ' ')).join(', ')}
+                                                                        <div className="mt-4">
+                                                                            <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {selectedStorefrontMethod.cardBrand.split(',').map(b => {
+                                                                                    const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                                                    if (!brand) return null
+                                                                                    return (
+                                                                                        <div key={brand.id} className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-3 py-1.5 rounded-lg">
+                                                                                            <img src={brand.image} alt={brand.name} className="w-5 h-5 object-contain opacity-90" />
+                                                                                            <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{brand.name}</span>
+                                                                                        </div>
+                                                                                    )
+                                                                                })}
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                     {shouldShowInstallments && (
-                                                                        <div className="mt-4">
-                                                                            <Label className="mb-2 block">Parcelas</Label>
-                                                                            <Select
+                                                                        <div className="mt-6">
+                                                                            <FormDropdown
+                                                                                label="Parcelas"
                                                                                 value={String(formData.installments)}
-                                                                                onValueChange={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
-                                                                            >
-                                                                                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                                                                                <SelectContent>
-                                                                                    {paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map((opt) => (
-                                                                                        <SelectItem key={opt.installments} value={String(opt.installments)}>
-                                                                                            {opt.installments}x de {formatCurrency(opt.installmentValue)} {opt.hasInterest ? "com juros" : "sem juros"}
-                                                                                        </SelectItem>
-                                                                                    )) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                                setValue={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                                                options={
+                                                                                    paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
+                                                                                        value: String(opt.installments),
+                                                                                        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)} ${opt.hasInterest ? "com juros" : "sem juros"}`
+                                                                                    })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                                         const installmentNumber = index + 1
                                                                                         const installmentAmount = paymentPreview?.installmentAmounts?.[index]
-                                                                                        return (
-                                                                                            <SelectItem key={installmentNumber} value={String(installmentNumber)}>
-                                                                                                {installmentNumber}x{installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}
-                                                                                            </SelectItem>
-                                                                                        )
-                                                                                    })}
-                                                                                </SelectContent>
-                                                                            </Select>
+                                                                                        return {
+                                                                                            value: String(installmentNumber),
+                                                                                            label: `${installmentNumber}x${installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}`
+                                                                                        }
+                                                                                    })
+                                                                                }
+                                                                            />
                                                                         </div>
                                                                     )}
                                                                 </motion.div>
@@ -1151,44 +1178,62 @@ export function CheckoutPageClient() {
                                                             <p className="text-sm text-brand-inactive-text">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
                                                         </div>
                                                         <div className="mb-6">
-                                                            <Label className="mb-2 block">Selecione o método</Label>
-                                                            <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value, installments: 1 })}>
-                                                                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                                                                <SelectContent>
-                                                                    {paymentMethods.map((method: any) => (
-                                                                        <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                            <Label className="mb-3 block">Selecione o método</Label>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                                                {paymentMethods.map((method: any) => (
+                                                                    <ListItem
+                                                                        key={method.value}
+                                                                        title={method.label}
+                                                                        className={`px-4 py-3 gap-4 ${formData.paymentMethod === method.value ? "border-brand-green dark:border-brand-green bg-brand-green/5" : ""}`}
+                                                                        onClick={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
+                                                                        right={
+                                                                            <RadioButton
+                                                                                name="paymentMethod"
+                                                                                value={method.value}
+                                                                                checked={formData.paymentMethod === method.value}
+                                                                                onChange={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
+                                                                            />
+                                                                        }
+                                                                    />
+                                                                ))}
+                                                            </div>
                                                             {selectedStorefrontMethod?.cardBrand && (
-                                                                <div className="mt-2 text-[13px] text-brand-inactive-text">
-                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Bandeiras aceitas:</span> {selectedStorefrontMethod.cardBrand.split(',').map(b => b.charAt(0).toUpperCase() + b.slice(1).replace('_', ' ')).join(', ')}
+                                                                <div className="mt-4">
+                                                                    <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {selectedStorefrontMethod.cardBrand.split(',').map(b => {
+                                                                            const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                                            if (!brand) return null
+                                                                            return (
+                                                                                <div key={brand.id} className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-3 py-1.5 rounded-lg">
+                                                                                    <img src={brand.image} alt={brand.name} className="w-5 h-5 object-contain opacity-90" />
+                                                                                    <span className="text-xs font-medium text-brand-dark dark:text-dark-heading">{brand.name}</span>
+                                                                                </div>
+                                                                            )
+                                                                        })}
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                             {shouldShowInstallments && (
-                                                                <div className="mt-4">
-                                                                    <Label className="mb-2 block">Parcelas</Label>
-                                                                    <Select
+                                                                <div className="mt-6">
+                                                                    <FormDropdown
+                                                                        label="Parcelas"
                                                                         value={String(formData.installments)}
-                                                                        onValueChange={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
-                                                                    >
-                                                                        <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map((opt) => (
-                                                                                <SelectItem key={opt.installments} value={String(opt.installments)}>
-                                                                                    {opt.installments}x de {formatCurrency(opt.installmentValue)} {opt.hasInterest ? "com juros" : "sem juros"}
-                                                                                </SelectItem>
-                                                                            )) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                        setValue={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                                        options={
+                                                                            paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
+                                                                                value: String(opt.installments),
+                                                                                label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)} ${opt.hasInterest ? "com juros" : "sem juros"}`
+                                                                            })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                                 const installmentNumber = index + 1
                                                                                 const installmentAmount = paymentPreview?.installmentAmounts?.[index]
-                                                                                return (
-                                                                                    <SelectItem key={installmentNumber} value={String(installmentNumber)}>
-                                                                                        {installmentNumber}x{installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}
-                                                                                    </SelectItem>
-                                                                                )
-                                                                            })}
-                                                                        </SelectContent>
-                                                                    </Select>
+                                                                                return {
+                                                                                    value: String(installmentNumber),
+                                                                                    label: `${installmentNumber}x${installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}`
+                                                                                }
+                                                                            })
+                                                                        }
+                                                                    />
                                                                 </div>
                                                             )}
                                                         </div>
