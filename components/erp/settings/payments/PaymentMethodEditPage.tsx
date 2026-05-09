@@ -11,6 +11,9 @@ import {
     Badge,
     FormSection,
     FormDropdown,
+    DefaultModal,
+    MoneyInput,
+    PercentageInput,
 } from "@/components/reusable"
 import {
     CpfCnpjInput,
@@ -98,6 +101,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
         use_partner_pix_data: false,
         supports_installments: true,
         default_finance_account_id: "" as string,
+        installment_fees: [] as { installmentNumber: number; feePercent: number }[],
     })
 
     const [baselineFormData, setBaselineFormData] = useState<any>(null)
@@ -128,6 +132,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                     use_partner_pix_data: false,
                     supports_installments: true,
                     default_finance_account_id: "",
+                    installment_fees: [],
                 }
                 setFormData(initial)
                 setBaselineFormData(JSON.parse(JSON.stringify(initial)))
@@ -154,6 +159,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                         use_partner_pix_data: Boolean(m.use_partner_pix_data),
                         supports_installments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
                         default_finance_account_id: m.default_finance_account_id || "",
+                        installment_fees: m.installment_fees?.map((f: any) => ({
+                            installmentNumber: Number(f.installment_number),
+                            feePercent: Number(f.fee_percent)
+                        })) || [],
                     }
                     setFormData(initial)
                     setBaselineFormData(JSON.parse(JSON.stringify(initial)))
@@ -166,6 +175,8 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
         }
         loadDetails()
     }, [editingMethod, notifyError])
+
+    const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState(false)
 
     const isDirty = useMemo(() => {
         if (!baselineFormData) return false
@@ -218,6 +229,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                 cardBrand: isCard ? formData.card_brand : null,
                 defaultFinanceAccountId: formData.default_finance_account_id || null,
                 partnerId: partnerId,
+                installmentFees: isCredit && formData.supports_installments ? formData.installment_fees : [],
             }
 
             let res
@@ -343,10 +355,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                 />
                                                 <RadioButton
                                                     name="type"
-                                                    value="other"
-                                                    checked={formData.type === "other"}
-                                                    onChange={() => setFormData({ ...formData, type: "other", supports_installments: false, max_installments: 1 })}
-                                                    label="Dinheiro/Outro"
+                                                    value="bank_transfer"
+                                                    checked={formData.type === "bank_transfer"}
+                                                    onChange={() => setFormData({ ...formData, type: "bank_transfer", supports_installments: false, max_installments: 1 })}
+                                                    label="Transferência Bancária"
                                                 />
                                             </div>
                                         </div>
@@ -368,20 +380,60 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                     <FormSection title="Configurações do Cartão">
                                         <div className="grid grid-cols-1 gap-6">
                                             {isCredit && (
-                                                <div className="space-y-4">
-                                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Parcelamento Máximo</label>
-                                                    <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                                                        {[1, 2, 3, 4, 6, 10, 12, 18, 24].map((n) => (
-                                                            <Button
-                                                                key={n}
-                                                                variant={formData.max_installments === n ? "default" : "outline"}
-                                                                className="h-10 text-xs font-bold"
-                                                                onClick={() => setFormData({ ...formData, max_installments: n })}
-                                                            >
-                                                                {n}x
-                                                            </Button>
-                                                        ))}
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Modo de Pagamento</label>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <RadioButton
+                                                                name="supports_installments"
+                                                                value="single"
+                                                                checked={!formData.supports_installments}
+                                                                onChange={() => setFormData({ ...formData, supports_installments: false, max_installments: 1 })}
+                                                                label="Pagamento Único"
+                                                            />
+                                                            <RadioButton
+                                                                name="supports_installments"
+                                                                value="installments"
+                                                                checked={formData.supports_installments}
+                                                                onChange={() => setFormData({ ...formData, supports_installments: true })}
+                                                                label="Permitir Parcelamento"
+                                                            />
+                                                        </div>
                                                     </div>
+
+                                                    {formData.supports_installments && (
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Parcelamento Máximo</label>
+                                                                <Button variant="outline" size="sm" onClick={() => setIsInstallmentModalOpen(true)}>
+                                                                    Configurar Taxas
+                                                                </Button>
+                                                            </div>
+                                                            <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                                                                {[1, 2, 3, 4, 6, 10, 12, 18, 24].map((n) => (
+                                                                    <Button
+                                                                        key={n}
+                                                                        variant={formData.max_installments === n ? "default" : "outline"}
+                                                                        className="h-10 text-xs font-bold"
+                                                                        onClick={() => {
+                                                                            setFormData(prev => {
+                                                                                const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n);
+                                                                                for (let i = 1; i <= n; i++) {
+                                                                                    if (!newFees.find(f => f.installmentNumber === i)) {
+                                                                                        newFees.push({ installmentNumber: i, feePercent: 0 })
+                                                                                    }
+                                                                                }
+                                                                                newFees.sort((a, b) => a.installmentNumber - b.installmentNumber);
+                                                                                return { ...prev, max_installments: n, installment_fees: newFees }
+                                                                            })
+                                                                        }}
+                                                                    >
+                                                                        {n}x
+                                                                    </Button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
 
@@ -497,30 +549,24 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                 <SidebarCard hasTopStrip>
                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Taxas e Custos</h3>
                                     <div className="grid grid-cols-1 gap-6">
-                                        <Input
+                                        <PercentageInput
                                             label="Taxa Administrativa (%)"
-                                            type="number"
                                             value={formData.fee_percent}
-                                            onChange={(e) => setFormData({ ...formData, fee_percent: Number(e.target.value) })}
+                                            onChange={(value) => setFormData({ ...formData, fee_percent: value })}
                                             suffix="%"
                                         />
-                                        <Input
+                                        <MoneyInput
                                             label="Taxa Fixa por Venda (R$)"
-                                            type="number"
                                             value={formData.fee_fixed}
-                                            onChange={(e) => setFormData({ ...formData, fee_fixed: Number(e.target.value) })}
+                                            onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
                                             prefix="R$"
                                         />
-                                        <Input
-                                            label="Desconto p/ Cliente (%)"
-                                            type="number"
+                                        <PercentageInput
+                                            label="Desconto (%)"
                                             value={formData.discount_percent}
-                                            onChange={(e) => setFormData({ ...formData, discount_percent: Number(e.target.value) })}
+                                            onChange={(value) => setFormData({ ...formData, discount_percent: value })}
                                             suffix="%"
                                         />
-                                        <p className="text-[11px] text-brand-inactive-text leading-relaxed bg-brand-gray/20 dark:bg-dark-border/20 p-3 rounded-xl">
-                                            Essas taxas são usadas para calcular automaticamente o valor líquido a receber em cada venda efetuada por este método.
-                                        </p>
                                     </div>
                                 </SidebarCard>
 
@@ -550,13 +596,6 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                         </div>
                                     </div>
                                 </SidebarCard>
-
-                                <div className="hidden md:block pt-6">
-                                    <Button onClick={handleSubmit} className="w-full h-12" disabled={isLoading}>
-                                        <SaveIcon className="w-5 h-5 mr-2" />
-                                        {isLoading ? "Salvando..." : editingMethod ? "Salvar Alterações" : "Criar Método"}
-                                    </Button>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -585,6 +624,56 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                         variant="warning"
                     />
                 )}
+
+                <DefaultModal
+                    isOpen={isInstallmentModalOpen}
+                    onClose={() => setIsInstallmentModalOpen(false)}
+                    title="Taxas por Parcela"
+                    maxWidth="md"
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text">
+                            Defina a taxa administrativa (em %) que será cobrada para cada quantidade de parcelas.
+                        </p>
+                        <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-2">
+                            {Array.from({ length: formData.max_installments }).map((_, i) => {
+                                const installment = i + 1;
+                                const fee = formData.installment_fees.find(f => f.installmentNumber === installment)?.feePercent || 0;
+                                return (
+                                    <div key={installment} className="flex items-center gap-4 p-3 border border-brand-border dark:border-dark-border rounded-xl">
+                                        <div className="w-16 font-bold text-brand-dark dark:text-dark-heading">{installment}x</div>
+                                        <div className="flex-1">
+                                            <Input
+                                                type="number"
+                                                value={fee}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value);
+                                                    setFormData(prev => {
+                                                        const newFees = [...prev.installment_fees];
+                                                        const index = newFees.findIndex(f => f.installmentNumber === installment);
+                                                        if (index >= 0) {
+                                                            newFees[index].feePercent = val;
+                                                        } else {
+                                                            newFees.push({ installmentNumber: installment, feePercent: val });
+                                                        }
+                                                        newFees.sort((a, b) => a.installmentNumber - b.installmentNumber);
+                                                        return { ...prev, installment_fees: newFees };
+                                                    })
+                                                }}
+                                                suffix="%"
+                                            />
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <div className="pt-4 flex justify-end gap-3">
+                            <Button onClick={() => setIsInstallmentModalOpen(false)}>
+                                Concluir
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
             </div>
         </FadeIn>
     )

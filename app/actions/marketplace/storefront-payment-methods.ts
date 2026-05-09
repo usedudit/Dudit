@@ -12,6 +12,7 @@ export interface StorefrontPaymentMethod {
   feeFixed: number
   maxInstallments: number
   supportsInstallments: boolean
+  cardBrand: string | null
 }
 
 /**
@@ -29,7 +30,7 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string) {
     .select(
       "id, type, payment_type, is_active, is_default, " +
       "discount_percent, fee_percent, fee_fixed, " +
-      "max_installments, supports_installments, priority"
+      "max_installments, supports_installments, priority, card_brand"
     )
     .eq("partner_id", partnerId)
     .eq("is_active", true)
@@ -61,6 +62,7 @@ export async function getStorefrontPaymentMethodsAction(partnerId: string) {
       feeFixed: Math.max(0, Number(m.fee_fixed || 0)),
       maxInstallments: Math.max(1, Number(m.max_installments || 1)),
       supportsInstallments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
+      cardBrand: m.card_brand || null,
     })
   }
 

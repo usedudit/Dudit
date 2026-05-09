@@ -7,7 +7,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { UnosendService } from "@/lib/services/unosend.service"
-import { syncToExploreRedis } from "@/lib/redis-sync"
+import { syncToExploreRedis, syncPartnerItemsToExploreRedis } from "@/lib/redis-sync"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { geocodeAddress } from "@/lib/services/location.service"
 
@@ -261,7 +261,7 @@ export async function updatePartnerAction(
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, addresses(street, number, neighborhood, city, state)")
+    .select("user_id, store_name, last_seo_update_at, addresses(street, number, neighborhood, city, state)")
     .eq("id", partnerId)
     .eq("addresses.is_default", true)
     .single()
@@ -270,7 +270,26 @@ export async function updatePartnerAction(
     return { error: "Não autorizado" }
   }
 
+  // Verificar se há mudanças sensíveis a SEO (nome da loja, cidade, estado)
+  const isSeoSensitiveChange = 
+    (data.storeName && data.storeName !== partnerCheck.store_name) ||
+    (data.city !== undefined && data.city !== partnerCheck.addresses?.[0]?.city) ||
+    (data.state !== undefined && data.state !== partnerCheck.addresses?.[0]?.state)
+
+  if (isSeoSensitiveChange) {
+    if (partnerCheck.last_seo_update_at) {
+      const lastUpdate = new Date(partnerCheck.last_seo_update_at)
+      const daysSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24)
+      if (daysSinceUpdate < 30) {
+        return { error: `Você só pode alterar o nome e a cidade da loja a cada 30 dias. Próxima alteração permitida em: ${new Date(lastUpdate.getTime() + 30 * 24 * 3600 * 1000).toLocaleDateString('pt-BR')}` }
+      }
+    }
+  }
+
   const updateData: any = {}
+  if (isSeoSensitiveChange) {
+    updateData.last_seo_update_at = new Date().toISOString()
+  }
   if (data.storeName) updateData.store_name = data.storeName
   if (data.storeDescription !== undefined) updateData.store_description = data.storeDescription
   if (data.businessType) updateData.business_type = data.businessType
@@ -369,6 +388,10 @@ export async function updatePartnerAction(
 
   // Redis Sync for Marketplace Vitrines
   await syncToExploreRedis({ id: partnerId, type: "loja", data: {} })
+  
+  if (isSeoSensitiveChange) {
+    await syncPartnerItemsToExploreRedis(partnerId)
+  }
 
   return { success: true }
 }

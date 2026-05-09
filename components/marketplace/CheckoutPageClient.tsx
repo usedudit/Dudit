@@ -107,6 +107,13 @@ interface MarketplacePaymentPreview {
     paymentMethodDiscountAmount: number
     installmentNumber: number
     installmentAmounts: number[]
+    installmentOptions?: {
+        installments: number
+        installmentValue: number
+        hasInterest: boolean
+        totalInterest: number
+        finalAmount: number
+    }[]
 }
 
 const fadeVariants = {
@@ -1102,6 +1109,11 @@ export function CheckoutPageClient() {
                                                                             ))}
                                                                         </SelectContent>
                                                                     </Select>
+                                                                    {selectedStorefrontMethod?.cardBrand && (
+                                                                        <div className="mt-2 text-[13px] text-brand-inactive-text">
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">Bandeiras aceitas:</span> {selectedStorefrontMethod.cardBrand.split(',').map(b => b.charAt(0).toUpperCase() + b.slice(1).replace('_', ' ')).join(', ')}
+                                                                        </div>
+                                                                    )}
                                                                     {shouldShowInstallments && (
                                                                         <div className="mt-4">
                                                                             <Label className="mb-2 block">Parcelas</Label>
@@ -1111,7 +1123,11 @@ export function CheckoutPageClient() {
                                                                             >
                                                                                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                                 <SelectContent>
-                                                                                    {Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                                    {paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map((opt) => (
+                                                                                        <SelectItem key={opt.installments} value={String(opt.installments)}>
+                                                                                            {opt.installments}x de {formatCurrency(opt.installmentValue)} {opt.hasInterest ? "com juros" : "sem juros"}
+                                                                                        </SelectItem>
+                                                                                    )) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                                         const installmentNumber = index + 1
                                                                                         const installmentAmount = paymentPreview?.installmentAmounts?.[index]
                                                                                         return (
@@ -1144,6 +1160,11 @@ export function CheckoutPageClient() {
                                                                     ))}
                                                                 </SelectContent>
                                                             </Select>
+                                                            {selectedStorefrontMethod?.cardBrand && (
+                                                                <div className="mt-2 text-[13px] text-brand-inactive-text">
+                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Bandeiras aceitas:</span> {selectedStorefrontMethod.cardBrand.split(',').map(b => b.charAt(0).toUpperCase() + b.slice(1).replace('_', ' ')).join(', ')}
+                                                                </div>
+                                                            )}
                                                             {shouldShowInstallments && (
                                                                 <div className="mt-4">
                                                                     <Label className="mb-2 block">Parcelas</Label>
@@ -1153,7 +1174,11 @@ export function CheckoutPageClient() {
                                                                     >
                                                                         <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                                                                         <SelectContent>
-                                                                            {Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                            {paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map((opt) => (
+                                                                                <SelectItem key={opt.installments} value={String(opt.installments)}>
+                                                                                    {opt.installments}x de {formatCurrency(opt.installmentValue)} {opt.hasInterest ? "com juros" : "sem juros"}
+                                                                                </SelectItem>
+                                                                            )) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                                 const installmentNumber = index + 1
                                                                                 const installmentAmount = paymentPreview?.installmentAmounts?.[index]
                                                                                 return (

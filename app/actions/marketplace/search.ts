@@ -122,8 +122,8 @@ async function _searchMarketplaceCore(
     
     // Inline version read
     const tV0 = performance.now()
-    let version: number = 2 // Bumping to v2 for the ID-only cache format change
-    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 2 } catch {}
+    let version: number = 3 // Bumping to v3 for the latitude/longitude cache format change
+    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch {}
     const tV1 = performance.now()
     if (tV1 - tV0 > 1000) console.warn(`[REDIS] SLOW VERSION READ: ${(tV1 - tV0).toFixed(1)}ms`)
     
@@ -142,7 +142,7 @@ async function _searchMarketplaceCore(
             if (cachedIds && Array.isArray(cachedIds)) {
                 console.log(`[REDIS] HIT (IDs) ${cacheKey} | Fetching ${cachedIds.length} objects...`)
                 
-                const dataKeys = cachedIds.map(id => `data:${id}`)
+                const dataKeys = cachedIds.map(id => `data:v2:${id}`)
                 const objectsRaw = await redis.mget(...dataKeys)
                 
                 const objects = objectsRaw
@@ -245,7 +245,7 @@ async function _searchMarketplaceInternal(
         filteredIds = filteredIds.slice(0, limitCount)
         if (!filteredIds.length) return { results: [], filteredIds: [] }
 
-        const dataKeys = filteredIds.map(id => `data:${id}`)
+        const dataKeys = filteredIds.map(id => `data:v2:${id}`)
 
         const tRedisKeys = performance.now()
         const cachedObjectsRaw = await redis.mget(...dataKeys)

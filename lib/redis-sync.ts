@@ -42,7 +42,7 @@ export async function syncToExploreRedis({
 }: SyncItemOptions): Promise<void> {
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
-  const dataKey = `data:${type}:${id}`
+  const dataKey = `data:v2:${type}:${id}`
   const memberId = `${type}:${id}`
   const finalScore = score ?? new Date(data.created_at || Date.now()).getTime()
 
@@ -73,7 +73,7 @@ export async function syncToExploreRedis({
           .from("products")
           .select(`
             id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active, show_in_marketplace,
-            partners(id, store_name, store_image_url, addresses(city, state)),
+            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
           `)
           .eq("id", id)
@@ -96,6 +96,8 @@ export async function syncToExploreRedis({
         const partner = rawPartner ? {
           ...rawPartner,
           store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+          latitude: rawPartner.latitude,
+          longitude: rawPartner.longitude,
           city: rawPartner.addresses?.[0]?.city || null,
           state: rawPartner.addresses?.[0]?.state || null
         } : null
@@ -110,7 +112,7 @@ export async function syncToExploreRedis({
           .from("services")
           .select(`
             id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active,
-            partners(id, store_name, store_image_url, addresses(city, state))
+            partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
           `)
           .eq("id", id)
           .single()
@@ -127,6 +129,8 @@ export async function syncToExploreRedis({
         const partner = rawPartner ? {
           ...rawPartner,
           store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+          latitude: rawPartner.latitude,
+          longitude: rawPartner.longitude,
           city: rawPartner.addresses?.[0]?.city || null,
           state: rawPartner.addresses?.[0]?.state || null
         } : null
@@ -136,7 +140,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("partners")
           .select(`
-            id, store_name, store_image_url, rating, created_at, updated_at,
+            id, store_name, store_image_url, rating, latitude, longitude, created_at, updated_at,
             addresses(city, state)
           `)
           .eq("id", id)
@@ -186,4 +190,48 @@ export async function syncToExploreRedis({
  */
 export async function removeFromExploreRedis(id: string, type: ItemType, silent: boolean = false): Promise<void> {
   return syncToExploreRedis({ id, type, data: {}, removeFromRedis: true, silent })
+}
+
+/**
+ * Atualiza todos os produtos e serviços de um parceiro no Redis.
+ * Útil quando o parceiro altera o nome da loja ou endereço, o que afeta a URL dos itens.
+ */
+export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise<void> {
+  const admin = getAdminClient()
+
+  // Buscar produtos ativos
+  const { data: products } = await admin
+    .from("products")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .neq("show_in_marketplace", false)
+
+  // Buscar serviços ativos
+  const { data: services } = await admin
+    .from("services")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+
+  const promises: Promise<void>[] = []
+
+  if (products && products.length > 0) {
+    for (const prod of products) {
+      promises.push(syncToExploreRedis({ id: prod.id, type: "produto", data: {}, silent: true }))
+    }
+  }
+
+  if (services && services.length > 0) {
+    for (const serv of services) {
+      promises.push(syncToExploreRedis({ id: serv.id, type: "servico", data: {}, silent: true }))
+    }
+  }
+
+  if (promises.length > 0) {
+    await Promise.all(promises)
+    // Forçar uma revalidação não-silenciosa ao final
+    await revalidateExploreSearch({ silent: false })
+    console.log(`[RedisSync] Sincronizados ${products?.length || 0} produtos e ${services?.length || 0} serviços para o parceiro ${partnerId}`)
+  }
 }
