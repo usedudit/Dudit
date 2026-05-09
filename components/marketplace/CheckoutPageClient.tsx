@@ -12,7 +12,6 @@ import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -207,12 +206,16 @@ export function CheckoutPageClient() {
 
     const [userAddresses, setUserAddresses] = useState<UserAddress[]>([])
     const [selectedAddressId, setSelectedAddressId] = useState<string>("")
+    const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [showAddressForm, setShowAddressForm] = useState(false)
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "",
     })
+
+    const [showAddressModal, setShowAddressModal] = useState(false)
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
 
     const [couponCode, setCouponCode] = useState("")
     const [couponDiscount, setCouponDiscount] = useState(0)
@@ -996,41 +999,20 @@ export function CheckoutPageClient() {
                                                         <motion.div key="delivery" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
                                                             {loadingAddresses ? (
                                                                 <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
-                                                            ) : userAddresses.length > 0 ? (
-                                                                <div className="space-y-3">
-                                                                    {userAddresses.map((address) => (
-                                                                        <div
-                                                                            key={address.id}
-                                                                            onClick={() => handleAddressSelect(address.id)}
-                                                                            className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
-                                                                                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                                                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                                                                                }`}
-                                                                        >
-                                                                            <div className="mt-2.5 shrink-0">
-                                                                                <RadioButton
-                                                                                    name="addressSelect"
-                                                                                    value={address.id}
-                                                                                    checked={selectedAddressId === address.id}
-                                                                                    onChange={() => handleAddressSelect(address.id)}
-                                                                                />
-                                                                            </div>
-                                                                            <div className="flex-1">
-                                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
-                                                                                <p className="text-sm text-brand-inactive-text mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
-                                                                                <p className="text-xs text-brand-inactive-text mt-1">CEP: {address.zip_code}</p>
-                                                                            </div>
+                                                            ) : userAddresses.length > 0 && selectedAddress ? (
+                                                                <div className="flex items-center justify-between w-full">
+                                                                    <div className="flex items-stretch gap-3">
+                                                                        <img
+                                                                            src="https://img.dudit.com.br/static/Map.png"
+                                                                            alt="Endereço de entrega"
+                                                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                                        />
+                                                                        <div className="flex flex-col justify-center">
+                                                                            <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
+                                                                            <p className="text-sm text-brand-inactive-text">{selectedAddress.street}, {selectedAddress.number}</p>
                                                                         </div>
-                                                                    ))}
-                                                                    {!showAddressForm && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setShowAddressForm(true)}
-                                                                            className="w-full py-3 border border-dashed border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-dark dark:text-dark-heading transition-colors flex items-center justify-center gap-2"
-                                                                        >
-                                                                            <PlusIcon size={16} /> Adicionar outro endereço
-                                                                        </button>
-                                                                    )}
+                                                                    </div>
+                                                                    <Button variant="link" onClick={() => setShowAddressModal(true)}>Trocar</Button>
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex flex-col items-center border-t border-brand-border pt-6">
@@ -1117,25 +1099,14 @@ export function CheckoutPageClient() {
                                                                     transition={{ duration: 0.2 }}
                                                                     className="mb-6"
                                                                 >
-                                                                    <Label className="mb-3 block">Selecione o método</Label>
-                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                                                                        {paymentMethods.map((method: any) => (
-                                                                            <ListItem
-                                                                                key={method.value}
-                                                                                title={method.label}
-                                                                                className={`px-4 py-3 gap-4 ${formData.paymentMethod === method.value ? "border-brand-green dark:border-brand-green bg-brand-green/5" : ""}`}
-                                                                                onClick={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
-                                                                                right={
-                                                                                    <RadioButton
-                                                                                        name="paymentMethod"
-                                                                                        value={method.value}
-                                                                                        checked={formData.paymentMethod === method.value}
-                                                                                        onChange={() => setFormData({ ...formData, paymentMethod: method.value, installments: 1 })}
-                                                                                    />
-                                                                                }
-                                                                            />
-                                                                        ))}
-                                                                    </div>
+                                                                    <Label className="mb-3 block">Forma de Pagamento</Label>
+                                                                    <ListItem
+                                                                        title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                                        className="border-none px-0 py-2 !bg-transparent shadow-none"
+                                                                        right={
+                                                                            <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                                        }
+                                                                    />
                                                                     {selectedStorefrontMethod?.cardBrand && (
                                                                         <div className="mt-4">
                                                                             <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
@@ -1612,6 +1583,94 @@ export function CheckoutPageClient() {
                     buyerId={userId!}
                 />
             )}
+
+            <DefaultModal
+                isOpen={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+                title="Seus Endereços"
+                maxWidth="md"
+            >
+                <div className="space-y-3 pb-4">
+                    {userAddresses.map((address) => (
+                        <div
+                            key={address.id}
+                            onClick={() => {
+                                handleAddressSelect(address.id)
+                                setShowAddressModal(false)
+                            }}
+                            className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
+                                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                                }`}
+                        >
+                            <div className="mt-2.5 shrink-0 px-4">
+                                <RadioButton
+                                    name="addressSelect"
+                                    value={address.id}
+                                    checked={selectedAddressId === address.id}
+                                    onChange={() => {
+                                        handleAddressSelect(address.id)
+                                        setShowAddressModal(false)
+                                    }}
+                                />
+                            </div>
+                            <div className="flex-1 pr-4">
+                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                <p className="text-sm text-brand-inactive-text mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                                <p className="text-xs text-brand-inactive-text mt-1">CEP: {address.zip_code}</p>
+                            </div>
+                        </div>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowAddressModal(false)
+                            setShowAddressForm(true)
+                        }}
+                        className="w-full py-3 border border-dashed border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-dark dark:text-dark-heading transition-colors flex items-center justify-center gap-2 mt-4"
+                    >
+                        <PlusIcon size={16} /> Adicionar outro endereço
+                    </button>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                title="Meio de Pagamento"
+                maxWidth="md"
+            >
+                <div className="space-y-3 pb-4">
+                    {storefrontMethods.map((m) => (
+                        <div
+                            key={m.id}
+                            onClick={() => {
+                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                setShowPaymentModal(false)
+                            }}
+                            className={`flex items-center border py-4 rounded-xl transition-all cursor-pointer px-4 ${formData.paymentMethod === m.id
+                                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                                }`}
+                        >
+                            <div className="shrink-0 mr-4">
+                                <RadioButton
+                                    name="paymentSelect"
+                                    value={m.id}
+                                    checked={formData.paymentMethod === m.id}
+                                    onChange={() => {
+                                        setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                        setShowPaymentModal(false)
+                                    }}
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{paymentTypeLabelMap[m.type] || m.type}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </DefaultModal>
         </>
     )
 }

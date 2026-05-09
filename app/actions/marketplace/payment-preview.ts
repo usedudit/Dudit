@@ -5,6 +5,7 @@ import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export async function previewMarketplacePaymentAction(input: {
   partnerId: string
@@ -28,7 +29,8 @@ export async function previewMarketplacePaymentAction(input: {
   
   const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
 
-  const { data: fees } = await supabase
+  const adminSupabase = createAdminClient()
+  const { data: fees } = await adminSupabase
     .from("payment_method_installment_fees")
     .select("installment_number, fee_percent")
     .eq("payment_method_id", method.id)
