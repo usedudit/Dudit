@@ -186,18 +186,24 @@ export async function quoteDeliveryFeeAction(input: {
   }
 
   const rules = capability.advancedEnabled ? (rulesRows || []).map(mapRuleRow) : []
-  const priced = calculateDeliveryFee({
-    distanceKm,
-    currentTime: input.currentTimeIso ? new Date(input.currentTimeIso) : new Date(),
-    settings,
-    rules,
-    freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
-  })
-  return {
-    success: true as const,
-    distanceKm,
-    fee: priced.fee,
-    breakdown: priced.breakdown,
-    capability,
+  
+  try {
+    const priced = calculateDeliveryFee({
+      distanceKm,
+      currentTime: input.currentTimeIso ? new Date(input.currentTimeIso) : new Date(),
+      settings,
+      rules,
+      freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
+    })
+    
+    return {
+      success: true as const,
+      distanceKm,
+      fee: priced.fee,
+      breakdown: priced.breakdown,
+      capability,
+    }
+  } catch (error: any) {
+    return { success: false as const, error: error.message || "Erro ao calcular taxa de entrega" }
   }
 }

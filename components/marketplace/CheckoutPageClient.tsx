@@ -216,6 +216,7 @@ export function CheckoutPageClient() {
 
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [showOutsideRadiusModal, setShowOutsideRadiusModal] = useState(false)
 
     const [couponCode, setCouponCode] = useState("")
     const [couponDiscount, setCouponDiscount] = useState(0)
@@ -503,6 +504,9 @@ export function CheckoutPageClient() {
                 })
             } else {
                 setDeliveryError(quote.error)
+                if (quote.error?.toLowerCase().includes("raio")) {
+                    setShowOutsideRadiusModal(true)
+                }
                 // Fallback to baseFee from server config
                 const baseFee = Number(deliverySettings?.baseFee || 0)
                 setDeliveryFee(baseFee)
@@ -633,9 +637,7 @@ export function CheckoutPageClient() {
             )}
         >
             <span className="inline-flex">
-                <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help">
-                    Método da loja
-                </Badge>
+                <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help px-2 border-0 bg-transparent" />
             </span>
         </Tooltip>
     ) : null
@@ -1099,9 +1101,15 @@ export function CheckoutPageClient() {
                                                                     transition={{ duration: 0.2 }}
                                                                     className="mb-6"
                                                                 >
-                                                                    <Label className="mb-3 block">Forma de Pagamento</Label>
                                                                     <ListItem
+                                                                        icon={
+                                                                            selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                                            selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                            MoneyIcon
+                                                                        }
                                                                         title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                                        description={selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" : selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro"}
                                                                         className="border-none px-0 py-2 !bg-transparent shadow-none"
                                                                         right={
                                                                             <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
@@ -1133,7 +1141,7 @@ export function CheckoutPageClient() {
                                                                                 options={
                                                                                     paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
                                                                                         value: String(opt.installments),
-                                                                                        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)} ${opt.hasInterest ? "com juros" : "sem juros"}`
+                                                                                        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
                                                                                     })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
                                                                                         const installmentNumber = index + 1
                                                                                         const installmentAmount = paymentPreview?.installmentAmounts?.[index]
@@ -1297,7 +1305,7 @@ export function CheckoutPageClient() {
                                             title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
                                             titleClassName="text-sm"
                                             description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
-                                            className={`px-4 py-3 gap-4 ${appliedCoupon ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
                                             onClick={() => {
                                                 if (!couponListLoading && availableCoupons.length > 0) {
                                                     setSelectedCouponId(appliedCoupon?.id || "")
@@ -1357,9 +1365,9 @@ export function CheckoutPageClient() {
                                         </div>
                                         {!isPickup && deliveryBreakdown && (
                                             <div className="space-y-1 text-xs text-brand-inactive-text">
-                                                <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>
-                                                <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>
-                                                <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>
+                                                {deliveryBreakdown.baseFee > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>}
+                                                {deliveryBreakdown.distanceFee > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>}
+                                                {deliveryBreakdown.timeAdjustmentTotal > 0 && <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>}
                                             </div>
                                         )}
                                         {isPickup && preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
@@ -1383,7 +1391,7 @@ export function CheckoutPageClient() {
                                             </div>
                                         )}
                                         {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
-                                            <div className="flex justify-between text-sm font-medium text-brand-orange">
+                                            <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                                 <span className="flex items-center gap-2">
                                                     <span>Juros</span>
                                                     {paymentMethodPreviewBadge}
@@ -1641,34 +1649,99 @@ export function CheckoutPageClient() {
                 maxWidth="md"
             >
                 <div className="space-y-3 pb-4">
-                    {storefrontMethods.map((m) => (
-                        <div
-                            key={m.id}
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                setShowPaymentModal(false)
-                            }}
-                            className={`flex items-center border py-4 rounded-xl transition-all cursor-pointer px-4 ${formData.paymentMethod === m.id
-                                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-                                }`}
+                    {storefrontMethods.map((m) => {
+                        const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                            m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                            m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                            <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+                        
+                        const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
+
+                        return (
+                            <div
+                                key={m.id}
+                                onClick={() => {
+                                    setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                    setShowPaymentModal(false)
+                                }}
+                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
+                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3 p-4">
+                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                                        {icon}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
+                                    </div>
+                                    <div className="shrink-0 ml-4">
+                                        <RadioButton
+                                            name="paymentSelect"
+                                            value={m.id}
+                                            checked={formData.paymentMethod === m.id}
+                                            onChange={() => {
+                                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                setShowPaymentModal(false)
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                {m.type.includes("card") && m.cardBrand && (
+                                    <>
+                                        <Separator className="mx-4 my-0" />
+                                        <div className="px-4 py-3 flex flex-wrap gap-2">
+                                            {m.cardBrand.split(',').map(b => {
+                                                const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                if (!brand) return null
+                                                return (
+                                                    <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
+                                                        <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showOutsideRadiusModal}
+                onClose={() => setShowOutsideRadiusModal(false)}
+                title="Endereço Indisponível"
+                maxWidth="sm"
+            >
+                <div className="flex flex-col items-center justify-center text-center p-4 pt-0">
+                    <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                        <MapPinIcon size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">
+                        {partnerInfo.store_name || "Este parceiro"} não entrega no endereço selecionado
+                    </h3>
+                    <p className="text-brand-inactive-text mb-6">
+                        Você gostaria de encontrar outro lugar que entregue neste endereço?
+                    </p>
+                    <div className="flex w-full gap-3">
+                        <Button 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => setShowOutsideRadiusModal(false)}
                         >
-                            <div className="shrink-0 mr-4">
-                                <RadioButton
-                                    name="paymentSelect"
-                                    value={m.id}
-                                    checked={formData.paymentMethod === m.id}
-                                    onChange={() => {
-                                        setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                        setShowPaymentModal(false)
-                                    }}
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{paymentTypeLabelMap[m.type] || m.type}</p>
-                            </div>
-                        </div>
-                    ))}
+                            Não
+                        </Button>
+                        <Button 
+                            className="flex-1"
+                            onClick={() => router.push("/")}
+                        >
+                            Sim
+                        </Button>
+                    </div>
                 </div>
             </DefaultModal>
         </>
