@@ -59,6 +59,7 @@ export interface Report {
     id: string
     reporter_user_id: string
     reporter_name: string
+    reporter_email: string
     target_type: ReportTargetType
     target_id: string
     target_name: string
@@ -415,23 +416,27 @@ export async function getReports(
     // Batch-fetch reporter names from user_profiles (no FK between reports ↔ user_profiles).
     const reporterIds = [...new Set(items.map((r: any) => r.reporter_user_id as string))]
     const reporterNames = new Map<string, string>()
+    const reporterEmails = new Map<string, string>()
     if (reporterIds.length > 0) {
         const { data: reporters } = await supabase
             .from("user_profiles")
-            .select("user_id, full_name")
+            .select("user_id, full_name, email")
             .in("user_id", reporterIds)
         ;(reporters || []).forEach((p: any) => {
             if (p.full_name) reporterNames.set(p.user_id, p.full_name)
+            if (p.email) reporterEmails.set(p.user_id, p.email)
         })
     }
 
     const mapped: Report[] = items.map((r: any) => {
         const reporterName = reporterNames.get(r.reporter_user_id)
+        const reporterEmail = reporterEmails.get(r.reporter_user_id)
         const tname = targetNames.get(`${r.target_type}:${r.target_id}`)
         return attachReasonInfo({
             id: r.id,
             reporter_user_id: r.reporter_user_id,
             reporter_name: reporterName || "Desconhecido",
+            reporter_email: reporterEmail || "N/A",
             target_type: r.target_type,
             target_id: r.target_id,
             target_name: tname || r.target_id,

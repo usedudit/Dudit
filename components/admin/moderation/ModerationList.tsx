@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useState, useTransition, useCallback } from "react"
+import React, { useState, useTransition, useCallback, useMemo } from "react"
 import {
     SearchIcon, CheckCircleIcon, CancelCircleIcon, EyeIcon, ClockIcon,
-    AlertTriangleIcon, TrashIcon, RemoveImageIcon, AllProductsIcon
+    AlertTriangleIcon, TrashIcon, RemoveImageIcon, AllProductsIcon,
+    StoreIcon, UserIcon, InfoIcon
 } from "@/lib/icons"
 import { ImageOff } from "lucide-react"
 import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
@@ -21,6 +22,17 @@ import {
     rejectModeration,
 } from "@/app/actions/admin/moderation"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+    SheetFooter,
+} from "@/components/ui/sheet"
+import BottomSheet from "@/components/BottomSheet"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { toast } from "sonner"
 
 
 // ─── Image thumbnail ────────────────────────────────────────────────────────
@@ -44,20 +56,33 @@ function ImageThumbnail({ url, selected, onToggle }: { url: string; selected: bo
 
 // ─── Product Detail Panel ───────────────────────────────────────────────────
 
-function ProductDetailPanel({
-    item, onClose, onApprove, onRejectImages, onFullReject, isPending,
-}: {
-    item: ModerationItem
+// ─── Product Moderation Sheet ───────────────────────────────────────────────────
+
+interface ProductModerationSheetProps {
+    item: ModerationItem | null
+    isOpen: boolean
     onClose: () => void
     onApprove: (id: string) => void
     onRejectImages: (id: string, urls: string[], reason: string) => void
     onFullReject: (id: string, reason: string) => void
     isPending: boolean
-}) {
+}
+
+function ProductModerationSheet({
+    item, isOpen, onClose, onApprove, onRejectImages, onFullReject, isPending,
+}: ProductModerationSheetProps) {
     const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
     const [showRejectImagesModal, setShowRejectImagesModal] = useState(false)
     const [showFullRejectModal, setShowFullRejectModal] = useState(false)
+    const [showApproveModal, setShowApproveModal] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
+    const isMobile = useMediaQuery("(max-width: 768px)")
+
+    // Reset local state when item changes
+    React.useEffect(() => {
+        setSelectedImages(new Set())
+        setRejectReason("")
+    }, [item])
 
     const toggleImage = (url: string) => {
         setSelectedImages(prev => {
@@ -68,197 +93,241 @@ function ProductDetailPanel({
         })
     }
 
-    return (
-        <div className="fixed inset-0 z-40 flex">
-            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+    if (!item) return null
 
-            <div className="relative ml-auto w-full max-w-2xl bg-white dark:bg-dark-surface h-full overflow-y-auto shadow-2xl">
-                <div className="sticky top-0 z-10 bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border p-4 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Detalhes do produto</h2>
-                    <Button variant="filled" onClick={onClose} className="w-[40px] h-[40px] p-0 flex items-center justify-center">
-                        <CancelCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                    </Button>
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
+                {/* Product Header */}
+                <div>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.title}</h3>
+                    <div className="flex items-center gap-3 mt-2">
+                        <Badge variant={
+                            item.moderation_status === "pending_moderation" ? "orange" : 
+                            item.moderation_status === "flagged" ? "red" : 
+                            item.moderation_status === "approved" ? "green" : 
+                            item.moderation_status === "rejected" ? "red" : 
+                            item.moderation_status === "needs_images" ? "blue" : "gray"
+                        }>
+                            {item.moderation_status === "pending_moderation" ? "Pendente" : 
+                             item.moderation_status === "flagged" ? "Flagged" : 
+                             item.moderation_status === "approved" ? "Aprovado" : 
+                             item.moderation_status === "rejected" ? "Rejeitado" : 
+                             item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
+                        </Badge>
+                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(item.price || 0)}
+                        </span>
+                    </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                    {/* Product Info */}
-                    <div>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.title}</h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">{item.description || "Sem descrição"}</p>
-                        <div className="flex items-center gap-3 mt-3">
-                            <Badge variant={
-                                item.moderation_status === "pending_moderation" ? "orange" : 
-                                item.moderation_status === "flagged" ? "red" : 
-                                item.moderation_status === "approved" ? "green" : 
-                                item.moderation_status === "rejected" ? "red" : 
-                                item.moderation_status === "needs_images" ? "blue" : "gray"
-                            }>
-                                {item.moderation_status === "pending_moderation" ? "Pendente" : 
-                                 item.moderation_status === "flagged" ? "Flagged" : 
-                                 item.moderation_status === "approved" ? "Aprovado" : 
-                                 item.moderation_status === "rejected" ? "Rejeitado" : 
-                                 item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
-                            </Badge>
-                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                {formatCurrency(item.price || 0)}
-                            </span>
-                        </div>
-                    </div>
+                {/* description */}
+                <div>
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">Descrição</h4>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
+                        {item.description || "Sem descrição disponível."}
+                    </p>
+                </div>
 
-                    {/* Partner / Owner */}
-                    <div className="p-4 bg-gray-50 dark:bg-dark-background rounded-xl">
+                {/* Partner Info */}
+                <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
+                    <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Loja: {item.owner_store_name}</p>
+                            <div className="flex items-center gap-2">
+                                <StoreIcon size={16} className="text-brand-inactive-text" />
+                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{item.owner_store_name}</span>
+                            </div>
                             {item.risk_score > 0 && (
                                 <Badge variant={item.risk_score >= 50 ? "red" : item.risk_score >= 20 ? "orange" : "blue"}>
                                     Risk: {item.risk_score}
                                 </Badge>
                             )}
                         </div>
-                        {item.owner_user_name && (
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">Responsável: {item.owner_user_name}</p>
-                        )}
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                            Criado em {formatDate(item.created_at)}
-                        </p>
-                    </div>
-
-                    {/* Images */}
-                    <div>
-                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                            Imagens ({item.images?.length || 0})
-                        </h4>
-                        {item.images && item.images.length > 0 ? (
-                            <div className="flex flex-wrap gap-3">
-                                {item.images.map((url: string, idx: number) => (
-                                    <ImageThumbnail key={idx} url={url} selected={selectedImages.has(url)} onToggle={() => toggleImage(url)} />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-700 dark:text-amber-400">
-                                <ImageOff className="w-5 h-5" />
-                                <span className="text-sm font-medium">Nenhuma imagem</span>
-                            </div>
-                        )}
-                        {selectedImages.size > 0 && (
-                            <p className="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
-                                {selectedImages.size} imagem(ns) selecionada(s) para remoção
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button onClick={() => onApprove(item.id)} disabled={isPending} className="w-full">
-                            <CheckCircleIcon className="w-4 h-4 mr-2" />
-                            Aprovar produto
-                        </Button>
-
-                        {selectedImages.size > 0 && (
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowRejectImagesModal(true)}
-                                disabled={isPending}
-                                className="w-full text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700"
-                            >
-                                <CancelCircleIcon className="w-4 h-4 mr-2" />
-                                Remover {selectedImages.size} imagem(ns) selecionada(s)
-                            </Button>
-                        )}
-
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowFullRejectModal(true)}
-                            disabled={isPending}
-                            className="w-full text-brand-red border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700"
-                        >
-                            <CancelCircleIcon className="w-4 h-4 mr-2" />
-                            Rejeitar produto
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <UserIcon size={16} className="text-brand-inactive-text" />
+                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Responsável: <strong>{item.owner_user_name}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                            <ClockIcon size={14} className="text-brand-inactive-text" />
+                            <span className="text-xs text-brand-inactive-text">Enviado em {formatDate(item.created_at)}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Reject images - DefaultModal with reason input */}
-                <DefaultModal
-                    isOpen={showRejectImagesModal}
-                    onClose={() => { setShowRejectImagesModal(false); setRejectReason("") }}
-                    title="Remover imagens"
-                    maxWidth="md"
-                    footer={
-                        <>
-                            <Button variant="outline" onClick={() => { setShowRejectImagesModal(false); setRejectReason("") }}>Cancelar</Button>
-                            <Button
-                                variant="destructive"
-                                disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                                onClick={() => {
-                                    onRejectImages(item.id, [...selectedImages], rejectReason)
-                                    setShowRejectImagesModal(false)
-                                    setRejectReason("")
-                                }}
-                            >
-                                Remover imagens
-                            </Button>
-                        </>
-                    }
-                >
-                    <div className="flex flex-col gap-4">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            {selectedImages.size} imagem(ns) serão removidas permanentemente. Esta ação é irreversível.
-                        </p>
-                        <Input
-                            name="reject-reason"
-                            label="Motivo"
-                            placeholder="Motivo da remoção (mínimo 5 caracteres)..."
-                            value={rejectReason}
-                            onChange={e => setRejectReason(e.target.value)}
-                            required
-                            multiline
-                            rows={3}
-                        />
+                {/* Images */}
+                <div>
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Imagens ({item.images?.length || 0})</h4>
+                        {selectedImages.size > 0 && (
+                            <span className="text-xs font-bold text-brand-red">{selectedImages.size} selecionada(s)</span>
+                        )}
                     </div>
-                </DefaultModal>
-
-                {/* Full reject - DefaultModal with reason input */}
-                <DefaultModal
-                    isOpen={showFullRejectModal}
-                    onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
-                    title="Rejeitar produto"
-                    maxWidth="md"
-                    footer={
-                        <>
-                            <Button variant="outline" onClick={() => { setShowFullRejectModal(false); setRejectReason("") }}>Cancelar</Button>
-                            <Button
-                                variant="destructive"
-                                disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                                onClick={() => {
-                                    onFullReject(item.id, rejectReason)
-                                    setShowFullRejectModal(false)
-                                    setRejectReason("")
-                                }}
-                            >
-                                Rejeitar
-                            </Button>
-                        </>
-                    }
-                >
-                    <div className="flex flex-col gap-4">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            O produto &quot;{item.title}&quot; será rejeitado e não aparecerá no marketplace.
-                        </p>
-                        <Input
-                            name="full-reject-reason"
-                            label="Motivo"
-                            placeholder="Motivo da rejeição (mínimo 5 caracteres)..."
-                            value={rejectReason}
-                            onChange={e => setRejectReason(e.target.value)}
-                            required
-                            multiline
-                            rows={3}
-                        />
-                    </div>
-                </DefaultModal>
+                    {item.images && item.images.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-3">
+                            {item.images.map((url: string, idx: number) => (
+                                <ImageThumbnail key={idx} url={url} selected={selectedImages.has(url)} onToggle={() => toggleImage(url)} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-8 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
+                            <ImageOff size={32} className="mb-2 opacity-30" />
+                            <span className="text-sm font-medium">Nenhuma imagem enviada</span>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* Sticky Actions */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
+                <div className="flex gap-3">
+                    <Button 
+                        variant="filled" 
+                        className="flex-1 rounded-full h-12 text-[15px] font-bold" 
+                        onClick={() => setShowApproveModal(true)}
+                        disabled={isPending}
+                    >
+                        <CheckCircleIcon size={20} className="mr-2" /> Aprovar Produto
+                    </Button>
+                </div>
+                <div className="flex gap-3">
+                    {selectedImages.size > 0 && (
+                        <Button
+                            variant="outline"
+                            className="flex-1 rounded-full h-12 text-amber-600 border-amber-200 hover:bg-amber-50"
+                            onClick={() => setShowRejectImagesModal(true)}
+                            disabled={isPending}
+                        >
+                            <CancelCircleIcon size={20} className="mr-2" /> Remover {selectedImages.size} Imagens
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        className="flex-1 rounded-full h-12 text-brand-red border-red-200 hover:bg-red-50"
+                        onClick={() => setShowFullRejectModal(true)}
+                        disabled={isPending}
+                    >
+                        <TrashIcon size={20} className="mr-2" /> Rejeitar Produto
+                    </Button>
+                </div>
+            </div>
+
+            {/* Modals */}
+            <DefaultModal
+                isOpen={showApproveModal}
+                onClose={() => setShowApproveModal(false)}
+                title="Aprovar Produto"
+                maxWidth="sm"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowApproveModal(false)} disabled={isPending}>Cancelar</Button>
+                        <Button onClick={() => { onApprove(item.id); setShowApproveModal(false) }} isLoading={isPending}>Confirmar Aprovação</Button>
+                    </>
+                }
+            >
+                <div className="flex flex-col items-center text-center gap-4 py-4">
+                    <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
+                        <CheckCircleIcon size={32} />
+                    </div>
+                    <div>
+                        <p className="text-brand-dark dark:text-dark-heading font-bold text-lg">Confirmar aprovação?</p>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">O produto &quot;{item.title}&quot; ficará visível imediatamente para todos os usuários.</p>
+                    </div>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showRejectImagesModal}
+                onClose={() => { setShowRejectImagesModal(false); setRejectReason("") }}
+                title="Remover Imagens"
+                maxWidth="md"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => { setShowRejectImagesModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
+                        <Button
+                            variant="destructive"
+                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
+                            onClick={() => {
+                                onRejectImages(item.id, [...selectedImages], rejectReason)
+                                setShowRejectImagesModal(false)
+                            }}
+                            isLoading={isPending}
+                        >
+                            Confirmar Remoção
+                        </Button>
+                    </>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-700 dark:text-amber-400">
+                        <InfoIcon size={20} className="shrink-0 mt-0.5" />
+                        <p className="text-sm font-medium">{selectedImages.size} imagem(ns) serão removidas. O parceiro será notificado para substituí-las.</p>
+                    </div>
+                    <Input
+                        name="reject-images-reason"
+                        label="Motivo da remoção"
+                        placeholder="Explique ao parceiro por que as imagens foram removidas..."
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        multiline
+                        rows={3}
+                        required
+                    />
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={showFullRejectModal}
+                onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
+                title="Rejeitar Produto"
+                maxWidth="md"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => { setShowFullRejectModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
+                        <Button
+                            variant="destructive"
+                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
+                            onClick={() => {
+                                onFullReject(item.id, rejectReason)
+                                setShowFullRejectModal(false)
+                            }}
+                            isLoading={isPending}
+                        >
+                            Confirmar Rejeição
+                        </Button>
+                    </>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">O produto será removido da fila e o parceiro receberá o motivo da rejeição.</p>
+                    <Input
+                        name="full-reject-reason"
+                        label="Motivo da rejeição"
+                        placeholder="Explique detalhadamente o motivo da rejeição..."
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        multiline
+                        rows={3}
+                        required
+                    />
+                </div>
+            </DefaultModal>
         </div>
+    )
+
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        )
+    }
+
+    return (
+        <Sheet open={isOpen} onOpenChange={(v) => !v && onClose()}>
+            <SheetContent className="p-0 sm:max-w-md border-0" side="right">
+                {content}
+            </SheetContent>
+        </Sheet>
     )
 }
 
@@ -300,8 +369,11 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         startTransition(async () => {
             const result = await approveModeration(id)
             if (result.success) {
+                toast.success("Produto aprovado com sucesso!")
                 setDetailItem(null)
                 fetchData()
+            } else {
+                toast.error(result.error || "Erro ao aprovar produto")
             }
         })
     }
@@ -310,9 +382,12 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         startTransition(async () => {
             const result = await rejectFlaggedImages(id, reason, urls)
             if (result.success) {
+                toast.success("Imagens removidas com sucesso!")
                 if (result.noImagesLeft) setNoImagesAlert(true)
                 setDetailItem(null)
                 fetchData()
+            } else {
+                toast.error(result.error || "Erro ao remover imagens")
             }
         })
     }
@@ -321,8 +396,11 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
         startTransition(async () => {
             const result = await rejectModeration(id, reason)
             if (result.success) {
+                toast.success("Produto rejeitado com sucesso!")
                 setDetailItem(null)
                 fetchData()
+            } else {
+                toast.error(result.error || "Erro ao rejeitar produto")
             }
         })
     }
@@ -439,11 +517,12 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 w-20 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Img</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider">Produto</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Criado em</th>
-                                                    <th className="py-3 px-2 w-40 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider">Produto</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider">Parceiro</th>
+                                                    <th className="py-3 px-2 w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Imagens</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Data</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider text-center">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -477,17 +556,16 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 </div>
             </div>
 
-            {/* Detail Panel */}
-            {detailItem && (
-                <ProductDetailPanel
-                    item={detailItem}
-                    onClose={() => setDetailItem(null)}
-                    onApprove={handleApprove}
-                    onRejectImages={handleRejectImages}
-                    onFullReject={handleFullReject}
-                    isPending={isPending}
-                />
-            )}
+            {/* Detail Sheet */}
+            <ProductModerationSheet
+                item={detailItem}
+                isOpen={!!detailItem}
+                onClose={() => setDetailItem(null)}
+                onApprove={handleApprove}
+                onRejectImages={handleRejectImages}
+                onFullReject={handleFullReject}
+                isPending={isPending}
+            />
 
             {/* No images left alert */}
             <AlertModal

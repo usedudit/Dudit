@@ -2,13 +2,14 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Button } from "@/components/reusable"
+import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import { 
     UserIcon, 
     CheckCircleIcon, 
     AlertCircleIcon, 
     ClockIcon, 
-    AlertTriangleIcon 
+    AlertTriangleIcon,
+    StoreIcon
 } from "@/lib/icons"
 import type { EnforcementUser } from "@/lib/admin/types"
 
@@ -17,13 +18,15 @@ interface UserEnforcementListRowProps {
     isPending: boolean
     onUnban: (user: EnforcementUser) => void
     onBan: (user: EnforcementUser) => void
+    onView: (user: EnforcementUser) => void
 }
 
 const UserEnforcementListRow = React.memo(({
     user,
     isPending,
     onUnban,
-    onBan
+    onBan,
+    onView
 }: UserEnforcementListRowProps) => {
     
     const initials = user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"
@@ -33,34 +36,48 @@ const UserEnforcementListRow = React.memo(({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+            onClick={() => onView(user)}
         >
-            {/* Usuário info */}
+            {/* Usuário */}
             <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-brand-green/10 dark:bg-brand-green/5 flex items-center justify-center shrink-0 border border-brand-green/20 dark:border-brand-green/10">
-                        <span className="text-[13px] font-bold text-brand-green">
-                            {initials}
-                        </span>
-                    </div>
-                    <div className="min-w-0 flex flex-col">
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                            {user.full_name || "Sem nome"}
-                        </span>
-                        {user.partner && (
-                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                Loja: {user.partner.store_name}
+                <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                        {user.full_name || "Sem nome"}
+                    </span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                        {user.user_id}
+                    </span>
+                </div>
+            </td>
+
+            {/* Loja */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                {user.partner ? (
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1">
+                            <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
+                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                                {user.partner.store_name}
                             </span>
-                        )}
-                        {user.banned_at && user.banned_reason && (
-                            <p className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1 mt-0.5 font-bold">
-                                <AlertTriangleIcon size={12} className="shrink-0" />
-                                <span className="truncate">{user.banned_reason}</span>
-                                {user.banned_until && (
-                                    <span className="shrink-0 ml-1 opacity-70">(até {new Date(user.banned_until).toLocaleDateString("pt-BR")})</span>
-                                )}
-                            </p>
-                        )}
+                        </div>
+                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
+                            {user.partner?.id}
+                        </span>
                     </div>
+                ) : (
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-50 italic">Sem loja</span>
+                )}
+            </td>
+
+            {/* Data */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex flex-col items-center">
+                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                        {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
+                        {new Date(user.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                 </div>
             </td>
 
@@ -71,7 +88,7 @@ const UserEnforcementListRow = React.memo(({
                         user.banned_until && new Date(user.banned_until) < new Date() ? (
                             <Badge variant="orange">Ban expirado</Badge>
                         ) : (
-                            <Badge variant="red">{!user.banned_until ? "Banido" : "Banido (temporário)"}</Badge>
+                            <Badge variant="red">Banido</Badge>
                         )
                     ) : (
                         <Badge variant="green">Ativo</Badge>
@@ -79,38 +96,20 @@ const UserEnforcementListRow = React.memo(({
                 </div>
             </td>
 
-            {/* Criado em */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                    <ClockIcon size={14} className="opacity-70" />
-                    {new Date(user.created_at).toLocaleDateString("pt-BR")}
-                </div>
-            </td>
-
             {/* Ações */}
             <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex items-center justify-center gap-2 flex-wrap action-btn opacity-0 group-hover:opacity-100 transition-opacity">
-                    {user.banned_at ? (
-                        <Button
-                            variant="outline"
-                            onClick={() => onUnban(user)}
-                            disabled={isPending}
-                            className="h-8 px-3 text-xs border-brand-green/20 hover:border-brand-green/40 hover:bg-brand-green/5 text-brand-green"
-                        >
-                            <CheckCircleIcon size={14} className="mr-1.5" />
-                            Desbanir
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="outline"
-                            onClick={() => onBan(user)}
-                            disabled={isPending}
-                            className="h-8 px-3 text-xs border-brand-red/20 hover:border-brand-red/40 hover:bg-brand-red/5 text-brand-red"
-                        >
-                            <AlertCircleIcon size={14} className="mr-1.5" />
-                            Banir
-                        </Button>
-                    )}
+                <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                    <ActionsDropdown>
+                        {user.banned_at ? (
+                            <DropdownItem onClick={() => onUnban(user)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Desbanir Usuário
+                            </DropdownItem>
+                        ) : (
+                            <DropdownItem onClick={() => onBan(user)} className="text-brand-red">
+                                <AlertCircleIcon size={16} /> Banir Usuário
+                            </DropdownItem>
+                        )}
+                    </ActionsDropdown>
                 </div>
             </td>
         </motion.tr>

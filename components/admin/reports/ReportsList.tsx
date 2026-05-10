@@ -9,6 +9,28 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { supabaseBrowser } from "@/lib/supabase/browser-client"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+    SheetFooter,
+} from "@/components/ui/sheet"
+import BottomSheet from "@/components/BottomSheet"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { toast } from "sonner"
+import {
+    InfoIcon,
+    AlertTriangleIcon,
+    CheckCircleIcon,
+    CancelCircleIcon,
+    ReturnIcon,
+    StoreIcon,
+    UserIcon,
+    MailIcon,
+    ClockIcon
+} from "@/lib/icons"
 import type {
     Report,
     ReportsStats,
@@ -234,9 +256,12 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
         startTransition(async () => {
             const result = await resolveReport(resolveTarget.id, reason)
             if (result.success) {
+                toast.success("Denúncia validada com sucesso!")
                 setResolveTarget(null)
                 setActionReason("")
                 await Promise.all([refetchFirstPage(), refetchStats()])
+            } else {
+                toast.error(result.error || "Erro ao validar denúncia")
             }
         })
     }
@@ -248,9 +273,12 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
         startTransition(async () => {
             const result = await dismissReport(dismissTarget.id, reason)
             if (result.success) {
+                toast.success("Denúncia descartada com sucesso!")
                 setDismissTarget(null)
                 setActionReason("")
                 await Promise.all([refetchFirstPage(), refetchStats()])
+            } else {
+                toast.error(result.error || "Erro ao descartar denúncia")
             }
         })
     }
@@ -262,9 +290,12 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
         startTransition(async () => {
             const result = await markReportSpam(spamTarget.id, reason)
             if (result.success) {
+                toast.success("Denúncia marcada como spam!")
                 setSpamTarget(null)
                 setActionReason("")
                 await Promise.all([refetchFirstPage(), refetchStats()])
+            } else {
+                toast.error(result.error || "Erro ao marcar como spam")
             }
         })
     }
@@ -276,9 +307,12 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
         startTransition(async () => {
             const result = await revertReportValidation(revertTarget.id, reason)
             if (result.success) {
+                toast.success("Validação revertida com sucesso!")
                 setRevertTarget(null)
                 setActionReason("")
                 await Promise.all([refetchFirstPage(), refetchStats()])
+            } else {
+                toast.error(result.error || "Erro ao reverter validação")
             }
         })
     }
@@ -404,12 +438,13 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 w-32 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Tipo</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider">Denúncia</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Severidade</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Data</th>
-                                                    <th className="py-3 px-2 w-48 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider">Item denunciado</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider">Motivo</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider">Quem denunciou</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Tipo</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Data</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider text-center">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -511,10 +546,15 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                 onConfirm={handleRevert}
             />
 
-            {/* Details modal */}
-            <ReportDetailsModal
+            {/* Details Sheet */}
+            <ReportDetailsSheet
                 report={detailTarget}
+                isOpen={!!detailTarget}
                 onClose={() => setDetailTarget(null)}
+                onResolve={setResolveTarget}
+                onDismiss={setDismissTarget}
+                onSpam={setSpamTarget}
+                onRevert={setRevertTarget}
             />
         </FadeIn>
     )
@@ -588,116 +628,143 @@ function ReportActionModal({
     )
 }
 
-interface ReportDetailsModalProps {
+interface ReportDetailsSheetProps {
     report: Report | null
+    isOpen: boolean
     onClose: () => void
+    onResolve: (r: Report) => void
+    onDismiss: (r: Report) => void
+    onSpam: (r: Report) => void
+    onRevert: (r: Report) => void
 }
 
-function ReportDetailsModal({ report, onClose }: ReportDetailsModalProps) {
+function ReportDetailsSheet({
+    report, isOpen, onClose, onResolve, onDismiss, onSpam, onRevert
+}: ReportDetailsSheetProps) {
     const [summary, setSummary] = useState<TargetReportSummary | null>(null)
     const [isLoading, setIsLoading] = useState(false)
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     useEffect(() => {
-        if (!report) {
+        if (report && isOpen) {
+            setIsLoading(true)
+            getTargetReportSummary({ targetId: report.target_id, targetType: report.target_type })
+                .then(setSummary)
+                .finally(() => setIsLoading(false))
+        } else if (!isOpen) {
             setSummary(null)
-            return
         }
-        setIsLoading(true)
-        let cancelled = false
-        getTargetReportSummary({ targetType: report.target_type, targetId: report.target_id })
-            .then(result => { if (!cancelled) setSummary(result) })
-            .catch(() => { if (!cancelled) setSummary(null) })
-            .finally(() => { if (!cancelled) setIsLoading(false) })
-        return () => { cancelled = true }
-    }, [report])
+    }, [report, isOpen])
 
-    return (
-        <DefaultModal
-            isOpen={!!report}
-            onClose={onClose}
-            title="Detalhes da denúncia"
-            maxWidth="lg"
-            footer={<Button variant="outline" onClick={onClose}>Fechar</Button>}
-        >
-            {report && (
-                <div className="flex flex-col gap-4 text-sm">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="blue">
-                            {report.target_type === "product" ? "Produto" :
-                                report.target_type === "service" ? "Serviço" :
-                                    report.target_type === "partner" ? "Parceiro" :
-                                        report.target_type === "review" ? "Avaliação" : report.target_type}
-                        </Badge>
-                        <Badge variant={
-                            report.status === "pending" ? "orange" :
-                                report.status === "validated" ? "red" :
-                                    report.status === "dismissed" ? "gray" :
-                                        report.status === "spam" ? "purple" : "gray"
-                        }>
-                            {report.status === "pending" ? "Pendente" :
-                                report.status === "validated" ? "Validada" :
-                                    report.status === "dismissed" ? "Descartada" :
-                                        report.status === "spam" ? "Spam" : report.status}
-                        </Badge>
-                        <Badge variant={report.severity === "high" ? "red" : report.severity === "normal" ? "orange" : "gray"}>
-                            {report.severity === "high" ? "Alto" : report.severity === "normal" ? "Médio" : "Baixo"}
-                        </Badge>
+    if (!report) return null
+
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
+                {/* Header */}
+                <div>
+                    <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"} className="mb-2">
+                        {report.target_type === "product" ? "Produto" :
+                            report.target_type === "service" ? "Serviço" :
+                                report.target_type === "partner" ? "Parceiro" :
+                                    report.target_type === "review" ? "Avaliação" : report.target_type}
+                    </Badge>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{report.target_name}</h3>
+                    <p className="text-xs font-medium text-brand-inactive-text mt-1 opacity-70">ID: {report.target_id}</p>
+                </div>
+
+                {/* Target Summary */}
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <div className="w-6 h-6 border-2 border-brand-red border-t-transparent rounded-full animate-spin"></div>
                     </div>
-
-                    <Field label="Alvo" value={report.target_name} />
-                    <Field label="Motivo" value={report.reason_label || report.reason} />
-                    {report.description && <Field label="Descrição" value={report.description} />}
-                    <Field label="Reportado por" value={report.reporter_name} />
-                    <Field label="Criado em" value={new Date(report.created_at).toLocaleString("pt-BR")} />
-
-                    {report.resolved_at && (
-                        <>
-                            <Field label="Resolvida em" value={new Date(report.resolved_at).toLocaleString("pt-BR")} />
-                            {report.resolution_reason && (
-                                <Field label="Motivo da resolução" value={report.resolution_reason} />
-                            )}
-                        </>
-                    )}
-
-                    <div className="border-t border-brand-border dark:border-dark-border pt-3">
-                        <div className="text-xs uppercase tracking-wide text-brand-inactive-text mb-2">
-                            Outras denúncias para este alvo
+                ) : summary ? (
+                    <div className="grid grid-cols-2 gap-3 p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Total de Denúncias</span>
+                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.total}</span>
                         </div>
-                        {isLoading ? (
-                            <div className="text-xs text-brand-inactive-text">Calculando...</div>
-                        ) : summary ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                <SummaryStat label="Total" value={summary.total} />
-                                <SummaryStat label="Reporters únicos" value={summary.distinct_reporters} />
-                                <SummaryStat label="Pendentes" value={summary.pending} />
-                                <SummaryStat label="Validadas" value={summary.validated} />
-                                <SummaryStat label="Descartadas" value={summary.dismissed} />
-                                <SummaryStat label="Spam" value={summary.spam} />
-                            </div>
-                        ) : (
-                            <div className="text-xs text-brand-inactive-text">Sem dados</div>
-                        )}
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Denunciantes Únicos</span>
+                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                {summary.distinct_reporters}
+                            </span>
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* Report List */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
+                    <div className="flex gap-3">
+                        <InfoIcon className="text-blue-600 shrink-0" size={18} />
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Resumo do Alvo</p>
+                            <p className="text-xs text-blue-800 dark:text-blue-400">
+                                Este item recebeu {summary?.total} denúncias no total, sendo {summary?.pending} ainda pendentes de análise.
+                            </p>
+                        </div>
                     </div>
                 </div>
-            )}
-        </DefaultModal>
-    )
-}
+            </div>
 
-function Field({ label, value }: { label: string; value: string }) {
-    return (
-        <div>
-            <div className="text-xs uppercase tracking-wide text-brand-inactive-text mb-1">{label}</div>
-            <div className="text-sm text-brand-dark dark:text-dark-heading break-words">{value}</div>
+            {/* Sticky Actions */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
+                {report.status === "pending" ? (
+                    <div className="flex flex-col gap-3">
+                        <Button
+                            variant="filled"
+                            className="w-full rounded-full h-12 text-[15px] font-bold"
+                            onClick={() => onResolve(report)}
+                        >
+                            <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
+                        </Button>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full h-11 text-brand-inactive-text"
+                                onClick={() => onDismiss(report)}
+                            >
+                                <CancelCircleIcon size={18} className="mr-2" /> Descartar
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full h-11 text-purple-600 border-purple-200"
+                                onClick={() => onSpam(report)}
+                            >
+                                <AlertTriangleIcon size={18} className="mr-2" /> Spam
+                            </Button>
+                        </div>
+                    </div>
+                ) : report.status === "validated" ? (
+                    <Button
+                        variant="outline"
+                        className="w-full rounded-full h-12 font-bold"
+                        onClick={() => onRevert(report)}
+                    >
+                        <ReturnIcon size={20} className="mr-2" /> Reverter Validação
+                    </Button>
+                ) : (
+                    <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-medium bg-brand-gray dark:bg-dark-border/20 rounded-xl">
+                        Esta denúncia já foi processada como <strong className="mx-1 uppercase">{report.status}</strong>.
+                    </div>
+                )}
+            </div>
         </div>
     )
-}
 
-function SummaryStat({ label, value }: { label: string; value: number }) {
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        )
+    }
+
     return (
-        <div className="rounded-lg border border-brand-border dark:border-dark-border px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-brand-inactive-text">{label}</div>
-            <div className="text-lg font-bold text-brand-dark dark:text-dark-heading">{value}</div>
-        </div>
+        <Sheet open={isOpen} onOpenChange={(v) => !v && onClose()}>
+            <SheetContent className="p-0 sm:max-w-md border-0" side="right">
+                {content}
+            </SheetContent>
+        </Sheet>
     )
 }

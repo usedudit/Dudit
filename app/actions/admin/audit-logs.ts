@@ -57,6 +57,24 @@ export async function getAuditLogs(
     const auditLogs = (logs || []) as AuditLogRow[]
     const hasMore = auditLogs.length > pageSize
     const items = auditLogs.slice(0, pageSize)
+    
+    // Batch fetch admin names/emails
+    const adminIds = [...new Set(items.map(l => l.admin_user_id))]
+    if (adminIds.length > 0) {
+        const { data: admins } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name, email")
+            .in("user_id", adminIds)
+        
+        const adminMap = new Map<string, any>(admins?.map((a: any) => [a.user_id, a]) || [])
+        items.forEach((item: AuditLogRow) => {
+            const profile = adminMap.get(item.admin_user_id)
+            if (profile) {
+                item.admin_name = profile.full_name
+                item.admin_email = profile.email
+            }
+        })
+    }
 
     return {
         data: items,
@@ -103,10 +121,27 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
             .limit(10),
     ])
 
+    const items = (recentLogs.data || []) as AuditLogRow[]
+    const adminIds = [...new Set(items.map(l => l.admin_user_id))]
+    if (adminIds.length > 0) {
+        const { data: admins } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name, email")
+            .in("user_id", adminIds)
+        const adminMap = new Map<string, any>(admins?.map((a: any) => [a.user_id, a]) || [])
+        items.forEach((item: AuditLogRow) => {
+            const profile = adminMap.get(item.admin_user_id)
+            if (profile) {
+                item.admin_name = profile.full_name
+                item.admin_email = profile.email
+            }
+        })
+    }
+
     return {
         pendingModeration: moderationCount.count || 0,
         bannedUsers: bannedCount.count || 0,
         activeSubscriptions: mpCount.count || 0,
-        recentAuditLogs: (recentLogs.data || []) as AuditLogRow[],
+        recentAuditLogs: items,
     }
 }

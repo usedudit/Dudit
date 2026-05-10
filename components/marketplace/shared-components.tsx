@@ -64,7 +64,7 @@ export const HeroBanner: React.FC = () => {
 
     return (
         <section className="mt-6 mb-12 px-4 lg:px-0 group">
-            <div className="mx-auto max-w-[1300px] w-full relative rounded-[20px] overflow-hidden shadow-sm">
+            <div className="mx-auto max-w-[1300px] w-full relative rounded-[20px] overflow-hidden">
                 <div
                     className="flex transition-transform duration-500 ease-out"
                     style={{ transform: `translateX(-${currentIndex * 100}%)` }}
@@ -141,14 +141,14 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
                 <img
                     src={bannerImage}
                     alt={vitrine.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover transition-transform duration-500"
                     loading="lazy"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-60" />
             </div>
 
             <div className="flex items-start gap-3 px-1">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0 bg-white">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shrink-0 bg-white">
                     <img
                         src={storeAvatar}
                         alt={vitrine.name}
@@ -157,13 +157,15 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-bold text-brand-dark text-base truncate group-hover:text-brand-green transition-colors">
+                        <h3 className="font-bold text-brand-dark text-base truncate">
                             {vitrine.name}
                         </h3>
-                        <div className="flex items-center gap-1 shrink-0 bg-gray-50 px-2 py-0.5 rounded-full">
-                            <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                            <span className="text-xs font-bold text-brand-dark">{vitrine.rating || 4.5}</span>
-                        </div>
+                        {(vitrine.rating ?? 0) > 0 && (
+                            <div className="flex items-center gap-1 shrink-0">
+                                <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                <span className="text-xs font-bold text-brand-dark">{vitrine.rating}</span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
                         <span className="truncate">{city}{city && state ? " - " : ""}{state}</span>
@@ -210,11 +212,11 @@ export const CategoryList: React.FC<CategoryListProps> = ({ vitrines = [] }) => 
                 ) : (
                     HOME_CATEGORIES.map((cat) => (
                         <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={false} className="flex flex-col gap-3 min-w-[100px] items-center text-center group snap-start">
-                            <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
+                            <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 transition-all">
                                 <img
                                     src={cat.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                     alt={cat.name}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                    className="w-full h-full object-cover transition-transform duration-500"
                                     loading="lazy"
                                 />
                             </div>
@@ -241,8 +243,8 @@ export const InfoSection: React.FC = () => {
                 <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-8 px-4 lg:px-0">Vender online nunca foi tão simples</h2>
                 <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x">
                     {items.map((item, idx) => (
-                        <div key={idx} className="bg-[#ffebe5] p-6 rounded-[16px] min-w-[260px] md:flex-1 flex flex-col items-start gap-4 snap-center cursor-pointer hover:shadow-md transition-shadow">
-                            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
+                        <div key={idx} className="bg-[#ffebe5] p-6 rounded-[16px] min-w-[260px] md:flex-1 flex flex-col items-start gap-4 snap-center cursor-pointer transition-shadow">
+                            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
                                 {item.icon}
                             </div>
                             <div>
@@ -274,6 +276,8 @@ interface ItemCardProps {
             longitude?: number | null
             distance_km?: number | null
             distance_km_formatted?: string | null
+            city?: string | null
+            state?: string | null
         }
     }
     userCoords?: { lat: number; lng: number } | null
@@ -296,10 +300,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
           <img
             src={imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
             alt={product.name}
-            className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover transition-transform duration-500"
             loading="lazy"
           />
-          <button className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-sm text-gray-400 hover:text-brand-green opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
+          <button className="absolute top-2 right-2 p-1.5 bg-white rounded-full text-gray-400 hover:text-brand-green opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
             <HeartIcon size={18} />
           </button>
         </div>
@@ -321,10 +325,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
               </span>
             </div>
 
-            <div className="flex items-center gap-0.5">
-              <StarIcon size={12} className="text-brand-green fill-brand-green" />
-              <span className="text-[11px] font-bold text-brand-dark">{product.rating || 4.5}</span>
-            </div>
+            {(product.rating ?? 0) > 0 && (
+              <div className="flex items-center gap-0.5">
+                <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                <span className="text-[11px] font-bold text-brand-dark">{product.rating}</span>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-gray-100 my-2" />
@@ -341,11 +347,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
               <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                 {product.partners?.store_name || 'Vendedor'}
               </p>
-              {distance && (
-                <p className="text-[10px] text-gray-400 font-normal">
-                  {distance}
-                </p>
-              )}
+              <p className="text-[10px] text-gray-400 font-normal truncate">
+                {product.partners?.city ? `${product.partners.city}${product.partners.state ? ` - ${product.partners.state}` : ''}` : ''}
+                {distance && product.partners?.city ? ' • ' : ''}
+                {distance}
+              </p>
             </div>
           </div>
         </div>

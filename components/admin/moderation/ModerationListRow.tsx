@@ -2,11 +2,15 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Button } from "@/components/reusable"
+import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
     ClockIcon,
     CheckCircleIcon,
     RemoveImageIcon,
+    StoreIcon,
+    EyeIcon,
+    CancelCircleIcon,
+    AlertTriangleIcon
 } from "@/lib/icons"
 import { formatDate } from "@/lib/utils"
 import type { ModerationItem } from "@/lib/admin/types"
@@ -47,33 +51,60 @@ const ModerationListRow = React.memo(({
             className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
             onClick={() => onDetail(item)}
         >
-            {/* Imagem */}
-            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-16">
-                <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                    {imageUrl ? (
-                        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
-                        </div>
-                    )}
+            {/* Produto */}
+            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                        {imageUrl ? (
+                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                            {item.title}
+                        </span>
+                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                            {item.id}
+                        </span>
+                    </div>
                 </div>
             </td>
 
-            {/* Info */}
+            {/* Parceiro */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                        {item.title}
-                    </span>
-                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                        {item.owner_store_name} • {item.images?.length || 0} imagens
-                    </span>
-                    {item.risk_score > 0 && (
-                        <span className="text-[11px] font-bold text-brand-red">
-                            Risk Score: {item.risk_score}
+                    <div className="flex items-center gap-1">
+                        <StoreIcon size={12} className="text-brand-inactive-text shrink-0" />
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate">
+                            {item.owner_store_name}
                         </span>
-                    )}
+                    </div>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 ml-4">
+                        {item.partner_id}
+                    </span>
+                </div>
+            </td>
+
+            {/* Imagens */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                    {item.images?.length || 0}
+                </span>
+            </td>
+
+            {/* Data */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex flex-col items-center">
+                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                        {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
+                        {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                 </div>
             </td>
 
@@ -86,27 +117,21 @@ const ModerationListRow = React.memo(({
                 </div>
             </td>
 
-            {/* Data */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                    <ClockIcon size={14} className="opacity-70" />
-                    {formatDate(item.created_at)}
-                </div>
-            </td>
-
-            {/* Ações Rápidas */}
+            {/* Ações */}
             <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex items-center justify-center action-btn opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                    <Button
-                        variant="outline"
-                        onClick={() => onApprove(item.id)}
-                        disabled={isPending}
-                        className="h-8 px-3 text-xs border-brand-green/20 hover:border-brand-green/40 hover:bg-brand-green/5 text-brand-green"
-                        title="Aprovar produto"
+                <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
+                    <ActionsDropdown
+                        onView={() => onDetail(item)}
                     >
-                        <CheckCircleIcon size={14} className="mr-1.5" />
-                        Aprovar
-                    </Button>
+                        {item.moderation_status === "pending_moderation" && (
+                            <DropdownItem onClick={() => onApprove(item.id)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Aprovar Produto
+                            </DropdownItem>
+                        )}
+                        <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
+                            <CancelCircleIcon size={16} /> Rejeitar Produto
+                        </DropdownItem>
+                    </ActionsDropdown>
                 </div>
             </td>
         </motion.tr>

@@ -50,58 +50,75 @@ export const getActionBadge = (action: string) => {
 
 interface AuditLogListRowProps {
     log: AuditLogRow
+    onView: (log: AuditLogRow) => void
 }
 
-const AuditLogListRow = React.memo(({ log }: AuditLogListRowProps) => {
+const AuditLogListRow = React.memo(({ log, onView }: AuditLogListRowProps) => {
     return (
         <motion.tr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background text-sm"
+            className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background text-sm cursor-pointer"
+            onClick={() => onView(log)}
         >
-            {/* Data/Hora */}
-            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
-                <div className="flex items-center gap-2 font-medium text-brand-dark dark:text-dark-heading">
-                    <ClockIcon size={14} className="text-brand-inactive-text shrink-0" />
-                    {formatDateTime(log.created_at)}
-                </div>
-            </td>
-
-            {/* Ação */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
-                    {getActionBadge(log.action_type)}
+            {/* Usuário (Executor) */}
+            <td className="py-4 px-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                <div className="flex flex-col">
+                    <span className="font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+                        {log.admin_name || log.admin_email || "Desconhecido"}
+                    </span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                        {log.admin_user_id}
+                    </span>
                 </div>
             </td>
 
             {/* Alvo */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex items-center justify-center gap-2">
-                    <span className="font-bold text-brand-dark dark:text-dark-heading uppercase text-[11px] tracking-wider opacity-60">
+            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border">
+                <div className="flex flex-col items-center">
+                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body opacity-80">
                         {TARGET_TYPE_LABELS[log.target_type] || log.target_type}
                     </span>
-                    {log.target_id && (
-                        <span className="text-brand-inactive-text dark:text-dark-body font-mono text-[10px] bg-brand-gray/50 dark:bg-dark-border/30 px-1.5 py-0.5 rounded">
-                            {log.target_id.slice(0, 8)}
-                        </span>
-                    )}
+                    <span className="text-[11px] font-mono text-brand-inactive-text opacity-50">
+                        {log.target_id || "Sem ID"}
+                    </span>
                 </div>
             </td>
 
-            {/* Detalhes */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
-                <div className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-full italic">
-                    {log.metadata?.reason
-                        ? String(log.metadata.reason)
-                        : log.metadata?.action
-                            ? String(log.metadata.action)
-                            : "-"}
+            {/* Detalhes (Ação + Badge) */}
+            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border">
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-start">
+                        {getActionBadge(log.action_type)}
+                    </div>
+                    <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate max-w-[250px] italic">
+                        {log.metadata?.reason
+                            ? String(log.metadata.reason)
+                            : log.metadata?.action
+                                ? String(log.metadata.action)
+                                : "-"}
+                    </p>
+                </div>
+            </td>
+
+            {/* Data/Hora */}
+            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border">
+                <div className="flex flex-col items-center">
+                    <span className="font-bold text-brand-dark dark:text-dark-heading text-[13px]">
+                        {new Date(log.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
+                        {new Date(log.created_at).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })}
+                    </span>
                 </div>
             </td>
 
             {/* IP Address */}
-            <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
-                <span className="text-[10px] font-mono text-brand-inactive-text dark:text-dark-body opacity-50">
+            <td className="py-4 px-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                <span className="text-[11px] font-mono text-brand-inactive-text dark:text-dark-body opacity-50">
                     {log.ip_address}
                 </span>
             </td>

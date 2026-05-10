@@ -95,6 +95,7 @@ export interface AuditLogRow {
     created_at: string
     // Joined fields
     admin_email?: string
+    admin_name?: string
 }
 
 // ─── Cursor Pagination ──────────────────────────────────────────────────────
