@@ -839,8 +839,35 @@ export function CheckoutPageClient() {
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
-                    notifySuccess("Pedido realizado", "Seu pedido foi criado com sucesso!")
-                    router.push("/pedidos")
+                    
+                    setPixPaymentData({
+                        orderId: result.orderId,
+                        orderNumber: result.orderNumber,
+                        amount: checkoutTotalToCharge,
+                        orderDetails: {
+                            items: products.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                price: p.price,
+                                quantity: quantities[p.id] || p.quantity,
+                                image: p.image || "",
+                                variant_id: p.variant || ""
+                            })),
+                            deliveryType: formData.deliveryType,
+                            deliveryAddress: formData.deliveryAddress,
+                            notes: formData.notes,
+                            couponCode: couponCode || null,
+                            couponDiscount: couponDiscount,
+                            deliveryFee: isPickup ? 0 : deliveryFee,
+                        },
+                        sellerName: sessionData?.partnerInfo?.store_name || "Loja",
+                        useMercadoPago: false,
+                        partnerId: partnerId,
+                        userEmail: userEmail,
+                        userName: userName
+                    })
+                    setShowPixModal(true)
+                    setIsLoading(false)
                 } else {
                     const result = await createOrderAction({
                         itemId: sessionData?.itemId || products[0]?.id || "",
@@ -858,8 +885,35 @@ export function CheckoutPageClient() {
                     })
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
-                    notifySuccess("Pedido realizado", `Número: ${result.orderNumber}`)
-                    router.push("/pedidos")
+                    
+                    setPixPaymentData({
+                        orderId: result.orderId,
+                        orderNumber: result.orderNumber,
+                        amount: checkoutTotalToCharge,
+                        orderDetails: {
+                            items: products.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                price: p.price,
+                                quantity: quantities[p.id] || p.quantity,
+                                image: p.image || "",
+                                variant_id: p.variant || ""
+                            })),
+                            deliveryType: formData.deliveryType,
+                            deliveryAddress: formData.deliveryAddress,
+                            notes: formData.notes,
+                            couponCode: couponCode || null,
+                            couponDiscount: couponDiscount,
+                            deliveryFee: isPickup ? 0 : deliveryFee,
+                        },
+                        sellerName: sessionData?.partnerInfo?.store_name || "Loja",
+                        useMercadoPago: false,
+                        partnerId: partnerId,
+                        userEmail: userEmail,
+                        userName: userName
+                    })
+                    setShowPixModal(true)
+                    setIsLoading(false)
                 }
             }
         } catch (err: any) {

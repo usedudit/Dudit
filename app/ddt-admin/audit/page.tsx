@@ -1,5 +1,5 @@
 import { AdminHeader } from "@/components/admin/admin-header"
-import AuditLogList from "@/components/admin/AuditLogList"
+import AuditLogList from "@/components/admin/audit/AuditLogList"
 import { getAuditLogs } from "@/app/actions/admin/audit-logs"
 
 export default async function AuditLogsPage() {

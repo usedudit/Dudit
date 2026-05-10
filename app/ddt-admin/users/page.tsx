@@ -1,5 +1,5 @@
 import { AdminHeader } from "@/components/admin/admin-header"
-import UserEnforcementList from "@/components/admin/UserEnforcementList"
+import UserEnforcementList from "@/components/admin/users/UserEnforcementList"
 import { getUsers } from "@/app/actions/admin/enforcement"
 
 export default async function UsersPage() {

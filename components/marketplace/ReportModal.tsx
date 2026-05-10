@@ -63,6 +63,32 @@ export function ReportModal({
 
   const targetLabel = targetType === "product" ? "este produto" : targetType === "partner" ? "este vendedor" : "este item"
 
+  // Filtra as opções baseadas no targetType
+  const getRelevantReasons = (): ReportReasonCode[] => {
+    if (targetType === "partner") {
+      return [
+        "scam_or_fraud",
+        "inappropriate_content",
+        "spam_or_misleading",
+        "harassment_or_hate",
+        "fake_listing",
+        "other"
+      ];
+    }
+    // Para products, services, rental_items, etc
+    return [
+      "counterfeit",
+      "illegal_or_dangerous",
+      "copyright_violation",
+      "scam_or_fraud",
+      "fake_listing",
+      "inappropriate_content",
+      "other"
+    ];
+  };
+
+  const relevantReasons = getRelevantReasons();
+
   return (
     <DefaultModal
       isOpen={isOpen}
@@ -88,7 +114,7 @@ export function ReportModal({
           <FormDropdown
             label="Motivo da denúncia"
             placeholder="Selecione o motivo..."
-            options={REPORT_REASON_CODES.map(code => ({
+            options={relevantReasons.map(code => ({
               value: code,
               label: REPORT_REASON_LABELS[code]
             }))}

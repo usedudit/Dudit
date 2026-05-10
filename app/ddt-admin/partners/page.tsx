@@ -1,5 +1,5 @@
 import { AdminHeader } from "@/components/admin/admin-header"
-import PartnersList from "@/components/admin/PartnersList"
+import PartnersList from "@/components/admin/partners/PartnersList"
 import { getPartners } from "@/app/actions/admin/enforcement"
 
 export default async function PartnersPage() {

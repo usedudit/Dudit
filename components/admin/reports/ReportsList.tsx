@@ -1,22 +1,19 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { Button, Badge, Input } from "@/components/reusable"
+import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import {
-    SearchIcon,
-    AlertTriangleIcon,
-    CheckCircleIcon,
-    CancelCircleIcon,
-    ClockIcon,
-    InfoIcon,
-    ReturnIcon,
-} from "@/lib/icons"
+import ReportListRow from "./ReportListRow"
+import ReportsPageControls from "./ReportsPageControls"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { AnimatePresence } from "framer-motion"
 import { supabaseBrowser } from "@/lib/supabase/browser-client"
 import type { CursorPaginatedResult } from "@/lib/admin/types"
 import type {
     Report,
     ReportsStats,
+    ReportStatus,
+    ReportTargetType,
     ReportListFilters,
     TargetReportSummary,
 } from "@/app/actions/admin/reports"
@@ -37,50 +34,7 @@ const REALTIME_DEBOUNCE_MS = 600
 const REALTIME_MAX_PENDING = 30
 const SEARCH_DEBOUNCE_MS = 300
 
-const STATUS_FILTERS = [
-    { value: "pending", label: "Pendentes" },
-    { value: "validated", label: "Validadas" },
-    { value: "dismissed", label: "Descartadas" },
-    { value: "spam", label: "Spam" },
-    { value: "all", label: "Todas" },
-] as const
 
-const TARGET_FILTERS = [
-    { value: "all", label: "Todos" },
-    { value: "product", label: "Produtos" },
-    { value: "service", label: "Serviços" },
-    { value: "partner", label: "Parceiros" },
-    { value: "review", label: "Avaliações" },
-] as const
-
-// ─── Visual helpers ─────────────────────────────────────────────────────────
-
-function ReportStatusBadge({ status }: { status: string }) {
-    const map: Record<string, { variant: "orange" | "red" | "gray" | "purple"; label: string }> = {
-        pending: { variant: "orange", label: "Pendente" },
-        validated: { variant: "red", label: "Validada" },
-        dismissed: { variant: "gray", label: "Descartada" },
-        spam: { variant: "purple", label: "Spam" },
-    }
-    const info = map[status] || { variant: "gray" as const, label: status }
-    return <Badge variant={info.variant}>{info.label}</Badge>
-}
-
-function TargetTypeBadge({ type }: { type: string }) {
-    const labels: Record<string, string> = {
-        product: "Produto",
-        service: "Serviço",
-        partner: "Parceiro",
-        review: "Avaliação",
-    }
-    return <Badge variant="blue">{labels[type] || type}</Badge>
-}
-
-function SeverityBadge({ severity }: { severity: "low" | "normal" | "high" }) {
-    if (severity === "high") return <Badge variant="red">Alto</Badge>
-    if (severity === "normal") return <Badge variant="orange">Médio</Badge>
-    return <Badge variant="gray">Baixo</Badge>
-}
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -97,10 +51,13 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
     const [stats, setStats] = useState<ReportsStats>(initialStats)
 
     // Filters (URL-light: kept in component state to keep this PR focused).
-    const [statusFilter, setStatusFilter] = useState<ReportListFilters["status"]>("pending")
-    const [targetFilter, setTargetFilter] = useState<ReportListFilters["targetType"]>("all")
+    // Filters
+    const [statusFilter, setStatusFilter] = useState<ReportStatus | "all">("pending")
+    const [targetFilter, setTargetFilter] = useState<ReportTargetType | "all">("all")
     const [searchInput, setSearchInput] = useState("")
     const [search, setSearch] = useState("")
+    const [page, setPage] = useState(1)
+    const itemsPerPage = 10
 
     // Modals
     const [resolveTarget, setResolveTarget] = useState<Report | null>(null)
@@ -167,6 +124,7 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
             return
         }
         startTransition(() => {
+            setPage(1)
             refetchFirstPage().catch(() => { /* swallow */ })
         })
     }, [statusFilter, targetFilter, search, refetchFirstPage])
@@ -334,187 +292,114 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
         { key: "spam", label: "Spam", value: stats.spam, color: "text-purple-600" },
     ]), [stats])
 
+    // ── Pagination logic ──
+    const totalPages = Math.ceil(items.length / itemsPerPage)
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return items.slice(start, start + itemsPerPage)
+    }, [items, page])
+
     return (
-        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 md:px-8 mb-4">
-                {headerStats.map(s => (
-                    <div
-                        key={s.key}
-                        className="rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2"
-                    >
-                        <div className="text-[11px] text-brand-inactive-text dark:text-dark-body uppercase tracking-wide">{s.label}</div>
-                        <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-                    </div>
-                ))}
-            </div>
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
 
-            {/* Toolbar */}
-            <div className="flex flex-col gap-3 mb-4 px-4 md:px-8">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div className="max-w-[260px] w-full sm:w-auto">
-                        <Input
-                            name="search"
-                            placeholder="Buscar..."
-                            value={searchInput}
-                            onChange={e => setSearchInput(e.target.value)}
-                            prefix={
-                                <SearchIcon
-                                    size={18}
-                                    className="text-brand-inactive-text shrink-0"
-                                />
-                            }
-                        />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {STATUS_FILTERS.map(f => (
-                            <Button
-                                key={f.value}
-                                variant={statusFilter === f.value ? "default" : "outline"}
-                                onClick={() => setStatusFilter(f.value)}
-                                className="h-[38px] px-3 text-xs"
-                            >
-                                {f.label}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {TARGET_FILTERS.map(f => (
-                        <Button
-                            key={f.value}
-                            variant={targetFilter === f.value ? "filled" : "ghost"}
-                            onClick={() => setTargetFilter(f.value)}
-                            className="h-8 px-3 text-xs"
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
-                </div>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-6">
-                {items.length === 0 && !isPending ? (
-                    <div className="flex flex-col items-center justify-center h-[400px] text-center">
-                        <AlertTriangleIcon className="w-12 h-12 text-brand-inactive-text dark:text-dark-body mb-3" />
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhuma denúncia</h3>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px]">
-                            Não há denúncias que correspondam aos filtros atuais
+                {/* Header Title/Subtitle (ERP Standard) */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Relatórios e Denúncias
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Gerencie as denúncias de usuários e mantenha a integridade da plataforma.
                         </p>
                     </div>
-                ) : (
-                    <>
-                        <div className="hidden md:grid grid-cols-[80px_1fr_90px_100px_130px_180px] gap-4 py-3 px-6 bg-brand-gray dark:bg-dark-border/50 rounded-lg mb-1">
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Tipo</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Denúncia</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Severidade</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</span>
-                        </div>
+                </div>
 
-                        {items.map(report => (
-                            <div
-                                key={report.id}
-                                className="grid grid-cols-1 md:grid-cols-[80px_1fr_90px_100px_130px_180px] gap-2 md:gap-4 items-center py-3 px-4 md:px-6 border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors"
-                            >
-                                <div>
-                                    <TargetTypeBadge type={report.target_type} />
+                {/* Controls (ERP Standard) */}
+                <ReportsPageControls
+                    statusFilter={statusFilter}
+                    setStatusFilter={setStatusFilter}
+                    targetFilter={targetFilter}
+                    setTargetFilter={setTargetFilter}
+                    search={searchInput}
+                    onSearchChange={setSearchInput}
+                    stats={stats}
+                />
+
+                {/* List Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                    <AnimatePresence mode="wait">
+                        {items.length === 0 && !isPending ? (
+                            <FadeIn key="empty" className="w-full">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageAlt="Nenhuma denúncia"
+                                    title="Nenhuma denúncia encontrada"
+                                    subtitle="Não há denúncias que correspondam aos filtros atuais ou à sua busca."
+                                    itemButton={{
+                                        text: "Limpar Filtros",
+                                        action: () => {
+                                            setStatusFilter("pending")
+                                            setTargetFilter("all")
+                                            setSearchInput("")
+                                        },
+                                        variant: "outline"
+                                    }}
+                                />
+                            </FadeIn>
+                        ) : (
+                            <div className="w-full">
+                                {/* Table Header (Desktop Only) */}
+                                <div className="hidden md:grid grid-cols-[100px_1fr_100px_100px_130px_180px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Tipo</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Denúncia</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Severidade</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Data</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
                                 </div>
 
-                                <div className="min-w-0">
-                                    <h3 className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
-                                        {report.target_name}
-                                    </h3>
-                                    <p className="text-xs text-brand-dark dark:text-dark-body mt-0.5 truncate">
-                                        Motivo: {report.reason_label || report.reason}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        Por: {report.reporter_name}
-                                    </p>
+                                {/* List Rows */}
+                                <div className="flex flex-col">
+                                    {paginatedItems.map(report => (
+                                        <ReportListRow
+                                            key={report.id}
+                                            report={report}
+                                            isPending={isPending}
+                                            onDetail={setDetailTarget}
+                                            onResolve={setResolveTarget}
+                                            onDismiss={setDismissTarget}
+                                            onSpam={setSpamTarget}
+                                            onRevert={setRevertTarget}
+                                        />
+                                    ))}
                                 </div>
 
-                                <div className="flex justify-center">
-                                    <SeverityBadge severity={report.severity} />
-                                </div>
+                                {/* Pagination (ERP Standard) */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6 flex justify-center">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
 
-                                <div className="flex justify-center">
-                                    <ReportStatusBadge status={report.status} />
-                                </div>
-
-                                <div className="flex items-center justify-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body">
-                                    <ClockIcon className="w-3 h-3" />
-                                    {new Date(report.created_at).toLocaleDateString("pt-BR")}
-                                </div>
-
-                                <div className="flex justify-center gap-2 flex-wrap">
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() => setDetailTarget(report)}
-                                        disabled={isPending}
-                                        className="h-8 px-2 text-xs"
-                                        title="Detalhes"
-                                    >
-                                        <InfoIcon className="w-3.5 h-3.5" />
-                                    </Button>
-
-                                    {report.status === "pending" && (
-                                        <>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => { setResolveTarget(report); setActionReason("") }}
-                                                disabled={isPending}
-                                                className="h-8 px-2 text-xs text-brand-red hover:text-brand-red"
-                                                title="Validar"
-                                            >
-                                                <CheckCircleIcon className="w-3.5 h-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => { setDismissTarget(report); setActionReason("") }}
-                                                disabled={isPending}
-                                                className="h-8 px-2 text-xs"
-                                                title="Descartar"
-                                            >
-                                                <CancelCircleIcon className="w-3.5 h-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => { setSpamTarget(report); setActionReason("") }}
-                                                disabled={isPending}
-                                                className="h-8 px-2 text-xs"
-                                                title="Marcar como spam"
-                                            >
-                                                <AlertTriangleIcon className="w-3.5 h-3.5 text-purple-600" />
-                                            </Button>
-                                        </>
-                                    )}
-
-                                    {report.status === "validated" && (
-                                        <Button
-                                            variant="ghost"
-                                            onClick={() => { setRevertTarget(report); setActionReason("") }}
-                                            disabled={isPending}
-                                            className="h-8 px-2 text-xs"
-                                            title="Reverter validação"
-                                        >
-                                            <ReturnIcon className="w-3.5 h-3.5" />
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* Loader sentinel */}
-                        {hasMore && (
-                            <div ref={sentinelRef} className="py-6 flex items-center justify-center">
-                                <span className="text-xs text-brand-inactive-text">{isLoadingMore ? "Carregando..." : ""}</span>
+                                {/* Infinite Scroll Loader (Hidden but present for functionality) */}
+                                {hasMore && (
+                                    <div ref={sentinelRef} className="py-8 flex items-center justify-center">
+                                        {isLoadingMore && <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-red"></div>}
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </>
-                )}
+                    </AnimatePresence>
+                </div>
             </div>
+            {/* Modals remain below */}
+
 
             {/* Resolve modal */}
             <ReportActionModal
@@ -577,7 +462,7 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                 report={detailTarget}
                 onClose={() => setDetailTarget(null)}
             />
-        </div>
+        </FadeIn>
     )
 }
 
@@ -683,9 +568,26 @@ function ReportDetailsModal({ report, onClose }: ReportDetailsModalProps) {
             {report && (
                 <div className="flex flex-col gap-4 text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <TargetTypeBadge type={report.target_type} />
-                        <ReportStatusBadge status={report.status} />
-                        <SeverityBadge severity={report.severity} />
+                        <Badge variant="blue">
+                            {report.target_type === "product" ? "Produto" :
+                                report.target_type === "service" ? "Serviço" :
+                                    report.target_type === "partner" ? "Parceiro" :
+                                        report.target_type === "review" ? "Avaliação" : report.target_type}
+                        </Badge>
+                        <Badge variant={
+                            report.status === "pending" ? "orange" :
+                                report.status === "validated" ? "red" :
+                                    report.status === "dismissed" ? "gray" :
+                                        report.status === "spam" ? "purple" : "gray"
+                        }>
+                            {report.status === "pending" ? "Pendente" :
+                                report.status === "validated" ? "Validada" :
+                                    report.status === "dismissed" ? "Descartada" :
+                                        report.status === "spam" ? "Spam" : report.status}
+                        </Badge>
+                        <Badge variant={report.severity === "high" ? "red" : report.severity === "normal" ? "orange" : "gray"}>
+                            {report.severity === "high" ? "Alto" : report.severity === "normal" ? "Médio" : "Baixo"}
+                        </Badge>
                     </div>
 
                     <Field label="Alvo" value={report.target_name} />

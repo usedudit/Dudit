@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id")
+      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id")
       .eq("id", orderId)
       .eq("buyer_id", user.id)
       .single()
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         orderId: order.id,
+        orderNumber: order.order_number,
         previousStatus: order.situation,
         newStatus: order.situation,
         updated: false,
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           orderId: order.id,
+          orderNumber: order.order_number,
           previousStatus: order.situation,
           newStatus: order.situation,
           paymentStatus: paymentData.status,
@@ -157,6 +159,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           orderId: order.id,
+          orderNumber: order.order_number,
           previousStatus: order.situation,
           newStatus: newOrderStatus,
           paymentStatus: paymentData.status,
@@ -216,6 +219,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         orderId: order.id,
+        orderNumber: order.order_number,
         previousStatus: order.situation,
         newStatus: newOrderStatus,
         paymentStatus: paymentData.status,
@@ -242,6 +246,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       orderId: order.id,
+      orderNumber: order.order_number,
       previousStatus: order.situation,
       newStatus: newOrderStatus,
       paymentStatus: paymentData.status,

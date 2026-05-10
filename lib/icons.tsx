@@ -62,6 +62,7 @@ import {
     FloppyDiskIcon,
     ImageUploadIcon,
     ImageDelete02Icon,
+    ImageNotFound01Icon,
     Calendar03Icon,
     Camera01Icon,
     Facebook02Icon,
@@ -220,6 +221,7 @@ export const FileVerifiedIcon = CreateIcon(FileVerified01Icon)
 
 export const UploadImageIcon = CreateIcon(ImageUploadIcon)
 export const RemoveImageIcon = CreateIcon(ImageDelete02Icon)
+export const ImageOffIcon = CreateIcon(ImageNotFound01Icon)
 export const CameraIcon = CreateIcon(Camera01Icon)
 
 export const ZoomInIcon = CreateIcon(ZoomInAreaIcon)
@@ -367,4 +369,4 @@ export const TwitterIcon = CreateIcon(NewTwitterIcon)
 export const CadastrosIcon = CreateIcon(ResourcesAddIcon)
 
 export const InstallmentIcon = CreateIcon(SplitIcon)
-export const RepeatIcon = CreateIcon(RepeatIcon01)
+export const RepeatIcon = CreateIcon(RepeatIcon01)

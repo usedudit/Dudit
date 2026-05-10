@@ -384,6 +384,7 @@ export function PaymentWrapper({
                     const data = await response.json()
                     // Se o status for pago (novo ou já vindo de webhook), confirma o pagamento
                     if (data.newStatus === "paid" || data.paymentStatus === "approved") {
+                        if (data.orderNumber) setActualOrderNumber(data.orderNumber)
                         setPaymentConfirmed(true)
                     } else {
                         // Notifica que ainda está pendente

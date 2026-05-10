@@ -25,24 +25,26 @@ async function checkFraudulentReview(
 
   // 2. Verificar se o usuário tem algum pedido pago DESTE produto/serviço
   // Selecionamos com !inner join em order_items para garantir que o item específico exista no pedido
-  let query = supabase
-    .from("orders")
-    .select("id, order_items!inner(product_id, service_id)")
-    .eq("buyer_id", userId)
-    .eq("partner_id", partnerId)
-    .eq("situation", "paid")
+  let orders = null;
 
   if (productId) {
-    query = query.eq("order_items.product_id", productId)
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, order_items!inner(product_id)")
+      .eq("buyer_id", userId)
+      .eq("partner_id", partnerId)
+      .eq("situation", "paid")
+      .eq("order_items.product_id", productId)
+
+    if (error) {
+      console.error(`[REVIEW CHECK] Database error querying orders: ${error.message}`)
+      return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
+    }
+    orders = data;
   } else if (serviceId) {
-    query = query.eq("order_items.service_id", serviceId)
-  }
-
-  const { data: orders, error: ordersError } = await query
-
-  if (ordersError) {
-    console.error(`[REVIEW CHECK] Database error querying orders: ${ordersError.message}`)
-    return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
+    // Serviços atualmente não possuem relacionamento explícito em order_items.
+    // Necessita implementação futura via appointments ou similar.
+    return { isSuspicious: true, reason: "Não foi possível verificar a compra deste serviço." }
   }
 
   console.log(`[REVIEW CHECK] Found ${orders?.length || 0} matching paid orders`)

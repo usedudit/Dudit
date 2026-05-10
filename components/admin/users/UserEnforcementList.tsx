@@ -1,10 +1,14 @@
 "use client"
 
 import React, { useState, useTransition, useCallback, useEffect } from "react"
-import { Button, Badge, Input, Pagination } from "@/components/reusable"
+import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import StepUpModal from "@/components/admin/StepUpModal"
+import UserEnforcementListRow from "./UserEnforcementListRow"
+import UserEnforcementPageControls from "./UserEnforcementPageControls"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { AnimatePresence } from "framer-motion"
 import { SearchIcon, CancelCircleIcon, UserIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
 import type { EnforcementUser, CursorPaginatedResult } from "@/lib/admin/types"
 import { getUsers, banUser, unbanUser } from "@/app/actions/admin/enforcement"
@@ -35,19 +39,6 @@ function DurationSelect({ value, onChange }: { value: number | null; onChange: (
     )
 }
 
-// ─── User Status Badge using reusable Badge ─────────────────────────────────
-
-function UserStatusBadge({ user }: { user: EnforcementUser }) {
-    if (user.banned_at) {
-        const isPermanent = !user.banned_until
-        const isExpired = user.banned_until && new Date(user.banned_until) < new Date()
-        if (isExpired) {
-            return <Badge variant="orange">Ban expirado</Badge>
-        }
-        return <Badge variant="red">{isPermanent ? "Banido" : "Banido (temporário)"}</Badge>
-    }
-    return <Badge variant="green">Ativo</Badge>
-}
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -60,6 +51,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [page, setPage] = useState(1)
+    const [statusTab, setStatusTab] = useState("all")
     const [banTarget, setBanTarget] = useState<EnforcementUser | null>(null)
     const [unbanTarget, setUnbanTarget] = useState<EnforcementUser | null>(null)
     const [banReason, setBanReason] = useState("")
@@ -89,9 +81,21 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
         fetchAllUsers(debouncedSearch || undefined)
     }, [debouncedSearch, fetchAllUsers])
 
+    // Filter by status
+    const filteredByStatus = allUsers.filter(user => {
+        if (statusTab === "active") return !user.banned_at
+        if (statusTab === "banned") return !!user.banned_at
+        return true
+    })
+
+    // Reset page when filter changes
+    useEffect(() => {
+        setPage(1)
+    }, [statusTab])
+
     // Client-side pagination
-    const totalPages = Math.ceil(allUsers.length / itemsPerPage)
-    const paginated = allUsers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    const totalPages = Math.ceil(filteredByStatus.length / itemsPerPage)
+    const paginated = filteredByStatus.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
     const handleBan = () => {
         if (!banTarget) return
@@ -128,124 +132,86 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
     }
 
     return (
-        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-            {/* Search bar - matches ERP style */}
-            <div className="flex items-center gap-3 mb-6 px-4 md:px-8">
-                <div className="max-w-[220px]">
-                    <Input
-                        name="search"
-                        placeholder="Buscar..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        prefix={
-                            <SearchIcon
-                                size={18}
-                                className="text-brand-inactive-text shrink-0"
-                            />
-                        }
-                    />
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+
+                {/* Header Title/Subtitle (ERP Standard) */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Controle de Usuários
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Monitore a atividade e gerencie bans de usuários em todo o ecossistema Dudit.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Page Controls (Standardized) */}
+                <UserEnforcementPageControls
+                    search={search}
+                    setSearch={setSearch}
+                    statusTab={statusTab}
+                    setStatusTab={setStatusTab}
+                />
+
+                {/* Users List */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                    <AnimatePresence mode="wait">
+                        {paginated.length === 0 ? (
+                            <FadeIn key="empty" className="w-full">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageAlt="Nenhum usuário"
+                                    title="Nenhum usuário encontrado"
+                                    subtitle={search ? "Tente ajustar sua busca." : "Nenhum usuário cadastrado no sistema."}
+                                    itemButton={search ? {
+                                        text: "Limpar Busca",
+                                        action: () => setSearch(""),
+                                        variant: "outline"
+                                    } : undefined}
+                                />
+                            </FadeIn>
+                        ) : (
+                            <div className="w-full">
+                                {/* Table header (Desktop Only) */}
+                                <div className="hidden md:grid grid-cols-[1fr_120px_160px_100px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Usuário</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Data</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
+                                </div>
+
+                                {/* List Rows */}
+                                <div className="flex flex-col">
+                                    {paginated.map((user) => (
+                                        <UserEnforcementListRow
+                                            key={user.user_id}
+                                            user={user}
+                                            isPending={isPending}
+                                            onUnban={setUnbanTarget}
+                                            onBan={setBanTarget}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Pagination (ERP Standard) */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6 flex justify-center">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
 
-            {/* Users list */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-0">
-                {paginated.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-[400px] text-center">
-                        <UserIcon className="w-12 h-12 text-brand-inactive-text dark:text-dark-body mb-3" />
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhum usuário encontrado</h3>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px]">
-                            {search ? "Tente ajustar sua busca." : "Nenhum usuário cadastrado no sistema."}
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Table header */}
-                        <div className="hidden md:grid grid-cols-[1fr_120px_160px_100px] gap-4 py-3 px-6 bg-brand-gray dark:bg-dark-border/50 rounded-lg mb-1">
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Usuário</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</span>
-                        </div>
-
-                        {/* Users rows */}
-                        {paginated.map((user) => (
-                            <div
-                                key={user.user_id}
-                                className="grid grid-cols-1 md:grid-cols-[1fr_120px_160px_100px] gap-2 md:gap-4 items-center py-3 px-4 md:px-6 border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors"
-                            >
-                                {/* User info */}
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-9 h-9 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
-                                        <span className="text-sm font-bold text-brand-green">
-                                            {user.full_name ? user.full_name.charAt(0).toUpperCase() : "?"}
-                                        </span>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h3 className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
-                                            {user.full_name || "Sem nome"}
-                                        </h3>
-                                        {user.partner && (
-                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                Loja: {user.partner.store_name}
-                                            </span>
-                                        )}
-                                        {user.banned_at && user.banned_reason && (
-                                            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1 mt-0.5">
-                                                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
-                                                <span className="truncate">{user.banned_reason}</span>
-                                                {user.banned_until && (
-                                                    <span className="shrink-0 ml-1">(até {new Date(user.banned_until).toLocaleDateString("pt-BR")})</span>
-                                                )}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Status */}
-                                <div className="flex justify-center">
-                                    <UserStatusBadge user={user} />
-                                </div>
-
-                                {/* Created at */}
-                                <div className="flex items-center justify-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body">
-                                    <ClockIcon className="w-3 h-3" />
-                                    {new Date(user.created_at).toLocaleDateString("pt-BR")}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex justify-center gap-2">
-                                    {user.banned_at ? (
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setUnbanTarget(user)}
-                                            disabled={isPending}
-                                            className="h-8 px-3 text-xs"
-                                        >
-                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1" />
-                                            Desbanir
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setBanTarget(user)}
-                                            disabled={isPending}
-                                            className="h-8 px-3 text-xs text-brand-red hover:text-brand-red"
-                                        >
-                                            <AlertCircleIcon className="w-3.5 h-3.5 mr-1" />
-                                            Banir
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </>
-                )}
-            </div>
-
-            {/* Pagination - reusable component same as ERP */}
-            {totalPages > 1 && (
-                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-            )}
 
             {/* Ban Modal - uses DefaultModal with form */}
             <DefaultModal
@@ -314,7 +280,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                 onClose={() => setShowStepUp(false)}
                 onAuthenticated={handleBanWithToken}
             />
-        </div>
+        </FadeIn>
     )
 }
 

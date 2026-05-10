@@ -31,6 +31,7 @@ import { createHash } from "crypto"
 import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -206,7 +207,6 @@ export async function createReport(data: {
         return { success: false, error: "Motivo inválido" }
     }
 
-    // 4. Verify target exists (uses correct table per type).
     const targetTable: Record<ReportTargetType, string> = {
         product: "products",
         service: "services",
@@ -214,7 +214,10 @@ export async function createReport(data: {
         review: "reviews",
     }
     const tableName = targetTable[data.targetType]
-    const { data: target, error: targetError } = await supabase
+    
+    // We use adminClient to verify existence to bypass RLS false-negatives (user just needs to know if it exists)
+    const adminClient = getAdminClient()
+    const { data: target, error: targetError } = await adminClient
         .from(tableName)
         .select("id")
         .eq("id", targetId)
@@ -310,8 +313,7 @@ export async function getReports(
         .select(`
             id, reporter_user_id, target_type, target_id,
             reason, reason_code, description,
-            status, resolved_by, resolved_at, resolution_reason, created_at,
-            reporter:user_profiles!reports_reporter_user_id_fkey(full_name)
+            status, resolved_by, resolved_at, resolution_reason, created_at
         `)
 
     // Status filter (server-side).
@@ -410,10 +412,21 @@ export async function getReports(
     }
     await Promise.all(fetches)
 
+    // Batch-fetch reporter names from user_profiles (no FK between reports ↔ user_profiles).
+    const reporterIds = [...new Set(items.map((r: any) => r.reporter_user_id as string))]
+    const reporterNames = new Map<string, string>()
+    if (reporterIds.length > 0) {
+        const { data: reporters } = await supabase
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", reporterIds)
+        ;(reporters || []).forEach((p: any) => {
+            if (p.full_name) reporterNames.set(p.user_id, p.full_name)
+        })
+    }
+
     const mapped: Report[] = items.map((r: any) => {
-        const reporterName = Array.isArray(r.reporter)
-            ? r.reporter[0]?.full_name
-            : r.reporter?.full_name
+        const reporterName = reporterNames.get(r.reporter_user_id)
         const tname = targetNames.get(`${r.target_type}:${r.target_id}`)
         return attachReasonInfo({
             id: r.id,

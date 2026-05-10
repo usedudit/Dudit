@@ -1,14 +1,18 @@
 "use client"
 
 import React, { useState, useTransition, useCallback } from "react"
-import { Button, Badge, Input, Pagination } from "@/components/reusable"
-import AlertModal from "@/components/reusable/AlertModal"
-import DefaultModal from "@/components/reusable/DefaultModal"
 import {
     SearchIcon, CheckCircleIcon, CancelCircleIcon, EyeIcon, ClockIcon,
-    AlertTriangleIcon, TrashIcon, RemoveImageIcon
+    AlertTriangleIcon, TrashIcon, RemoveImageIcon, AllProductsIcon
 } from "@/lib/icons"
 import { ImageOff } from "lucide-react"
+import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
+import AlertModal from "@/components/reusable/AlertModal"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import ModerationListRow from "./ModerationListRow"
+import ModerationPageControls from "./ModerationPageControls"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { AnimatePresence } from "framer-motion"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
 import {
     getModerationQueue,
@@ -18,19 +22,6 @@ import {
 } from "@/app/actions/admin/moderation"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
-// ─── Status badge (using reusable Badge) ────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-    const map: Record<string, { variant: "orange" | "red" | "green" | "gray" | "blue"; label: string }> = {
-        pending_moderation: { variant: "orange", label: "Pendente" },
-        flagged: { variant: "red", label: "Flagged" },
-        approved: { variant: "green", label: "Aprovado" },
-        rejected: { variant: "red", label: "Rejeitado" },
-        needs_images: { variant: "blue", label: "Sem imagens" },
-    }
-    const info = map[status] || { variant: "gray" as const, label: status }
-    return <Badge variant={info.variant}>{info.label}</Badge>
-}
 
 // ─── Image thumbnail ────────────────────────────────────────────────────────
 
@@ -95,7 +86,19 @@ function ProductDetailPanel({
                         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.title}</h3>
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">{item.description || "Sem descrição"}</p>
                         <div className="flex items-center gap-3 mt-3">
-                            <StatusBadge status={item.moderation_status} />
+                            <Badge variant={
+                                item.moderation_status === "pending_moderation" ? "orange" : 
+                                item.moderation_status === "flagged" ? "red" : 
+                                item.moderation_status === "approved" ? "green" : 
+                                item.moderation_status === "rejected" ? "red" : 
+                                item.moderation_status === "needs_images" ? "blue" : "gray"
+                            }>
+                                {item.moderation_status === "pending_moderation" ? "Pendente" : 
+                                 item.moderation_status === "flagged" ? "Flagged" : 
+                                 item.moderation_status === "approved" ? "Aprovado" : 
+                                 item.moderation_status === "rejected" ? "Rejeitado" : 
+                                 item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
+                            </Badge>
                             <span className="text-sm text-brand-inactive-text dark:text-dark-body">
                                 {formatCurrency(item.price || 0)}
                             </span>
@@ -334,122 +337,90 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
     const paginated = filteredItems.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
     return (
-        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-            {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 px-4 md:px-8">
-                <div className="max-w-[220px]">
-                    <Input
-                        name="search"
-                        placeholder="Buscar..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        prefix={
-                            <SearchIcon
-                                size={18}
-                                className="text-brand-inactive-text shrink-0"
-                            />
-                        }
-                    />
-                </div>
-                <div className="flex gap-2">
-                    {[
-                        { value: "all", label: "Todos" },
-                        { value: "pending_moderation", label: "Pendentes" },
-                        { value: "flagged", label: "Flagged" },
-                        { value: "needs_images", label: "Sem imagens" },
-                    ].map(f => (
-                        <Button
-                            key={f.value}
-                            variant={statusFilter === f.value ? "default" : "outline"}
-                            onClick={() => handleFilterChange(f.value)}
-                            className="h-[42px] px-3 text-xs"
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Items */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-20 md:pb-0">
-                {paginated.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-[400px] text-center">
-                        <AlertTriangleIcon className="w-12 h-12 text-brand-inactive-text dark:text-dark-body mb-3" />
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">Nenhum item na fila</h3>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px]">
-                            Todos os produtos foram revisados
+        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                
+                {/* Header Title/Subtitle (ERP Standard) */}
+                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                    <div className="flex flex-col gap-2 pt-1">
+                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            Moderação de Conteúdo
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                            Revise e aprove produtos enviados pelos parceiros para garantir a qualidade do marketplace.
                         </p>
                     </div>
-                ) : (
-                    <>
-                        {/* Table header */}
-                        <div className="hidden md:grid grid-cols-[64px_1fr_100px_130px_100px] gap-4 py-3 px-6 bg-brand-gray dark:bg-dark-border/50 rounded-lg mb-1">
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Img</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</span>
-                            <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</span>
-                        </div>
+                </div>
 
-                        {paginated.map((item) => {
-                            const firstImage = item.images?.[0]
-                            const imageUrl = firstImage
-                                ? (firstImage.startsWith("http") ? firstImage : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${firstImage}`)
-                                : null
-                            return (
-                                <div
-                                    key={item.id}
-                                    onClick={() => setDetailItem(item)}
-                                    className="grid grid-cols-1 md:grid-cols-[64px_1fr_100px_130px_100px] gap-2 md:gap-4 items-center py-3 px-4 md:px-6 border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 cursor-pointer transition-colors"
-                                >
-                                    {/* Image */}
-                                    <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0">
-                                        {imageUrl ? (
-                                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
-                                            </div>
-                                        )}
-                                    </div>
+                {/* Controls (ERP Standard) */}
+                <ModerationPageControls 
+                    statusFilter={statusFilter}
+                    setStatusFilter={handleFilterChange}
+                    search={search}
+                    onSearchChange={setSearch}
+                />
 
-                                    {/* Info */}
-                                    <div className="min-w-0">
-                                        <h3 className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">{item.title}</h3>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                            {item.owner_store_name} • {item.images?.length || 0} imagens
-                                            {item.risk_score > 0 && ` • Risk: ${item.risk_score}`}
-                                        </p>
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="flex justify-center">
-                                        <StatusBadge status={item.moderation_status} />
-                                    </div>
-
-                                    {/* Time */}
-                                    <div className="flex items-center justify-center gap-1 text-xs text-brand-inactive-text dark:text-dark-body">
-                                        <ClockIcon className="w-3 h-3" />
-                                        {formatDate(item.created_at)}
-                                    </div>
-
-                                    {/* Quick Actions */}
-                                    <div className="flex justify-center gap-2" onClick={e => e.stopPropagation()}>
-                                        <Button variant="outline" onClick={() => handleApprove(item.id)} disabled={isPending} className="h-8 px-2 text-xs">
-                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1" /> Aprovar
-                                        </Button>
-                                    </div>
+                {/* Items */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                    <AnimatePresence mode="wait">
+                        {paginated.length === 0 ? (
+                            <FadeIn key="empty" className="w-full">
+                                <IconPlaceholder
+                                    placeholderType="image"
+                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                    imageAlt="Fila vazia"
+                                    title="Nenhum item na fila"
+                                    subtitle="Todos os produtos foram revisados ou não correspondem aos filtros atuais."
+                                    itemButton={search || statusFilter !== "all" ? {
+                                        text: "Limpar Filtros",
+                                        action: () => {
+                                            setStatusFilter("all")
+                                            setSearch("")
+                                            fetchData("all")
+                                        },
+                                        variant: "outline"
+                                    } : undefined}
+                                />
+                            </FadeIn>
+                        ) : (
+                            <div className="w-full">
+                                {/* Table header (Desktop Only) */}
+                                <div className="hidden md:grid grid-cols-[64px_1fr_100px_130px_100px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Img</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Produto</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Criado em</span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
                                 </div>
-                            )
-                        })}
-                    </>
-                )}
-            </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-            )}
+                                {/* List Rows */}
+                                <div className="flex flex-col">
+                                    {paginated.map((item) => (
+                                        <ModerationListRow 
+                                            key={item.id}
+                                            item={item}
+                                            isPending={isPending}
+                                            onDetail={setDetailItem}
+                                            onApprove={handleApprove}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Pagination (ERP Standard) */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6 flex justify-center">
+                                        <Pagination 
+                                            currentPage={page} 
+                                            totalPages={totalPages} 
+                                            onPageChange={setPage} 
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
 
             {/* Detail Panel */}
             {detailItem && (
@@ -471,7 +442,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 message="Todas as imagens foram removidas. O produto ficará com status pendente até que o parceiro adicione novas imagens."
                 variant="warning"
             />
-        </div>
+        </FadeIn>
     )
 }
 

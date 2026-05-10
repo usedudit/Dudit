@@ -1,5 +1,5 @@
 import { AdminHeader } from "@/components/admin/admin-header"
-import ReportsList from "@/components/admin/ReportsList"
+import ReportsList from "@/components/admin/reports/ReportsList"
 import { getReports, getReportsStats } from "@/app/actions/admin/reports"
 
 export const dynamic = "force-dynamic"
