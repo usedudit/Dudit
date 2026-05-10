@@ -46,30 +46,29 @@ const AuditLogPageControls = ({
     ]
 
     return (
-        <div className="flex flex-col gap-6 mb-6 px-4 md:px-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                {/* Tabs de Alvo */}
-                <Tabs value={targetFilter} onValueChange={(val) => { setTargetFilter(val); onApplyFilters(); }} className="w-full md:w-auto">
-                    <TabsList className="bg-brand-gray/50 dark:bg-dark-border/30 p-1 h-11">
+        <>
+            <div className="mb-6 px-4 md:px-8">
+                <Tabs value={targetFilter} onValueChange={(val) => { setTargetFilter(val); onApplyFilters(); }}>
+                    <TabsList className="px-0">
                         {targetTabs.map((tab) => (
                             <TabsTrigger
                                 key={tab.value}
                                 value={tab.value}
-                                className="flex items-center gap-2 px-4 h-9 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading data-[state=active]:shadow-sm transition-all rounded-md"
+                                icon={tab.icon}
                             >
-                                <tab.icon size={16} className={targetFilter === tab.value ? "text-brand-green" : "text-brand-inactive-text"} />
-                                <span className="text-[13px] font-bold whitespace-nowrap">{tab.label}</span>
+                                {tab.label}
                             </TabsTrigger>
                         ))}
                     </TabsList>
                 </Tabs>
+            </div>
 
-                {/* Filtro de Ação e Botão */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <select
                         value={actionFilter}
                         onChange={(e) => { setActionFilter(e.target.value); onApplyFilters(); }}
-                        className="h-[42px] px-4 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/30 text-[13px] font-bold text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green transition-colors min-w-[160px]"
+                        className="h-[42px] px-6 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/30 text-[13px] font-bold text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green transition-all min-w-[180px] cursor-pointer"
                     >
                         {actionOptions.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -79,14 +78,14 @@ const AuditLogPageControls = ({
                     <Button 
                         variant="outline" 
                         onClick={onApplyFilters}
-                        className="h-[42px] px-5 rounded-full border-brand-green/20 hover:border-brand-green/40 hover:bg-brand-green/5 text-brand-green font-bold text-[13px]"
+                        className="h-[42px] px-6 rounded-full border-brand-green/20 hover:border-brand-green/40 hover:bg-brand-green/5 text-brand-green font-bold text-[13px] transition-all"
                     >
                         <FilterIcon size={16} className="mr-2" />
                         Atualizar
                     </Button>
                 </div>
             </div>
-        </div>
+        </>
     )
 }
 

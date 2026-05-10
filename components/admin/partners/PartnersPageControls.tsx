@@ -32,25 +32,24 @@ const PartnersPageControls = ({
     ] as const
 
     return (
-        <div className="flex flex-col gap-6 mb-6 px-4 md:px-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                {/* Tabs de Status */}
-                <Tabs value={statusTab} onValueChange={setStatusTab} className="w-full md:w-auto">
-                    <TabsList className="bg-brand-gray/50 dark:bg-dark-border/30 p-1 h-11">
+        <>
+            <div className="mb-6 px-4 md:px-8">
+                <Tabs value={statusTab} onValueChange={setStatusTab}>
+                    <TabsList className="px-0">
                         {tabs.map((tab) => (
                             <TabsTrigger
                                 key={tab.value}
                                 value={tab.value}
-                                className="flex items-center gap-2 px-4 h-9 data-[state=active]:bg-white dark:data-[state=active]:bg-dark-surface data-[state=active]:text-brand-dark dark:data-[state=active]:text-dark-heading data-[state=active]:shadow-sm transition-all rounded-md"
+                                icon={tab.icon}
                             >
-                                <tab.icon size={16} className={statusTab === tab.value ? "text-brand-green" : "text-brand-inactive-text"} />
-                                <span className="text-[13px] font-bold whitespace-nowrap">{tab.label}</span>
+                                {tab.label}
                             </TabsTrigger>
                         ))}
                     </TabsList>
                 </Tabs>
+            </div>
 
-                {/* Barra de Busca */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
                 <div className="w-full md:w-80">
                     <Input
                         name="search"
@@ -64,7 +63,7 @@ const PartnersPageControls = ({
                     />
                 </div>
             </div>
-        </div>
+        </>
     )
 }
 

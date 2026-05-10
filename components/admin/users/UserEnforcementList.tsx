@@ -155,8 +155,8 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                     setStatusTab={setStatusTab}
                 />
 
-                {/* Users List */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                {/* List Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {paginated.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
@@ -174,31 +174,81 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                 />
                             </FadeIn>
                         ) : (
-                            <div className="w-full">
-                                {/* Table header (Desktop Only) */}
-                                <div className="hidden md:grid grid-cols-[1fr_120px_160px_100px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Usuário</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Data</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
+                            <FadeIn key="list" className="w-full">
+                                {/* Mobile/Tablet View */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginated.map((user) => (
+                                        <div
+                                            key={user.user_id}
+                                            className="py-5 flex flex-col gap-3"
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-green/10 dark:bg-brand-green/5 flex items-center justify-center shrink-0 border border-brand-green/20 dark:border-brand-green/10">
+                                                        <span className="text-[13px] font-bold text-brand-green">
+                                                            {user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="min-w-0 flex flex-col">
+                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                            {user.full_name || "Sem nome"}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-brand-inactive-text">
+                                                            {user.partner?.store_name}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {user.banned_at ? (
+                                                    <Badge variant="red">Banido</Badge>
+                                                ) : (
+                                                    <Badge variant="green">Ativo</Badge>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {user.banned_at ? (
+                                                    <Button variant="outline" size="sm" onClick={() => setUnbanTarget(user)} className="flex-1 text-xs h-9">Desbanir</Button>
+                                                ) : (
+                                                    <Button variant="outline" size="sm" onClick={() => setBanTarget(user)} className="flex-1 text-xs h-9">Banir</Button>
+                                                )}
+                                                <span className="text-xs text-brand-inactive-text ml-auto">
+                                                    {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                {/* List Rows */}
-                                <div className="flex flex-col">
-                                    {paginated.map((user) => (
-                                        <UserEnforcementListRow
-                                            key={user.user_id}
-                                            user={user}
-                                            isPending={isPending}
-                                            onUnban={setUnbanTarget}
-                                            onBan={setBanTarget}
-                                        />
-                                    ))}
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Usuário</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Data</th>
+                                                    <th className="py-3 px-2 w-40 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginated.map((user) => (
+                                                    <UserEnforcementListRow
+                                                        key={user.user_id}
+                                                        user={user}
+                                                        isPending={isPending}
+                                                        onUnban={setUnbanTarget}
+                                                        onBan={setBanTarget}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 {/* Pagination (ERP Standard) */}
                                 {totalPages > 1 && (
-                                    <div className="mt-6 flex justify-center">
+                                    <div className="mt-6">
                                         <Pagination
                                             currentPage={page}
                                             totalPages={totalPages}
@@ -206,7 +256,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                         />
                                     </div>
                                 )}
-                            </div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>

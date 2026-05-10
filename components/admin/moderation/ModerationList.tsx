@@ -360,8 +360,8 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                     onSearchChange={setSearch}
                 />
 
-                {/* Items */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                {/* List Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {paginated.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
@@ -383,40 +383,95 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                 />
                             </FadeIn>
                         ) : (
-                            <div className="w-full">
-                                {/* Table header (Desktop Only) */}
-                                <div className="hidden md:grid grid-cols-[64px_1fr_100px_130px_100px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Img</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Produto</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Criado em</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
+                            <FadeIn key="list" className="w-full">
+                                {/* Mobile/Tablet View */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginated.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="py-5 flex items-start gap-3"
+                                            onClick={() => setDetailItem(item)}
+                                        >
+                                            <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                {item.images?.[0] ? (
+                                                    <img src={item.images[0].startsWith("http") ? item.images[0] : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${item.images[0]}`} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        {item.title}
+                                                    </h3>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                    <span className="text-xs font-medium text-brand-inactive-text">
+                                                        {item.owner_store_name}
+                                                    </span>
+                                                    <span className="text-brand-inactive-text">•</span>
+                                                    <Badge variant={
+                                                        item.moderation_status === "pending_moderation" ? "orange" : 
+                                                        item.moderation_status === "flagged" ? "red" : 
+                                                        item.moderation_status === "approved" ? "green" : 
+                                                        item.moderation_status === "rejected" ? "red" : 
+                                                        item.moderation_status === "needs_images" ? "blue" : "gray"
+                                                    } className="scale-90 origin-left">
+                                                        {item.moderation_status === "pending_moderation" ? "Pendente" : 
+                                                            item.moderation_status === "flagged" ? "Flagged" : 
+                                                            item.moderation_status === "approved" ? "Aprovado" : 
+                                                            item.moderation_status === "rejected" ? "Rejeitado" : 
+                                                            item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                {/* List Rows */}
-                                <div className="flex flex-col">
-                                    {paginated.map((item) => (
-                                        <ModerationListRow 
-                                            key={item.id}
-                                            item={item}
-                                            isPending={isPending}
-                                            onDetail={setDetailItem}
-                                            onApprove={handleApprove}
-                                        />
-                                    ))}
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 px-2 w-20 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Img</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider">Produto</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Criado em</th>
+                                                    <th className="py-3 px-2 w-40 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginated.map((item) => (
+                                                    <ModerationListRow
+                                                        key={item.id}
+                                                        item={item}
+                                                        isPending={isPending}
+                                                        onDetail={setDetailItem}
+                                                        onApprove={handleApprove}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 {/* Pagination (ERP Standard) */}
                                 {totalPages > 1 && (
-                                    <div className="mt-6 flex justify-center">
-                                        <Pagination 
-                                            currentPage={page} 
-                                            totalPages={totalPages} 
-                                            onPageChange={setPage} 
+                                    <div className="mt-6">
+                                        <Pagination
+                                            currentPage={page}
+                                            totalPages={totalPages}
+                                            onPageChange={setPage}
                                         />
                                     </div>
                                 )}
-                            </div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>

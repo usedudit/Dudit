@@ -50,112 +50,123 @@ const ReportListRow = React.memo(({
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 md:grid-cols-[100px_1fr_100px_100px_130px_180px] gap-2 md:gap-4 items-center py-3 px-4 md:px-6 border-b border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors bg-white dark:bg-dark-background group"
+        <motion.tr
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+            onClick={() => onDetail(report)}
         >
             {/* Tipo */}
-            <div className="flex items-center md:justify-start">
+            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
                 <Badge variant="blue" className="w-fit">
                     {targetTypeLabels[report.target_type] || report.target_type}
                 </Badge>
-            </div>
+            </td>
 
             {/* Denúncia Info */}
-            <div className="min-w-0 flex flex-col text-left">
-                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
-                    {report.target_name}
-                </span>
-                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                    Motivo: {report.reason_label || report.reason}
-                </span>
-                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body/60">
-                    Por: {report.reporter_name}
-                </span>
-            </div>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                        {report.target_name}
+                    </span>
+                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                        Motivo: {report.reason_label || report.reason}
+                    </span>
+                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body/60">
+                        Por: {report.reporter_name}
+                    </span>
+                </div>
+            </td>
 
             {/* Severidade */}
-            <div className="flex md:justify-center">
-                {report.severity === "high" ? (
-                    <Badge variant="red">Alto</Badge>
-                ) : report.severity === "normal" ? (
-                    <Badge variant="orange">Médio</Badge>
-                ) : (
-                    <Badge variant="gray">Baixo</Badge>
-                )}
-            </div>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex justify-center">
+                    {report.severity === "high" ? (
+                        <Badge variant="red">Alto</Badge>
+                    ) : report.severity === "normal" ? (
+                        <Badge variant="orange">Médio</Badge>
+                    ) : (
+                        <Badge variant="gray">Baixo</Badge>
+                    )}
+                </div>
+            </td>
 
             {/* Status */}
-            <div className="flex md:justify-center">
-                <Badge variant={statusInfo.variant}>
-                    {statusInfo.label}
-                </Badge>
-            </div>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex justify-center">
+                    <Badge variant={statusInfo.variant}>
+                        {statusInfo.label}
+                    </Badge>
+                </div>
+            </td>
 
             {/* Data */}
-            <div className="flex items-center md:justify-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                <ClockIcon size={14} className="opacity-70" />
-                {new Date(report.created_at).toLocaleDateString("pt-BR")}
-            </div>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                    <ClockIcon size={14} className="opacity-70" />
+                    {new Date(report.created_at).toLocaleDateString("pt-BR")}
+                </div>
+            </td>
 
             {/* Ações */}
-            <div className="flex items-center justify-end md:justify-center gap-2 flex-wrap opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                    variant="ghost"
-                    onClick={() => onDetail(report)}
-                    disabled={isPending}
-                    className="h-8 w-8 p-0"
-                    title="Detalhes"
-                >
-                    <InfoIcon size={16} className="text-brand-inactive-text" />
-                </Button>
-
-                {report.status === "pending" && (
-                    <>
-                        <Button
-                            variant="outline"
-                            onClick={() => onResolve(report)}
-                            disabled={isPending}
-                            className="h-8 w-8 p-0 border-brand-red/20 hover:border-brand-red/40 hover:bg-brand-red/5"
-                            title="Validar"
-                        >
-                            <CheckCircleIcon size={16} className="text-brand-red" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => onDismiss(report)}
-                            disabled={isPending}
-                            className="h-8 w-8 p-0"
-                            title="Descartar"
-                        >
-                            <CancelCircleIcon size={16} className="text-brand-inactive-text" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            onClick={() => onSpam(report)}
-                            disabled={isPending}
-                            className="h-8 w-8 p-0 hover:bg-purple-50 dark:hover:bg-purple-900/10"
-                            title="Marcar como spam"
-                        >
-                            <AlertTriangleIcon size={16} className="text-purple-600" />
-                        </Button>
-                    </>
-                )}
-
-                {report.status === "validated" && (
+            <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex items-center justify-center gap-2 flex-wrap action-btn opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     <Button
                         variant="ghost"
-                        onClick={() => onRevert(report)}
+                        onClick={() => onDetail(report)}
                         disabled={isPending}
                         className="h-8 w-8 p-0"
-                        title="Reverter validação"
+                        title="Detalhes"
                     >
-                        <ReturnIcon size={16} className="text-brand-inactive-text" />
+                        <InfoIcon size={16} className="text-brand-inactive-text" />
                     </Button>
-                )}
-            </div>
-        </motion.div>
+
+                    {report.status === "pending" && (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={() => onResolve(report)}
+                                disabled={isPending}
+                                className="h-8 w-8 p-0 border-brand-red/20 hover:border-brand-red/40 hover:bg-brand-red/5"
+                                title="Validar"
+                            >
+                                <CheckCircleIcon size={16} className="text-brand-red" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => onDismiss(report)}
+                                disabled={isPending}
+                                className="h-8 w-8 p-0"
+                                title="Descartar"
+                            >
+                                <CancelCircleIcon size={16} className="text-brand-inactive-text" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => onSpam(report)}
+                                disabled={isPending}
+                                className="h-8 w-8 p-0 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                                title="Marcar como spam"
+                            >
+                                <AlertTriangleIcon size={16} className="text-purple-600" />
+                            </Button>
+                        </>
+                    )}
+
+                    {report.status === "validated" && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => onRevert(report)}
+                            disabled={isPending}
+                            className="h-8 w-8 p-0"
+                            title="Reverter validação"
+                        >
+                            <ReturnIcon size={16} className="text-brand-inactive-text" />
+                        </Button>
+                    )}
+                </div>
+            </td>
+        </motion.tr>
     )
 }, (prev, next) => 
     prev.report === next.report && 

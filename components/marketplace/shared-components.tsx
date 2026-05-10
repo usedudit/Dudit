@@ -5,7 +5,7 @@ import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, Inf
 import Link from "next/link"
 import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { getProductUrl } from "@/lib/utils/url-generator"
+import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 
 const HOME_BANNERS = [
@@ -119,28 +119,109 @@ export const HeroBanner: React.FC = () => {
     );
 };
 
-export const CategoryList: React.FC = () => {
+interface VitrineCardProps {
+    vitrine: any
+}
+
+export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
+    const partner = vitrine.partners || {}
+    const storeAvatar = partner.store_avatar || "https://img.dudit.com.br/static/Logo.png"
+    const bannerImage = vitrine.images?.[0] || storeAvatar
+    const distance = partner.distance_km_formatted || null
+    const city = partner.city || ""
+    const state = partner.state || ""
+
     return (
-        <section className="mx-auto mb-16 max-w-[1300px]">
-            <div className="px-4 lg:px-0 mb-8">
-                <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-1 leading-tight">Vitrines Populares</h2>
-                <div className="text-gray-500 font-normal text-sm md:text-base">Explore lojas e encontre itens únicos da sua região.</div>
+        <Link
+            href={getPartnerUrl(partner)}
+            prefetch={false}
+            className="flex flex-col min-w-[280px] md:min-w-[320px] group cursor-pointer"
+        >
+            <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3">
+                <img
+                    src={bannerImage}
+                    alt={vitrine.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-60" />
             </div>
 
-            <div className="flex overflow-x-auto gap-4 md:gap-8 px-4 lg:px-0 scrollbar-hide pb-4">
-                {HOME_CATEGORIES.map((cat) => (
-                    <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={false} className="flex flex-col gap-3 min-w-[100px] items-center text-center group">
-                        <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
-                            <img
-                                src={cat.image || "https://img.dudit.com.br/static/Placeholder.png"}
-                                alt={cat.name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                loading="lazy"
-                            />
+            <div className="flex items-start gap-3 px-1">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0 bg-white">
+                    <img
+                        src={storeAvatar}
+                        alt={vitrine.name}
+                        className="w-full h-full object-cover"
+                    />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-bold text-brand-dark text-base truncate group-hover:text-brand-green transition-colors">
+                            {vitrine.name}
+                        </h3>
+                        <div className="flex items-center gap-1 shrink-0 bg-gray-50 px-2 py-0.5 rounded-full">
+                            <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                            <span className="text-xs font-bold text-brand-dark">{vitrine.rating || 4.5}</span>
                         </div>
-                        <span className="font-semibold text-gray-800 text-xs md:text-sm group-hover:text-brand-green transition-colors">{cat.name}</span>
-                    </Link>
-                ))}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                        <span className="truncate">{city}{city && state ? " - " : ""}{state}</span>
+                        {distance && (
+                            <>
+                                <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                <span className="font-medium text-brand-dark/70">{distance}</span>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </Link>
+    )
+}
+
+interface CategoryListProps {
+    vitrines?: any[]
+}
+
+export const CategoryList: React.FC<CategoryListProps> = ({ vitrines = [] }) => {
+    return (
+        <section className="mx-auto mb-16 max-w-[1300px]">
+            <div className="px-4 lg:px-0 mb-8 flex items-end justify-between">
+                <div>
+                    <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-1 leading-tight">Vitrines Populares</h2>
+                    <div className="text-gray-500 font-normal text-sm md:text-base">Explore lojas e encontre itens únicos da sua região.</div>
+                </div>
+                <Link
+                    href="/explorar?type=vitrines"
+                    className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
+                >
+                    Ver todas <ChevronRightIcon size={16} />
+                </Link>
+            </div>
+
+            <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x snap-mandatory">
+                {vitrines.length > 0 ? (
+                    vitrines.slice(0, 8).map((vitrine) => (
+                        <div key={vitrine.id} className="snap-start">
+                            <VitrineCard vitrine={vitrine} />
+                        </div>
+                    ))
+                ) : (
+                    HOME_CATEGORIES.map((cat) => (
+                        <Link href={`/explorar?q=${cat.name}`} key={cat.name} prefetch={false} className="flex flex-col gap-3 min-w-[100px] items-center text-center group snap-start">
+                            <div className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full overflow-hidden border border-gray-100 shadow-sm group-hover:shadow-md transition-all">
+                                <img
+                                    src={cat.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                    alt={cat.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                    loading="lazy"
+                                />
+                            </div>
+                            <span className="font-semibold text-gray-800 text-xs md:text-sm group-hover:text-brand-green transition-colors">{cat.name}</span>
+                        </Link>
+                    ))
+                )}
             </div>
         </section>
     );

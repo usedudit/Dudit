@@ -8,6 +8,7 @@ import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { searchMarketplaceDirect } from "@/app/actions/marketplace/search"
 
 export const metadata: Metadata = {
   title: "Dudit | Encontre produtos e serviços na sua cidade",
@@ -40,7 +41,11 @@ async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
   const t0 = performance.now()
   console.log(`[SSR] Home (Feed Payload) | START`)
 
-  const products = await getCachedHomeProducts()
+  const [products, vitrines] = await Promise.all([
+    getCachedHomeProducts(),
+    searchMarketplaceDirect("", "vitrines", { vitrines: 10 })
+  ])
+
   const productsWithDistance = enrichMarketplaceDistance(products || [], userProfile?.latitude && userProfile?.longitude
     ? { lat: userProfile.latitude, lng: userProfile.longitude }
     : null)
@@ -51,6 +56,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
   return (
     <MarketplaceHome
       products={productsWithDistance}
+      vitrines={vitrines || []}
       user={user}
       userProfile={userProfile}
       cartCount={cartCount}

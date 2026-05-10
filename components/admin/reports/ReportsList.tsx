@@ -327,7 +327,7 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                 />
 
                 {/* List Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {items.length === 0 && !isPending ? (
                             <FadeIn key="empty" className="w-full">
@@ -349,36 +349,90 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                                 />
                             </FadeIn>
                         ) : (
-                            <div className="w-full">
-                                {/* Table Header (Desktop Only) */}
-                                <div className="hidden md:grid grid-cols-[100px_1fr_100px_100px_130px_180px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Tipo</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Denúncia</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Severidade</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Data</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
+                            <FadeIn key="list" className="w-full">
+                                {/* Mobile/Tablet View */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginatedItems.map(report => (
+                                        <div
+                                            key={report.id}
+                                            className="py-5 flex flex-col gap-3"
+                                            onClick={() => setDetailTarget(report)}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex flex-col gap-1 min-w-0">
+                                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        {report.target_name}
+                                                    </span>
+                                                    <span className="text-xs font-medium text-brand-inactive-text">
+                                                        Motivo: {report.reason_label || report.reason}
+                                                    </span>
+                                                </div>
+                                                <Badge variant={report.severity === "high" ? "red" : report.severity === "normal" ? "orange" : "gray"}>
+                                                    {report.severity === "high" ? "Alto" : report.severity === "normal" ? "Médio" : "Baixo"}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="blue">
+                                                    {report.target_type === "product" ? "Produto" :
+                                                        report.target_type === "service" ? "Serviço" :
+                                                            report.target_type === "partner" ? "Parceiro" :
+                                                                report.target_type === "review" ? "Avaliação" : report.target_type}
+                                                </Badge>
+                                                <Badge variant={
+                                                    report.status === "pending" ? "orange" :
+                                                        report.status === "validated" ? "red" :
+                                                            report.status === "dismissed" ? "gray" :
+                                                                report.status === "spam" ? "purple" : "gray"
+                                                }>
+                                                    {report.status === "pending" ? "Pendente" :
+                                                        report.status === "validated" ? "Validada" :
+                                                            report.status === "dismissed" ? "Descartada" :
+                                                                report.status === "spam" ? "Spam" : report.status}
+                                                </Badge>
+                                                <span className="text-xs text-brand-inactive-text ml-auto">
+                                                    {new Date(report.created_at).toLocaleDateString("pt-BR")}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                {/* List Rows */}
-                                <div className="flex flex-col">
-                                    {paginatedItems.map(report => (
-                                        <ReportListRow
-                                            key={report.id}
-                                            report={report}
-                                            isPending={isPending}
-                                            onDetail={setDetailTarget}
-                                            onResolve={setResolveTarget}
-                                            onDismiss={setDismissTarget}
-                                            onSpam={setSpamTarget}
-                                            onRevert={setRevertTarget}
-                                        />
-                                    ))}
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 px-2 w-32 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Tipo</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider">Denúncia</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Severidade</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Data</th>
+                                                    <th className="py-3 px-2 w-48 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedItems.map(report => (
+                                                    <ReportListRow
+                                                        key={report.id}
+                                                        report={report}
+                                                        isPending={isPending}
+                                                        onDetail={setDetailTarget}
+                                                        onResolve={setResolveTarget}
+                                                        onDismiss={setDismissTarget}
+                                                        onSpam={setSpamTarget}
+                                                        onRevert={setRevertTarget}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 {/* Pagination (ERP Standard) */}
                                 {totalPages > 1 && (
-                                    <div className="mt-6 flex justify-center">
+                                    <div className="mt-6">
                                         <Pagination
                                             currentPage={page}
                                             totalPages={totalPages}
@@ -387,13 +441,13 @@ const ReportsList = ({ initialData, initialStats }: ReportsListProps) => {
                                     </div>
                                 )}
 
-                                {/* Infinite Scroll Loader (Hidden but present for functionality) */}
+                                {/* Infinite Scroll Loader */}
                                 {hasMore && (
                                     <div ref={sentinelRef} className="py-8 flex items-center justify-center">
                                         {isLoadingMore && <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-red"></div>}
                                     </div>
                                 )}
-                            </div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>

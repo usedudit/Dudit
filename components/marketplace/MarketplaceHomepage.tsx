@@ -12,6 +12,7 @@ import {
 
 interface MarketplaceHomeProps {
   products: any[]
+  vitrines?: any[]
   user?: any
   userProfile?: any
   cartCount?: number
@@ -28,7 +29,7 @@ const TRENDS = [
   "Papai noel",
 ]
 
-export default function MarketplaceHome({ products = [], user, userProfile, cartCount, hideHeaderAndFooter }: MarketplaceHomeProps) {
+export default function MarketplaceHome({ products = [], vitrines = [], user, userProfile, cartCount, hideHeaderAndFooter }: MarketplaceHomeProps) {
   const [activeTrend, setActiveTrend] = useState(TRENDS[0])
 
   // useMemo: Prevent re-computation when activeTrend changes (products don't change)
@@ -92,7 +93,7 @@ export default function MarketplaceHome({ products = [], user, userProfile, cart
         </div>
       </div>
 
-      <CategoryList />
+      <CategoryList vitrines={vitrines} />
 
       <InfoSection />
 

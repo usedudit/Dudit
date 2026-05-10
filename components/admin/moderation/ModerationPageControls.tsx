@@ -32,9 +32,8 @@ const ModerationPageControls: React.FC<ModerationPageControlsProps> = ({
     ] as const
 
     return (
-        <div className="flex flex-col gap-6 mb-6">
-            {/* Status Tabs */}
-            <div className="px-4 md:px-8">
+        <>
+            <div className="mb-6 px-4 md:px-8">
                 <Tabs
                     value={statusFilter}
                     onValueChange={setStatusFilter}
@@ -49,8 +48,7 @@ const ModerationPageControls: React.FC<ModerationPageControlsProps> = ({
                 </Tabs>
             </div>
 
-            {/* Search */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="w-full md:w-80">
                         <Input
@@ -66,7 +64,7 @@ const ModerationPageControls: React.FC<ModerationPageControlsProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     )
 }
 

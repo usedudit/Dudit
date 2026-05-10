@@ -193,8 +193,8 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                     setStatusTab={setStatusTab}
                 />
 
-                {/* Partners List */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6">
+                {/* List Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
                         {paginated.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
@@ -212,34 +212,99 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                 />
                             </FadeIn>
                         ) : (
-                            <div className="w-full">
-                                {/* Table header (Desktop Only) */}
-                                <div className="hidden md:grid grid-cols-[1fr_130px_100px_160px_140px] gap-4 py-3 px-6 bg-brand-gray/50 dark:bg-dark-border/30 rounded-lg mb-2">
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider">Parceiro</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Status</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Risco</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Data</span>
-                                    <span className="text-[12px] font-bold text-brand-inactive-text uppercase tracking-wider text-center">Ações</span>
+                            <FadeIn key="list" className="w-full">
+                                {/* Mobile/Tablet View */}
+                                <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
+                                    {paginated.map((partner) => (
+                                        <div
+                                            key={partner.id}
+                                            className="py-5 flex flex-col gap-3"
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
+                                                        <StoreIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                                    </div>
+                                                    <div className="min-w-0 flex flex-col">
+                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                            {partner.store_name}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-brand-inactive-text">
+                                                            Dono: {partner.owner_name}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {partner.risk_score > 0 && (
+                                                    <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 20 ? "orange" : "blue"}>
+                                                        Risk: {partner.risk_score}
+                                                    </Badge>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {partner.erp_disabled ? (
+                                                    <Badge variant="red">ERP Desabilitado</Badge>
+                                                ) : partner.suspended_at ? (
+                                                    <Badge variant="orange">Suspenso</Badge>
+                                                ) : !partner.is_active ? (
+                                                    <Badge variant="gray">Inativo</Badge>
+                                                ) : (
+                                                    <Badge variant="green">Ativo</Badge>
+                                                )}
+                                                <span className="text-xs text-brand-inactive-text ml-auto">
+                                                    {new Date(partner.created_at).toLocaleDateString("pt-BR")}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {partner.suspended_at ? (
+                                                    <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
+                                                ) : (
+                                                    <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
+                                                )}
+                                                {partner.erp_disabled ? (
+                                                    <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
+                                                ) : (
+                                                    <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                {/* List Rows */}
-                                <div className="flex flex-col">
-                                    {paginated.map((partner) => (
-                                        <PartnerListRow
-                                            key={partner.id}
-                                            partner={partner}
-                                            isPending={isPending}
-                                            onUnsuspend={setUnsuspendTarget}
-                                            onSuspend={setSuspendTarget}
-                                            onEnableERP={setEnableTarget}
-                                            onDisableERP={setDisableTarget}
-                                        />
-                                    ))}
+                                {/* Desktop Table View */}
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider">Parceiro</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Status</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Risco</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 uppercase tracking-wider text-center">Data</th>
+                                                    <th className="py-3 px-2 w-48 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body uppercase tracking-wider text-center">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginated.map((partner) => (
+                                                    <PartnerListRow
+                                                        key={partner.id}
+                                                        partner={partner}
+                                                        isPending={isPending}
+                                                        onUnsuspend={setUnsuspendTarget}
+                                                        onSuspend={setSuspendTarget}
+                                                        onEnableERP={setEnableTarget}
+                                                        onDisableERP={setDisableTarget}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 {/* Pagination (ERP Standard) */}
                                 {totalPages > 1 && (
-                                    <div className="mt-6 flex justify-center">
+                                    <div className="mt-6">
                                         <Pagination
                                             currentPage={page}
                                             totalPages={totalPages}
@@ -247,7 +312,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                         />
                                     </div>
                                 )}
-                            </div>
+                            </FadeIn>
                         )}
                     </AnimatePresence>
                 </div>
