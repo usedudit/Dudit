@@ -32,7 +32,7 @@ async function _getMarketplaceProductBase(id: string) {
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, 
-        store_image_url, max_installments, interest_rate_percent,
+        store_image_url, banner_url, max_installments, interest_rate_percent,
         mp_user_id, mp_public_key, opening_hours,
         addresses(city, state),
         payment_methods(*)
@@ -52,9 +52,10 @@ async function _getMarketplaceProductBase(id: string) {
     if (Array.isArray(p)) p = p[0]
 
     if (!p) {
-      p = { store_name: "Vendedor", store_avatar: null, city: null, state: null }
+      p = { store_name: "Vendedor", store_avatar: null, banner_url: null, city: null, state: null }
     } else {
       p.store_avatar = p.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+      p.banner_url = p.banner_url || null
       p.city = p.addresses?.[0]?.city || null
       p.state = p.addresses?.[0]?.state || null
     }

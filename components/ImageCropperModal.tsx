@@ -52,7 +52,7 @@ const ImageCropperModal = memo(({
 
   const drag = useRef({
     active: false,
-    type: "" as "move-img" | "nw" | "ne" | "sw" | "se" | "",
+    type: "" as "move-img" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "e" | "w" | "",
     pointerId: -1,
     startX: 0,
     startY: 0,
@@ -497,18 +497,22 @@ const ImageCropperModal = memo(({
 
             {/* HANDLES */}
 
-            {["nw", "ne", "sw", "se"].map(pos => (
+            {["nw", "ne", "sw", "se", "n", "s", "e", "w"].map(pos => (
 
               <div
                 key={pos}
                 data-handle
-                onPointerDown={e => pointerDown(e, pos)}
+                onPointerDown={e => pointerDown(e, pos as any)}
                 className={`
-                absolute w-4 h-4 bg-white border rounded-full
+                absolute w-4 h-4 bg-white border rounded-full z-10
                 ${pos === "nw" && "-top-2 -left-2 cursor-nw-resize"}
                 ${pos === "ne" && "-top-2 -right-2 cursor-ne-resize"}
                 ${pos === "sw" && "-bottom-2 -left-2 cursor-sw-resize"}
                 ${pos === "se" && "-bottom-2 -right-2 cursor-se-resize"}
+                ${pos === "n" && "-top-2 left-1/2 -translate-x-1/2 cursor-n-resize"}
+                ${pos === "s" && "-bottom-2 left-1/2 -translate-x-1/2 cursor-s-resize"}
+                ${pos === "e" && "top-1/2 -right-2 -translate-y-1/2 cursor-e-resize"}
+                ${pos === "w" && "top-1/2 -left-2 -translate-y-1/2 cursor-w-resize"}
                 `}
               />
 

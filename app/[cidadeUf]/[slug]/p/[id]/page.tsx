@@ -54,11 +54,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const productUrl = `https://dudit.com.br${getProductUrl(product)}`
 
-  // Título mais "chamativo" com o preço
-  const title = `${product.name} - ${priceFormatted} | Dudit ${city}`
+  // Título mais "chamativo" sem o preço
+  const title = `${product.name} | Dudit em ${city}`
 
   // Descrição com gatilho de "Conexão Direta" e Localização
-  const description = `Oferta em ${city}: ${product.name} por apenas ${priceFormatted}. Compre direto do vendedor pela Dudit e economize!`
+  const description = `Oferta em ${city}: ${product.name}. Compre direto do vendedor pela Dudit e economize!`
 
   return {
     title: title,

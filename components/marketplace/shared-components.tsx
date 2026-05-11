@@ -144,7 +144,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
                     className="w-full h-full object-cover transition-transform duration-500"
                     loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-60" />
+                <div className="absolute inset-0" />
             </div>
 
             <div className="flex items-start gap-3 px-1">
@@ -284,80 +284,80 @@ interface ItemCardProps {
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
-  const imageUrl = getProductImageUrl(product.images)
-  const distance = product.partners?.distance_km_formatted || null
+    const imageUrl = getProductImageUrl(product.images)
+    const distance = product.partners?.distance_km_formatted || null
 
-  return (
-    <div
-      className="w-[160px] md:w-[196px] relative group/card h-full shrink-0"
-    >
-      <Link
-        href={getProductUrl(product, product.partners)}
-        prefetch={false}
-        className="block h-full flex-col hover:no-underline"
-      >
-        <div className="relative mb-3 overflow-hidden rounded-[16px] border border-gray-100 bg-brand-gray aspect-square">
-          <img
-            src={imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
-            alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-500"
-            loading="lazy"
-          />
-          <button className="absolute top-2 right-2 p-1.5 bg-white rounded-full text-gray-400 hover:text-brand-green opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
-            <HeartIcon size={18} />
-          </button>
+    return (
+        <div
+            className="w-[160px] md:w-[196px] relative group/card h-full shrink-0"
+        >
+            <Link
+                href={getProductUrl(product, product.partners)}
+                prefetch={false}
+                className="block h-full flex-col hover:no-underline"
+            >
+                <div className="relative mb-3 overflow-hidden rounded-[16px] border border-gray-100 bg-brand-gray aspect-square">
+                    <img
+                        src={imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                        alt={product.name}
+                        className="w-full h-full object-cover transition-transform duration-500"
+                        loading="lazy"
+                    />
+                    <button className="absolute top-2 right-2 p-1.5 bg-white rounded-full text-gray-400 hover:text-brand-green opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
+                        <HeartIcon size={18} />
+                    </button>
+                </div>
+
+                <div className="px-1">
+                    <h3 className="text-[13px] md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-1">
+                        {product.name}
+                    </h3>
+
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex flex-col">
+                            {product.originalPrice && (
+                                <span className="text-[10px] text-gray-400 line-through">
+                                    {formatCurrency(product.originalPrice)}
+                                </span>
+                            )}
+                            <span className="text-base font-bold text-brand-dark leading-tight">
+                                {formatCurrency(product.price)}
+                            </span>
+                        </div>
+
+                        {(product.rating ?? 0) > 0 && (
+                            <div className="flex items-center gap-0.5">
+                                <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                <span className="text-[11px] font-bold text-brand-dark">{product.rating}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-100 my-2" />
+
+                    <div className="flex items-start gap-2 pt-1">
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0 bg-gray-50 mt-0.5">
+                            <img
+                                src={product.partners?.store_avatar || 'https://img.dudit.com.br/static/Logo.png'}
+                                alt={product.partners?.store_name}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
+                                {product.partners?.store_name || 'Vendedor'}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-normal truncate">
+                                {product.partners?.city ? `${product.partners.city}${product.partners.state ? ` - ${product.partners.state}` : ''}` : ''}
+                                {distance && product.partners?.city ? ' • ' : ''}
+                                {distance}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </Link>
         </div>
-
-        <div className="px-1">
-          <h3 className="text-[13px] md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-1">
-            {product.name}
-          </h3>
-
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex flex-col">
-              {product.originalPrice && (
-                <span className="text-[10px] text-gray-400 line-through">
-                  {formatCurrency(product.originalPrice)}
-                </span>
-              )}
-              <span className="text-base font-bold text-brand-dark leading-tight">
-                {formatCurrency(product.price)}
-              </span>
-            </div>
-
-            {(product.rating ?? 0) > 0 && (
-              <div className="flex items-center gap-0.5">
-                <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                <span className="text-[11px] font-bold text-brand-dark">{product.rating}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-gray-100 my-2" />
-
-          <div className="flex items-start gap-2 pt-1">
-            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0 bg-gray-50 mt-0.5">
-              <img
-                src={product.partners?.store_avatar || 'https://img.dudit.com.br/static/Logo.png'}
-                alt={product.partners?.store_name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
-                {product.partners?.store_name || 'Vendedor'}
-              </p>
-              <p className="text-[10px] text-gray-400 font-normal truncate">
-                {product.partners?.city ? `${product.partners.city}${product.partners.state ? ` - ${product.partners.state}` : ''}` : ''}
-                {distance && product.partners?.city ? ' • ' : ''}
-                {distance}
-              </p>
-            </div>
-          </div>
-        </div>
-      </Link>
-    </div>
-  );
+    );
 };
 
 interface ProductCarouselProps {

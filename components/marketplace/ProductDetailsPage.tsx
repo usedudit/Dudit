@@ -149,6 +149,7 @@ export function ProductDetailsPageClient({
       city: address?.city || "Brasil",
       state: address?.state || "BR",
       profile_image_url: p?.profile_image_url || p?.store_image_url || null,
+      banner_url: p?.banner_url || null,
       mp_user_id: p?.mp_user_id,
       mp_public_key: p?.mp_public_key,
       address: {
@@ -647,32 +648,40 @@ export function ProductDetailsPageClient({
       </div>
 
       {/* Store */}
-      <div className="bg-brand-gray rounded-xl p-5 border border-brand-border">
-        <div className="flex items-center justify-between mb-4">
-          <Link href={getPartnerUrl(partner)} prefetch={true} className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-full overflow-hidden border border-white bg-white shrink-0">
-              <img src={getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"} alt="Loja"
-                className="w-full h-full object-cover" />
+      <div className="rounded-2xl border border-brand-border overflow-hidden bg-white">
+        <Link href={getPartnerUrl(partner)} prefetch={true} className="group block">
+          <div className="relative aspect-[21/9] bg-brand-gray overflow-hidden">
+            <img src={getR2ImageUrl(partner.banner_url) || getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              alt={partner.store_name} />
+          </div>
+          <div className="px-5 pb-4 pt-0 -mt-6 relative z-10 flex gap-4">
+            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white bg-white shrink-0 shadow-sm">
+              <img src={getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"}
+                className="w-full h-full object-cover"
+                alt={partner.store_name} />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 pt-7">
               <div className="flex items-center gap-2">
-                <p className="font-bold text-brand-dark text-[15px] group-hover:text-brand-green transition-colors leading-tight">{partner.store_name}</p>
+                <h4 className="font-bold text-brand-dark text-[1.0625rem] group-hover:text-brand-green transition-colors leading-tight">
+                  {partner.store_name}
+                </h4>
                 {partner.rating > 0 && (
-                  <div className="flex items-center gap-0.5 bg-[rgba(0,0,0,0.04)] px-1.5 py-0.5 rounded">
+                  <div className="flex items-center gap-0.5 bg-brand-gray px-1.5 py-0.5 rounded text-[10px] font-bold text-brand-dark">
                     <StarIcon size={10} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                    <span className="text-[10px] font-bold text-brand-dark mt-0.5">{Number(partner.rating).toFixed(1)}</span>
+                    <span>{Number(partner.rating).toFixed(1)}</span>
                   </div>
                 )}
               </div>
               <p className="text-brand-inactive-text text-xs mt-0.5">{partner.city} - {partner.state}</p>
             </div>
-          </Link>
-        </div>
-        <div className="flex items-center gap-4 text-xs font-bold text-brand-dark mb-4 px-1">
-          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          </div>
+        </Link>
+        <div className="px-5 pb-5 flex items-center gap-4 text-xs font-bold text-brand-dark">
+          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={false} className="flex items-center gap-1 hover:text-brand-green transition-colors">
             Lojas em {partner.city} <ChevronRightIcon size={10} />
           </Link>
-          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={false} className="flex items-center gap-1 cursor-pointer hover:text-brand-green transition-colors">
+          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={false} className="flex items-center gap-1 hover:text-brand-green transition-colors">
             Produtos em {partner.city} <ChevronRightIcon size={10} />
           </Link>
         </div>
@@ -696,7 +705,13 @@ export function ProductDetailsPageClient({
     : null
 
   const LightboxContent = (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
+    >
 
       {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
       <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
@@ -789,7 +804,7 @@ export function ProductDetailsPageClient({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -938,7 +953,9 @@ export function ProductDetailsPageClient({
         className="min-h-screen bg-white lg:pt-[50px] font-sans flex flex-col"
       >
 
-        {isMounted && isLightboxOpen && createPortal(LightboxContent, document.body)}
+        <AnimatePresence>
+          {isMounted && isLightboxOpen && createPortal(LightboxContent, document.body)}
+        </AnimatePresence>
 
         <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           {/* Breadcrumb */}
@@ -950,8 +967,8 @@ export function ProductDetailsPageClient({
             <span className="text-brand-inactive-text truncate max-w-[300px]">{product.name}</span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-8">
-            <div className="lg:col-span-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
+            <div className="lg:col-span-7">
 
               {/* Gallery */}
               <div className="flex gap-3 mb-6">
@@ -966,7 +983,16 @@ export function ProductDetailsPageClient({
                   ))}
                 </div>
 
-                <div className="flex gap-2 flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
+                  {/* Desktop Prev Button */}
+                  <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                    {productImages.length > 1 && (
+                      <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                        <ChevronLeftIcon size={20} className="text-brand-dark" />
+                      </button>
+                    )}
+                  </div>
+
                   <div className="relative flex-1 min-w-0">
                     {/* Desktop main image */}
                     <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
@@ -988,22 +1014,6 @@ export function ProductDetailsPageClient({
                             transition={{ duration: 0.2 }}
                             style={{ transformOrigin, scale: smoothScale }} />
                         </AnimatePresence>
-                        {productImages.length > 1 && (
-                          <>
-                            <button onClick={(e) => { e.stopPropagation(); goToPrev() }}
-                              onMouseEnter={() => zoomScale.set(1)}
-                              onMouseMove={(e) => e.stopPropagation()}
-                              className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors z-10">
-                              <ChevronLeftIcon size={20} className="text-brand-dark" />
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); goToNext() }}
-                              onMouseEnter={() => zoomScale.set(1)}
-                              onMouseMove={(e) => e.stopPropagation()}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors z-10">
-                              <ChevronRightIcon size={20} className="text-brand-dark" />
-                            </button>
-                          </>
-                        )}
                       </div>
                     </div>
 
@@ -1033,8 +1043,26 @@ export function ProductDetailsPageClient({
                     </div>
                   </div>
 
+                  {/* Desktop Next Button */}
+                  <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                    {productImages.length > 1 && (
+                      <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                        <ChevronRightIcon size={20} className="text-brand-dark" />
+                      </button>
+                    )}
+                  </div>
 
+                  {/* Desktop Action Buttons */}
+                  <div className="hidden lg:flex flex-col gap-3 shrink-0 self-start mt-2">
+                    <button onClick={() => setIsFavorite(!isFavorite)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Favoritar">
+                      <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
+                    </button>
+                    <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Compartilhar">
+                      <ShareIcon className="w-5 h-5 text-brand-green" />
+                    </button>
+                  </div>
                 </div>
+
               </div>
 
               {/* Buy panel (mobile/tablet) */}
@@ -1142,7 +1170,7 @@ export function ProductDetailsPageClient({
             </div>
 
             {/* Desktop buy panel */}
-            <div className="hidden lg:block lg:col-span-4 relative">
+            <div className="hidden lg:block lg:col-span-5 relative">
               {BuyPanel}
             </div>
           </div>
