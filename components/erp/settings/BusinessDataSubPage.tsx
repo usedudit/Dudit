@@ -33,6 +33,7 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 const SELLS_OPTIONS = [
     {
@@ -333,6 +334,12 @@ export const BusinessDataSubPage = ({
         setBannerPreview(url)
         setGeneralInfo((p: any) => ({ ...p, bannerUrl: url }))
         setTempBannerFile(null)
+    }
+
+    const handleRemoveBanner = () => {
+        const randomBanner = getRandomDefaultBanner()
+        setBannerPreview(randomBanner)
+        setGeneralInfo((p: any) => ({ ...p, bannerUrl: randomBanner }))
     }
 
     const formattedAddress = React.useMemo(() => {
@@ -730,10 +737,15 @@ export const BusinessDataSubPage = ({
                                                         </div>
                                                     )}
 
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 z-10">
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 z-10">
                                                         <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
                                                             Trocar Banner
                                                         </Button>
+                                                        {bannerPreview && !bannerPreview.includes('default/') && (
+                                                            <Button variant="outline" onClick={handleRemoveBanner} className="bg-white/10 text-white hover:bg-white/20 border-white/40">
+                                                                Remover
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1300x300px. Máximo 3MB.</p>

@@ -10,6 +10,7 @@ import { UnosendService } from "@/lib/services/unosend.service"
 import { syncToExploreRedis, syncPartnerItemsToExploreRedis } from "@/lib/redis-sync"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { geocodeAddress } from "@/lib/services/location.service"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 // --- Interfaces Atualizadas ---
 
@@ -102,6 +103,7 @@ export async function createPartnerAction(data: CreatePartnerData) {
       cpf: cpfEncrypted,
       opening_hours: data.openingHours || defaultOpeningHours,
       store_image_url: data.storeImageUrl,
+      banner_url: getRandomDefaultBanner(),
       offering_type: data.offeringType,
       provides_services: data.offeringType === "services" || data.offeringType === "both",
       latitude: null as number | null,

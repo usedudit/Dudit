@@ -10,6 +10,7 @@ import {
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Button } from "@/components/reusable"
+import { useMediaQuery } from "@/components/erp/hooks"
 import {
   UploadIcon,
   ZoomInIcon,
@@ -27,7 +28,6 @@ interface Props {
   aspectRatio?: number
 }
 
-const SIZE = 400
 const MAX_ZOOM = 5
 const MIN_CROP = 50
 const INERTIA = 0.92
@@ -41,6 +41,9 @@ const ImageCropperModal = memo(({
   imageSrc: imageSrcProp,
   aspectRatio,
 }: Props) => {
+
+  const isDesktop = useMediaQuery("(min-width: 1024px)")
+  const SIZE = isDesktop ? 800 : 400
 
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -59,7 +62,7 @@ const ImageCropperModal = memo(({
     lastX: 0,
     lastY: 0,
     initialPos: { x: 0, y: 0 },
-    initialCrop: { x: 0, y: 0, width: SIZE, height: SIZE },
+    initialCrop: { x: 0, y: 0, width: 400, height: 400 },
   })
 
   const [imageSrc, setImageSrc] = useState("")
@@ -79,6 +82,13 @@ const ImageCropperModal = memo(({
   })
   const cropRef = useRef(crop)
   cropRef.current = crop
+
+  // Update crop on SIZE change
+  useEffect(() => {
+    if (isOpen) {
+      reset()
+    }
+  }, [SIZE, isOpen])
 
   /* LOAD IMAGE */
 
@@ -249,45 +259,87 @@ const ImageCropperModal = memo(({
 
       if (aspectRatio) {
         if (drag.current.type === "se" || drag.current.type === "ne" || drag.current.type === "e") {
-          c.width = Math.max(MIN_CROP, c.width + dx)
+          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), SIZE - c.x)
           c.height = c.width / aspectRatio
-          if (drag.current.type === "ne") c.y = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+          
+          if (c.y + c.height > SIZE) {
+            c.height = SIZE - c.y
+            c.width = c.height * aspectRatio
+          }
+
+          if (drag.current.type === "ne") {
+            const desiredY = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+            if (desiredY < 0) {
+              c.height = drag.current.initialCrop.y + drag.current.initialCrop.height
+              c.width = c.height * aspectRatio
+              c.y = 0
+            } else {
+              c.y = desiredY
+            }
+          }
         } else if (drag.current.type === "sw" || drag.current.type === "nw" || drag.current.type === "w") {
-          const w = Math.max(MIN_CROP, c.width - dx)
-          c.x = drag.current.initialCrop.x + (c.width - w)
-          c.width = w
+          const maxWidthAllowedByX = drag.current.initialCrop.x + drag.current.initialCrop.width
+          const desiredW = Math.max(MIN_CROP, drag.current.initialCrop.width - dx)
+          c.width = Math.min(desiredW, maxWidthAllowedByX)
           c.height = c.width / aspectRatio
-          if (drag.current.type === "nw") c.y = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+          
+          if (c.y + c.height > SIZE) {
+            c.height = SIZE - c.y
+            c.width = c.height * aspectRatio
+          }
+
+          c.x = maxWidthAllowedByX - c.width
+
+          if (drag.current.type === "nw") {
+            const desiredY = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+            if (desiredY < 0) {
+              c.height = drag.current.initialCrop.y + drag.current.initialCrop.height
+              c.width = c.height * aspectRatio
+              c.y = 0
+              c.x = maxWidthAllowedByX - c.width
+            } else {
+              c.y = desiredY
+            }
+          }
         } else if (drag.current.type === "s") {
-          c.height = Math.max(MIN_CROP, c.height + dy)
+          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), SIZE - c.y)
           c.width = c.height * aspectRatio
+          if (c.x + c.width > SIZE) {
+            c.width = SIZE - c.x
+            c.height = c.width / aspectRatio
+          }
         } else if (drag.current.type === "n") {
-          const h = Math.max(MIN_CROP, c.height - dy)
-          c.y = drag.current.initialCrop.y + (c.height - h)
-          c.height = h
+          const maxHeightAllowedByY = drag.current.initialCrop.y + drag.current.initialCrop.height
+          const desiredH = Math.max(MIN_CROP, drag.current.initialCrop.height - dy)
+          c.height = Math.min(desiredH, maxHeightAllowedByY)
           c.width = c.height * aspectRatio
+          
+          if (c.x + c.width > SIZE) {
+            c.width = SIZE - c.x
+            c.height = c.width / aspectRatio
+          }
+
+          c.y = maxHeightAllowedByY - c.height
         }
       } else {
         if (drag.current.type.includes("e"))
-          c.width = Math.max(MIN_CROP, c.width + dx)
+          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), SIZE - c.x)
 
         if (drag.current.type.includes("s"))
-          c.height = Math.max(MIN_CROP, c.height + dy)
+          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), SIZE - c.y)
 
         if (drag.current.type.includes("w")) {
-          const w = c.width - dx
-          if (w >= MIN_CROP) {
-            c.x += dx
-            c.width = w
-          }
+          const maxWidthAllowedByX = drag.current.initialCrop.x + drag.current.initialCrop.width
+          const desiredW = Math.max(MIN_CROP, drag.current.initialCrop.width - dx)
+          c.width = Math.min(desiredW, maxWidthAllowedByX)
+          c.x = maxWidthAllowedByX - c.width
         }
 
         if (drag.current.type.includes("n")) {
-          const h = c.height - dy
-          if (h >= MIN_CROP) {
-            c.y += dy
-            c.height = h
-          }
+          const maxHeightAllowedByY = drag.current.initialCrop.y + drag.current.initialCrop.height
+          const desiredH = Math.max(MIN_CROP, drag.current.initialCrop.height - dy)
+          c.height = Math.min(desiredH, maxHeightAllowedByY)
+          c.y = maxHeightAllowedByY - c.height
         }
       }
 
@@ -397,6 +449,7 @@ const ImageCropperModal = memo(({
       isOpen={isOpen}
       onClose={onClose}
       title="Recortar imagem"
+      maxWidth="4xl"
       icon={<UploadIcon className="w-5 h-5" />}
       footer={
         <div className="flex gap-2 justify-end">

@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
 import Link from "next/link"
-import { createSlug } from "@/lib/utils/slugify"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -125,10 +125,10 @@ interface VitrineCardProps {
 
 export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
     const partner = vitrine.partners || {}
-    const storeAvatar = partner.store_avatar || "https://img.dudit.com.br/static/Logo.png"
+    const storeAvatar = partner.store_avatar || partner.profile_image_url || partner.store_image_url || "https://img.dudit.com.br/static/Logo.png"
     const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
         ? getR2ImageUrl(partner.banner_url)
-        : (vitrine.images?.[0] || storeAvatar)
+        : (partner.banner_url || getRandomDefaultBanner())
     const distance = partner.distance_km_formatted || null
     const city = partner.city || ""
     const state = partner.state || ""
@@ -274,6 +274,8 @@ interface ItemCardProps {
         partners?: {
             store_name: string
             store_avatar?: string
+            profile_image_url?: string
+            store_image_url?: string
             latitude?: number | null
             longitude?: number | null
             distance_km?: number | null
@@ -340,7 +342,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                     <div className="flex items-start gap-2 pt-1">
                         <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0 bg-gray-50 mt-0.5">
                             <img
-                                src={product.partners?.store_avatar || 'https://img.dudit.com.br/static/Logo.png'}
+                                src={getR2ImageUrl(product.partners?.store_avatar || product.partners?.profile_image_url || product.partners?.store_image_url || 'https://img.dudit.com.br/static/Logo.png')}
                                 alt={product.partners?.store_name}
                                 className="w-full h-full object-cover"
                             />
