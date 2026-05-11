@@ -129,7 +129,7 @@ export default function NcmSelectionModal({
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-mono text-base font-semibold text-brand-dark dark:text-dark-heading">
+                      <span className="text-base font-semibold text-brand-dark dark:text-dark-heading">
                         {suggestion.ncm}
                       </span>
                       <span

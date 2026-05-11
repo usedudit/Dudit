@@ -64,7 +64,8 @@ async function deactivatePartnerProducts(partnerId: string): Promise<void> {
 export async function getUsers(
     cursor?: string | null,
     limit: number = 20,
-    search?: string
+    search?: string,
+    status?: string
 ): Promise<CursorPaginatedResult<EnforcementUser>> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
@@ -86,6 +87,12 @@ export async function getUsers(
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
         query = query.ilike("full_name", `%${sanitized}%`)
+    }
+
+    if (status === "active") {
+        query = query.is("banned_at", null)
+    } else if (status === "banned") {
+        query = query.not("banned_at", "is", null)
     }
 
     if (cursor) {
@@ -150,7 +157,8 @@ export async function getUsers(
 export async function getPartners(
     cursor?: string | null,
     limit: number = 20,
-    search?: string
+    search?: string,
+    status?: string
 ): Promise<CursorPaginatedResult<EnforcementPartner>> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
@@ -166,6 +174,14 @@ export async function getPartners(
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
         query = query.ilike("store_name", `%${sanitized}%`)
+    }
+
+    if (status === "active") {
+        query = query.is("suspended_at", null).eq("erp_disabled", false).eq("is_active", true)
+    } else if (status === "suspended") {
+        query = query.not("suspended_at", "is", null)
+    } else if (status === "erp_disabled") {
+        query = query.eq("erp_disabled", true)
     }
 
     if (cursor) {

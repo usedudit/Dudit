@@ -1,3 +1,5 @@
+import { de } from "date-fns/locale";
+
 /** Human-readable labels for `plans.features_json` keys (shared by settings + upgrade modal). */
 export const FEATURE_LABELS: Record<string, string> = {
   public_storefront: "Vitrine digital pública",
@@ -62,69 +64,63 @@ export function buildFeaturesDisplay(features: string[], tierSlug: string, allPl
 export const HARDCODED_PLANS: Record<string, { name: string; objective: string; features: string[]; limits: string[] }> = {
   free: {
     name: "Começar",
-    objective: "Pra quem quer testar e começar a vender",
+    objective: "Pra começar a vender e organizar seu negócio",
     features: [
-      "Crie sua vitrine online e compartilhe com clientes",
-      "Cadastre produtos e serviços em poucos passos",
-      "Controle seu estoque básico sem planilhas",
-      "Receba agendamentos e organize sua agenda",
-      "Envie orçamentos de forma simples e rápida",
-      "Registre pedidos e vendas no sistema",
-      "Use um PDV básico para vendas presenciais",
-      "Organize seus clientes em um só lugar",
-      "Receba pedidos e agendamentos direto pelo WhatsApp",
+      "Vitrine online para seus clientes",
+      "Pedidos e agendamentos pelo WhatsApp",
+      "PDV para vendas presenciais",
+      "Registro fácil de pedidos e vendas",
+      "Agenda com agendamentos online",
+      "Orçamentos simples e profissionais",
+      "Controle de estoque sem planilhas",
+      "Clientes organizados em um só lugar",
+      "Cadastro rápido de produtos e serviços"
     ],
     limits: [
       "Até 15 itens no catálogo",
-      "Até 2 imagens por item",
-      "Até 25 pedidos/mês",
-      "Até 30 agendamentos/mês",
-      "Até 15 ordens de serviço/mês",
-      "1 usuário",
+      "Até 25 pedidos por mês",
+      "1 usuário"
     ],
   },
   crescer: {
     name: "Crescer",
-    objective: "Pra quem já vende e quer crescer na cidade",
+    objective: "Pra quem quer crescer e vender mais",
     features: [
-      "Tudo do Começar +",
+      "Tudo do plano Começar +",
       "Receba pedidos direto pelo sistema",
-      "Aceite pagamentos online automáticos (Mercado Pago)",
-      "Ofereça variações de produtos (tamanho, cor, etc.)",
-      "Crie cupons e promoções para aumentar suas vendas",
-      "Configure entrega local de forma simples",
-      "Gerencie fornecedores com mais organização",
-      "Crie e gerencie ordens de serviço",
-      "Veja seu financeiro e saiba seu ganho real",
-      "Acompanhe relatórios básicos do seu negócio",
+      "Pagamentos online com Mercado Pago",
+      "Cupons e promoções para vender mais",
+      "Variações de produtos (cor, tamanho e mais)",
+      "Configuração simples de entregas",
+      "Controle financeiro com visão do lucro",
+      "Relatórios básicos do negócio",
+      "Gestão organizada de fornecedores",
+      "Ordens de serviço em um só lugar"
     ],
     limits: [
       "Até 100 itens no catálogo",
-      "Até 5 imagens por item",
-      "Até 150 pedidos/mês",
-      "Até 150 agendamentos/mês",
-      "Até 100 ordens de serviço/mês",
-      "Até 3 usuários",
+      "Até 150 pedidos por mês",
+      "3 usuários"
     ],
   },
   escalar: {
     name: "Escalar",
-    objective: "Pra quem quer mais controle e organização",
+    objective: "Pra negócios que precisam de mais controle",
     features: [
-      "Tudo do Crescer +",
-      "Gerencie expedição e entregas com mais controle",
-      "Tenha um financeiro completo (fluxo de caixa + DRE)",
-      "Acompanhe relatórios avançados para tomar decisões",
-      "Controle devoluções e trocas com facilidade",
-      "Monte kits e combos de produtos",
-      "Crie campanhas promocionais mais estratégicas",
+      "Tudo do plano Crescer +",
+      "Financeiro completo com fluxo de caixa e DRE",
+      "Relatórios avançados para decisões estratégicas",
+      "Controle de expedição e entregas",
+      "Gestão fácil de trocas e devoluções",
+      "Kits e combos de produtos",
+      "Campanhas promocionais para vender mais"
     ],
     limits: [
-      "Itens e Pedidos ilimitados",
-      "Até 15 imagens por item",
+      "Itens e pedidos ilimitados",
       "Ordens de serviço ilimitadas",
       "Agendamentos ilimitados",
-      "Até 10 usuários",
+      "15 imagens por item",
+      "10 usuários",
     ],
   },
   profissional: {

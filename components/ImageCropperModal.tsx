@@ -24,6 +24,7 @@ interface Props {
   onCropComplete?: (img: string) => void
   imageFile?: File | null
   imageSrc?: string | null
+  aspectRatio?: number
 }
 
 const SIZE = 400
@@ -38,6 +39,7 @@ const ImageCropperModal = memo(({
   onCropComplete,
   imageFile,
   imageSrc: imageSrcProp,
+  aspectRatio,
 }: Props) => {
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -115,12 +117,27 @@ const ImageCropperModal = memo(({
     setRotation(0)
     setImagePos({ x: 0, y: 0 })
 
-    setCrop({
-      x: 0,
-      y: 0,
-      width: SIZE,
-      height: SIZE
-    })
+    if (aspectRatio) {
+      let w = SIZE
+      let h = SIZE / aspectRatio
+      if (h > SIZE) {
+        h = SIZE
+        w = SIZE * aspectRatio
+      }
+      setCrop({
+        x: (SIZE - w) / 2,
+        y: (SIZE - h) / 2,
+        width: w,
+        height: h
+      })
+    } else {
+      setCrop({
+        x: 0,
+        y: 0,
+        width: SIZE,
+        height: SIZE
+      })
+    }
 
   }
 
@@ -230,25 +247,47 @@ const ImageCropperModal = memo(({
 
       let c = { ...drag.current.initialCrop }
 
-      if (drag.current.type.includes("e"))
-        c.width = Math.max(MIN_CROP, c.width + dx)
-
-      if (drag.current.type.includes("s"))
-        c.height = Math.max(MIN_CROP, c.height + dy)
-
-      if (drag.current.type.includes("w")) {
-        const w = c.width - dx
-        if (w >= MIN_CROP) {
-          c.x += dx
+      if (aspectRatio) {
+        if (drag.current.type === "se" || drag.current.type === "ne" || drag.current.type === "e") {
+          c.width = Math.max(MIN_CROP, c.width + dx)
+          c.height = c.width / aspectRatio
+          if (drag.current.type === "ne") c.y = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+        } else if (drag.current.type === "sw" || drag.current.type === "nw" || drag.current.type === "w") {
+          const w = Math.max(MIN_CROP, c.width - dx)
+          c.x = drag.current.initialCrop.x + (c.width - w)
           c.width = w
-        }
-      }
-
-      if (drag.current.type.includes("n")) {
-        const h = c.height - dy
-        if (h >= MIN_CROP) {
-          c.y += dy
+          c.height = c.width / aspectRatio
+          if (drag.current.type === "nw") c.y = drag.current.initialCrop.y + (drag.current.initialCrop.height - c.height)
+        } else if (drag.current.type === "s") {
+          c.height = Math.max(MIN_CROP, c.height + dy)
+          c.width = c.height * aspectRatio
+        } else if (drag.current.type === "n") {
+          const h = Math.max(MIN_CROP, c.height - dy)
+          c.y = drag.current.initialCrop.y + (c.height - h)
           c.height = h
+          c.width = c.height * aspectRatio
+        }
+      } else {
+        if (drag.current.type.includes("e"))
+          c.width = Math.max(MIN_CROP, c.width + dx)
+
+        if (drag.current.type.includes("s"))
+          c.height = Math.max(MIN_CROP, c.height + dy)
+
+        if (drag.current.type.includes("w")) {
+          const w = c.width - dx
+          if (w >= MIN_CROP) {
+            c.x += dx
+            c.width = w
+          }
+        }
+
+        if (drag.current.type.includes("n")) {
+          const h = c.height - dy
+          if (h >= MIN_CROP) {
+            c.y += dy
+            c.height = h
+          }
         }
       }
 

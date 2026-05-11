@@ -102,6 +102,9 @@ export const BusinessDataSubPage = ({
         sells: businessInfo?.sells || ["products"],
         mode: (businessInfo?.mode || "erp") as BusinessMode,
         phone: formatE164ToDisplay(partner.phone) || "",
+        bannerUrl: partner.banner_url || "",
+        isShowcaseActive: partner.is_showcase_active ?? true,
+        category: partner.category || "",
     })
 
     const address = partner.addresses?.[0] || {};
@@ -151,6 +154,12 @@ export const BusinessDataSubPage = ({
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const [imageUploading, setImageUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const [bannerPreview, setBannerPreview] = useState<string | null>(partner.banner_url || null)
+    const [bannerCropModalOpen, setBannerCropModalOpen] = useState(false)
+    const [tempBannerFile, setTempBannerFile] = useState<File | null>(null)
+    const [bannerUploading, setBannerUploading] = useState(false)
+    const bannerInputRef = useRef<HTMLInputElement>(null)
 
     const toggleArrayItem = (key: "sells", value: string) =>
         setGeneralInfo((prev: any) => {
@@ -229,6 +238,9 @@ export const BusinessDataSubPage = ({
                     inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
                     ieIsento: fiscalInfo.ieIsento,
                     inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
+                    bannerUrl: generalInfo.bannerUrl || null,
+                    isShowcaseActive: generalInfo.isShowcaseActive,
+                    category: generalInfo.category || null,
                     userId: partner.user_id,
                 })
 
@@ -296,6 +308,49 @@ export const BusinessDataSubPage = ({
         } finally {
             setImageUploading(false)
             setTempImageFile(null)
+        }
+    }
+
+    const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB")
+        setTempBannerFile(file)
+        setBannerCropModalOpen(true)
+    }
+
+    const handleBannerCropComplete = async (url: string) => {
+        setBannerUploading(true)
+        setBannerCropModalOpen(false)
+        setBannerPreview(url)
+        try {
+            const blob = await (await fetch(url)).blob()
+            const ext = blob.type === "image/png" ? "png" : "jpg"
+            const file = new File([blob], `partner-banner.${ext}`, { type: blob.type })
+            const formData = new FormData()
+            formData.append("file", file, "partner-banner.jpg")
+
+            const response = await fetchWithCSRF("/api/upload-image?uploadType=partner-banner", { method: "POST", body: formData })
+            const data = await response.json()
+
+            if (!response.ok) {
+                setBannerPreview(partner.banner_url || null)
+                setGeneralInfo((p: any) => ({ ...p, bannerUrl: partner.banner_url || "" }))
+                notifyError(data.error || "Erro ao fazer upload")
+                return
+            }
+
+            if (data.success && data.publicUrl) {
+                setGeneralInfo((p: any) => ({ ...p, bannerUrl: data.publicUrl }))
+                notifySuccess("Banner enviado com sucesso!")
+            }
+        } catch {
+            setBannerPreview(partner.banner_url || null)
+            setGeneralInfo((p: any) => ({ ...p, bannerUrl: partner.banner_url || "" }))
+            notifyError("Erro no upload do banner")
+        } finally {
+            setBannerUploading(false)
+            setTempBannerFile(null)
         }
     }
 
@@ -373,6 +428,7 @@ export const BusinessDataSubPage = ({
                                             {getTabErrorCount("address") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="hours">Horários</TabsTrigger>
+                                        <TabsTrigger value="vitrine">Vitrine Online</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -492,26 +548,14 @@ export const BusinessDataSubPage = ({
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Categoria do Negócio</h3>
 
-                                                <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                        {imagePreview ? (
-                                                            <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
-                                                        ) : (
-                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                                                        )}
-                                                        {imageUploading && (
-                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                                                <Spinner size={20} className="text-white" />
-                                                            </div>
-                                                        )}
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-background/30 flex items-center justify-between opacity-60 cursor-not-allowed">
+                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Selecione uma categoria...</span>
+                                                        <div className="w-5 h-5 border-2 border-brand-border dark:border-dark-border rounded-full" />
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Selecione uma imagem</p>
-                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
-                                                    </div>
-                                                    <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Em breve você poderá categorizar seu negócio para facilitar buscas no marketplace.</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -653,8 +697,99 @@ export const BusinessDataSubPage = ({
 
                                 <TabsContent value="hours" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden">
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Horários de Funcionamento</h3>
+                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Horários de Funcionamento</h3>
                                         <BusinessHoursSelector value={hours as any} onChange={setHours} />
+                                    </motion.div>
+                                </TabsContent>
+
+                                <TabsContent value="vitrine" className="mt-0 focus-visible:outline-none">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                        <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                                            {/* Status da Vitrine */}
+                                            <div className="mb-8">
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Status da Vitrine</h3>
+                                                <div className="grid gap-3">
+                                                    <ListItem
+                                                        title="Vitrine Ativa"
+                                                        description="Seu negócio está visível e apto a receber novos pedidos online."
+                                                        icon={<Store className="text-brand-green" />}
+                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
+                                                        right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
+                                                        className="py-4 px-6 gap-4"
+                                                    />
+                                                    <ListItem
+                                                        title="Vitrine Inativa"
+                                                        description="Sua vitrine continua visível, mas não poderá receber pedidos temporariamente."
+                                                        icon={<Store className="text-brand-inactive-text" />}
+                                                        onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
+                                                        right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}
+                                                        className="py-4 px-6 gap-4"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-brand-border dark:bg-dark-border w-full mb-8" />
+
+                                            {/* Banner da Vitrine */}
+                                            <div>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Banner da Vitrine</h3>
+                                                <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1300/300] bg-brand-gray dark:bg-dark-surface">
+                                                    {bannerPreview ? (
+                                                        <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex flex-col items-center justify-center text-brand-inactive-text">
+                                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                                                            <span className="text-sm font-medium">Nenhum banner configurado</span>
+                                                        </div>
+                                                    )}
+
+                                                    {bannerUploading && (
+                                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                                                            <Spinner size={32} className="text-white" />
+                                                        </div>
+                                                    )}
+
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100 z-10">
+                                                        <Button variant="filled" onClick={() => bannerInputRef.current?.click()} className="bg-white text-brand-dark hover:bg-gray-100 border-none">
+                                                            Trocar Banner
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1300x300px. Máximo 3MB.</p>
+                                                <input ref={bannerInputRef} type="file" hidden accept="image/*" onChange={handleBannerChange} />
+                                            </div>
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                            {/* Logo movida para cá */}
+                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
+
+                                                <div className="flex items-center gap-4 dark:bg-dark-background/50">
+                                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
+                                                        {imagePreview ? (
+                                                            <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" />
+                                                        ) : (
+                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                                        )}
+                                                        {imageUploading && (
+                                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                                <Spinner size={20} className="text-white" />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                                                    </div>
+                                                    <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </motion.div>
                                 </TabsContent>
 
@@ -711,6 +846,14 @@ export const BusinessDataSubPage = ({
                     onClose={() => setCropModalOpen(false)}
                     imageFile={tempImageFile}
                     onCropComplete={handleCropComplete}
+                />
+
+                <ImageCropperModal
+                    isOpen={bannerCropModalOpen}
+                    onClose={() => setBannerCropModalOpen(false)}
+                    imageFile={tempBannerFile}
+                    onCropComplete={handleBannerCropComplete}
+                    aspectRatio={1300 / 300}
                 />
 
             </div>

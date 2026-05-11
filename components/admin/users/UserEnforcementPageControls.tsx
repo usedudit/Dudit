@@ -1,11 +1,13 @@
 "use client"
 
-import { Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import React from "react"
+import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import {
     SearchIcon,
     UserIcon,
     CheckCircleIcon,
-    AlertCircleIcon
+    AlertCircleIcon,
+    FilterIcon
 } from "@/lib/icons"
 
 interface UserEnforcementPageControlsProps {
@@ -13,13 +15,15 @@ interface UserEnforcementPageControlsProps {
     setSearch: (val: string) => void
     statusTab: string
     setStatusTab: (val: string) => void
+    hasData?: boolean
 }
 
 const UserEnforcementPageControls = ({
     search,
     setSearch,
     statusTab,
-    setStatusTab
+    setStatusTab,
+    hasData = true
 }: UserEnforcementPageControlsProps) => {
 
     const tabs = [
@@ -30,6 +34,7 @@ const UserEnforcementPageControls = ({
 
     return (
         <>
+            {/* --- TABS --- */}
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={statusTab} onValueChange={setStatusTab}>
                     <TabsList className="px-0">
@@ -46,18 +51,40 @@ const UserEnforcementPageControls = ({
                 </Tabs>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
-                <div className="w-full md:w-80">
-                    <Input
-                        name="search"
-                        placeholder="Buscar por nome ou loja..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="h-[42px]"
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                        label=""
-                    />
+            {/* --- CONTROLS BAR --- */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+                {/* MOBILE CONTROLS */}
+                <div className="md:hidden flex items-center gap-2 w-full">
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            name="search"
+                            placeholder="Buscar..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="h-[42px] w-full"
+                            variant="full-rounded"
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            label=""
+                        />
+                    </div>
+                </div>
+
+                {/* DESKTOP CONTROLS */}
+                <div className="hidden md:flex items-center w-full gap-4">
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className="w-80">
+                            <Input
+                                name="search"
+                                placeholder="Buscar usuários ou lojas..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="h-[42px]"
+                                variant="full-rounded"
+                                label=""
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

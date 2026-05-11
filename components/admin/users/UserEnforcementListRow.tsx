@@ -3,11 +3,11 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
-import { 
-    UserIcon, 
-    CheckCircleIcon, 
-    AlertCircleIcon, 
-    ClockIcon, 
+import {
+    UserIcon,
+    CheckCircleIcon,
+    AlertCircleIcon,
+    ClockIcon,
     AlertTriangleIcon,
     StoreIcon
 } from "@/lib/icons"
@@ -28,7 +28,7 @@ const UserEnforcementListRow = React.memo(({
     onBan,
     onView
 }: UserEnforcementListRowProps) => {
-    
+
     const initials = user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"
 
     return (
@@ -65,7 +65,7 @@ const UserEnforcementListRow = React.memo(({
                         </span>
                     </div>
                 ) : (
-                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-50 italic">Sem loja</span>
+                    <span className="text-[11px] font-medium text-brand-inactive-text opacity-50">Sem loja</span>
                 )}
             </td>
 
@@ -114,8 +114,8 @@ const UserEnforcementListRow = React.memo(({
             </td>
         </motion.tr>
     )
-}, (prev, next) => 
-    prev.user === next.user && 
+}, (prev, next) =>
+    prev.user === next.user &&
     prev.isPending === next.isPending
 )
 

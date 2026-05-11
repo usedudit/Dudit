@@ -53,6 +53,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
   // --- Lógica dos Atributos ---
   const addAttribute = () => {
+    if (attributes.length >= 25) return;
     const newAttributes = [...attributes, { id: Date.now(), name: "", value: "" }]
     manualChange("attributes", newAttributes)
   }
@@ -132,7 +133,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="mb-6 rounded-b-xl p-4 bg-white dark:bg-dark-surface">
+                  <div className="mb-6 rounded-b-xl p-4 bg-white dark:bg-dark-surface max-h-[300px] overflow-y-auto custom-scrollbar">
                     <AnimatePresence initial={false}>
                       {attributes.map((attr: any) => (
                         <motion.div

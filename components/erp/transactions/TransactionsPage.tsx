@@ -1515,6 +1515,7 @@ export default function TransactionsPage({
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
                                 rows={3}
+                                maxLength={120}
                                 className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-white dark:bg-dark-surface/50 text-sm outline-none focus:border-brand-primary"
                                 placeholder="Ex: cobrança duplicada"
                             />

@@ -33,6 +33,10 @@ import {
     StarAward01Icon,
     RankingIcon as RankingIcon01,
     WhatsappIcon as WhatsappIcon01,
+    ComputerTerminal01Icon,
+    DatabaseIcon as DatabaseIcon01,
+    GlobeIcon as GlobeIcon01,
+    ComputerIcon as ComputerIcon01,
     HelpCircleIcon as HelpCircle,
     ArrowLeftRightIcon as ArrowLeftRightIcon01,
     Archive03Icon,
@@ -309,7 +313,10 @@ export const EyeOffIcon = CreateIcon(ViewOffSlashIcon)
 export const MailIcon = CreateIcon(Mail01Icon)
 export const PrinterIcon = CreateIcon(Printer)
 export const UnderlineIcon = CreateIcon(TextUnderlineIcon)
-
+export const MonitorIcon = CreateIcon(ComputerIcon01)
+export const TerminalIcon = CreateIcon(ComputerTerminal01Icon)
+export const DatabaseIcon = CreateIcon(DatabaseIcon01)
+export const GlobeIcon = CreateIcon(GlobeIcon01)
 
 // ============================
 // SYSTEM / MISC
@@ -369,4 +376,4 @@ export const TwitterIcon = CreateIcon(NewTwitterIcon)
 export const CadastrosIcon = CreateIcon(ResourcesAddIcon)
 
 export const InstallmentIcon = CreateIcon(SplitIcon)
-export const RepeatIcon = CreateIcon(RepeatIcon01)
+export const RepeatIcon = CreateIcon(RepeatIcon01)

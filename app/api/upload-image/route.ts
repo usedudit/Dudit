@@ -211,7 +211,13 @@ async function handleUpload(request: NextRequest) {
     // Determinar prefixo da pasta
     // =============================
     const uploadType = request.nextUrl.searchParams.get("uploadType") || "products"
-    const prefix = uploadType === "partner-logo" ? "partner-logos/" : "products/"
+    
+    const prefixMap: Record<string, string> = {
+      "partner-logo": "partner-logos/",
+      "partner-banner": "partner-banners/",
+      "products": "products/",
+    }
+    const prefix = prefixMap[uploadType] || "products/"
 
     // =============================
     // Signed URL - user-scoped, short expiry

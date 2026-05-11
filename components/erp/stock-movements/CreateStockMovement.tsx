@@ -559,6 +559,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                 });
                                                                             }
                                                                         }}
+                                                                        maxLength={120}
                                                                         error={fieldErrors.has('customReason')}
                                                                         errorMessage={fieldErrors.has('customReason') ? 'Informe o motivo da movimentação.' : undefined}
                                                                     />

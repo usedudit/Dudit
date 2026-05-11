@@ -14,6 +14,7 @@ import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } fr
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import BottomSheet from "@/components/BottomSheet"
+import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 
 import type { Report, ReportsStats, ReportStatus, ReportTargetType, TargetReportSummary } from "@/app/actions/admin/reports"
@@ -80,7 +81,6 @@ export default function ReportsList({ initialData, initialStats, initialHasMore,
         },
         dedupeKey: (r) => r.id,
         getDetailFn: async () => null,
-        listToDetail: (item) => item,
     })
 
     const {
@@ -250,6 +250,7 @@ export default function ReportsList({ initialData, initialStats, initialHasMore,
                     onOpenFilter={() => setModals({ filter: true })}
                     hasActiveFilters={hasActiveFilters}
                     stats={initialStats}
+                    hasData={hasData}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
@@ -555,6 +556,7 @@ interface ReportDetailsSheetProps {
 }
 
 function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onSpam, onRevert }: ReportDetailsSheetProps) {
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const [summary, setSummary] = useState<TargetReportSummary | null>(null)
     const [targetDetails, setTargetDetails] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -579,158 +581,182 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
 
     if (!report) return null
 
-    return (
-        <>
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"} className="mb-2">
-                                    {report.target_type === "product" ? "Produto" : report.target_type === "service" ? "Serviço" : report.target_type === "partner" ? "Parceiro" : report.target_type === "review" ? "Avaliação" : report.target_type}
-                                </Badge>
-                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{report.target_name}</h3>
-                                <p className="text-xs font-medium text-brand-inactive-text mt-1 opacity-70">ID: {report.target_id}</p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                className="h-10 px-4 rounded-full font-bold text-[13px]"
-                                leftIcon={<ClockIcon size={16} />}
-                                onClick={() => setHistoryOpen(true)}
-                            >
-                                Histórico
-                            </Button>
-                        </div>
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"} className="mb-2">
+                            {report.target_type === "product" ? "Produto" : report.target_type === "service" ? "Serviço" : report.target_type === "partner" ? "Parceiro" : report.target_type === "review" ? "Avaliação" : report.target_type}
+                        </Badge>
+                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{report.target_name}</h3>
+                        <p className="text-xs font-medium text-brand-inactive-text mt-1 opacity-70">ID: {report.target_id}</p>
+                    </div>
+                    <Button
+                        variant="outline"
+                        className="h-10 px-4 rounded-full font-bold text-[13px]"
+                        leftIcon={<ClockIcon size={16} />}
+                        onClick={() => setHistoryOpen(true)}
+                    >
+                        Histórico
+                    </Button>
+                </div>
 
-                        {/* Rich Details Section */}
-                        {isLoading ? (
-                            <div className="flex justify-center py-4"><ThreeDotsLoader /></div>
-                        ) : targetDetails ? (
-                            <div className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-xl space-y-4">
-                                <h4 className="text-[13px] font-bold text-brand-inactive-text uppercase tracking-wider flex items-center gap-2">
-                                    {report.target_type === 'product' ? <AllProductsIcon size={16} /> : <StoreIcon size={16} />}
-                                    Detalhes do Alvo
-                                </h4>
+                {/* Rich Details Section */}
+                {isLoading ? (
+                    <div className="flex justify-center py-4"><ThreeDotsLoader /></div>
+                ) : targetDetails ? (
+                    <div className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-xl space-y-4">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text uppercase tracking-wider flex items-center gap-2">
+                            {report.target_type === 'product' ? <AllProductsIcon size={16} /> : <StoreIcon size={16} />}
+                            Detalhes do Alvo
+                        </h4>
 
-                                {report.target_type === 'product' && (
-                                    <div className="flex gap-4">
-                                        <div className="w-20 h-20 rounded-lg overflow-hidden border border-brand-border shrink-0 bg-white relative">
-                                            {targetDetails.images?.[0] ? (
-                                                <Image src={targetDetails.images[0]} alt="Produto" fill className="object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><AllProductsIcon size={24} /></div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-brand-dark">{targetDetails.name}</span>
-                                            <span className="text-xs text-brand-inactive-text line-clamp-2">{targetDetails.description || "Sem descrição."}</span>
-                                            <div className="flex gap-4 mt-1">
-                                                <span className="text-xs font-bold text-brand-green">{(targetDetails.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                                <span className="text-xs font-medium text-brand-inactive-text">Estoque: {targetDetails.stock_quantity || 0}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50">
-                                                <StoreIcon size={12} className="text-brand-inactive-text" />
-                                                <span className="text-xs font-medium text-brand-dark">Vendedor: {targetDetails.partner?.business_name || "Desconhecido"}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {report.target_type === 'partner' && (
-                                    <div className="flex gap-4 items-center">
-                                        <div className="w-16 h-16 rounded-full overflow-hidden border border-brand-border shrink-0 bg-white relative">
-                                            {targetDetails.profile_image_url ? (
-                                                <Image src={targetDetails.profile_image_url} alt="Parceiro" fill className="object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><StoreIcon size={24} /></div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-brand-dark">{targetDetails.business_name}</span>
-                                            <span className="text-xs font-medium text-brand-inactive-text">ID: {targetDetails.id}</span>
-                                            <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : null}
-
-                        {/* Summary Grid */}
-                        {summary && (
-                            <div className="grid grid-cols-2 gap-3 p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Total de Denúncias</span>
-                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.total}</span>
+                        {report.target_type === 'product' && (
+                            <div className="flex gap-4">
+                                <div className="w-20 h-20 rounded-lg overflow-hidden border border-brand-border shrink-0 bg-white relative">
+                                    {targetDetails.images?.[0] ? (
+                                        <Image src={targetDetails.images[0]} alt="Produto" fill className="object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><AllProductsIcon size={24} /></div>
+                                    )}
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Denunciantes Únicos</span>
-                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.distinct_reporters}</span>
+                                <div className="flex flex-col gap-1">
+                                    <span className="font-bold text-brand-dark">{targetDetails.name}</span>
+                                    <span className="text-xs text-brand-inactive-text line-clamp-2">{targetDetails.description || "Sem descrição."}</span>
+                                    <div className="flex gap-4 mt-1">
+                                        <span className="text-xs font-bold text-brand-green">{(targetDetails.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                        <span className="text-xs font-medium text-brand-inactive-text">Estoque: {targetDetails.stock_quantity || 0}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-brand-border/50">
+                                        <StoreIcon size={12} className="text-brand-inactive-text" />
+                                        <span className="text-xs font-medium text-brand-dark">Vendedor: {targetDetails.partner?.business_name || "Desconhecido"}</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
-                            <div className="flex gap-3">
-                                <InfoIcon className="text-blue-600 shrink-0" size={18} />
-                                <div className="space-y-1">
-                                    <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Resumo do Alvo</p>
-                                    <p className="text-xs text-blue-800 dark:text-blue-400">
-                                        Este item recebeu {summary?.total || 0} denúncias no total, sendo {summary?.pending || 0} ainda pendentes de análise.
-                                    </p>
+                        {report.target_type === 'partner' && (
+                            <div className="flex gap-4 items-center">
+                                <div className="w-16 h-16 rounded-full overflow-hidden border border-brand-border shrink-0 bg-white relative">
+                                    {targetDetails.profile_image_url ? (
+                                        <Image src={targetDetails.profile_image_url} alt="Parceiro" fill className="object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><StoreIcon size={24} /></div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="font-bold text-brand-dark">{targetDetails.business_name}</span>
+                                    <span className="text-xs font-medium text-brand-inactive-text">ID: {targetDetails.id}</span>
+                                    <span className="text-xs font-medium text-brand-inactive-text">Entrou em: {new Date(targetDetails.created_at).toLocaleDateString("pt-BR")}</span>
                                 </div>
                             </div>
+                        )}
+                    </div>
+                ) : null}
+
+                {/* Summary Grid */}
+                {summary && (
+                    <div className="grid grid-cols-2 gap-3 p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Total de Denúncias</span>
+                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.total}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Denunciantes Únicos</span>
+                            <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{summary.distinct_reporters}</span>
                         </div>
                     </div>
+                )}
 
-                    {/* Sticky Actions */}
-                    <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
-                        {report.status === "pending" ? (
-                            <div className="flex flex-col gap-3">
-                                <Button
-                                    variant="filled"
-                                    className="w-full rounded-full h-12 text-[15px] font-bold"
-                                    onClick={() => onResolve(report)}
-                                >
-                                    <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
-                                </Button>
-                                <div className="flex gap-3">
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 rounded-full h-11 text-brand-inactive-text"
-                                        onClick={() => onDismiss(report)}
-                                    >
-                                        <CancelCircleIcon size={18} className="mr-2" /> Descartar
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 rounded-full h-11 text-purple-600 border-purple-200"
-                                        onClick={() => onSpam(report)}
-                                    >
-                                        <AlertTriangleIcon size={18} className="mr-2" /> Spam
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : report.status === "validated" ? (
-                            <Button variant="outline" className="w-full rounded-full h-12 font-bold" onClick={() => onRevert(report)}>
-                                <ReturnIcon size={20} className="mr-2" /> Reverter Validação
-                            </Button>
-                        ) : (
-                            <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-medium bg-brand-gray dark:bg-dark-border/20 rounded-xl">
-                                Esta denúncia já foi processada como <strong className="mx-1 uppercase">{report.status}</strong>.
-                            </div>
-                        )}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
+                    <div className="flex gap-3">
+                        <InfoIcon className="text-blue-600 shrink-0" size={18} />
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Resumo do Alvo</p>
+                            <p className="text-xs text-blue-800 dark:text-blue-400">
+                                Este item recebeu {summary?.total || 0} denúncias no total, sendo {summary?.pending || 0} ainda pendentes de análise.
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </BottomSheet>
+            </div>
 
-            {/* Nested History Sheet */}
+            {/* Sticky Actions */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
+                {report.status === "pending" ? (
+                    <div className="flex flex-col gap-3">
+                        <Button
+                            variant="filled"
+                            className="w-full rounded-full h-12 text-[15px] font-bold"
+                            onClick={() => onResolve(report)}
+                        >
+                            <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
+                        </Button>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full h-11 text-brand-inactive-text"
+                                onClick={() => onDismiss(report)}
+                            >
+                                <CancelCircleIcon size={18} className="mr-2" /> Descartar
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full h-11 text-purple-600 border-purple-200"
+                                onClick={() => onSpam(report)}
+                            >
+                                <AlertTriangleIcon size={18} className="mr-2" /> Spam
+                            </Button>
+                        </div>
+                    </div>
+                ) : report.status === "validated" ? (
+                    <Button variant="outline" className="w-full rounded-full h-12 font-bold" onClick={() => onRevert(report)}>
+                        <ReturnIcon size={20} className="mr-2" /> Reverter Validação
+                    </Button>
+                ) : (
+                    <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-medium bg-brand-gray dark:bg-dark-border/20 rounded-xl">
+                        Esta denúncia já foi processada como <strong className="mx-1 uppercase">{report.status}</strong>.
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+
+    if (isMobile) {
+        return (
+            <>
+                <BottomSheet isOpen={isOpen} onClose={onClose}>
+                    {content}
+                </BottomSheet>
+                <AuditHistorySheet targetId={report.target_id} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+            </>
+        )
+    }
+
+    return (
+        <>
+            <Portal>
+                <div
+                    className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                    onClick={onClose}
+                >
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? historyOpen ? "-translate-x-10 scale-[0.97] opacity-70" : "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {content}
+                    </div>
+                </div>
+            </Portal>
             <AuditHistorySheet targetId={report.target_id} isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
         </>
     )
 }
 
 function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, isOpen: boolean, onClose: () => void }) {
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const [history, setHistory] = useState<AuditLogRow[]>([])
     const [isLoading, setIsLoading] = useState(false)
 
@@ -741,58 +767,80 @@ function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, is
         }
     }, [isOpen, targetId])
 
-    return (
-        <BottomSheet isOpen={isOpen} onClose={onClose}>
-            <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-                <div className="p-4 md:p-6 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-                    <div>
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight flex items-center gap-2">
-                            <ClockIcon size={20} className="text-brand-inactive-text" /> Histórico de Ações
-                        </h3>
-                        <p className="text-xs font-medium text-brand-inactive-text mt-1 opacity-70">ID: {targetId}</p>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar pb-24 md:pb-6">
-                    {isLoading ? (
-                        <div className="flex justify-center py-8"><ThreeDotsLoader /></div>
-                    ) : history.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                            <ShieldIcon size={48} className="text-brand-gray dark:text-dark-border mb-4" />
-                            <h4 className="text-brand-dark font-bold">Nenhum histórico encontrado</h4>
-                            <p className="text-brand-inactive-text text-sm mt-2">Este alvo ainda não sofreu nenhuma ação administrativa.</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-4">
-                            {history.map(log => (
-                                <div key={log.id} className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border dark:border-dark-border flex flex-col gap-2">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-[14px] text-brand-dark leading-none">{log.action_type}</span>
-                                            <span className="text-xs text-brand-inactive-text">{log.admin_name || log.admin_email || log.admin_user_id}</span>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-xs font-bold text-brand-dark">{new Date(log.created_at).toLocaleDateString("pt-BR")}</span>
-                                            <span className="text-[10px] text-brand-inactive-text">{new Date(log.created_at).toLocaleTimeString("pt-BR")}</span>
-                                        </div>
-                                    </div>
-                                    {!!(log.metadata && typeof log.metadata === 'object' && 'reason' in log.metadata && log.metadata.reason) && (
-                                        <p className="text-xs text-brand-inactive-text italic border-t border-brand-border/50 pt-2 mt-1">
-                                            "{String((log.metadata as any).reason)}"
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-10">
-                    <Button variant="outline" className="w-full rounded-full h-12 font-bold" onClick={onClose}>
-                        Voltar aos Detalhes
-                    </Button>
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="p-4 md:p-6 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
+                <div>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight flex items-center gap-2">
+                        <ClockIcon size={20} className="text-brand-inactive-text" /> Histórico de Ações
+                    </h3>
+                    <p className="text-xs font-medium text-brand-inactive-text mt-1 opacity-70">ID: {targetId}</p>
                 </div>
             </div>
-        </BottomSheet>
+
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar pb-24 md:pb-6">
+                {isLoading ? (
+                    <div className="flex justify-center py-8"><ThreeDotsLoader /></div>
+                ) : history.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                        <ShieldIcon size={48} className="text-brand-gray dark:text-dark-border mb-4" />
+                        <h4 className="text-brand-dark font-bold">Nenhum histórico encontrado</h4>
+                        <p className="text-brand-inactive-text text-sm mt-2">Este alvo ainda não sofreu nenhuma ação administrativa.</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-4">
+                        {history.map(log => (
+                            <div key={log.id} className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border dark:border-dark-border flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="font-bold text-[14px] text-brand-dark leading-none">{log.action_type}</span>
+                                        <span className="text-xs text-brand-inactive-text">{log.admin_name || log.admin_email || log.admin_user_id}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs font-bold text-brand-dark">{new Date(log.created_at).toLocaleDateString("pt-BR")}</span>
+                                        <span className="text-[10px] text-brand-inactive-text">{new Date(log.created_at).toLocaleTimeString("pt-BR")}</span>
+                                    </div>
+                                </div>
+                                {!!(log.metadata && typeof log.metadata === 'object' && 'reason' in log.metadata && log.metadata.reason) && (
+                                    <p className="text-xs text-brand-inactive-text border-t border-brand-border/50 pt-2 mt-1">
+                                        "{String((log.metadata as any).reason)}"
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border z-10">
+                <Button variant="outline" className="w-full rounded-full h-12 font-bold" onClick={onClose}>
+                    Voltar aos Detalhes
+                </Button>
+            </div>
+        </div>
+    )
+
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        )
+    }
+
+    return (
+        <Portal>
+            <div
+                className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
+        </Portal>
     )
 }

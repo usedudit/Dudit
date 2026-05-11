@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useTransition, useCallback, useEffect } from "react"
-import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
+import { useState, useTransition, useRef, useCallback, useMemo } from "react"
+import { Button, Badge, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import StepUpModal from "@/components/admin/StepUpModal"
@@ -9,18 +9,15 @@ import PartnerListRow from "./PartnerListRow"
 import PartnersPageControls from "./PartnersPageControls"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { 
-    SearchIcon, 
-    StoreIcon, 
-    CheckCircleIcon, 
-    BlockedIcon, 
-    ClockIcon, 
+import {
+    StoreIcon,
+    CheckCircleIcon,
+    BlockedIcon,
+    ClockIcon,
     AlertTriangleIcon,
     UserIcon,
     ShieldIcon,
-    InfoIcon,
-    AlertCircleIcon,
-    MailIcon
+    InfoIcon
 } from "@/lib/icons"
 import type { EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 import {
@@ -30,16 +27,11 @@ import {
     disableTenantAccess,
     enableTenantAccess,
 } from "@/app/actions/admin/enforcement"
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-    SheetFooter,
-} from "@/components/ui/sheet"
 import BottomSheet from "@/components/BottomSheet"
+import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { toast } from "sonner"
 
 
@@ -75,10 +67,9 @@ interface PartnersListProps {
 }
 
 const PartnersList = ({ initialData }: PartnersListProps) => {
-    const [allPartners, setAllPartners] = useState<EnforcementPartner[]>(initialData.data)
+    const isMobile = useMediaQuery("(max-width: 768px)")
+    const observerTarget = useRef<HTMLDivElement>(null)
     const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
-    const [page, setPage] = useState(1)
     const [statusTab, setStatusTab] = useState("all")
     const [disableTarget, setDisableTarget] = useState<EnforcementPartner | null>(null)
     const [enableTarget, setEnableTarget] = useState<EnforcementPartner | null>(null)
@@ -92,48 +83,40 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
     const [detailPartner, setDetailPartner] = useState<EnforcementPartner | null>(null)
     const [isPending, startTransition] = useTransition()
 
-    const itemsPerPage = 20
+    // ─── Entity Page ──────────────────────────────────────────────────────────
+    const fetchPageFn = useCallback(async ({ cursor }: { cursor: string | null }) => {
+        const res = await getPartners(cursor, 20, search, statusTab)
+        return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
+    }, [search, statusTab])
 
-    // Debounced search
-    useEffect(() => {
-        const timeout = setTimeout(() => setDebouncedSearch(search), 400)
-        return () => clearTimeout(timeout)
-    }, [search])
+    const dedupeKey = useCallback((p: any) => p.id, [])
+    const getDetailFn = useCallback(async () => null, [])
 
-    const fetchAllPartners = useCallback((searchTerm?: string) => {
-        startTransition(async () => {
-            const result = await getPartners(null, 200, searchTerm || undefined)
-            setAllPartners(result.data)
-            setPage(1)
-        })
-    }, [])
-
-    useEffect(() => {
-        fetchAllPartners(debouncedSearch || undefined)
-    }, [debouncedSearch, fetchAllPartners])
-
-    // Filter by status
-    const filteredByStatus = allPartners.filter(partner => {
-        if (statusTab === "active") return partner.is_active && !partner.suspended_at && !partner.erp_disabled
-        if (statusTab === "suspended") return !!partner.suspended_at
-        if (statusTab === "erp_disabled") return !!partner.erp_disabled
-        return true
+    const entityPage = useEntityPage<EnforcementPartner, any, string>({
+        entityType: 'admin-partners',
+        partnerId: 'admin',
+        queryKey: ['admin', 'partners', statusTab, search],
+        initialItems: (search === "" && statusTab === "all") ? initialData.data : [],
+        initialNextCursor: (search === "" && statusTab === "all") ? initialData.nextCursor : null,
+        initialHasMore: (search === "" && statusTab === "all") ? initialData.hasMore : true,
+        fetchPageFn,
+        dedupeKey,
+        getDetailFn,
     })
 
-    // Reset page when filter changes
-    useEffect(() => {
-        setPage(1)
-    }, [statusTab])
+    const { items, hasNextPage, isFetchingNextPage, isListLoading: isLoading, fetchNextPage, afterMutation } = entityPage
 
-    // Client-side pagination
-    const totalPages = Math.ceil(filteredByStatus.length / itemsPerPage)
-    const paginated = filteredByStatus.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    useInfiniteScrollObserver(observerTarget, {
+        fetchNextPage,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        enabled: true
+    })
 
     const handleDisableERP = () => {
         if (!disableTarget) return
         if (!disableReason.trim() || disableReason.trim().length < 5) return
         if (!disableConfirmed) return
-        // Show step-up modal instead of executing directly
         setPendingStepUpAction("disable")
         setShowStepUp(true)
     }
@@ -145,7 +128,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
             if (result.success) {
                 toast.success("Acesso ERP reabilitado com sucesso!")
                 setEnableTarget(null)
-                fetchAllPartners(debouncedSearch || undefined)
+                afterMutation(enableTarget.id)
             } else {
                 toast.error(result.error || "Erro ao habilitar ERP")
             }
@@ -154,7 +137,6 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
 
     const handleSuspend = () => {
         if (!suspendTarget) return
-        // Show step-up modal instead of executing directly
         setPendingStepUpAction("suspend")
         setShowStepUp(true)
     }
@@ -171,7 +153,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                     setDisableReason("")
                     setDisableDuration(30)
                     setDisableConfirmed(false)
-                    fetchAllPartners(debouncedSearch || undefined)
+                    afterMutation(disableTarget.id)
                 } else {
                     toast.error(result.error || "Erro ao desabilitar ERP")
                 }
@@ -182,7 +164,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 if (result.success) {
                     toast.success("Parceiro suspenso com sucesso!")
                     setSuspendTarget(null)
-                    fetchAllPartners(debouncedSearch || undefined)
+                    afterMutation(suspendTarget.id)
                 } else {
                     toast.error(result.error || "Erro ao suspender parceiro")
                 }
@@ -198,7 +180,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
             if (result.success) {
                 toast.success("Parceiro reativado com sucesso!")
                 setUnsuspendTarget(null)
-                fetchAllPartners(debouncedSearch || undefined)
+                afterMutation(unsuspendTarget.id)
             } else {
                 toast.error(result.error || "Erro ao reativar parceiro")
             }
@@ -232,7 +214,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginated.length === 0 ? (
+                        {items.length === 0 && !isLoading ? (
                             <FadeIn key="empty" className="w-full">
                                 <IconPlaceholder
                                     placeholderType="image"
@@ -251,62 +233,63 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                             <FadeIn key="list" className="w-full">
                                 {/* Mobile/Tablet View */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {paginated.map((partner) => (
-                                            <div 
-                                                className="py-5 flex flex-col gap-3 cursor-pointer"
-                                                onClick={() => setDetailPartner(partner)}
-                                            >
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
-                                                            <StoreIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                                                        </div>
-                                                        <div className="min-w-0 flex flex-col">
-                                                            <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                {partner.store_name}
-                                                            </span>
-                                                            <span className="text-xs font-medium text-brand-inactive-text">
-                                                                Dono: {partner.owner_name}
-                                                            </span>
-                                                        </div>
+                                    {items.map((partner) => (
+                                        <div
+                                            key={partner.id}
+                                            className="py-5 flex flex-col gap-3 cursor-pointer"
+                                            onClick={() => setDetailPartner(partner)}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/30">
+                                                        <StoreIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                                     </div>
-                                                    {partner.risk_score > 0 && (
-                                                        <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 20 ? "orange" : "blue"}>
-                                                            Risk: {partner.risk_score}
-                                                        </Badge>
-                                                    )}
+                                                    <div className="min-w-0 flex flex-col">
+                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                            {partner.store_name}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-brand-inactive-text">
+                                                            Dono: {partner.owner_name}
+                                                        </span>
+                                                    </div>
                                                 </div>
+                                                {partner.risk_score > 0 && (
+                                                    <Badge variant={partner.risk_score >= 50 ? "red" : partner.risk_score >= 20 ? "orange" : "blue"}>
+                                                        Risk: {partner.risk_score}
+                                                    </Badge>
+                                                )}
+                                            </div>
 
-                                                <div className="flex items-center gap-2">
-                                                    {partner.erp_disabled ? (
-                                                        <Badge variant="red">ERP Desabilitado</Badge>
-                                                    ) : partner.suspended_at ? (
-                                                        <Badge variant="orange">Suspenso</Badge>
-                                                    ) : !partner.is_active ? (
-                                                        <Badge variant="gray">Inativo</Badge>
+                                            <div className="flex items-center gap-2">
+                                                {partner.erp_disabled ? (
+                                                    <Badge variant="red">ERP Desabilitado</Badge>
+                                                ) : partner.suspended_at ? (
+                                                    <Badge variant="orange">Suspenso</Badge>
+                                                ) : !partner.is_active ? (
+                                                    <Badge variant="gray">Inativo</Badge>
+                                                ) : (
+                                                    <Badge variant="green">Ativo</Badge>
+                                                )}
+                                                <span className="text-xs text-brand-inactive-text ml-auto">
+                                                    {new Date(partner.created_at).toLocaleDateString("pt-BR")}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
+                                                    {partner.suspended_at ? (
+                                                        <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
                                                     ) : (
-                                                        <Badge variant="green">Ativo</Badge>
+                                                        <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
                                                     )}
-                                                    <span className="text-xs text-brand-inactive-text ml-auto">
-                                                        {new Date(partner.created_at).toLocaleDateString("pt-BR")}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className="flex gap-2 flex-1 action-btn" onClick={e => e.stopPropagation()}>
-                                                        {partner.suspended_at ? (
-                                                            <Button variant="outline" size="sm" onClick={() => setUnsuspendTarget(partner)} className="flex-1 text-xs h-9">Reativar</Button>
-                                                        ) : (
-                                                            <Button variant="outline" size="sm" onClick={() => setSuspendTarget(partner)} className="flex-1 text-xs h-9">Suspender</Button>
-                                                        )}
-                                                        {partner.erp_disabled ? (
-                                                            <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
-                                                        ) : (
-                                                            <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
-                                                        )}
-                                                    </div>
+                                                    {partner.erp_disabled ? (
+                                                        <Button variant="outline" size="sm" onClick={() => setEnableTarget(partner)} className="flex-1 text-xs h-9">Habilitar ERP</Button>
+                                                    ) : (
+                                                        <Button variant="outline" size="sm" onClick={() => setDisableTarget(partner)} className="flex-1 text-xs h-9">Desativar ERP</Button>
+                                                    )}
                                                 </div>
                                             </div>
+                                        </div>
                                     ))}
                                 </div>
 
@@ -316,16 +299,16 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider">Parceiro</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider">Dono</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Data</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Risco</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-wider text-center">Status</th>
-                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-wider text-center">Ações</th>
+                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">Parceiro</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight">Dono</th>
+                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Data</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Risco</th>
+                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
+                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {paginated.map((partner) => (
+                                                {items.map((partner) => (
                                                     <PartnerListRow
                                                         key={partner.id}
                                                         partner={partner}
@@ -342,16 +325,10 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                     </div>
                                 </div>
 
-                                {/* Pagination (ERP Standard) */}
-                                {totalPages > 1 && (
-                                    <div className="mt-6">
-                                        <Pagination
-                                            currentPage={page}
-                                            totalPages={totalPages}
-                                            onPageChange={setPage}
-                                        />
-                                    </div>
-                                )}
+                                {/* Infinite Scroll Observer */}
+                                <div ref={observerTarget} className="h-20 flex items-center justify-center">
+                                    {isLoading && <ThreeDotsLoader />}
+                                </div>
                             </FadeIn>
                         )}
                     </AnimatePresence>
@@ -477,8 +454,8 @@ interface PartnerDetailsSheetProps {
     onDisableERP: (p: EnforcementPartner) => void
 }
 
-function PartnerDetailsSheet({ 
-    partner, isOpen, onClose, onSuspend, onUnsuspend, onEnableERP, onDisableERP 
+function PartnerDetailsSheet({
+    partner, isOpen, onClose, onSuspend, onUnsuspend, onEnableERP, onDisableERP
 }: PartnerDetailsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
 
@@ -498,7 +475,7 @@ function PartnerDetailsSheet({
                         </h3>
                         <p className="text-sm font-medium text-brand-inactive-text opacity-70">ID: {partner.id}</p>
                     </div>
-                    
+
                     <div className="flex gap-2">
                         {partner.erp_disabled ? (
                             <Badge variant="red" className="px-3 py-1">ERP BLOQUEADO</Badge>
@@ -541,7 +518,7 @@ function PartnerDetailsSheet({
                                 <InfoIcon size={18} className="text-brand-inactive-text" />
                                 <div className="flex flex-col">
                                     <span className="text-[11px] text-brand-inactive-text font-medium">User ID</span>
-                                    <span className="text-[11px] font-mono font-bold text-brand-dark dark:text-dark-heading break-all">{partner.owner_user_id}</span>
+                                    <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading break-all">{partner.owner_user_id}</span>
                                 </div>
                             </div>
                         </div>
@@ -584,14 +561,14 @@ function PartnerDetailsSheet({
                             <AlertTriangleIcon size={18} className="mr-2" /> Suspender
                         </Button>
                     )}
-                    
+
                     {partner.erp_disabled ? (
                         <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-blue text-brand-blue" onClick={() => onEnableERP(partner)}>
                             <CheckCircleIcon size={18} className="mr-2" /> Habilitar ERP
                         </Button>
                     ) : (
                         <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-red text-brand-red" onClick={() => onDisableERP(partner)}>
-                            <BlockedIcon size={18} className="mr-2" /> Bloquear ERP
+                            <ShieldIcon size={18} className="mr-2" /> Bloquear ERP
                         </Button>
                     )}
                 </div>
@@ -611,10 +588,18 @@ function PartnerDetailsSheet({
     }
 
     return (
-        <Sheet open={isOpen} onOpenChange={(v) => !v && onClose()}>
-            <SheetContent className="p-0 sm:max-w-md border-0" side="right">
-                {content}
-            </SheetContent>
-        </Sheet>
+        <Portal>
+            <div
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
+        </Portal>
     )
 }

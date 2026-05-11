@@ -62,7 +62,7 @@ const AuditLogListRow = React.memo(({ log, onView }: AuditLogListRowProps) => {
             onClick={() => onView(log)}
         >
             {/* Usuário (Executor) */}
-            <td className="py-4 px-2 pl-6 border-b border-brand-border dark:border-dark-border">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border">
                 <div className="flex flex-col">
                     <span className="font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                         {log.admin_name || log.admin_email || "Desconhecido"}
@@ -74,20 +74,20 @@ const AuditLogListRow = React.memo(({ log, onView }: AuditLogListRowProps) => {
             </td>
 
             {/* Alvo */}
-            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center">
                     <span className="font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                         {log.target_name || TARGET_TYPE_LABELS[log.target_type] || log.target_type}
                     </span>
-                    <span className="text-[11px] font-mono text-brand-inactive-text opacity-50">
+                    <span className="text-[11px] text-brand-inactive-text opacity-50">
                         {log.target_id || "Sem ID"}
                     </span>
                 </div>
             </td>
 
             {/* Motivo/Detalhes */}
-            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border">
-                <p className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[250px] italic">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                <p className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[250px]">
                     {log.metadata?.reason
                         ? String(log.metadata.reason)
                         : log.metadata?.action
@@ -97,7 +97,7 @@ const AuditLogListRow = React.memo(({ log, onView }: AuditLogListRowProps) => {
             </td>
 
             {/* Data/Hora */}
-            <td className="py-4 px-2 border-b border-brand-border dark:border-dark-border text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center">
                     <span className="font-bold text-brand-dark dark:text-dark-heading text-[13px]">
                         {new Date(log.created_at).toLocaleDateString("pt-BR")}

@@ -20,6 +20,7 @@ interface AuditLogPageControlsProps {
     onSearchChange: (val: string) => void
     onOpenFilter: () => void
     hasActiveFilters: boolean
+    hasData: boolean
 }
 
 const AuditLogPageControls = ({
@@ -28,7 +29,8 @@ const AuditLogPageControls = ({
     search,
     onSearchChange,
     onOpenFilter,
-    hasActiveFilters
+    hasActiveFilters,
+    hasData
 }: AuditLogPageControlsProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
 
@@ -75,16 +77,18 @@ const AuditLogPageControls = ({
                     />
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Button
-                        variant={hasActiveFilters ? "default" : "outline"}
-                        onClick={onOpenFilter}
-                        className={`w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] ${hasActiveFilters ? "" : "bg-white dark:bg-dark-surface"}`}
-                        leftIcon={<FilterIcon size={16} />}
-                    >
-                        Filtros
-                    </Button>
-                </div>
+                {(hasData || hasActiveFilters) && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Button
+                            variant={hasActiveFilters ? "default" : "outline"}
+                            onClick={onOpenFilter}
+                            className={`w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] ${hasActiveFilters ? "" : "bg-white dark:bg-dark-surface"}`}
+                            leftIcon={<FilterIcon size={16} />}
+                        >
+                            Filtros
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     )

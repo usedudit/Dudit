@@ -27,6 +27,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
     // --- Lógica dos Atributos (Ficha Técnica) ---
     const addAttribute = () => {
+        if (technicalDetails.length >= 25) return;
         const newAttributes = [...technicalDetails, { id: Date.now(), name: "", value: "" }]
         manualChange("technical_details", newAttributes)
     }
@@ -108,7 +109,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                                         </div>
                                     </div>
 
-                                    <div className="mb-6 rounded-b-xl p-4 bg-white dark:bg-dark-surface">
+                                    <div className="mb-6 rounded-b-xl p-4 bg-white dark:bg-dark-surface max-h-[300px] overflow-y-auto custom-scrollbar">
                                         <AnimatePresence initial={false}>
                                             {technicalDetails.map((attr: any) => (
                                                 <motion.div

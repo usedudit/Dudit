@@ -998,6 +998,7 @@ export default function OrdersPage({
                                 placeholder="Descreva o motivo..."
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
+                                maxLength={120}
                             />
                             <label className="flex items-center gap-3 py-2 cursor-pointer">
                                 <Checkbox checked={restoreStockOnCancel} onChange={(checked) => setRestoreStockOnCancel(Boolean(checked))} />

@@ -1,13 +1,14 @@
 "use client"
 
 import React from "react"
-import { Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import { 
-    SearchIcon, 
-    StoreIcon, 
-    BlockedIcon, 
+import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import {
+    SearchIcon,
+    StoreIcon,
+    BlockedIcon,
     AlertTriangleIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    FilterIcon
 } from "@/lib/icons"
 
 interface PartnersPageControlsProps {
@@ -15,15 +16,17 @@ interface PartnersPageControlsProps {
     setSearch: (val: string) => void
     statusTab: string
     setStatusTab: (val: string) => void
+    hasData?: boolean
 }
 
 const PartnersPageControls = ({
     search,
     setSearch,
     statusTab,
-    setStatusTab
+    setStatusTab,
+    hasData = true
 }: PartnersPageControlsProps) => {
-    
+
     const tabs = [
         { value: "all", label: "Todos", icon: StoreIcon },
         { value: "active", label: "Ativos", icon: CheckCircleIcon },
@@ -33,6 +36,7 @@ const PartnersPageControls = ({
 
     return (
         <>
+            {/* --- TABS --- */}
             <div className="mb-6 px-4 md:px-8">
                 <Tabs value={statusTab} onValueChange={setStatusTab}>
                     <TabsList className="px-0">
@@ -49,18 +53,40 @@ const PartnersPageControls = ({
                 </Tabs>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
-                <div className="w-full md:w-80">
-                    <Input
-                        name="search"
-                        placeholder="Buscar por loja ou dono..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="h-[42px]"
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                        label=""
-                    />
+            {/* --- CONTROLS BAR --- */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+                {/* MOBILE CONTROLS */}
+                <div className="md:hidden flex items-center gap-2 w-full">
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            name="search"
+                            placeholder="Buscar..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="h-[42px] w-full"
+                            variant="full-rounded"
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            label=""
+                        />
+                    </div>
+                </div>
+
+                {/* DESKTOP CONTROLS */}
+                <div className="hidden md:flex items-center w-full gap-4">
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className="w-80">
+                            <Input
+                                name="search"
+                                placeholder="Buscar lojas ou proprietários..."
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="h-[42px]"
+                                variant="full-rounded"
+                                label=""
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

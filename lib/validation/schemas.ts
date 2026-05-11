@@ -2,8 +2,8 @@ import { z } from "zod"
 
 // Produto
 export const ProductSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório").max(200, "Nome muito longo"),
-  description: z.string().max(5000, "Descrição muito longa").optional().nullable(),
+  name: z.string().min(3, "Nome muito curto").max(120, "Nome muito longo"),
+  description: z.string().max(2000, "Descrição muito longa").optional().nullable(),
   price: z.number().min(0.01, "Preço deve ser maior que zero").max(999999, "Preço muito alto"),
   stockQuantity: z.number().int("Estoque deve ser número inteiro").min(0, "Estoque não pode ser negativo").max(999999),
   category: z.string().max(100).optional().nullable(),
@@ -14,8 +14,8 @@ export const ProductSchema = z.object({
 export const ProductCreateSchema = z.object({
   partnerId: z.string().uuid("ID de parceiro inválido"),
   storeId: z.string().uuid("ID de loja inválido"),
-  name: z.string().min(1, "Nome é obrigatório").max(200),
-  description: z.string().max(5000).optional().nullable(),
+  name: z.string().min(3, "Nome é obrigatório").max(120),
+  description: z.string().max(2000).optional().nullable(),
   sku: z.string().max(100).optional().nullable(),
   gtin: z.string().max(50).optional().nullable(),
   brand: z.string().max(100).optional().nullable(),
@@ -55,7 +55,7 @@ export const OrderSchema = z.object({
   deliveryType: z.enum(["delivery", "pickup"]),
   deliveryAddress: z.string().min(10, "Endereço muito curto").max(500),
   paymentMethod: z.string().min(1, "Método de pagamento obrigatório").max(100),
-  notes: z.string().max(1000).optional(),
+  notes: z.string().max(200).optional(),
   partnerId: z.string().uuid(),
   buyerId: z.string().uuid(),
 })
@@ -87,7 +87,7 @@ export const ReviewSchema = z.object({
 // Cliente
 export const CustomerSchema = z.object({
   partnerId: z.string().uuid(),
-  name: z.string().min(3, "Nome muito curto").max(200),
+  name: z.string().min(3, "Nome muito curto").max(120),
   email: z.string().email("Email inválido").max(200).optional().nullable(),
   phone: z
     .string()
@@ -96,13 +96,13 @@ export const CustomerSchema = z.object({
     .optional()
     .nullable(),
   address: z.string().max(500).optional().nullable(),
-  notes: z.string().max(2000).optional().nullable(),
+  notes: z.string().max(200).optional().nullable(),
 })
 
 // Método de Pagamento
 export const PaymentMethodSchema = z.object({
   partnerId: z.string().uuid(),
-  name: z.string().min(1).max(100),
+  name: z.string().min(3).max(120),
   paymentType: z.enum(["pix", "credit_card", "debit_card", "cash", "other"]),
   pixKeyType: z.enum(["cpf", "cnpj", "email", "phone", "random"]).optional().nullable(),
   pixKey: z.string().max(255).optional().nullable(),
@@ -128,7 +128,7 @@ export const PaymentMethodSchema = z.object({
 
 // Perfil de Usuário
 export const UserProfileSchema = z.object({
-  fullName: z.string().min(3, "Nome muito curto").max(200),
+  fullName: z.string().min(3, "Nome muito curto").max(120),
   phone: z
     .string()
     .regex(/^\+?[\d\s()-]+$/, "Telefone inválido")

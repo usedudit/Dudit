@@ -367,6 +367,11 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.inscricaoEstadual !== undefined) updateData.inscricao_estadual = data.inscricaoEstadual
   if (data.ieIsento !== undefined) updateData.ie_isento = data.ieIsento
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
+  
+  // Vitrine Online
+  if (data.bannerUrl !== undefined) updateData.banner_url = data.bannerUrl
+  if (data.isShowcaseActive !== undefined) updateData.is_showcase_active = data.isShowcaseActive
+  if (data.category !== undefined) updateData.category = data.category
 
   // Handle CPF (Encrypted)
   if (data.cpf !== undefined) {
