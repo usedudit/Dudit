@@ -20,8 +20,7 @@ export function getUserInitials(fullName: string): string {
  * @param name - User's name
  * @returns Tailwind background color class
  */
-export function getAvatarColor(name: string): string {
-  const colors = [
+export const AVATAR_COLORS = [
     "bg-red-400",
     "bg-orange-400",
     "bg-yellow-400",
@@ -30,14 +29,21 @@ export function getAvatarColor(name: string): string {
     "bg-indigo-400",
     "bg-purple-400",
     "bg-pink-400",
-  ]
-  
+]
+
+/**
+ * Generate a consistent background color based on user name
+ * Uses hash function to ensure same name always gets same color
+ * @param name - User's name
+ * @returns Tailwind background color class
+ */
+export function getAvatarColor(name: string): string {
   let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
   }
   
-  return colors[Math.abs(hash) % colors.length]
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
 /**

@@ -1,13 +1,12 @@
 "use client"
 
-import React, { useState, useTransition, useCallback, useMemo } from "react"
+import React, { useState, useTransition, useCallback, useRef, useEffect } from "react"
 import {
-    SearchIcon, CheckCircleIcon, CancelCircleIcon, EyeIcon, ClockIcon,
-    AlertTriangleIcon, TrashIcon, RemoveImageIcon, AllProductsIcon,
-    StoreIcon, UserIcon, InfoIcon
+    CheckCircleIcon, CancelCircleIcon, ClockIcon, TrashIcon, RemoveImageIcon,
+    StoreIcon, UserIcon, InfoIcon, XIcon
 } from "@/lib/icons"
-import { ImageOff } from "lucide-react"
-import { Button, Badge, Input, Pagination, IconPlaceholder } from "@/components/reusable"
+import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import Portal from "@/components/Portal"
 import AlertModal from "@/components/reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import ModerationListRow from "./ModerationListRow"
@@ -22,18 +21,11 @@ import {
     rejectModeration,
 } from "@/app/actions/admin/moderation"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-    SheetFooter,
-} from "@/components/ui/sheet"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { toast } from "sonner"
-
+import { useEntityPage } from "@/hooks/use-entity-page"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // ─── Image thumbnail ────────────────────────────────────────────────────────
 
@@ -54,17 +46,15 @@ function ImageThumbnail({ url, selected, onToggle }: { url: string; selected: bo
     )
 }
 
-// ─── Product Detail Panel ───────────────────────────────────────────────────
-
 // ─── Product Moderation Sheet ───────────────────────────────────────────────────
 
 interface ProductModerationSheetProps {
     item: ModerationItem | null
     isOpen: boolean
     onClose: () => void
-    onApprove: (id: string) => void
+    onApprove: (id: string, type: ModerationItem["type"]) => void
     onRejectImages: (id: string, urls: string[], reason: string) => void
-    onFullReject: (id: string, reason: string) => void
+    onFullReject: (id: string, reason: string, type: ModerationItem["type"]) => void
     isPending: boolean
 }
 
@@ -79,7 +69,7 @@ function ProductModerationSheet({
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Reset local state when item changes
-    React.useEffect(() => {
+    useEffect(() => {
         setSelectedImages(new Set())
         setRejectReason("")
     }, [item])
@@ -96,34 +86,45 @@ function ProductModerationSheet({
     if (!item) return null
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}</h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
-                {/* Product Header */}
+                {/* Product/Partner Info */}
                 <div>
-                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.title}</h3>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{item.title}</h3>
                     <div className="flex items-center gap-3 mt-2">
                         <Badge variant={
-                            item.moderation_status === "pending_moderation" ? "orange" : 
-                            item.moderation_status === "flagged" ? "red" : 
-                            item.moderation_status === "approved" ? "green" : 
-                            item.moderation_status === "rejected" ? "red" : 
-                            item.moderation_status === "needs_images" ? "blue" : "gray"
+                            item.moderation_status === "pending_moderation" ? "orange" :
+                                item.moderation_status === "flagged" ? "red" :
+                                    item.moderation_status === "approved" ? "green" :
+                                        item.moderation_status === "rejected" ? "red" :
+                                            item.moderation_status === "needs_images" ? "blue" : "gray"
                         }>
-                            {item.moderation_status === "pending_moderation" ? "Pendente" : 
-                             item.moderation_status === "flagged" ? "Flagged" : 
-                             item.moderation_status === "approved" ? "Aprovado" : 
-                             item.moderation_status === "rejected" ? "Rejeitado" : 
-                             item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
+                            {item.moderation_status === "pending_moderation" ? "Pendente" :
+                                item.moderation_status === "flagged" ? "Flagged" :
+                                    item.moderation_status === "approved" ? "Aprovado" :
+                                        item.moderation_status === "rejected" ? "Rejeitado" :
+                                            item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
                         </Badge>
-                        <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                            {formatCurrency(item.price || 0)}
-                        </span>
+                        {item.price > 0 && (
+                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(item.price)}
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 {/* description */}
                 <div>
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider mb-2">Descrição</h4>
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body mb-2">Descrição</h4>
                     <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
                         {item.description || "Sem descrição disponível."}
                     </p>
@@ -135,7 +136,7 @@ function ProductModerationSheet({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <StoreIcon size={16} className="text-brand-inactive-text" />
-                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{item.owner_store_name}</span>
+                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.owner_store_name}</span>
                             </div>
                             {item.risk_score > 0 && (
                                 <Badge variant={item.risk_score >= 50 ? "red" : item.risk_score >= 20 ? "orange" : "blue"}>
@@ -145,19 +146,19 @@ function ProductModerationSheet({
                         </div>
                         <div className="flex items-center gap-2">
                             <UserIcon size={16} className="text-brand-inactive-text" />
-                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Responsável: <strong>{item.owner_user_name}</strong></span>
+                            <span className="text-sm text-brand-inactive-text dark:text-dark-body truncate">Responsável: <strong>{item.owner_user_name}</strong></span>
                         </div>
                         <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
                             <ClockIcon size={14} className="text-brand-inactive-text" />
-                            <span className="text-xs text-brand-inactive-text">Enviado em {formatDate(item.created_at)}</span>
+                            <span className="text-xs text-brand-inactive-text truncate">Enviado em {formatDate(item.created_at)}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Images */}
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Imagens ({item.images?.length || 0})</h4>
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Imagens ({item.images?.length || 0})</h4>
                         {selectedImages.size > 0 && (
                             <span className="text-xs font-bold text-brand-red">{selectedImages.size} selecionada(s)</span>
                         )}
@@ -170,57 +171,58 @@ function ProductModerationSheet({
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center p-8 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
-                            <ImageOff size={32} className="mb-2 opacity-30" />
+                            <RemoveImageIcon size={32} className="mb-2 opacity-30" />
                             <span className="text-sm font-medium">Nenhuma imagem enviada</span>
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* Sticky Actions */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
-                <div className="flex gap-3">
-                    <Button 
-                        variant="filled" 
-                        className="flex-1 rounded-full h-12 text-[15px] font-bold" 
-                        onClick={() => setShowApproveModal(true)}
-                        disabled={isPending}
-                    >
-                        <CheckCircleIcon size={20} className="mr-2" /> Aprovar Produto
-                    </Button>
-                </div>
-                <div className="flex gap-3">
-                    {selectedImages.size > 0 && (
+                {/* Actions Section */}
+                {item.moderation_status === "pending_moderation" && (
+                    <div className="pt-4 border-t border-brand-border dark:border-dark-border space-y-3">
                         <Button
-                            variant="outline"
-                            className="flex-1 rounded-full h-12 text-amber-600 border-amber-200 hover:bg-amber-50"
-                            onClick={() => setShowRejectImagesModal(true)}
+                            variant="filled"
+                            className="w-full rounded-full h-12 text-[15px] font-bold"
+                            onClick={() => setShowApproveModal(true)}
                             disabled={isPending}
                         >
-                            <CancelCircleIcon size={20} className="mr-2" /> Remover {selectedImages.size} Imagens
+                            <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
                         </Button>
-                    )}
-                    <Button
-                        variant="outline"
-                        className="flex-1 rounded-full h-12 text-brand-red border-red-200 hover:bg-red-50"
-                        onClick={() => setShowFullRejectModal(true)}
-                        disabled={isPending}
-                    >
-                        <TrashIcon size={20} className="mr-2" /> Rejeitar Produto
-                    </Button>
-                </div>
+
+                        <div className="flex gap-3">
+                            {selectedImages.size > 0 && (item.type === "product" || item.type === "service") && (
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 rounded-full h-12 text-amber-600 border-amber-200 hover:bg-amber-50"
+                                    onClick={() => setShowRejectImagesModal(true)}
+                                    disabled={isPending}
+                                >
+                                    <CancelCircleIcon size={20} className="mr-2" /> Remover Imagens
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full h-12 text-brand-red border-red-200 hover:bg-red-50"
+                                onClick={() => setShowFullRejectModal(true)}
+                                disabled={isPending}
+                            >
+                                <TrashIcon size={20} className="mr-2" /> Rejeitar Tudo
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Modals */}
             <DefaultModal
                 isOpen={showApproveModal}
                 onClose={() => setShowApproveModal(false)}
-                title="Aprovar Produto"
+                title={`Aprovar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}`}
                 maxWidth="sm"
                 footer={
                     <>
                         <Button variant="outline" onClick={() => setShowApproveModal(false)} disabled={isPending}>Cancelar</Button>
-                        <Button onClick={() => { onApprove(item.id); setShowApproveModal(false) }} isLoading={isPending}>Confirmar Aprovação</Button>
+                        <Button onClick={() => { onApprove(item.id, item.type); setShowApproveModal(false) }} isLoading={isPending}>Confirmar Aprovação</Button>
                     </>
                 }
             >
@@ -230,7 +232,11 @@ function ProductModerationSheet({
                     </div>
                     <div>
                         <p className="text-brand-dark dark:text-dark-heading font-bold text-lg">Confirmar aprovação?</p>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">O produto &quot;{item.title}&quot; ficará visível imediatamente para todos os usuários.</p>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
+                            {item.type === "product"
+                                ? `O produto "${item.title}" ficará visível imediatamente.`
+                                : `O perfil de "${item.owner_store_name}" terá suas imagens aprovadas.`}
+                        </p>
                     </div>
                 </div>
             </DefaultModal>
@@ -278,7 +284,7 @@ function ProductModerationSheet({
             <DefaultModal
                 isOpen={showFullRejectModal}
                 onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
-                title="Rejeitar Produto"
+                title={`Rejeitar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}`}
                 maxWidth="md"
                 footer={
                     <>
@@ -287,7 +293,7 @@ function ProductModerationSheet({
                             variant="destructive"
                             disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
                             onClick={() => {
-                                onFullReject(item.id, rejectReason)
+                                onFullReject(item.id, rejectReason, item.type)
                                 setShowFullRejectModal(false)
                             }}
                             isLoading={isPending}
@@ -298,7 +304,7 @@ function ProductModerationSheet({
                 }
             >
                 <div className="flex flex-col gap-4">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">O produto será removido da fila e o parceiro receberá o motivo da rejeição.</p>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">O item será removido da fila e o parceiro receberá o motivo da rejeição.</p>
                     <Input
                         name="full-reject-reason"
                         label="Motivo da rejeição"
@@ -323,11 +329,19 @@ function ProductModerationSheet({
     }
 
     return (
-        <Sheet open={isOpen} onOpenChange={(v) => !v && onClose()}>
-            <SheetContent className="p-0 sm:max-w-md border-0" side="right">
-                {content}
-            </SheetContent>
-        </Sheet>
+        <Portal>
+            <div
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
+        </Portal>
     )
 }
 
@@ -338,42 +352,58 @@ interface ModerationListProps {
 }
 
 const ModerationList = ({ initialData }: ModerationListProps) => {
-    const [allItems, setAllItems] = useState<ModerationItem[]>(initialData.data)
-    const [search, setSearch] = useState("")
+    const isMobile = useMediaQuery("(max-width: 768px)")
+    const observerTarget = useRef<HTMLDivElement>(null)
     const [statusFilter, setStatusFilter] = useState("all")
     const [detailItem, setDetailItem] = useState<ModerationItem | null>(null)
     const [noImagesAlert, setNoImagesAlert] = useState(false)
     const [isPending, startTransition] = useTransition()
-    const [page, setPage] = useState(1)
 
-    const itemsPerPage = 20
+    // ─── Entity Page ──────────────────────────────────────────────────────────
+    const entityPage = useEntityPage<ModerationItem, any, string | null>({
+        entityType: 'admin-moderation',
+        partnerId: 'admin',
+        queryKey: ['admin', 'moderation', statusFilter],
+        initialItems: statusFilter === 'all' ? initialData.data : [],
+        initialNextCursor: statusFilter === 'all' ? initialData.nextCursor : null,
+        initialHasMore: statusFilter === 'all' ? initialData.hasMore : true,
+        fetchPageFn: async ({ cursor }) => {
+            const result = await getModerationQueue(cursor, 50, statusFilter)
+            return { items: result.data, nextCursor: result.nextCursor, hasMore: result.hasMore }
+        },
+        dedupeKey: (item) => item.id,
+        getDetailFn: async () => null,
+    })
 
-    // ─── Fetch data ────────────────────────────────────────────────────
+    const {
+        items: allItems, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading, afterMutation,
+        search, setSearch, debouncedSearch,
+    } = entityPage
 
-    const fetchData = useCallback((filter?: string) => {
-        startTransition(async () => {
-            const result = await getModerationQueue(null, 200, filter || statusFilter)
-            setAllItems(result.data)
-            setPage(1)
-        })
-    }, [statusFilter])
+    useInfiniteScrollObserver(observerTarget, {
+        enabled: true,
+        hasNextPage: !!hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage: () => fetchNextPage(),
+        rootMargin: "320px",
+        threshold: 0,
+    })
 
     const handleFilterChange = (filter: string) => {
         setStatusFilter(filter)
-        fetchData(filter)
     }
 
     // ─── Actions ───────────────────────────────────────────────────────
 
-    const handleApprove = (id: string) => {
+    const handleApprove = (id: string, type: ModerationItem["type"]) => {
         startTransition(async () => {
-            const result = await approveModeration(id)
+            const result = await approveModeration(id, type as any)
             if (result.success) {
-                toast.success("Produto aprovado com sucesso!")
+                toast.success(`${type === "product" ? "Produto" : "Perfil"} aprovado com sucesso!`)
                 setDetailItem(null)
-                fetchData()
+                afterMutation()
             } else {
-                toast.error(result.error || "Erro ao aprovar produto")
+                toast.error(result.error || `Erro ao aprovar ${type === "product" ? "produto" : "perfil"}`)
             }
         })
     }
@@ -385,39 +415,45 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 toast.success("Imagens removidas com sucesso!")
                 if (result.noImagesLeft) setNoImagesAlert(true)
                 setDetailItem(null)
-                fetchData()
+                afterMutation()
             } else {
                 toast.error(result.error || "Erro ao remover imagens")
             }
         })
     }
 
-    const handleFullReject = (id: string, reason: string) => {
+    const handleFullReject = (id: string, reason: string, type: ModerationItem["type"]) => {
         startTransition(async () => {
-            const result = await rejectModeration(id, reason)
+            const result = await rejectModeration(id, reason, type as any)
             if (result.success) {
-                toast.success("Produto rejeitado com sucesso!")
+                toast.success(`${type === "product" ? "Produto" : "Perfil"} rejeitado com sucesso!`)
                 setDetailItem(null)
-                fetchData()
+                afterMutation()
             } else {
-                toast.error(result.error || "Erro ao rejeitar produto")
+                toast.error(result.error || `Erro ao rejeitar ${type === "product" ? "produto" : "perfil"}`)
             }
         })
     }
 
-    // ─── Filtered + paginated items ────────────────────────────────────
+    // ─── Filtered items ────────────────────────────────────
 
     const filteredItems = allItems.filter(item =>
-        !search || item.title.toLowerCase().includes(search.toLowerCase())
+        !debouncedSearch || item.title.toLowerCase().includes(debouncedSearch.toLowerCase())
     )
 
+    // Pagination
+    const [page, setPage] = useState(1)
+    const itemsPerPage = 20
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
     const paginated = filteredItems.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+
+    // Reset page when search/filter changes
+    useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter])
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                
+
                 {/* Header Title/Subtitle (ERP Standard) */}
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
@@ -431,7 +467,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 </div>
 
                 {/* Controls (ERP Standard) */}
-                <ModerationPageControls 
+                <ModerationPageControls
                     statusFilter={statusFilter}
                     setStatusFilter={handleFilterChange}
                     search={search}
@@ -441,7 +477,11 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {paginated.length === 0 ? (
+                        {isListLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
+                        ) : filteredItems.length === 0 ? (
                             <FadeIn key="empty" className="w-full">
                                 <IconPlaceholder
                                     placeholderType="image"
@@ -454,7 +494,6 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                         action: () => {
                                             setStatusFilter("all")
                                             setSearch("")
-                                            fetchData("all")
                                         },
                                         variant: "outline"
                                     } : undefined}
@@ -493,17 +532,17 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                                     </span>
                                                     <span className="text-brand-inactive-text">•</span>
                                                     <Badge variant={
-                                                        item.moderation_status === "pending_moderation" ? "orange" : 
-                                                        item.moderation_status === "flagged" ? "red" : 
-                                                        item.moderation_status === "approved" ? "green" : 
-                                                        item.moderation_status === "rejected" ? "red" : 
-                                                        item.moderation_status === "needs_images" ? "blue" : "gray"
+                                                        item.moderation_status === "pending_moderation" ? "orange" :
+                                                            item.moderation_status === "flagged" ? "red" :
+                                                                item.moderation_status === "approved" ? "green" :
+                                                                    item.moderation_status === "rejected" ? "red" :
+                                                                        item.moderation_status === "needs_images" ? "blue" : "gray"
                                                     } className="scale-90 origin-left">
-                                                        {item.moderation_status === "pending_moderation" ? "Pendente" : 
-                                                            item.moderation_status === "flagged" ? "Flagged" : 
-                                                            item.moderation_status === "approved" ? "Aprovado" : 
-                                                            item.moderation_status === "rejected" ? "Rejeitado" : 
-                                                            item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
+                                                        {item.moderation_status === "pending_moderation" ? "Pendente" :
+                                                            item.moderation_status === "flagged" ? "Flagged" :
+                                                                item.moderation_status === "approved" ? "Aprovado" :
+                                                                    item.moderation_status === "rejected" ? "Rejeitado" :
+                                                                        item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
                                                     </Badge>
                                                 </div>
                                             </div>
@@ -546,13 +585,19 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                         <Pagination
                                             currentPage={page}
                                             totalPages={totalPages}
-                                            onPageChange={setPage}
+                                            onPageChange={(p) => {
+                                                setPage(p)
+                                                if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                                    void fetchNextPage()
+                                                }
+                                            }}
                                         />
                                     </div>
                                 )}
                             </FadeIn>
                         )}
                     </AnimatePresence>
+                    {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                 </div>
             </div>
 

@@ -105,14 +105,13 @@ export async function getModerationQueue(
     const { data: products, error } = await productQuery
 
     if (error) {
-        console.error("[ADMIN_MODERATION] Failed to fetch queue:", error.message)
-        return { data: [], nextCursor: null, prevCursor: null, hasMore: false }
+        console.error("[ADMIN_MODERATION] Failed to fetch products queue:", error.message)
     }
 
     const hasMore = (products?.length || 0) > pageSize
     const items = (products || []).slice(0, pageSize)
 
-    // Fetch owner names for each partner
+    // Fetch owner names for each partner (products only)
     const ownerIds = [...new Set(items.map((p: any) => p.partner?.user_id).filter(Boolean))]
     let ownerMap = new Map<string, string>()
     if (ownerIds.length > 0) {
@@ -123,7 +122,28 @@ export async function getModerationQueue(
         ownerMap = new Map((owners || []).map((o: any) => [o.user_id, o.full_name]))
     }
 
-    const mapped: ModerationItem[] = items.map((p: any) => ({
+    // 2. Partners query
+    let partnerQuery = supabase
+        .from("partners")
+        .select(`
+            id, store_name, store_description, store_image_url, banner_url,
+            logo_moderation_status, banner_moderation_status, risk_score, created_at,
+            user_profiles!partners_user_id_fkey(full_name)
+        `)
+    
+    if (statusFilter && statusFilter !== "all") {
+        partnerQuery = partnerQuery.or(`logo_moderation_status.eq.${statusFilter},banner_moderation_status.eq.${statusFilter}`)
+    } else {
+        partnerQuery = partnerQuery.or('logo_moderation_status.eq.pending_moderation,banner_moderation_status.eq.pending_moderation')
+    }
+
+    const { data: partners, error: partnerError } = await partnerQuery.order("created_at", { ascending: false }).limit(pageSize)
+
+    if (partnerError) {
+        console.error("[ADMIN_MODERATION] Failed to fetch partners queue:", partnerError.message)
+    }
+
+    const mappedProducts: ModerationItem[] = items.map((p: any) => ({
         id: p.id,
         type: "product" as const,
         title: p.name,
@@ -138,9 +158,43 @@ export async function getModerationQueue(
         created_at: p.created_at,
     }))
 
+    const mappedPartners: ModerationItem[] = (partners || []).map((p: any) => {
+        const images: string[] = []
+        if (p.store_image_url) images.push(p.store_image_url)
+        if (p.banner_url) images.push(p.banner_url)
+        
+        // Determine consolidated status
+        let status = "approved"
+        if (p.logo_moderation_status === "pending_moderation" || p.banner_moderation_status === "pending_moderation") {
+            status = "pending_moderation"
+        } else if (p.logo_moderation_status === "rejected" || p.banner_moderation_status === "rejected") {
+            status = "rejected"
+        }
+
+        return {
+            id: p.id,
+            type: "partner" as const,
+            title: `Perfil: ${p.store_name}`,
+            description: p.store_description,
+            price: 0,
+            images,
+            owner_store_name: p.store_name,
+            partner_id: p.id,
+            owner_user_name: p.user_profiles?.full_name || "",
+            moderation_status: status,
+            risk_score: p.risk_score || 0,
+            created_at: p.created_at,
+        }
+    })
+
+    // Combine and sort
+    const combined = [...mappedProducts, ...mappedPartners]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, pageSize)
+
     return {
-        data: mapped,
-        nextCursor: hasMore && items.length > 0 ? items[items.length - 1].created_at : null,
+        data: combined,
+        nextCursor: hasMore && combined.length > 0 ? combined[combined.length - 1].created_at : null,
         prevCursor: cursor || null,
         hasMore,
     }
@@ -149,7 +203,8 @@ export async function getModerationQueue(
 // ─── Approve Product ────────────────────────────────────────────────────────
 
 export async function approveModeration(
-    entityId: string
+    entityId: string,
+    type: "product" | "partner" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -158,38 +213,49 @@ export async function approveModeration(
 
     // Anti-IDOR: re-fetch entity
     const { data: entity, error: fetchError } = await supabase
-        .from("products")
-        .select("id, name, moderation_status, images")
+        .from(type === "product" ? "products" : "partners")
+        .select(type === "product" ? "id, name, moderation_status, images" : "id, store_name, logo_moderation_status, banner_moderation_status")
         .eq("id", entityId)
-        .is("deleted_at", null)
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: "Produto não encontrado" }
+        return { success: false, error: `${type === "product" ? "Produto" : "Perfil"} não encontrado` }
     }
 
-    // Mass-assignment: whitelisted fields only
-    const { error: updateError } = await supabase
-        .from("products")
-        .update({
-            moderation_status: "approved",
-            moderation_reviewed_by: admin.userId,
-            moderation_reviewed_at: new Date().toISOString(),
-            is_active: true,
-        })
-        .eq("id", entityId)
+    if (type === "product") {
+        const { error: updateError } = await supabase
+            .from("products")
+            .update({
+                moderation_status: "approved",
+                moderation_reviewed_by: admin.userId,
+                moderation_reviewed_at: new Date().toISOString(),
+                is_active: true,
+            })
+            .eq("id", entityId)
 
-    if (updateError) {
-        return { success: false, error: updateError.message }
+        if (updateError) return { success: false, error: updateError.message }
+    } else {
+        const { error: updateError } = await supabase
+            .from("partners")
+            .update({
+                logo_moderation_status: "approved",
+                banner_moderation_status: "approved",
+            })
+            .eq("id", entityId)
+
+        if (updateError) return { success: false, error: updateError.message }
     }
 
     // Audit log (append-only, via service-role)
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.MODERATION_APPROVE,
-        targetType: "product",
+        targetType: type,
         targetId: entityId,
-        metadata: { previousStatus: entity.moderation_status, productName: entity.name },
+        metadata: { 
+            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status }, 
+            name: type === "product" ? entity.name : entity.store_name 
+        },
     })
 
     return { success: true }
@@ -334,7 +400,8 @@ export async function rejectFlaggedImages(
 
 export async function rejectModeration(
     entityId: string,
-    reason: string
+    reason: string,
+    type: "product" | "partner" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -347,30 +414,40 @@ export async function rejectModeration(
 
     // Anti-IDOR
     const { data: entity, error: fetchError } = await supabase
-        .from("products")
-        .select("id, name, moderation_status, partner_id")
+        .from(type === "product" ? "products" : "partners")
+        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, store_name, logo_moderation_status, banner_moderation_status")
         .eq("id", entityId)
-        .is("deleted_at", null)
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: "Produto não encontrado" }
+        return { success: false, error: `${type === "product" ? "Produto" : "Perfil"} não encontrado` }
     }
 
-    // Mass-assignment: whitelisted fields only
-    const { error: updateError } = await supabase
-        .from("products")
-        .update({
-            moderation_status: "rejected",
-            moderation_reason: reason.trim(),
-            moderation_reviewed_by: admin.userId,
-            moderation_reviewed_at: new Date().toISOString(),
-            is_active: false,
-        })
-        .eq("id", entityId)
+    if (type === "product") {
+        const { error: updateError } = await supabase
+            .from("products")
+            .update({
+                moderation_status: "rejected",
+                moderation_reason: reason.trim(),
+                moderation_reviewed_by: admin.userId,
+                moderation_reviewed_at: new Date().toISOString(),
+                is_active: false,
+            })
+            .eq("id", entityId)
 
-    if (updateError) {
-        return { success: false, error: updateError.message }
+        if (updateError) return { success: false, error: updateError.message }
+    } else {
+        const { error: updateError } = await supabase
+            .from("partners")
+            .update({
+                logo_moderation_status: "rejected",
+                banner_moderation_status: "rejected",
+                // For partners, we might not want to deactivate the whole partner, 
+                // just the specific fields. But for now, let's keep it simple.
+            })
+            .eq("id", entityId)
+
+        if (updateError) return { success: false, error: updateError.message }
     }
 
     // Risk score: +3 for full product rejection (admin-confirmed)
@@ -381,9 +458,14 @@ export async function rejectModeration(
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.MODERATION_REJECT,
-        targetType: "product",
+        targetType: type,
         targetId: entityId,
-        metadata: { reason: reason.trim(), previousStatus: entity.moderation_status, productName: entity.name, riskScoreAdded: 3 },
+        metadata: { 
+            reason: reason.trim(), 
+            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status },
+            name: type === "product" ? entity.name : entity.store_name,
+            riskScoreAdded: type === "product" ? 3 : 0 
+        },
     })
 
     return { success: true }

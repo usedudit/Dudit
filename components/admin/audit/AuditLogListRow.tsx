@@ -3,8 +3,6 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/reusable"
-import { ClockIcon, UserIcon, ShieldIcon } from "@/lib/icons"
-import { formatDateTime } from "@/lib/utils"
 import type { AuditLogRow } from "@/lib/admin/types"
 
 export const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -22,6 +20,8 @@ export const ACTION_TYPE_LABELS: Record<string, string> = {
     "partner.disable_erp": "Desabilitar ERP",
     "partner.enable_erp": "Habilitar ERP",
     "product.soft_delete": "Deletar Produto",
+    "report.validate": "Validar Denúncia",
+    "report.revert": "Reverter Denúncia",
     "service.soft_delete": "Deletar Serviço",
     "subscription.cancel": "Cancelar Assinatura",
 }
@@ -74,7 +74,7 @@ const AuditLogListRow = React.memo(({ log, onView }: AuditLogListRowProps) => {
             </td>
 
             {/* Alvo */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
                 <div className="flex flex-col items-center">
                     <span className="font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
                         {log.target_name || TARGET_TYPE_LABELS[log.target_type] || log.target_type}

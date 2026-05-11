@@ -372,6 +372,8 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.bannerUrl !== undefined) updateData.banner_url = data.bannerUrl
   if (data.isShowcaseActive !== undefined) updateData.is_showcase_active = data.isShowcaseActive
   if (data.category !== undefined) updateData.category = data.category
+  if (data.logoModerationStatus !== undefined) updateData.logo_moderation_status = data.logoModerationStatus
+  if (data.bannerModerationStatus !== undefined) updateData.banner_moderation_status = data.bannerModerationStatus
 
   // Handle CPF (Encrypted)
   if (data.cpf !== undefined) {

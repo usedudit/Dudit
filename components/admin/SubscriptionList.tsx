@@ -1,28 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-    Search,
-    Filter,
-    MoreHorizontal,
-    CreditCard,
-    Calendar,
-    Download,
-    CheckCircle2,
-    AlertCircle,
-    XCircle,
-    Clock,
-    ChevronLeft,
-    ChevronRight,
-    X,
-    Building2,
-    DollarSign
-} from 'lucide-react';
+    SearchIcon,
+    FilterIcon,
+    MoreHorizontalIcon,
+    CreditCardIcon,
+    CalendarIcon,
+    DownloadIcon,
+    CancelCircleIcon,
+    ClockIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    XIcon,
+    StoreIcon,
+    MoneyIcon,
+} from '@/lib/icons';
 import Button from '@/components/reusable/Button';
 import { Badge } from '@/components/reusable/Badge';
 import Dropdown, { DropdownItem } from '@/components/reusable/Dropdown';
 import { Checkbox } from '@/components/reusable/Checkbox';
-import { motion, AnimatePresence } from 'framer-motion';
+import BottomSheet from '@/components/BottomSheet';
+import Portal from "@/components/Portal";
+import { useMediaQuery } from '@/hooks';
 
 const SubscriptionList = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -136,7 +136,7 @@ const SubscriptionList = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="gap-2">
-                        <Download size={16} /> Export Report
+                        <DownloadIcon size={16} /> Export Report
                     </Button>
                 </div>
             </div>
@@ -145,7 +145,7 @@ const SubscriptionList = () => {
             <div className="bg-white dark:bg-dark-surface p-4 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-inactive-text" size={18} />
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-inactive-text" size={18} />
                         <input
                             type="text"
                             placeholder="Search tenant, ID, or plan..."
@@ -153,7 +153,7 @@ const SubscriptionList = () => {
                         />
                     </div>
                     <Button variant="outline" className="gap-2 px-3">
-                        <Filter size={16} /> <span className="hidden sm:inline">Filters</span>
+                        <FilterIcon size={16} /> <span className="hidden sm:inline">Filters</span>
                     </Button>
                 </div>
 
@@ -180,7 +180,7 @@ const SubscriptionList = () => {
                     >
                         <div className="flex items-start gap-4">
                             <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                                <Building2 size={20} />
+                                <StoreIcon size={20} />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
@@ -194,11 +194,11 @@ const SubscriptionList = () => {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                        <DollarSign size={14} className="text-brand-inactive-text" />
+                                        <MoneyIcon size={14} className="text-brand-inactive-text" />
                                         {sub.amount}
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                        <Calendar size={12} />
+                                        <CalendarIcon size={12} />
                                         Next: {sub.nextBilling}
                                     </div>
                                 </div>
@@ -266,7 +266,7 @@ const SubscriptionList = () => {
                                     <td className="p-4 border-b border-brand-border dark:border-dark-border">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border overflow-hidden shrink-0 flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                                                <Building2 size={18} />
+                                                <StoreIcon size={18} />
                                             </div>
                                             <div>
                                                 <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
@@ -289,7 +289,7 @@ const SubscriptionList = () => {
                                     </td>
                                     <td className="p-4 border-b border-brand-border dark:border-dark-border">
                                         <div className="flex items-center gap-2 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                            <Calendar size={14} className="text-brand-inactive-text" />
+                                            <CalendarIcon size={14} className="text-brand-inactive-text" />
                                             {sub.nextBilling}
                                         </div>
                                     </td>
@@ -300,19 +300,19 @@ const SubscriptionList = () => {
                                             showChevron={false}
                                             trigger={
                                                 <Button variant="outline" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <MoreHorizontal size={16} />
+                                                    <MoreHorizontalIcon size={16} />
                                                 </Button>
                                             }
                                         >
                                             <DropdownItem className="gap-2" onClick={() => setDetailItem(sub)}>
-                                                <CreditCard size={14} /> View Details
+                                                <CreditCardIcon size={14} /> View Details
                                             </DropdownItem>
                                             <DropdownItem className="gap-2">
-                                                <Download size={14} /> Download Invoice
+                                                <DownloadIcon size={14} /> Download Invoice
                                             </DropdownItem>
                                             <div className="h-px bg-gray-200 dark:bg-gray-800 my-1" />
                                             <DropdownItem className="gap-2 text-red-600">
-                                                <XCircle size={14} /> Cancel Subscription
+                                                <CancelCircleIcon size={14} /> Cancel Subscription
                                             </DropdownItem>
                                         </Dropdown>
                                     </td>
@@ -327,124 +327,167 @@ const SubscriptionList = () => {
             <div className="flex justify-center mb-8">
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" className="w-8 h-8 flex items-center justify-center disabled:opacity-50" disabled>
-                        <ChevronLeft size={18} />
+                        <ChevronLeftIcon size={18} />
                     </Button>
                     <button className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-brand-slate dark:bg-gray-800 text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border transition-all hover:border-gray-300 dark:hover:border-gray-600">1</button>
                     <button className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-brand-inactive-text dark:text-dark-body hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">2</button>
                     <button className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-brand-inactive-text dark:text-dark-body hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">3</button>
                     <Button variant="ghost" size="icon" className="w-8 h-8 flex items-center justify-center">
-                        <ChevronRight size={18} />
+                        <ChevronRightIcon size={18} />
                     </Button>
                 </div>
             </div>
 
-            {/* Detail Slide-over */}
-            <AnimatePresence>
-                {detailItem && (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 0.5 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setDetailItem(null)}
-                            className="fixed inset-0 bg-black z-60"
-                        />
-                        <motion.div
-                            initial={{ x: '100%' }}
-                            animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                            className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-dark-surface shadow-2xl z-70 border-l border-brand-border dark:border-dark-border overflow-y-auto flex flex-col"
-                        >
-                            <div className="p-6 border-b border-brand-border dark:border-dark-border flex items-center justify-between sticky top-0 bg-white dark:bg-dark-surface z-10">
-                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Subscription Details</h2>
-                                <button onClick={() => setDetailItem(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                                    <X size={20} className="text-brand-dark dark:text-dark-heading" />
-                                </button>
-                            </div>
-
-                            <div className="p-6 space-y-6">
-                                {/* Header */}
-                                <div className="flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                                        <Building2 size={32} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{detailItem.tenant}</h3>
-                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body">{detailItem.tenantId}</div>
-                                    </div>
-                                </div>
-
-                                {/* Plan Info */}
-                                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-brand-border dark:border-dark-border">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase font-bold mb-1">Current Plan</div>
-                                            <div className="text-lg font-bold text-brand-dark dark:text-dark-heading">{detailItem.plan}</div>
-                                        </div>
-                                        {getStatusBadge(detailItem.status)}
-                                    </div>
-                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border">
-                                        <div className="text-sm text-brand-dark dark:text-dark-heading font-medium">
-                                            {detailItem.amount} <span className="text-brand-inactive-text font-normal">/ {detailItem.billingCycle}</span>
-                                        </div>
-                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
-                                            <Clock size={12} /> Renews {detailItem.nextBilling}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Payment Method */}
-                                <div>
-                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading mb-3">Payment Method</h4>
-                                    <div className="flex items-center gap-3 p-3 rounded-lg border border-brand-border dark:border-dark-border">
-                                        <div className="w-10 h-6 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center text-xs font-bold text-gray-500">
-                                            CARD
-                                        </div>
-                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{detailItem.paymentMethod}</span>
-                                    </div>
-                                </div>
-
-                                {/* Invoice History */}
-                                <div>
-                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading mb-3">Recent Invoices</h4>
-                                    <div className="space-y-2">
-                                        {detailItem.history.length > 0 ? detailItem.history.map((inv: any, idx: number) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-2 h-2 rounded-full ${inv.status === 'Paid' ? 'bg-green-500' : 'bg-red-500'}`} />
-                                                    <div>
-                                                        <div className="text-sm font-medium text-brand-dark dark:text-dark-heading">{inv.date}</div>
-                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">{inv.invoice}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{inv.amount}</div>
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body">{inv.status}</div>
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="text-sm text-brand-inactive-text dark:text-dark-body italic">No invoice history available.</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="pt-6 border-t border-brand-border dark:border-dark-border space-y-3">
-                                    <Button className="w-full justify-center gap-2">
-                                        <Download size={16} /> Download Statement
-                                    </Button>
-                                    <Button variant="outline" className="w-full justify-center gap-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20">
-                                        Cancel Subscription
-                                    </Button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+            {/* Detail Sheet */}
+            <SubscriptionDetailsSheet
+                item={detailItem}
+                isOpen={!!detailItem}
+                onClose={() => setDetailItem(null)}
+            />
         </div>
     );
 };
 
 export default SubscriptionList;
+
+// ─── Detail Sheet Sub-component ──────────────────────────────────────────────
+
+interface SubscriptionDetailsSheetProps {
+    item: any | null
+    isOpen: boolean
+    onClose: () => void
+}
+
+function SubscriptionDetailsSheet({ item, isOpen, onClose }: SubscriptionDetailsSheetProps) {
+    const isMobile = useMediaQuery("(max-width: 768px)")
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case 'Active': return <Badge variant="green">{status}</Badge>;
+            case 'Past Due': return <Badge variant="red">{status}</Badge>;
+            case 'Canceled': return <Badge variant="gray">{status}</Badge>;
+            case 'Trial': return <Badge variant="blue">{status}</Badge>;
+            default: return <Badge variant="gray">{status}</Badge>;
+        }
+    };
+
+    if (!item) return null
+
+    const content = (
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Assinatura</h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Store Header */}
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 border border-brand-border dark:border-dark-border flex items-center justify-center text-brand-dark dark:text-dark-heading">
+                        <StoreIcon size={32} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.tenant}</h3>
+                        <div className="text-sm text-brand-inactive-text dark:text-dark-body font-mono">{item.tenantId}</div>
+                    </div>
+                </div>
+
+                {/* Plan Card */}
+                <div className="bg-gray-50 dark:bg-dark-background/50 p-5 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <span className="text-[11px] font-bold text-brand-inactive-text block mb-1">Plano Atual</span>
+                            <div className="text-xl font-bold text-brand-dark dark:text-dark-heading">{item.plan}</div>
+                        </div>
+                        {getStatusBadge(item.status)}
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border">
+                        <div className="flex items-center gap-2 text-base font-bold text-brand-dark dark:text-dark-heading">
+                            <MoneyIcon size={18} className="text-brand-inactive-text" />
+                            {item.amount} <span className="text-brand-inactive-text text-sm font-medium">/ {item.billingCycle}</span>
+                        </div>
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
+                            <ClockIcon size={14} /> Renova em {item.nextBilling}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Payment Method */}
+                <div className="space-y-3">
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Método de Pagamento</h4>
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30">
+                        <div className="w-12 h-8 bg-white dark:bg-gray-800 rounded border border-brand-border/50 flex items-center justify-center text-[10px] font-black text-brand-inactive-text">
+                            CARD
+                        </div>
+                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{item.paymentMethod}</span>
+                    </div>
+                </div>
+
+                {/* Invoice History */}
+                <div className="space-y-4">
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Faturas Recentes</h4>
+                    <div className="space-y-2">
+                        {item.history.length > 0 ? item.history.map((inv: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${inv.status === 'Paid' ? 'bg-brand-green shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-brand-red shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`} />
+                                    <div>
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{inv.date}</div>
+                                        <div className="text-[11px] text-brand-inactive-text font-mono">{inv.invoice}</div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-sm font-black text-brand-dark dark:text-dark-heading">{inv.amount}</div>
+                                    <div className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-tighter">{inv.status}</div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="flex flex-col items-center justify-center p-8 bg-brand-gray/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
+                                <ClockIcon size={32} className="mb-2 opacity-20" />
+                                <span className="text-sm font-medium italic">Nenhum histórico disponível</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-6 border-t border-brand-border dark:border-dark-border space-y-3">
+                    <Button className="w-full justify-center gap-2 h-12 rounded-full font-bold">
+                        <DownloadIcon size={18} /> Baixar Extrato
+                    </Button>
+                    <Button variant="outline" className="w-full justify-center gap-2 h-12 rounded-full font-bold text-brand-red border-red-200 hover:bg-red-50 dark:hover:bg-red-900/10">
+                        <CancelCircleIcon size={18} /> Cancelar Assinatura
+                    </Button>
+                </div>
+            </div>
+        </div>
+    )
+
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={isOpen} onClose={onClose}>
+                {content}
+            </BottomSheet>
+        )
+    }
+
+    return (
+        <Portal>
+            <div
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                onClick={onClose}
+            >
+                <div
+                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {content}
+                </div>
+            </div>
+        </Portal>
+    )
+}
+

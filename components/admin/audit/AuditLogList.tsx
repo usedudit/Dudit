@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useMemo, useRef, useCallback } from "react"
+import React, { useState, useMemo, useRef } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { TerminalIcon, DatabaseIcon, GlobeIcon, MonitorIcon } from "@/lib/icons"
+import { TerminalIcon, DatabaseIcon, GlobeIcon, MonitorIcon, XIcon, ClockIcon, UserIcon } from "@/lib/icons"
 import { Button, IconPlaceholder, Badge, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -15,7 +15,7 @@ import { getAuditLogs } from "@/app/actions/admin/audit-logs"
 import type { AuditLogRow, CursorPaginatedResult } from "@/lib/admin/types"
 import AuditLogListRow, { getActionBadge, TARGET_TYPE_LABELS, ACTION_TYPE_LABELS } from "./AuditLogListRow"
 import AuditLogPageControls from "./AuditLogPageControls"
-import { ClockIcon, UserIcon } from "@/lib/icons"
+
 import { formatDateTime } from "@/lib/utils"
 
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -37,30 +37,6 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    // ─── Entity Page ──────────────────────────────────────────────────────────
-    const entityPage = useEntityPage<AuditLogRow, any, string>({
-        entityType: 'audit-logs',
-        partnerId: 'admin',
-        queryKey: ['admin', 'audit-logs'],
-        initialItems: initialData.data,
-        initialNextCursor: initialData.nextCursor,
-        initialHasMore: initialData.hasMore,
-        fetchPageFn: async ({ cursor }) => {
-            const res = await getAuditLogs(cursor, 100, {
-                actionType: "all",
-                targetType: "all",
-            })
-            return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
-        },
-        dedupeKey: useCallback((l) => l.id, []),
-        getDetailFn: async () => null,
-    })
-
-    const {
-        items: rawLogs, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading,
-        search, setSearch, debouncedSearch,
-    } = entityPage
-
     // ─── Local State ──────────────────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<string>("all")
     const [page, setPage] = useState(1)
@@ -68,16 +44,39 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
     const [modals, setModals] = useState({ filter: false })
     const [detailLog, setDetailLog] = useState<AuditLogRow | null>(null)
 
-    const itemsPerPage = 20
+    // Search state
+    const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    React.useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(t)
+    }, [search])
 
-    useInfiniteScrollObserver(observerTarget, {
-        enabled: true,
-        hasNextPage: !!hasNextPage,
-        isFetchingNextPage,
-        fetchNextPage: () => fetchNextPage(),
-        rootMargin: "320px",
-        threshold: 0,
+    // ─── Entity Page ──────────────────────────────────────────────────────────
+    const entityPage = useEntityPage<AuditLogRow, any, string>({
+        entityType: 'audit-logs',
+        partnerId: 'admin',
+        queryKey: ['admin', 'audit-logs', activeTab, debouncedSearch],
+        initialItems: (activeTab === "all" && debouncedSearch === "") ? initialData.data : [],
+        initialNextCursor: (activeTab === "all" && debouncedSearch === "") ? initialData.nextCursor : null,
+        initialHasMore: (activeTab === "all" && debouncedSearch === "") ? initialData.hasMore : true,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getAuditLogs(cursor, 40, {
+                actionType: "all",
+                targetType: activeTab as any,
+                search: debouncedSearch
+            })
+            return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (l) => l.id,
+        getDetailFn: async () => null,
     })
+
+    const {
+        items: rawLogs, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading,
+    } = entityPage
+
+    const itemsPerPage = 8
 
     const filterSections: FilterSectionConfig[] = [
         {
@@ -90,32 +89,24 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
 
     const filteredLogs = useMemo(() => {
         if (!rawLogs) return []
-        const term = debouncedSearch.toLowerCase()
-
         return rawLogs.filter(log => {
-            // Search
-            const searchMatch =
-                log.id.toLowerCase().includes(term) ||
-                (log.admin_email || "").toLowerCase().includes(term) ||
-                (log.metadata?.reason || "").toString().toLowerCase().includes(term) ||
-                (log.target_id || "").toLowerCase().includes(term)
-
-            // Tab Filter (Target Type)
-            const tabMatch = activeTab === "all" || log.target_type === activeTab
-
             // Action Filter
             const actionLabel = ACTION_TYPE_LABELS[log.action_type] || log.action_type
             const filterMatch = filters.action.length === 0 || filters.action.includes(actionLabel)
-
-            return searchMatch && tabMatch && filterMatch
+            return filterMatch
         })
-    }, [rawLogs, debouncedSearch, activeTab, filters])
+    }, [rawLogs, filters])
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage)
     const paginated = filteredLogs.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
-    const hasActiveFilters = filters.action.length > 0 || debouncedSearch.length > 0
+    const hasActiveFilters = filters.action.length > 0 || search.length > 0
     const hasLogs = (rawLogs?.length || 0) > 0
+
+    // Reset page when search or tab changes
+    useMemo(() => {
+        setPage(1)
+    }, [debouncedSearch, activeTab])
 
     return (
         <>
@@ -142,13 +133,13 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                         hasData={hasLogs}
                     />
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                         <AnimatePresence mode="wait">
                             {isListLoading ? (
                                 <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
                                     <ThreeDotsLoader />
                                 </FadeIn>
-                            ) : !hasLogs ? (
+                            ) : !hasLogs && !isListLoading ? (
                                 <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -158,7 +149,7 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                                         subtitle="Ainda não existem logs de auditoria."
                                     />
                                 </FadeIn>
-                            ) : paginated.length === 0 ? (
+                            ) : paginated.length === 0 && !isListLoading ? (
                                 <FadeIn key="empty-results" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -235,16 +226,15 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                                 </FadeIn>
                             )}
                         </AnimatePresence>
-                        {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                     </div>
 
-                    {hasLogs && paginated.length > 0 && (
+                    {hasLogs && (
                         <Pagination
                             currentPage={page}
                             totalPages={totalPages}
                             onPageChange={(p) => {
                                 setPage(p)
-                                if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                if (p >= totalPages - 1 && hasNextPage && !isFetchingNextPage) {
                                     void fetchNextPage()
                                 }
                             }}
@@ -286,9 +276,18 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
     if (!log) return null
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-20 md:pb-6">
-                {/* Header */}
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Log</h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Status/Type Header */}
                 <div className="space-y-4">
                     <div className="flex items-center gap-2">
                         {getActionBadge(log.action_type)}
@@ -298,7 +297,7 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                         <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                             {ACTION_TYPE_LABELS[log.action_type] || log.action_type}
                         </h3>
-                        <p className="text-sm text-brand-inactive-text mt-1">ID do Log: {log.id}</p>
+                        <p className="text-xs text-brand-inactive-text mt-1 opacity-70 tracking-wider font-bold">LOG ID: {log.id}</p>
                     </div>
                 </div>
 
@@ -308,14 +307,14 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                         <div className="flex items-start gap-3">
                             <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                             <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">Data e Hora</span>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Data e Hora</span>
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(log.created_at)}</span>
                             </div>
                         </div>
                         <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                             <UserIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                             <div>
-                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">Executor</span>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Executor</span>
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{log.admin_name || log.admin_email || "N/A"}</span>
                                 <span className="text-[10px] text-brand-inactive-text block opacity-70">UID: {log.admin_user_id}</span>
                             </div>
@@ -324,11 +323,11 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                             <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
                                 <DatabaseIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
                                 <div>
-                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">Alvo</span>
+                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Alvo da Ação</span>
                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-1 block">
                                         {log.target_name || TARGET_TYPE_LABELS[log.target_type] || log.target_type}
                                     </span>
-                                    <span className="text-[11px] text-brand-inactive-text bg-white dark:bg-dark-background px-2 py-0.5 rounded border border-brand-border/50">
+                                    <span className="text-[11px] text-brand-inactive-text bg-white dark:bg-dark-background px-2 py-0.5 rounded border border-brand-border/50 font-mono">
                                         ID: {log.target_id}
                                     </span>
                                 </div>
@@ -339,13 +338,11 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
 
                 {/* Metadata JSON */}
                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider flex items-center gap-2">
-                            <TerminalIcon size={16} /> Parâmetros e Contexto
-                        </h4>
-                    </div>
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body flex items-center gap-2">
+                        <TerminalIcon size={16} /> Parâmetros e Contexto
+                    </h4>
                     <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4 overflow-x-auto">
-                        <pre className="text-[12px] text-brand-dark dark:text-dark-heading">
+                        <pre className="text-[12px] text-brand-dark dark:text-dark-heading font-mono leading-relaxed">
                             {JSON.stringify(log.metadata, null, 2)}
                         </pre>
                     </div>
@@ -353,16 +350,16 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
 
                 {/* Connection Details */}
                 <div className="space-y-3">
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">Origem do Acesso</h4>
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Origem do Acesso</h4>
                     <div className="space-y-2">
-                        <div className="flex items-center justify-between p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30 dark:border-dark-border/30">
                             <div className="flex items-center gap-2">
                                 <GlobeIcon size={14} className="text-brand-inactive-text" />
                                 <span className="text-xs font-medium text-brand-inactive-text">Endereço IP</span>
                             </div>
-                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{log.ip_address}</span>
+                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading font-mono">{log.ip_address}</span>
                         </div>
-                        <div className="flex items-start gap-2 p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl">
+                        <div className="flex items-start gap-2 p-3 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30 dark:border-dark-border/30">
                             <MonitorIcon size={14} className="text-brand-inactive-text mt-0.5 shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <span className="text-xs font-medium text-brand-inactive-text">User Agent</span>
@@ -371,17 +368,6 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
-                <Button
-                    variant="outline"
-                    className="w-full rounded-full h-12 font-bold"
-                    onClick={onClose}
-                >
-                    Fechar Detalhes
-                </Button>
             </div>
         </div>
     )
@@ -401,7 +387,7 @@ function AuditLogDetailsSheet({ log, isOpen, onClose }: AuditLogDetailsSheetProp
                 onClick={onClose}
             >
                 <div
-                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-100"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}

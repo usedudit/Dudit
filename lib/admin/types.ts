@@ -118,7 +118,7 @@ export interface CursorPaginatedResult<T> {
 
 export interface ModerationItem {
     id: string
-    type: "product" | "service"
+    type: "product" | "service" | "partner"
     title: string
     description: string | null
     price: number

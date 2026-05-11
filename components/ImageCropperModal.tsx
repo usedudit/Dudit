@@ -126,7 +126,7 @@ const ImageCropperModal = memo(({
       }
       setCrop({
         x: (SIZE - w) / 2,
-        y: (SIZE - h) / 2,
+        y: (aspectRatio > 1 ? (SIZE / aspectRatio - h) / 2 : (SIZE - h) / 2),
         width: w,
         height: h
       })
@@ -439,7 +439,7 @@ const ImageCropperModal = memo(({
           ref={containerRef}
           style={{
             width: SIZE,
-            height: SIZE,
+            height: aspectRatio && aspectRatio > 1 ? SIZE / aspectRatio : SIZE,
             touchAction: "none"
           }}
           className="relative overflow-hidden border rounded-lg bg-gray-100"

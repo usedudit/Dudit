@@ -211,6 +211,41 @@ export const BusinessDataSubPage = ({
         setIsLoading(true)
         startTransition(async () => {
             try {
+                let finalLogoUrl = generalInfo.storeImageUrl
+                let finalBannerUrl = generalInfo.bannerUrl
+
+                // Upload logo if it's base64
+                if (finalLogoUrl && finalLogoUrl.startsWith("data:")) {
+                    setImageUploading(true)
+                    try {
+                        const blob = await (await fetch(finalLogoUrl)).blob()
+                        const file = new File([blob], "logo.jpg", { type: "image/jpeg" })
+                        const formData = new FormData()
+                        formData.append("file", file)
+                        const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-logo", { method: "POST", body: formData })
+                        const data = await res.json()
+                        if (data.success) finalLogoUrl = data.publicUrl
+                    } finally {
+                        setImageUploading(false)
+                    }
+                }
+
+                // Upload banner if it's base64
+                if (finalBannerUrl && finalBannerUrl.startsWith("data:")) {
+                    setBannerUploading(true)
+                    try {
+                        const blob = await (await fetch(finalBannerUrl)).blob()
+                        const file = new File([blob], "banner.jpg", { type: "image/jpeg" })
+                        const formData = new FormData()
+                        formData.append("file", file)
+                        const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-banner", { method: "POST", body: formData })
+                        const data = await res.json()
+                        if (data.success) finalBannerUrl = data.publicUrl
+                    } finally {
+                        setBannerUploading(false)
+                    }
+                }
+
                 const businessInfoData = {
                     sells: generalInfo.sells,
                     mode: generalInfo.mode,
@@ -219,7 +254,8 @@ export const BusinessDataSubPage = ({
                 const result = await updatePartnerAction(partner.id, {
                     storeName: generalInfo.storeName,
                     storeDescription: generalInfo.storeDescription,
-                    storeImageUrl: generalInfo.storeImageUrl || null,
+                    storeImageUrl: finalLogoUrl || null,
+                    logoModerationStatus: (finalLogoUrl && finalLogoUrl !== partner.store_image_url) ? 'pending_moderation' : undefined,
                     phone: generalInfo.phone || null,
                     businessType: generalInfo.businessType as "pf" | "pj",
                     cnpj: generalInfo.businessType === "pj" ? (generalInfo.cnpj || null) : null,
@@ -238,7 +274,8 @@ export const BusinessDataSubPage = ({
                     inscricaoEstadual: fiscalInfo.inscricaoEstadual || null,
                     ieIsento: fiscalInfo.ieIsento,
                     inscricaoMunicipal: fiscalInfo.inscricaoMunicipal || null,
-                    bannerUrl: generalInfo.bannerUrl || null,
+                    bannerUrl: finalBannerUrl || null,
+                    bannerModerationStatus: (finalBannerUrl && finalBannerUrl !== partner.banner_url) ? 'pending_moderation' : undefined,
                     isShowcaseActive: generalInfo.isShowcaseActive,
                     category: generalInfo.category || null,
                     userId: partner.user_id,
@@ -276,39 +313,11 @@ export const BusinessDataSubPage = ({
         setCropModalOpen(true)
     }
 
-    const handleCropComplete = async (url: string) => {
-        setImageUploading(true)
+    const handleCropComplete = (url: string) => {
         setCropModalOpen(false)
         setImagePreview(url)
-        try {
-            const blob = await (await fetch(url)).blob()
-            const ext = blob.type === "image/png" ? "png" : "jpg"
-            const file = new File([blob], `partner-logo.${ext}`, { type: blob.type })
-            const formData = new FormData()
-            formData.append("file", file, "partner-logo.jpg")
-
-            const response = await fetchWithCSRF("/api/upload-image?uploadType=partner-logo", { method: "POST", body: formData })
-            const data = await response.json()
-
-            if (!response.ok) {
-                setImagePreview(partner.store_image_url || null)
-                setGeneralInfo((p: any) => ({ ...p, storeImageUrl: partner.store_image_url || "" }))
-                notifyError(data.error || "Erro ao fazer upload")
-                return
-            }
-
-            if (data.success && data.publicUrl) {
-                setGeneralInfo((p: any) => ({ ...p, storeImageUrl: data.publicUrl }))
-                notifySuccess("Logo enviada com sucesso!")
-            }
-        } catch {
-            setImagePreview(partner.store_image_url || null)
-            setGeneralInfo((p: any) => ({ ...p, storeImageUrl: partner.store_image_url || "" }))
-            notifyError("Erro no upload da imagem")
-        } finally {
-            setImageUploading(false)
-            setTempImageFile(null)
-        }
+        setGeneralInfo((p: any) => ({ ...p, storeImageUrl: url }))
+        setTempImageFile(null)
     }
 
     const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,39 +328,11 @@ export const BusinessDataSubPage = ({
         setBannerCropModalOpen(true)
     }
 
-    const handleBannerCropComplete = async (url: string) => {
-        setBannerUploading(true)
+    const handleBannerCropComplete = (url: string) => {
         setBannerCropModalOpen(false)
         setBannerPreview(url)
-        try {
-            const blob = await (await fetch(url)).blob()
-            const ext = blob.type === "image/png" ? "png" : "jpg"
-            const file = new File([blob], `partner-banner.${ext}`, { type: blob.type })
-            const formData = new FormData()
-            formData.append("file", file, "partner-banner.jpg")
-
-            const response = await fetchWithCSRF("/api/upload-image?uploadType=partner-banner", { method: "POST", body: formData })
-            const data = await response.json()
-
-            if (!response.ok) {
-                setBannerPreview(partner.banner_url || null)
-                setGeneralInfo((p: any) => ({ ...p, bannerUrl: partner.banner_url || "" }))
-                notifyError(data.error || "Erro ao fazer upload")
-                return
-            }
-
-            if (data.success && data.publicUrl) {
-                setGeneralInfo((p: any) => ({ ...p, bannerUrl: data.publicUrl }))
-                notifySuccess("Banner enviado com sucesso!")
-            }
-        } catch {
-            setBannerPreview(partner.banner_url || null)
-            setGeneralInfo((p: any) => ({ ...p, bannerUrl: partner.banner_url || "" }))
-            notifyError("Erro no upload do banner")
-        } finally {
-            setBannerUploading(false)
-            setTempBannerFile(null)
-        }
+        setGeneralInfo((p: any) => ({ ...p, bannerUrl: url }))
+        setTempBannerFile(null)
     }
 
     const formattedAddress = React.useMemo(() => {

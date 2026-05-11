@@ -34,6 +34,7 @@ async function _getMarketplaceProductBase(id: string) {
         id, store_name, store_description, rating, user_id, 
         store_image_url, banner_url, max_installments, interest_rate_percent,
         mp_user_id, mp_public_key, opening_hours,
+        logo_moderation_status, banner_moderation_status,
         addresses(city, state),
         payment_methods(*)
       )
@@ -56,6 +57,8 @@ async function _getMarketplaceProductBase(id: string) {
     } else {
       p.store_avatar = p.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
       p.banner_url = p.banner_url || null
+      p.logo_moderation_status = p.logo_moderation_status || "approved"
+      p.banner_moderation_status = p.banner_moderation_status || "approved"
       p.city = p.addresses?.[0]?.city || null
       p.state = p.addresses?.[0]?.state || null
     }

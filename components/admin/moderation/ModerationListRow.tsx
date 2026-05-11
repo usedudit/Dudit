@@ -4,22 +4,18 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
-    ClockIcon,
     CheckCircleIcon,
     RemoveImageIcon,
     StoreIcon,
-    EyeIcon,
     CancelCircleIcon,
-    AlertTriangleIcon
 } from "@/lib/icons"
-import { formatDate } from "@/lib/utils"
 import type { ModerationItem } from "@/lib/admin/types"
 
 interface ModerationListRowProps {
     item: ModerationItem
     isPending: boolean
     onDetail: (item: ModerationItem) => void
-    onApprove: (id: string) => void
+    onApprove: (id: string, type: ModerationItem["type"]) => void
 }
 
 const ModerationListRow = React.memo(({
@@ -59,7 +55,11 @@ const ModerationListRow = React.memo(({
                             <img src={imageUrl} alt="" className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                                <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
+                                {item.type === "partner" ? (
+                                    <StoreIcon className="w-4 h-4 text-brand-inactive-text" />
+                                ) : (
+                                    <RemoveImageIcon className="w-4 h-4 text-brand-inactive-text" />
+                                )}
                             </div>
                         )}
                     </div>
@@ -124,12 +124,12 @@ const ModerationListRow = React.memo(({
                         onView={() => onDetail(item)}
                     >
                         {item.moderation_status === "pending_moderation" && (
-                            <DropdownItem onClick={() => onApprove(item.id)} className="text-brand-green">
-                                <CheckCircleIcon size={16} /> Aprovar Produto
+                            <DropdownItem onClick={() => onApprove(item.id, item.type)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
                             </DropdownItem>
                         )}
                         <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
-                            <CancelCircleIcon size={16} /> Rejeitar Produto
+                            <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : "Serviço"}
                         </DropdownItem>
                     </ActionsDropdown>
                 </div>
@@ -137,7 +137,8 @@ const ModerationListRow = React.memo(({
         </motion.tr>
     )
 }, (prev, next) =>
-    prev.item === next.item &&
+    prev.item.id === next.item.id &&
+    prev.item.moderation_status === next.item.moderation_status &&
     prev.isPending === next.isPending
 )
 

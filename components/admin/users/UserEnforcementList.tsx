@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useRef, useCallback, useMemo } from "react"
+import { useState, useTransition, useRef, useCallback, useMemo, useEffect } from "react"
 import { Button, Badge, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -9,7 +9,7 @@ import UserEnforcementListRow from "./UserEnforcementListRow"
 import UserEnforcementPageControls from "./UserEnforcementPageControls"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { UserIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon, MailIcon, StoreIcon, ShieldIcon } from "@/lib/icons"
+import { UserIcon, ClockIcon, AlertTriangleIcon, CheckCircleIcon, MailIcon, StoreIcon, ShieldIcon, XIcon } from "@/lib/icons"
 import type { EnforcementUser, CursorPaginatedResult } from "@/lib/admin/types"
 import { getUsers, banUser, unbanUser } from "@/app/actions/admin/enforcement"
 import BottomSheet from "@/components/BottomSheet"
@@ -55,7 +55,6 @@ interface UserEnforcementListProps {
 const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const observerTarget = useRef<HTMLDivElement>(null)
-    const [search, setSearch] = useState("")
     const [statusTab, setStatusTab] = useState("all")
     const [banTarget, setBanTarget] = useState<EnforcementUser | null>(null)
     const [unbanTarget, setUnbanTarget] = useState<EnforcementUser | null>(null)
@@ -66,44 +65,49 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
     const [detailUser, setDetailUser] = useState<EnforcementUser | null>(null)
     const [isPending, startTransition] = useTransition()
 
+    // Search state
+    const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(t)
+    }, [search])
+
     // ─── Entity Page ──────────────────────────────────────────────────────────
-    const memoInitialItems = useMemo(() =>
-        initialData.data.map(u => ({ ...u, id: u.user_id })),
-        [initialData.data]
-    )
-
-    const fetchPageFn = useCallback(async ({ cursor }: { cursor: string | null }) => {
-        const res = await getUsers(cursor, 20, search, statusTab)
-        return {
-            items: res.data.map(u => ({ ...u, id: u.user_id })),
-            nextCursor: res.nextCursor,
-            hasMore: res.hasMore
-        }
-    }, [search, statusTab])
-
-    const dedupeKey = useCallback((u: any) => u.user_id || u.id, [])
-    const getDetailFn = useCallback(async () => null, [])
-
     const entityPage = useEntityPage<EnforcementUser & { id: string }, any, string>({
         entityType: 'admin-users',
         partnerId: 'admin',
-        queryKey: ['admin', 'users', statusTab, search],
-        initialItems: (search === "" && statusTab === "all") ? memoInitialItems : [],
-        initialNextCursor: (search === "" && statusTab === "all") ? initialData.nextCursor : null,
-        initialHasMore: (search === "" && statusTab === "all") ? initialData.hasMore : true,
-        fetchPageFn,
-        dedupeKey,
-        getDetailFn,
+        queryKey: ['admin', 'users', statusTab, debouncedSearch],
+        initialItems: (debouncedSearch === "" && statusTab === "all") ? initialData.data.map(u => ({ ...u, id: u.user_id })) : [],
+        initialNextCursor: (debouncedSearch === "" && statusTab === "all") ? initialData.nextCursor : null,
+        initialHasMore: (debouncedSearch === "" && statusTab === "all") ? initialData.hasMore : true,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getUsers(cursor, 40, debouncedSearch, statusTab)
+            return {
+                items: res.data.map(u => ({ ...u, id: u.user_id })),
+                nextCursor: res.nextCursor,
+                hasMore: res.hasMore
+            }
+        },
+        dedupeKey: (u) => u.user_id || u.id,
+        getDetailFn: async () => null,
     })
 
-    const { items, hasNextPage, isFetchingNextPage, isListLoading: isLoading, fetchNextPage, afterMutation } = entityPage
+    const {
+        items: rawUsers, hasNextPage, isFetchingNextPage, isListLoading, fetchNextPage, afterMutation
+    } = entityPage
 
-    useInfiniteScrollObserver(observerTarget, {
-        fetchNextPage,
-        hasNextPage: !!hasNextPage,
-        isFetchingNextPage,
-        enabled: true
-    })
+    // Pagination
+    const [page, setPage] = useState(1)
+    const itemsPerPage = 8
+    const totalPages = Math.ceil(rawUsers.length / itemsPerPage)
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return rawUsers.slice(start, start + itemsPerPage)
+    }, [rawUsers, page])
+
+    // Reset page when filters change
+    useMemo(() => { setPage(1) }, [debouncedSearch, statusTab])
 
     const handleBan = () => {
         if (!banTarget) return
@@ -169,10 +173,10 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                 />
 
                 {/* List Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {items.length === 0 && !isLoading ? (
-                            <FadeIn key="empty" className="w-full">
+                        {paginatedItems.length === 0 && !isListLoading ? (
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -186,11 +190,15 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                     } : undefined}
                                 />
                             </FadeIn>
+                        ) : isListLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
                         ) : (
                             <FadeIn key="list" className="w-full">
                                 {/* Mobile/Tablet View */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {items.map((user) => (
+                                    {paginatedItems.map((user) => (
                                         <div
                                             key={user.user_id}
                                             className="py-5 flex flex-col gap-3 cursor-pointer"
@@ -241,15 +249,15 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    <th className="py-3 px-2 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-left">Usuário</th>
-                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-left">Loja</th>
-                                                    <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Data</th>
-                                                    <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 tracking-tight text-center">Status</th>
-                                                    <th className="py-3 px-2 w-24 pr-6 rounded-r-lg bg-brand-gray dark:bg-dark-border/50 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">Ações</th>
+                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Usuário</th>
+                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-left">Loja</th>
+                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Data</th>
+                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Status</th>
+                                                    <th className="py-3 px-3 text-[13px] rounded-l-lg font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-left cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors text-center">Ações</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {items.map((user) => (
+                                                {paginatedItems.map((user) => (
                                                     <UserEnforcementListRow
                                                         key={user.user_id}
                                                         user={user}
@@ -262,11 +270,6 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                             </tbody>
                                         </table>
                                     </div>
-                                </div>
-
-                                {/* Infinite Scroll Observer */}
-                                <div ref={observerTarget} className="h-20 flex items-center justify-center">
-                                    {isLoading && <ThreeDotsLoader />}
                                 </div>
                             </FadeIn>
                         )}
@@ -348,8 +351,6 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                 user={detailUser}
                 isOpen={!!detailUser}
                 onClose={() => setDetailUser(null)}
-                onBan={setBanTarget}
-                onUnban={setUnbanTarget}
             />
         </FadeIn>
     )
@@ -363,134 +364,95 @@ interface UserDetailsSheetProps {
     user: EnforcementUser | null
     isOpen: boolean
     onClose: () => void
-    onBan: (u: EnforcementUser) => void
-    onUnban: (u: EnforcementUser) => void
 }
 
-function UserDetailsSheet({ user, isOpen, onClose, onBan, onUnban }: UserDetailsSheetProps) {
+function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-
     if (!user) return null
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32 md:pb-6">
-                {/* Header Profile */}
-                <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="w-20 h-20 rounded-full bg-brand-green/10 flex items-center justify-center border-2 border-brand-green/20">
-                        <UserIcon size={40} className="text-brand-green" />
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Usuário</h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Header Info */}
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center border border-brand-green/20">
+                        <span className="text-xl font-bold text-brand-green">
+                            {user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"}
+                        </span>
                     </div>
                     <div>
-                        <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                             {user.full_name || "Sem nome"}
                         </h3>
-                        <p className="text-sm font-medium text-brand-inactive-text opacity-70">UID: {user.user_id}</p>
+                        <p className="text-sm text-brand-inactive-text mt-1">{user.email}</p>
                     </div>
-                    {user.banned_at ? (
-                        <Badge variant="red" className="px-4 py-1.5 text-xs">USUÁRIO BANIDO</Badge>
-                    ) : (
-                        <Badge variant="green" className="px-4 py-1.5 text-xs">USUÁRIO ATIVO</Badge>
-                    )}
                 </div>
 
-                {/* Info Sections */}
-                <div className="space-y-6">
-                    {/* Contact Info */}
-                    <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest">Informações de Contato</h4>
-                        <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                            <div className="flex items-center gap-3">
-                                <MailIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">Email</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{user.email}</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <ClockIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">Membro desde</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{new Date(user.created_at).toLocaleDateString("pt-BR")}</span>
-                                </div>
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                        <div className="flex items-start gap-3">
+                            <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                            <div>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Membro desde</span>
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    {new Date(user.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </span>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Associated Partner */}
-                    <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest">Loja / Parceiro Associado</h4>
-                        {user.partner ? (
-                            <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <StoreIcon size={18} className="text-brand-inactive-text" />
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] text-brand-inactive-text font-medium">Nome da Loja</span>
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{user.partner.store_name}</span>
+                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                            <ShieldIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                            <div>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status Atual</span>
+                                {user.banned_at ? (
+                                    <div className="space-y-1">
+                                        <Badge variant="red">Banido</Badge>
+                                        <p className="text-xs text-red-600 font-medium mt-1">
+                                            Motivo: {user.banned_reason || "Não informado"}
+                                        </p>
+                                        {user.banned_until && (
+                                            <p className="text-[10px] text-brand-inactive-text">
+                                                Expira em: {new Date(user.banned_until).toLocaleDateString("pt-BR")}
+                                            </p>
+                                        )}
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                    <ShieldIcon size={18} className="text-brand-inactive-text" />
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] text-brand-inactive-text font-medium">Status da Loja</span>
-                                        <Badge variant={user.partner.is_active ? "green" : "red"}>
-                                            {user.partner.is_active ? "Ativa" : "Inativa"}
-                                        </Badge>
-                                    </div>
-                                </div>
+                                ) : (
+                                    <Badge variant="green">Ativo</Badge>
+                                )}
                             </div>
-                        ) : (
-                            <div className="p-4 text-sm text-brand-inactive-text bg-brand-gray/50 dark:bg-dark-border/10 rounded-xl border border-dashed border-brand-border">
-                                Este usuário não possui uma loja associada.
+                        </div>
+
+                        {user.partner && (
+                            <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                                <StoreIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                                <div>
+                                    <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Loja Vinculada</span>
+                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{user.partner.store_name}</span>
+                                    <span className="text-[10px] text-brand-inactive-text block opacity-70">ID: {user.partner.id}</span>
+                                </div>
                             </div>
                         )}
                     </div>
-
-                    {/* Ban History Details */}
-                    {user.banned_at && (
-                        <div className="space-y-3">
-                            <h4 className="text-[11px] font-bold text-brand-red uppercase tracking-widest">Detalhes do Banimento</h4>
-                            <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 space-y-4">
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-red font-bold">MOTIVO</span>
-                                    <p className="text-sm text-brand-dark dark:text-dark-heading mt-1">&ldquo;{user.banned_reason || "Sem motivo registrado"}&rdquo;</p>
-                                </div>
-                                <div className="flex justify-between items-center pt-4 border-t border-red-100 dark:border-red-900/20">
-                                    <div className="flex flex-col">
-                                        <span className="text-[11px] text-brand-red font-bold">DESDE</span>
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{new Date(user.banned_at).toLocaleDateString("pt-BR")}</span>
-                                    </div>
-                                    <div className="flex flex-col text-right">
-                                        <span className="text-[11px] text-brand-red font-bold">ATÉ</span>
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            {user.banned_until ? new Date(user.banned_until).toLocaleDateString("pt-BR") : "Permanente"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
-            </div>
 
-            {/* Sticky Actions */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border">
-                {user.banned_at ? (
-                    <Button
-                        variant="filled"
-                        className="w-full rounded-full h-12 text-[15px] font-bold bg-brand-green hover:bg-brand-green/90"
-                        onClick={() => onUnban(user)}
-                    >
-                        <CheckCircleIcon size={20} className="mr-2" /> Desbanir Usuário
-                    </Button>
-                ) : (
-                    <Button
-                        variant="filled"
-                        className="w-full rounded-full h-12 text-[15px] font-bold bg-brand-red hover:bg-brand-red/90"
-                        onClick={() => onBan(user)}
-                    >
-                        <AlertTriangleIcon size={20} className="mr-2" /> Banir Usuário
-                    </Button>
-                )}
+                <div className="space-y-3">
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
+                    <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-brand-inactive-text font-medium">User ID</span>
+                            <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{user.user_id}</code>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     )
@@ -510,7 +472,7 @@ function UserDetailsSheet({ user, isOpen, onClose, onBan, onUnban }: UserDetails
                 onClick={onClose}
             >
                 <div
-                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-96 overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}

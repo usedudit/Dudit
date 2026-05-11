@@ -8,10 +8,10 @@ import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, Chev
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
-import { MarketplaceFooter } from "./MarketplaceFooter"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
+import { getAvatarColor } from "@/lib/utils/UserProfileImage";
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
@@ -145,11 +145,13 @@ export function ProductDetailsPageClient({
     return {
       id: p?.id || product.partner_id || "1",
       user_id: p?.user_id,
-      store_name: p?.store_name || "Loja Parceira",
+      store_name: p?.store_name || "Vendedor da Dudit",
       city: address?.city || "Brasil",
       state: address?.state || "BR",
-      profile_image_url: p?.profile_image_url || p?.store_image_url || null,
+      profile_image_url: p?.profile_image_url || p?.store_image_url || p?.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
       banner_url: p?.banner_url || null,
+      logo_moderation_status: p?.logo_moderation_status || 'approved',
+      banner_moderation_status: p?.banner_moderation_status || 'approved',
       mp_user_id: p?.mp_user_id,
       mp_public_key: p?.mp_public_key,
       address: {
@@ -648,43 +650,52 @@ export function ProductDetailsPageClient({
       </div>
 
       {/* Store */}
-      <div className="rounded-2xl border border-brand-border overflow-hidden bg-white">
-        <Link href={getPartnerUrl(partner)} prefetch={true} className="group block">
-          <div className="relative aspect-[21/9] bg-brand-gray overflow-hidden">
-            <img src={getR2ImageUrl(partner.banner_url) || getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              alt={partner.store_name} />
-          </div>
-          <div className="px-5 pb-4 pt-0 -mt-6 relative z-10 flex gap-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white bg-white shrink-0 shadow-sm">
-              <img src={getR2ImageUrl(partner.profile_image_url) || "https://img.dudit.com.br/static/Placeholder.png"}
-                className="w-full h-full object-cover"
-                alt={partner.store_name} />
+      <div className="mb-8">
+        <Link
+          href={getPartnerUrl(partner)}
+          prefetch={true}
+          className="flex flex-col group cursor-pointer"
+        >
+          <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3">
+            <div className={`w-full h-full ${partner.banner_url && partner.banner_moderation_status === 'approved' ? '' : getAvatarColor(partner.store_name)}`}>
+              <img
+                src={partner.banner_url && partner.banner_moderation_status === 'approved'
+                  ? getR2ImageUrl(partner.banner_url)
+                  : "https://img.dudit.com.br/static/banners/DefaultBanner.png"}
+                alt={partner.store_name}
+                className={`w-full h-full ${partner.banner_url && partner.banner_moderation_status === 'approved' ? 'object-cover' : 'object-contain p-8 md:p-12 opacity-50'} transition-transform duration-500 group-hover:scale-105`}
+                loading="lazy"
+              />
             </div>
-            <div className="flex-1 pt-7">
-              <div className="flex items-center gap-2">
-                <h4 className="font-bold text-brand-dark text-[1.0625rem] group-hover:text-brand-green transition-colors leading-tight">
+            <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+          </div>
+
+          <div className="flex items-end gap-4 px-2 -mt-12 relative z-10">
+            <div className="w-20 h-20 rounded-2xl border-[3px] border-white dark:border-dark-background shadow-lg overflow-hidden bg-white shrink-0">
+              <img
+                src={(partner.logo_moderation_status === 'approved' ? partner.profile_image_url : null) || "https://img.dudit.com.br/static/Placeholder.png"}
+                alt={partner.store_name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-bold text-brand-dark text-base truncate">
                   {partner.store_name}
-                </h4>
+                </h3>
                 {partner.rating > 0 && (
-                  <div className="flex items-center gap-0.5 bg-brand-gray px-1.5 py-0.5 rounded text-[10px] font-bold text-brand-dark">
-                    <StarIcon size={10} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                    <span>{Number(partner.rating).toFixed(1)}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                    <span className="text-xs font-bold text-brand-dark">{Number(partner.rating).toFixed(1)}</span>
                   </div>
                 )}
               </div>
-              <p className="text-brand-inactive-text text-xs mt-0.5">{partner.city} - {partner.state}</p>
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                <p>{partner.city}{partner.state ? ` - ${partner.state}` : ''}</p>
+              </div>
             </div>
           </div>
         </Link>
-        <div className="px-5 pb-5 flex items-center gap-4 text-xs font-bold text-brand-dark">
-          <Link href={`/explorar?q=${partner.city}&type=lojas`} prefetch={false} className="flex items-center gap-1 hover:text-brand-green transition-colors">
-            Lojas em {partner.city} <ChevronRightIcon size={10} />
-          </Link>
-          <Link href={`/explorar?q=${partner.city}&type=produtos`} prefetch={false} className="flex items-center gap-1 hover:text-brand-green transition-colors">
-            Produtos em {partner.city} <ChevronRightIcon size={10} />
-          </Link>
-        </div>
       </div>
 
       {!isProductOwner && (
@@ -704,108 +715,7 @@ export function ProductDetailsPageClient({
     ? Object.entries(selectedVariant.attributes || {}).map(([k, v]) => `${k}: ${v}`).join(" · ")
     : null
 
-  const LightboxContent = (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
-    >
 
-      {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
-      <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
-        <button onClick={() => setIsLightboxOpen(false)}
-          className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-          <XIcon size={20} />
-        </button>
-        <span className="text-white text-sm font-semibold">
-          {lightboxActiveImg + 1}/{productImages.length}
-        </span>
-        <div className="flex items-center gap-2">
-          <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-            <HeartIcon size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* ── Desktop layout ── */}
-      <div className="hidden lg:flex flex-1 min-h-0 relative">
-        {/* Close button */}
-        <button onClick={() => setIsLightboxOpen(false)}
-          className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-          <XIcon size={22} />
-        </button>
-
-        {/* Thumbnails column */}
-        <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
-          {productImages.map((img: string, i: number) => (
-            <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
-              className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
-                ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
-              <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
-            </div>
-          ))}
-        </div>
-
-        {/* Main image */}
-        <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
-          <AnimatePresence mode="wait" custom={slideDirection}
-            onExitComplete={() => { lightboxJustOpened.current = false }}>
-            <motion.img
-              key={lightboxActiveImg}
-              src={productImages[lightboxActiveImg]}
-              className="max-w-full max-h-full object-contain"
-              alt={`Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-              custom={slideDirection}
-              variants={lightboxJustOpened.current ? {} : slideVariants}
-              initial={lightboxJustOpened.current ? false : "enter"}
-              animate="center"
-              exit={lightboxJustOpened.current ? undefined : "exit"}
-              transition={{ duration: 0.2 }}
-            />
-          </AnimatePresence>
-          {productImages.length > 1 && (
-            <>
-              <button onClick={() => lightboxNav(-1)}
-                className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                <ChevronLeftIcon size={26} />
-              </button>
-              <button onClick={() => lightboxNav(1)}
-                className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                <ChevronRightIcon size={26} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Mobile image area ── */}
-      <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
-        <AnimatePresence mode="wait" custom={slideDirection}
-          onExitComplete={() => { lightboxJustOpened.current = false }}>
-          <motion.img
-            key={lightboxActiveImg}
-            src={productImages[lightboxActiveImg]}
-            className="max-w-full max-h-full object-contain px-4"
-            alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-            custom={slideDirection}
-            variants={lightboxJustOpened.current ? {} : slideVariants}
-            initial={lightboxJustOpened.current ? false : "enter"}
-            animate="center"
-            exit={lightboxJustOpened.current ? undefined : "exit"}
-            transition={{ duration: 0.2 }}
-          />
-        </AnimatePresence>
-
-        {variantLabel && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
-            {variantLabel}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  )
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -954,7 +864,108 @@ export function ProductDetailsPageClient({
       >
 
         <AnimatePresence>
-          {isMounted && isLightboxOpen && createPortal(LightboxContent, document.body)}
+          {isMounted && isLightboxOpen && createPortal(
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
+            >
+              {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
+              <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
+                <button onClick={() => setIsLightboxOpen(false)}
+                  className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                  <XIcon size={20} />
+                </button>
+                <span className="text-white text-sm font-semibold">
+                  {lightboxActiveImg + 1}/{productImages.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                    <HeartIcon size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Desktop layout ── */}
+              <div className="hidden lg:flex flex-1 min-h-0 relative">
+                {/* Close button */}
+                <button onClick={() => setIsLightboxOpen(false)}
+                  className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                  <XIcon size={22} />
+                </button>
+
+                {/* Thumbnails column */}
+                <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
+                  {productImages.map((img: string, i: number) => (
+                    <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
+                      className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
+                        ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
+                      <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Main image */}
+                <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
+                  <AnimatePresence mode="wait" custom={slideDirection}
+                    onExitComplete={() => { lightboxJustOpened.current = false }}>
+                    <motion.img
+                      key={lightboxActiveImg}
+                      src={productImages[lightboxActiveImg]}
+                      className="max-w-full max-h-full object-contain"
+                      alt={`Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                      custom={slideDirection}
+                      variants={lightboxJustOpened.current ? {} : slideVariants}
+                      initial={lightboxJustOpened.current ? false : "enter"}
+                      animate="center"
+                      exit={lightboxJustOpened.current ? undefined : "exit"}
+                      transition={{ duration: 0.2 }}
+                    />
+                  </AnimatePresence>
+                  {productImages.length > 1 && (
+                    <>
+                      <button onClick={() => lightboxNav(-1)}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                        <ChevronLeftIcon size={26} />
+                      </button>
+                      <button onClick={() => lightboxNav(1)}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                        <ChevronRightIcon size={26} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Mobile image area ── */}
+              <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
+                <AnimatePresence mode="wait" custom={slideDirection}
+                  onExitComplete={() => { lightboxJustOpened.current = false }}>
+                  <motion.img
+                    key={lightboxActiveImg}
+                    src={productImages[lightboxActiveImg]}
+                    className="max-w-full max-h-full object-contain px-4"
+                    alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                    custom={slideDirection}
+                    variants={lightboxJustOpened.current ? {} : slideVariants}
+                    initial={lightboxJustOpened.current ? false : "enter"}
+                    animate="center"
+                    exit={lightboxJustOpened.current ? undefined : "exit"}
+                    transition={{ duration: 0.2 }}
+                  />
+                </AnimatePresence>
+
+                {variantLabel && (
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
+                    {variantLabel}
+                  </div>
+                )}
+              </div>
+            </motion.div>,
+            document.body
+          )}
         </AnimatePresence>
 
         <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
@@ -968,7 +979,7 @@ export function ProductDetailsPageClient({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-8">
 
               {/* Gallery */}
               <div className="flex gap-3 mb-6">
@@ -1043,20 +1054,20 @@ export function ProductDetailsPageClient({
                     </div>
                   </div>
 
-                  {/* Desktop Next Button */}
-                  <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                    {productImages.length > 1 && (
-                      <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
-                        <ChevronRightIcon size={20} className="text-brand-dark" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Desktop Action Buttons */}
-                  <div className="hidden lg:flex flex-col gap-3 shrink-0 self-start mt-2">
+                  {/* Desktop Right Column (Actions + Next) */}
+                  <div className="hidden lg:flex flex-col gap-6 shrink-0 items-center self-stretch py-2">
                     <button onClick={() => setIsFavorite(!isFavorite)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Favoritar">
                       <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
                     </button>
+
+                    <div className="flex-1 flex items-center">
+                      {productImages.length > 1 && (
+                        <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                          <ChevronRightIcon size={20} className="text-brand-dark" />
+                        </button>
+                      )}
+                    </div>
+
                     <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Compartilhar">
                       <ShareIcon className="w-5 h-5 text-brand-green" />
                     </button>
@@ -1170,7 +1181,7 @@ export function ProductDetailsPageClient({
             </div>
 
             {/* Desktop buy panel */}
-            <div className="hidden lg:block lg:col-span-5 relative">
+            <div className="hidden lg:block lg:col-span-4 relative">
               {BuyPanel}
             </div>
           </div>

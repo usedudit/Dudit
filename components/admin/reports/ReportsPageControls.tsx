@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Button, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger, Input } from "@/components/reusable"
 import {
     SearchIcon,
     FilterIcon,
@@ -68,19 +68,14 @@ const ReportsPageControls: React.FC<ReportsPageControlsProps> = ({
 
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-                <div className="relative flex-1 w-full">
-                    <SearchIcon
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-inactive-text"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Buscar por alvo ou reporter..."
-                        value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="w-full h-11 pl-11 pr-4 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full text-[14px] font-medium text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:border-brand-primary transition-colors"
-                    />
-                </div>
+                <Input
+                    placeholder="Buscar por alvo ou reporter..."
+                    value={search}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    variant="full-rounded"
+                    className="flex-1"
+                    prefix={<SearchIcon size={18} />}
+                />
 
                 {(hasData || hasActiveFilters) && (
                     <div className="flex items-center gap-2 w-full sm:w-auto">

@@ -12,6 +12,11 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { AuditLogRow, CursorPaginatedResult, AdminDashboardStats } from "@/lib/admin/types"
 
+// SECURITY FIX (MED-01): Sanitize wildcard chars in ILIKE queries
+function sanitizeIlike(input: string): string {
+    return input.replace(/[%_\\]/g, c => `\\${c}`)
+}
+
 // ─── Shared Enrichment Logic ──────────────────────────────────────────────────
 
 async function enrichAuditLogs(admin: any, items: AuditLogRow[]) {
@@ -89,6 +94,11 @@ export async function getAuditLogs(
 
     if (filters?.targetType && filters.targetType !== "all") {
         query = query.eq("target_type", filters.targetType)
+    }
+
+    if (filters?.search && filters.search.trim().length > 0) {
+        const sanitized = sanitizeIlike(filters.search.trim())
+        query = query.or(`admin_email.ilike.%${sanitized}%,target_id.ilike.%${sanitized}%`)
     }
 
     if (cursor) {

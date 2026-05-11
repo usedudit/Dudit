@@ -54,40 +54,23 @@ const PartnersPageControls = ({
             </div>
 
             {/* --- CONTROLS BAR --- */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-                {/* MOBILE CONTROLS */}
-                <div className="md:hidden flex items-center gap-2 w-full">
-                    <div className="flex-1 min-w-0">
-                        <Input
-                            name="search"
-                            placeholder="Buscar..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="h-[42px] w-full"
-                            variant="full-rounded"
-                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                            label=""
-                        />
-                    </div>
-                </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full px-4 md:px-8 mb-6">
+                <Input
+                    placeholder="Buscar lojas ou proprietários..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    variant="full-rounded"
+                    className="flex-1"
+                    prefix={<SearchIcon size={18} />}
+                />
 
-                {/* DESKTOP CONTROLS */}
-                <div className="hidden md:flex items-center w-full gap-4">
-                    <div className="flex items-center gap-3 shrink-0">
-                        <div className="w-80">
-                            <Input
-                                name="search"
-                                placeholder="Buscar lojas ou proprietários..."
-                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="h-[42px]"
-                                variant="full-rounded"
-                                label=""
-                            />
-                        </div>
-                    </div>
-                </div>
+                <Button
+                    variant="outline"
+                    className="w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] bg-white dark:bg-dark-surface"
+                    leftIcon={<FilterIcon size={16} />}
+                >
+                    Filtros
+                </Button>
             </div>
         </>
     )

@@ -97,7 +97,7 @@ export default function POSShippingSheet({
     setState(customerDetails.address.state || "")
   }, [customerDetails?.id])
 
-  const isDirty = 
+  const isDirty =
     zipCode !== (customerDetails?.address?.zipCode || "") ||
     street !== (customerDetails?.address?.street || "") ||
     number !== (customerDetails?.address?.number || "") ||

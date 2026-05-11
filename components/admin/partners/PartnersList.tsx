@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useRef, useCallback, useMemo } from "react"
+import { useState, useTransition, useRef, useMemo, useEffect } from "react"
 import { Button, Badge, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -9,16 +9,7 @@ import PartnerListRow from "./PartnerListRow"
 import PartnersPageControls from "./PartnersPageControls"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import {
-    StoreIcon,
-    CheckCircleIcon,
-    BlockedIcon,
-    ClockIcon,
-    AlertTriangleIcon,
-    UserIcon,
-    ShieldIcon,
-    InfoIcon
-} from "@/lib/icons"
+import { StoreIcon, ClockIcon, UserIcon, ShieldIcon, XIcon } from "@/lib/icons"
 import type { EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 import {
     getPartners,
@@ -31,7 +22,6 @@ import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityPage } from "@/hooks/use-entity-page"
-import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { toast } from "sonner"
 
 
@@ -69,7 +59,6 @@ interface PartnersListProps {
 const PartnersList = ({ initialData }: PartnersListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const observerTarget = useRef<HTMLDivElement>(null)
-    const [search, setSearch] = useState("")
     const [statusTab, setStatusTab] = useState("all")
     const [disableTarget, setDisableTarget] = useState<EnforcementPartner | null>(null)
     const [enableTarget, setEnableTarget] = useState<EnforcementPartner | null>(null)
@@ -83,35 +72,45 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
     const [detailPartner, setDetailPartner] = useState<EnforcementPartner | null>(null)
     const [isPending, startTransition] = useTransition()
 
+    // Search state
+    const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 300)
+        return () => clearTimeout(t)
+    }, [search])
+
     // ─── Entity Page ──────────────────────────────────────────────────────────
-    const fetchPageFn = useCallback(async ({ cursor }: { cursor: string | null }) => {
-        const res = await getPartners(cursor, 20, search, statusTab)
-        return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
-    }, [search, statusTab])
-
-    const dedupeKey = useCallback((p: any) => p.id, [])
-    const getDetailFn = useCallback(async () => null, [])
-
     const entityPage = useEntityPage<EnforcementPartner, any, string>({
         entityType: 'admin-partners',
         partnerId: 'admin',
-        queryKey: ['admin', 'partners', statusTab, search],
-        initialItems: (search === "" && statusTab === "all") ? initialData.data : [],
-        initialNextCursor: (search === "" && statusTab === "all") ? initialData.nextCursor : null,
-        initialHasMore: (search === "" && statusTab === "all") ? initialData.hasMore : true,
-        fetchPageFn,
-        dedupeKey,
-        getDetailFn,
+        queryKey: ['admin', 'partners', statusTab, debouncedSearch],
+        initialItems: (debouncedSearch === "" && statusTab === "all") ? initialData.data : [],
+        initialNextCursor: (debouncedSearch === "" && statusTab === "all") ? initialData.nextCursor : null,
+        initialHasMore: (debouncedSearch === "" && statusTab === "all") ? initialData.hasMore : true,
+        fetchPageFn: async ({ cursor }) => {
+            const res = await getPartners(cursor, 40, debouncedSearch, statusTab)
+            return { items: res.data, nextCursor: res.nextCursor, hasMore: res.hasMore }
+        },
+        dedupeKey: (p) => p.id,
+        getDetailFn: async () => null,
     })
 
-    const { items, hasNextPage, isFetchingNextPage, isListLoading: isLoading, fetchNextPage, afterMutation } = entityPage
+    const {
+        items: rawPartners, hasNextPage, isFetchingNextPage, isListLoading, fetchNextPage, afterMutation,
+    } = entityPage
 
-    useInfiniteScrollObserver(observerTarget, {
-        fetchNextPage,
-        hasNextPage: !!hasNextPage,
-        isFetchingNextPage,
-        enabled: true
-    })
+    // Pagination
+    const [page, setPage] = useState(1)
+    const itemsPerPage = 8
+    const totalPages = Math.ceil(rawPartners.length / itemsPerPage)
+    const paginatedItems = useMemo(() => {
+        const start = (page - 1) * itemsPerPage
+        return rawPartners.slice(start, start + itemsPerPage)
+    }, [rawPartners, page])
+
+    // Reset page when filters change
+    useMemo(() => { setPage(1) }, [debouncedSearch, statusTab])
 
     const handleDisableERP = () => {
         if (!disableTarget) return
@@ -212,10 +211,10 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 />
 
                 {/* List Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-20 md:pb-6 relative">
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 pb-24 md:pb-6 relative">
                     <AnimatePresence mode="wait">
-                        {items.length === 0 && !isLoading ? (
-                            <FadeIn key="empty" className="w-full">
+                        {paginatedItems.length === 0 && !isListLoading ? (
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[500px]">
                                 <IconPlaceholder
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
@@ -229,11 +228,15 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                     } : undefined}
                                 />
                             </FadeIn>
+                        ) : isListLoading ? (
+                            <FadeIn key="loading" className="flex items-center justify-center min-h-[500px]">
+                                <ThreeDotsLoader />
+                            </FadeIn>
                         ) : (
                             <FadeIn key="list" className="w-full">
                                 {/* Mobile/Tablet View */}
                                 <div className="md:hidden flex flex-col w-full divide-y divide-brand-border dark:divide-dark-border">
-                                    {items.map((partner) => (
+                                    {paginatedItems.map((partner) => (
                                         <div
                                             key={partner.id}
                                             className="py-5 flex flex-col gap-3 cursor-pointer"
@@ -308,7 +311,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {items.map((partner) => (
+                                                {paginatedItems.map((partner) => (
                                                     <PartnerListRow
                                                         key={partner.id}
                                                         partner={partner}
@@ -323,11 +326,6 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                             </tbody>
                                         </table>
                                     </div>
-                                </div>
-
-                                {/* Infinite Scroll Observer */}
-                                <div ref={observerTarget} className="h-20 flex items-center justify-center">
-                                    {isLoading && <ThreeDotsLoader />}
                                 </div>
                             </FadeIn>
                         )}
@@ -431,10 +429,6 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                 partner={detailPartner}
                 isOpen={!!detailPartner}
                 onClose={() => setDetailPartner(null)}
-                onSuspend={setSuspendTarget}
-                onUnsuspend={setUnsuspendTarget}
-                onEnableERP={setEnableTarget}
-                onDisableERP={setDisableTarget}
             />
         </FadeIn>
     )
@@ -448,133 +442,85 @@ interface PartnerDetailsSheetProps {
     partner: EnforcementPartner | null
     isOpen: boolean
     onClose: () => void
-    onSuspend: (p: EnforcementPartner) => void
-    onUnsuspend: (p: EnforcementPartner) => void
-    onEnableERP: (p: EnforcementPartner) => void
-    onDisableERP: (p: EnforcementPartner) => void
 }
 
-function PartnerDetailsSheet({
-    partner, isOpen, onClose, onSuspend, onUnsuspend, onEnableERP, onDisableERP
-}: PartnerDetailsSheetProps) {
+function PartnerDetailsSheet({ partner, isOpen, onClose }: PartnerDetailsSheetProps) {
     const isMobile = useMediaQuery("(max-width: 768px)")
-
     if (!partner) return null
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32 md:pb-6">
-                {/* Header Store */}
-                <div className="flex flex-col items-center text-center space-y-4">
-                    <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border-2 border-blue-100 dark:border-blue-900/30">
-                        <StoreIcon size={40} className="text-blue-600 dark:text-blue-400" />
+        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
+            {/* Header */}
+            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
+                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Parceiro</h2>
+                <Button variant="ghost" onClick={onClose} size="icon">
+                    <XIcon className="w-5 h-5" />
+                </Button>
+            </header>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* Header Info */}
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30">
+                        <StoreIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                        <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
                             {partner.store_name}
                         </h3>
-                        <p className="text-sm font-medium text-brand-inactive-text opacity-70">ID: {partner.id}</p>
-                    </div>
-
-                    <div className="flex gap-2">
-                        {partner.erp_disabled ? (
-                            <Badge variant="red" className="px-3 py-1">ERP BLOQUEADO</Badge>
-                        ) : (
-                            <Badge variant="green" className="px-3 py-1">ERP ATIVO</Badge>
-                        )}
-                        {partner.suspended_at ? (
-                            <Badge variant="orange" className="px-3 py-1">SUSPENSO</Badge>
-                        ) : (
-                            <Badge variant="green" className="px-3 py-1">MARKETPLACE OK</Badge>
-                        )}
-                    </div>
-                </div>
-
-                {/* Risk Score Card */}
-                <div className="p-5 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border flex items-center justify-between">
-                    <div className="space-y-1">
-                        <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest block">Índice de Risco</span>
-                        <p className="text-xs text-brand-inactive-text leading-tight max-w-[180px]">Calculado com base em denúncias e estornos recentes.</p>
-                    </div>
-                    <div className={`text-3xl font-black ${partner.risk_score >= 50 ? "text-brand-red" : partner.risk_score >= 20 ? "text-brand-orange" : "text-brand-green"}`}>
-                        {partner.risk_score}
-                    </div>
-                </div>
-
-                {/* Info Sections */}
-                <div className="space-y-6">
-                    {/* Owner Info */}
-                    <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest">Informações do Proprietário</h4>
-                        <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                            <div className="flex items-center gap-3">
-                                <UserIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">Responsável</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.owner_name}</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <InfoIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">User ID</span>
-                                    <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading break-all">{partner.owner_user_id}</span>
-                                </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[11px] font-bold text-brand-inactive-text">Score de Risco</span>
+                            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${partner.risk_score > 70 ? "bg-red-100 text-red-700" : partner.risk_score > 30 ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
+                                {partner.risk_score}
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Metadata */}
-                    <div className="space-y-3">
-                        <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest">Metadata do Sistema</h4>
-                        <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
-                            <div className="flex items-center gap-3">
-                                <ClockIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">Integrado em</span>
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{new Date(partner.created_at).toLocaleDateString("pt-BR")}</span>
-                                </div>
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border space-y-4">
+                        <div className="flex items-start gap-3">
+                            <UserIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                            <div>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Proprietário</span>
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{partner.owner_name}</span>
+                                <span className="text-[10px] text-brand-inactive-text block opacity-70 break-all">{partner.owner_user_id}</span>
                             </div>
-                            <div className="flex items-center gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
-                                <ShieldIcon size={18} className="text-brand-inactive-text" />
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] text-brand-inactive-text font-medium">Status de Ativação</span>
-                                    <Badge variant={partner.is_active ? "green" : "red"}>
-                                        {partner.is_active ? "Parceiro Ativo" : "Parceiro Inativo"}
-                                    </Badge>
+                        </div>
+
+                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                            <ClockIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                            <div>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Integrado em</span>
+                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    {new Date(partner.created_at).toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 pt-4 border-t border-brand-border/50 dark:border-dark-border/50">
+                            <ShieldIcon className="w-5 h-5 text-brand-inactive-text mt-0.5" />
+                            <div>
+                                <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body block">Status do Sistema</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {partner.suspended_at ? <Badge variant="red">Suspenso</Badge> : <Badge variant="green">Parceiro Ativo</Badge>}
+                                    {partner.erp_disabled ? <Badge variant="red">ERP Bloqueado</Badge> : <Badge variant="blue">ERP Ativo</Badge>}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Sticky Actions */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex flex-col gap-3">
-                <div className="flex gap-3">
-                    {partner.suspended_at ? (
-                        <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-green text-brand-green" onClick={() => onUnsuspend(partner)}>
-                            <CheckCircleIcon size={18} className="mr-2" /> Reativar
-                        </Button>
-                    ) : (
-                        <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-orange text-brand-orange" onClick={() => onSuspend(partner)}>
-                            <AlertTriangleIcon size={18} className="mr-2" /> Suspender
-                        </Button>
-                    )}
-
-                    {partner.erp_disabled ? (
-                        <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-blue text-brand-blue" onClick={() => onEnableERP(partner)}>
-                            <CheckCircleIcon size={18} className="mr-2" /> Habilitar ERP
-                        </Button>
-                    ) : (
-                        <Button variant="outline" className="flex-1 rounded-full h-12 font-bold border-brand-red text-brand-red" onClick={() => onDisableERP(partner)}>
-                            <ShieldIcon size={18} className="mr-2" /> Bloquear ERP
-                        </Button>
-                    )}
+                <div className="space-y-3">
+                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Identificação</h4>
+                    <div className="bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-brand-inactive-text font-medium">Tenant ID</span>
+                            <code className="text-xs font-bold text-brand-dark dark:text-dark-heading">{partner.id}</code>
+                        </div>
+                    </div>
                 </div>
-                <Button variant="outline" className="w-full rounded-full h-11 text-brand-inactive-text" onClick={onClose}>
-                    Fechar Detalhes
-                </Button>
             </div>
         </div>
     )
@@ -594,7 +540,7 @@ function PartnerDetailsSheet({
                 onClick={onClose}
             >
                 <div
-                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                    className={`fixed right-4 top-4 bottom-4 w-96 overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {content}
