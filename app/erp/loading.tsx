@@ -1,6 +1,5 @@
 "use client"
 
-import React from 'react'
 import ThreeDotsLoader from '@/components/reusable/ThreeDotsLoader'
 
 export default function GenericERPLoading() {

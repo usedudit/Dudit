@@ -685,8 +685,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                     {report.status === "pending" ? (
                         <div className="flex flex-col gap-3">
                             <Button
-                                variant="filled"
-                                className="w-full rounded-full h-12 text-[15px] font-bold shadow-lg shadow-brand-green/20"
+                                className="w-full h-12"
                                 onClick={() => onResolve(report)}
                             >
                                 <CheckCircleIcon size={20} className="mr-2" /> Validar Denúncia
@@ -694,14 +693,14 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                             <div className="flex gap-3">
                                 <Button
                                     variant="outline"
-                                    className="flex-1 rounded-full h-11 text-brand-inactive-text font-bold"
+                                    className="flex-1 h-12"
                                     onClick={() => onDismiss(report)}
                                 >
                                     <CancelCircleIcon size={18} className="mr-2" /> Descartar
                                 </Button>
                                 <Button
-                                    variant="outline"
-                                    className="flex-1 rounded-full h-11 text-purple-600 border-purple-200 font-bold hover:bg-purple-50"
+                                    variant="outlinered"
+                                    className="flex-1 h-12"
                                     onClick={() => onSpam(report)}
                                 >
                                     <AlertTriangleIcon size={18} className="mr-2" /> Spam
@@ -709,12 +708,12 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                             </div>
                         </div>
                     ) : report.status === "validated" ? (
-                        <Button variant="outline" className="w-full rounded-full h-12 font-bold" onClick={() => onRevert(report)}>
+                        <Button variant="outline" className="w-full h-12" onClick={() => onRevert(report)}>
                             <ReturnIcon size={20} className="mr-2" /> Reverter Validação
                         </Button>
                     ) : (
                         <div className="flex items-center justify-center p-4 text-sm text-brand-inactive-text font-bold bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/30">
-                            Status: <strong className="ml-2 uppercase tracking-widest">{report.status}</strong>
+                            Status: <strong className="ml-2">{report.status}</strong>
                         </div>
                     )}
                 </div>

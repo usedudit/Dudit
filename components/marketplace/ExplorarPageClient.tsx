@@ -3,16 +3,14 @@
 import { useState, useMemo, useRef } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { ItemCard } from "./shared-components"
+import { ItemCard, VitrineCard } from "./shared-components"
 import { Switch } from "@/components/reusable/Switch"
-import { IconPlaceholder, FormRadioGroup, Dropdown, DropdownItem, Button, FormDropdown } from "@/components/reusable"
+import { IconPlaceholder, FormRadioGroup, Button, FormDropdown } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import Link from "next/link"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
-import { ChevronDown, ChevronLeft } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
@@ -379,14 +377,9 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                                     {vitrinesDestaque.length > 0 && (
                                         <div className="mb-10">
                                             <h2 className="text-[18px] font-bold text-brand-dark mb-4 opacity-80 tracking-widest text-xs uppercase">Vitrines relacionadas</h2>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 {vitrinesDestaque.map((item) => (
-                                                    <Link key={`vitrine-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                                                        <img src={item.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-3" />
-                                                        <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
-                                                        <p className="text-xs text-brand-inactive-text truncate w-full mb-3">{item.partners?.city} - {item.partners?.state}</p>
-                                                        <span className="text-[11px] font-bold text-brand-green mt-auto bg-green-50 px-3 py-1 rounded-full uppercase tracking-wider">Ver Vitrine</span>
-                                                    </Link>
+                                                    <VitrineCard key={`vitrine-${item.id}`} vitrine={item} />
                                                 ))}
                                             </div>
                                         </div>
@@ -404,14 +397,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                                             {filteredResults.map((item) => {
                                                 if (item.itemType === 'loja') {
-                                                    return (
-                                                        <Link key={`loja-${item.id}`} href={getPartnerUrl(item.partners)} prefetch={false} className="border border-brand-border p-4 rounded-xl flex flex-col items-center text-center hover:border-brand-green transition-colors group">
-                                                            <img src={item.images?.[0] || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-20 h-20 rounded-full object-cover mb-4 shadow-sm" />
-                                                            <h3 className="font-bold text-brand-dark truncate w-full group-hover:text-brand-green transition-colors">{item.name}</h3>
-                                                            <p className="text-xs text-brand-inactive-text truncate w-full mb-4">{item.partners?.city} - {item.partners?.state}</p>
-                                                            <span className="text-sm font-bold text-brand-green mt-auto uppercase tracking-wide">Explorar Loja</span>
-                                                        </Link>
-                                                    )
+                                                    return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
                                                 }
                                                 const userCoords = userProfile?.latitude && userProfile?.longitude
                                                     ? { lat: userProfile.latitude, lng: userProfile.longitude }

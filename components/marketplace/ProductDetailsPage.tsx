@@ -14,6 +14,7 @@ import { formatCurrency } from "@/lib/utils";
 import { getAvatarColor } from "@/lib/utils/UserProfileImage";
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
+import { VitrineCard } from "./shared-components"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
@@ -651,51 +652,15 @@ export function ProductDetailsPageClient({
 
       {/* Store */}
       <div className="mb-8">
-        <Link
-          href={getPartnerUrl(partner)}
-          prefetch={true}
-          className="flex flex-col group cursor-pointer"
-        >
-          <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3">
-            <div className={`w-full h-full ${partner.banner_url && partner.banner_moderation_status === 'approved' ? '' : getAvatarColor(partner.store_name)}`}>
-              <img
-                src={partner.banner_url && partner.banner_moderation_status === 'approved'
-                  ? getR2ImageUrl(partner.banner_url)
-                  : "https://img.dudit.com.br/static/banners/DefaultBanner.png"}
-                alt={partner.store_name}
-                className={`w-full h-full ${partner.banner_url && partner.banner_moderation_status === 'approved' ? 'object-cover' : 'object-contain p-8 md:p-12 opacity-50'} transition-transform duration-500 group-hover:scale-105`}
-                loading="lazy"
-              />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-          </div>
-
-          <div className="flex items-end gap-4 px-2 -mt-12 relative z-10">
-            <div className="w-20 h-20 rounded-2xl border-[3px] border-white dark:border-dark-background shadow-lg overflow-hidden bg-white shrink-0">
-              <img
-                src={(partner.logo_moderation_status === 'approved' ? partner.profile_image_url : null) || "https://img.dudit.com.br/static/Placeholder.png"}
-                alt={partner.store_name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-bold text-brand-dark text-base truncate">
-                  {partner.store_name}
-                </h3>
-                {partner.rating > 0 && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                    <span className="text-xs font-bold text-brand-dark">{Number(partner.rating).toFixed(1)}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                <p>{partner.city}{partner.state ? ` - ${partner.state}` : ''}</p>
-              </div>
-            </div>
-          </div>
-        </Link>
+        <VitrineCard vitrine={{
+          ...partner,
+          name: partner.store_name,
+          partners: {
+            ...partner,
+            store_avatar: partner.profile_image_url
+          },
+          images: partner.banner_url ? [partner.banner_url] : []
+        }} />
       </div>
 
       {!isProductOwner && (
@@ -1017,12 +982,16 @@ export function ProductDetailsPageClient({
                         }}
                         onMouseLeave={() => zoomScale.set(1)}
                         onClick={() => openLightbox(activeImgIndex)}>
-                        <AnimatePresence mode="wait" custom={slideDirection}>
+                        <AnimatePresence mode="popLayout" custom={slideDirection}>
                           <motion.img key={activeImgIndex} src={productImages[activeImgIndex]}
-                            className="absolute inset-0 w-full h-full object-contain" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                            className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
                             custom={slideDirection} variants={slideVariants}
                             initial="enter" animate="center" exit="exit"
                             transition={{ duration: 0.2 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLightbox(activeImgIndex);
+                            }}
                             style={{ transformOrigin, scale: smoothScale }} />
                         </AnimatePresence>
                       </div>
@@ -1060,6 +1029,10 @@ export function ProductDetailsPageClient({
                       <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
                     </button>
 
+                    <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Compartilhar">
+                      <ShareIcon className="w-5 h-5 text-brand-green" />
+                    </button>
+
                     <div className="flex-1 flex items-center">
                       {productImages.length > 1 && (
                         <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
@@ -1067,10 +1040,6 @@ export function ProductDetailsPageClient({
                         </button>
                       )}
                     </div>
-
-                    <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Compartilhar">
-                      <ShareIcon className="w-5 h-5 text-brand-green" />
-                    </button>
                   </div>
                 </div>
 

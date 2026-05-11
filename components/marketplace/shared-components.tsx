@@ -126,7 +126,9 @@ interface VitrineCardProps {
 export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
     const partner = vitrine.partners || {}
     const storeAvatar = partner.store_avatar || "https://img.dudit.com.br/static/Logo.png"
-    const bannerImage = vitrine.images?.[0] || storeAvatar
+    const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
+        ? getR2ImageUrl(partner.banner_url)
+        : (vitrine.images?.[0] || storeAvatar)
     const distance = partner.distance_km_formatted || null
     const city = partner.city || ""
     const state = partner.state || ""
@@ -135,9 +137,9 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
         <Link
             href={getPartnerUrl(partner)}
             prefetch={false}
-            className="flex flex-col min-w-[280px] md:min-w-[320px] group cursor-pointer"
+            className="flex flex-col w-[280px] md:w-[320px] group cursor-pointer"
         >
-            <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3">
+            <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0">
                 <img
                     src={bannerImage}
                     alt={vitrine.name}
