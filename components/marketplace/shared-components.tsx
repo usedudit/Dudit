@@ -124,11 +124,15 @@ interface VitrineCardProps {
 }
 
 export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
-    const partner = vitrine.partners || {}
-    const storeAvatar = partner.store_avatar || partner.profile_image_url || partner.store_image_url || "https://img.dudit.com.br/static/Logo.png"
-    const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
-        ? getR2ImageUrl(partner.banner_url)
-        : (partner.banner_url || getRandomDefaultBanner())
+    // Resolve partner object (handle array or object)
+    const partner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : (vitrine.partners || vitrine)
+    const storeAvatar = getR2ImageUrl(partner.store_avatar || partner.profile_image_url || partner.store_image_url || "https://img.dudit.com.br/static/Logo.png")
+    
+    // Resolve banner logic
+    const bannerUrl = partner.banner_url || (Array.isArray(vitrine.images) ? vitrine.images[0] : null)
+    const bannerImage = (bannerUrl && partner.banner_moderation_status === 'approved')
+        ? getR2ImageUrl(bannerUrl)
+        : (bannerUrl || getRandomDefaultBanner())
     const distance = partner.distance_km_formatted || null
     const city = partner.city || ""
     const state = partner.state || ""
@@ -342,8 +346,13 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                     <div className="flex items-start gap-2 pt-1">
                         <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0 bg-gray-50 mt-0.5">
                             <img
-                                src={getR2ImageUrl(product.partners?.store_avatar || product.partners?.profile_image_url || product.partners?.store_image_url || 'https://img.dudit.com.br/static/Logo.png')}
-                                alt={product.partners?.store_name}
+                                src={getR2ImageUrl(
+                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_avatar || 
+                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.profile_image_url || 
+                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_image_url || 
+                                    'https://img.dudit.com.br/static/Logo.png'
+                                )}
+                                alt={(Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_name}
                                 className="w-full h-full object-cover"
                             />
                         </div>
@@ -351,7 +360,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {product.partners?.store_name || 'Vendedor'}
                             </p>
-                            <p className="text-[10px] text-gray-400 font-normal truncate">
+                            <p className="text-[11px] text-gray-500 font-normal truncate">
                                 {product.partners?.city ? `${product.partners.city}${product.partners.state ? ` - ${product.partners.state}` : ''}` : ''}
                                 {distance && product.partners?.city ? ' • ' : ''}
                                 {distance}

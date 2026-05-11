@@ -10,6 +10,7 @@ import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
 import { MarketplaceHeader } from "./MarketplaceHeader"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
@@ -596,7 +597,10 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
-    const partnerProfileImageUrl = getImageUrl(partner.profile_image_url || partner.storeImageUrl)
+    const partnerProfileImageUrl = getImageUrl(partner.store_avatar || partner.profile_image_url || partner.storeImageUrl)
+    const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
+        ? getImageUrl(partner.banner_url)
+        : (partner.banner_url || getRandomDefaultBanner())
     const currentTags = useMemo(
         () => ["todos", ...(activeContext === "Produtos" ? productCategories : serviceCategories)],
         [activeContext, productCategories, serviceCategories]
@@ -686,7 +690,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
             {/* Banner - rounded a partir de lg, sem margem lateral no mobile para ocupar tudo sob o header */}
             <div className="w-full h-[180px] lg:h-[220px] lg:rounded-[24px] lg:mb-4 overflow-hidden relative">
                 <img
-                    src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1400"
+                    src={bannerImage}
                     alt="Banner"
                     className="w-full h-full object-cover object-center"
                 />

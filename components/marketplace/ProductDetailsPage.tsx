@@ -70,17 +70,20 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   )
 }
 
-function ActionButtons({ className = "", onShareClick }: { className?: string, onShareClick?: () => void }) {
+function ActionButtons({ isFavorite, onFavorite, onShareClick, className = "" }: { isFavorite: boolean, onFavorite: () => void, onShareClick: () => void, className?: string }) {
   return (
-    <div className={`flex gap-2 ${className}`}>
-      <button className="w-9 h-9 lg:w-11 lg:h-11 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors">
-        <HeartIcon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-inactive-text" />
+    <div className={`flex flex-col gap-3 ${className}`}>
+      <button 
+        onClick={(e) => { e.stopPropagation(); onFavorite(); }}
+        className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray shadow-sm transition-colors"
+      >
+        <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
       </button>
       <button
-        onClick={onShareClick}
-        className="w-9 h-9 lg:w-11 lg:h-11 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors"
+        onClick={(e) => { e.stopPropagation(); onShareClick(); }}
+        className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray shadow-sm transition-colors"
       >
-        <ShareIcon className="w-4 h-4 lg:w-5 lg:h-5 text-brand-green" />
+        <ShareIcon className="w-5 h-5 text-brand-green" />
       </button>
     </div>
   )
@@ -988,10 +991,7 @@ export function ProductDetailsPageClient({
                             custom={slideDirection} variants={slideVariants}
                             initial="enter" animate="center" exit="exit"
                             transition={{ duration: 0.2 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openLightbox(activeImgIndex);
-                            }}
+                            onClick={() => openLightbox(activeImgIndex)}
                             style={{ transformOrigin, scale: smoothScale }} />
                         </AnimatePresence>
                       </div>
@@ -1007,6 +1007,14 @@ export function ProductDetailsPageClient({
                           transition={{ duration: 0.2 }}
                           onClick={() => openLightbox(activeImgIndex)} />
                       </AnimatePresence>
+
+                      <ActionButtons 
+                        isFavorite={isFavorite}
+                        onFavorite={() => setIsFavorite(!isFavorite)}
+                        onShareClick={() => setShowShareModal(true)}
+                        className="absolute top-4 right-4 z-20 lg:hidden"
+                      />
+
                       {productImages.length > 1 && (
                         <>
                           <button onClick={goToPrev}

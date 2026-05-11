@@ -183,6 +183,9 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     lng: partner.longitude,
     businessInfo: partner.business_info,
     paymentMethods: partner.payment_methods,
+    banner_url: partner.banner_url,
+    banner_moderation_status: partner.banner_moderation_status || 'approved',
+    logo_moderation_status: partner.logo_moderation_status || 'approved',
   }
 
   return (
