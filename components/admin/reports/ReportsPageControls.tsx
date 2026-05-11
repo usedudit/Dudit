@@ -1,25 +1,25 @@
 "use client"
 
 import React from "react"
-import { Button, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import { 
-    SearchIcon, 
+import { Button, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import {
+    SearchIcon,
     FilterIcon,
     ClockIcon,
     CheckCircleIcon,
     CancelCircleIcon,
     AlertTriangleIcon,
-    AllProductsIcon // Using this as a placeholder for 'All'
+    AllProductsIcon
 } from "@/lib/icons"
-import type { ReportStatus, ReportTargetType } from "@/app/actions/admin/reports"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 interface ReportsPageControlsProps {
-    statusFilter: ReportStatus | "all"
-    setStatusFilter: (status: ReportStatus | "all") => void
-    targetFilter: ReportTargetType | "all"
-    setTargetFilter: (target: ReportTargetType | "all") => void
+    activeTab: string
+    setActiveTab: (status: string) => void
     search: string
     onSearchChange: (value: string) => void
+    onOpenFilter: () => void
+    hasActiveFilters: boolean
     stats: {
         pending: number
         validated: number
@@ -29,31 +29,22 @@ interface ReportsPageControlsProps {
 }
 
 const ReportsPageControls: React.FC<ReportsPageControlsProps> = ({
-    statusFilter,
-    setStatusFilter,
-    targetFilter,
-    setTargetFilter,
+    activeTab,
+    setActiveTab,
     search,
     onSearchChange,
+    onOpenFilter,
+    hasActiveFilters,
     stats
 }) => {
-    
-    const TARGET_FILTERS = [
-        { value: "all", label: "Todos" },
-        { value: "product", label: "Produtos" },
-        { value: "service", label: "Serviços" },
-        { value: "partner", label: "Parceiros" },
-        { value: "review", label: "Avaliações" },
-    ] as const
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     return (
-        <>
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs
-                    value={statusFilter}
-                    onValueChange={(val) => setStatusFilter(val as ReportStatus | "all")}
-                >
-                    <TabsList className="px-0">
+        <div className="flex flex-col gap-4 px-4 md:px-8 mb-6">
+            {/* Tabs */}
+            <div className="w-full overflow-x-auto hide-scrollbar">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="px-0 w-max min-w-full">
                         <TabsTrigger value="pending" icon={ClockIcon}>
                             Pendentes ({stats.pending})
                         </TabsTrigger>
@@ -73,43 +64,34 @@ const ReportsPageControls: React.FC<ReportsPageControlsProps> = ({
                 </Tabs>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="w-full md:w-80">
-                        <Input
-                            name="search"
-                            placeholder="Buscar por alvo ou reporter..."
-                            value={search}
-                            onChange={(e) => onSearchChange(e.target.value)}
-                            className="h-[42px]"
-                            variant="full-rounded"
-                            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                            label=""
-                        />
-                    </div>
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                <div className="relative flex-1 w-full">
+                    <SearchIcon
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-inactive-text"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Buscar por alvo ou reporter..."
+                        value={search}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        className="w-full h-11 pl-11 pr-4 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full text-[14px] font-medium text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:border-brand-primary transition-colors"
+                    />
                 </div>
 
-                <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar w-full md:w-auto pb-2 md:pb-0">
-                    <span className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider mr-2 shrink-0">
-                        Tipo:
-                    </span>
-                    {TARGET_FILTERS.map((f) => (
-                        <Button
-                            key={f.value}
-                            variant={targetFilter === f.value ? "filled" : "ghost"}
-                            onClick={() => setTargetFilter(f.value)}
-                            className={`h-8 px-3 text-xs whitespace-nowrap rounded-full ${
-                                targetFilter === f.value 
-                                ? "bg-brand-gray text-brand-dark" 
-                                : "text-brand-inactive-text hover:bg-brand-gray/50"
-                            }`}
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button
+                        variant={hasActiveFilters ? "default" : "outline"}
+                        onClick={onOpenFilter}
+                        className={`w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] ${hasActiveFilters ? "" : "bg-white dark:bg-dark-surface"}`}
+                        leftIcon={<FilterIcon size={16} />}
+                    >
+                        Filtros
+                    </Button>
                 </div>
             </div>
-        </>
+        </div>
     )
 }
 

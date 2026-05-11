@@ -2,54 +2,50 @@
 
 import React from "react"
 import { Button, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import { 
-    ShieldIcon, 
-    CheckCircleIcon, 
-    AlertTriangleIcon,
+import {
+    ShieldIcon,
     UserIcon,
     StoreIcon,
     AllProductsIcon,
-    FilterIcon
+    FilterIcon,
+    SearchIcon,
+    SettingsIcon
 } from "@/lib/icons"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 interface AuditLogPageControlsProps {
-    actionFilter: string
-    setActionFilter: (val: string) => void
-    targetFilter: string
-    setTargetFilter: (val: string) => void
-    onApplyFilters: () => void
+    activeTab: string
+    setActiveTab: (val: string) => void
+    search: string
+    onSearchChange: (val: string) => void
+    onOpenFilter: () => void
+    hasActiveFilters: boolean
 }
 
 const AuditLogPageControls = ({
-    actionFilter,
-    setActionFilter,
-    targetFilter,
-    setTargetFilter,
-    onApplyFilters
+    activeTab,
+    setActiveTab,
+    search,
+    onSearchChange,
+    onOpenFilter,
+    hasActiveFilters
 }: AuditLogPageControlsProps) => {
-    
+    const isMobile = useMediaQuery("(max-width: 768px)")
+
     const targetTabs = [
         { value: "all", label: "Todos", icon: ShieldIcon },
         { value: "user", label: "Usuário", icon: UserIcon },
         { value: "partner", label: "Parceiro", icon: StoreIcon },
         { value: "product", label: "Produto", icon: AllProductsIcon },
-        { value: "system", label: "Sistema", icon: FilterIcon },
+        { value: "system", label: "Sistema", icon: SettingsIcon },
     ] as const
 
-    const actionOptions = [
-        { value: "all", label: "Todas as Ações" },
-        { value: "moderation.approve", label: "Aprovações" },
-        { value: "moderation.reject", label: "Rejeições" },
-        { value: "user.ban", label: "Banimentos" },
-        { value: "partner.suspend", label: "Suspensões" },
-        { value: "subscription.cancel", label: "Cancelamentos" },
-    ]
-
     return (
-        <>
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs value={targetFilter} onValueChange={(val) => { setTargetFilter(val); onApplyFilters(); }}>
-                    <TabsList className="px-0">
+        <div className="flex flex-col gap-4 px-4 md:px-8 mb-6">
+            {/* Desktop and Mobile Tabs */}
+            <div className="w-full overflow-x-auto hide-scrollbar">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="px-0 w-max min-w-full">
                         {targetTabs.map((tab) => (
                             <TabsTrigger
                                 key={tab.value}
@@ -63,29 +59,34 @@ const AuditLogPageControls = ({
                 </Tabs>
             </div>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4 md:px-8 mb-4">
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <select
-                        value={actionFilter}
-                        onChange={(e) => { setActionFilter(e.target.value); onApplyFilters(); }}
-                        className="h-[42px] px-6 rounded-full border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-border/30 text-[13px] font-bold text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green transition-all min-w-[180px] cursor-pointer"
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                <div className="relative flex-1 w-full">
+                    <SearchIcon
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-inactive-text"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Buscar log (id, motivo, email do executor)..."
+                        value={search}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        className="w-full h-11 pl-11 pr-4 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full text-[14px] font-medium text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:border-brand-primary transition-colors"
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button
+                        variant={hasActiveFilters ? "default" : "outline"}
+                        onClick={onOpenFilter}
+                        className={`w-full sm:w-auto h-11 px-6 rounded-full font-bold text-[14px] ${hasActiveFilters ? "" : "bg-white dark:bg-dark-surface"}`}
+                        leftIcon={<FilterIcon size={16} />}
                     >
-                        {actionOptions.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                    
-                    <Button 
-                        variant="outline" 
-                        onClick={onApplyFilters}
-                        className="h-[42px] px-6 rounded-full border-brand-green/20 hover:border-brand-green/40 hover:bg-brand-green/5 text-brand-green font-bold text-[13px] transition-all"
-                    >
-                        <FilterIcon size={16} className="mr-2" />
-                        Atualizar
+                        Filtros
                     </Button>
                 </div>
             </div>
-        </>
+        </div>
     )
 }
 

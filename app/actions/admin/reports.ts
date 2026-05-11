@@ -416,27 +416,24 @@ export async function getReports(
     // Batch-fetch reporter names from user_profiles (no FK between reports ↔ user_profiles).
     const reporterIds = [...new Set(items.map((r: any) => r.reporter_user_id as string))]
     const reporterNames = new Map<string, string>()
-    const reporterEmails = new Map<string, string>()
     if (reporterIds.length > 0) {
         const { data: reporters } = await supabase
             .from("user_profiles")
-            .select("user_id, full_name, email")
+            .select("user_id, full_name")
             .in("user_id", reporterIds)
         ;(reporters || []).forEach((p: any) => {
             if (p.full_name) reporterNames.set(p.user_id, p.full_name)
-            if (p.email) reporterEmails.set(p.user_id, p.email)
         })
     }
 
     const mapped: Report[] = items.map((r: any) => {
         const reporterName = reporterNames.get(r.reporter_user_id)
-        const reporterEmail = reporterEmails.get(r.reporter_user_id)
         const tname = targetNames.get(`${r.target_type}:${r.target_id}`)
         return attachReasonInfo({
             id: r.id,
             reporter_user_id: r.reporter_user_id,
             reporter_name: reporterName || "Desconhecido",
-            reporter_email: reporterEmail || "N/A",
+            reporter_email: "N/A",
             target_type: r.target_type,
             target_id: r.target_id,
             target_name: tname || r.target_id,
@@ -700,4 +697,99 @@ export async function revertReportValidation(
     })
 
     return { success: true }
+}
+
+// ─── Marketplace Moderation Actions ─────────────────────────────────────────
+
+export async function removeProductFromMarketplace(
+    productId: string,
+    reason: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    const id = sanitizeUUID(productId)
+    if (!id) return { success: false, error: "ID de produto inválido" }
+
+    const cleanReason = sanitizeString(reason, MAX_RESOLUTION_LEN)
+    if (!cleanReason || cleanReason.length < 5) {
+        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
+    }
+
+    const adminClient = getAdminClient()
+    
+    // Validate product exists
+    const { data: product, error: productError } = await adminClient
+        .from("products")
+        .select("id, partner_id, name")
+        .eq("id", id)
+        .single()
+        
+    if (productError || !product) {
+        return { success: false, error: "Produto não encontrado" }
+    }
+
+    // Update product status
+    const { error: updateError } = await adminClient
+        .from("products")
+        .update({
+            show_in_marketplace: false,
+            moderation_status: "removed",
+            moderation_reviewed_by: admin.userId,
+            moderation_reviewed_at: new Date().toISOString(),
+            moderation_reason: cleanReason,
+            deleted_reason: cleanReason,
+            deleted_by: admin.userId,
+            deleted_at: new Date().toISOString()
+        })
+        .eq("id", id)
+
+    if (updateError) {
+        console.error("[ADMIN_REPORTS] Failed to remove product from marketplace:", updateError.message)
+        return { success: false, error: "Falha ao remover produto do marketplace" }
+    }
+
+    await adminAuditLog({
+        adminUserId: admin.userId,
+        actionType: AdminActionType.REPORT_VALIDATE, // Or a custom one for product removal
+        targetType: "product",
+        targetId: id,
+        metadata: {
+            action: "removed_from_marketplace",
+            reason: cleanReason,
+            partnerId: product.partner_id,
+            productName: product.name
+        },
+    })
+
+    return { success: true }
+}
+
+export async function getAdminTargetDetails(targetType: string, targetId: string) {
+    await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const adminClient = getAdminClient()
+
+    if (targetType === "product") {
+        const { data, error } = await adminClient
+            .from("products")
+            .select("*, partner:partners(business_name, id, profile_image_url)")
+            .eq("id", targetId)
+            .single()
+        if (error || !data) return null
+        return data
+    }
+
+    if (targetType === "partner") {
+        const { data, error } = await adminClient
+            .from("partners")
+            .select("*")
+            .eq("id", targetId)
+            .single()
+        if (error || !data) return null
+        return data
+    }
+
+    return null
 }

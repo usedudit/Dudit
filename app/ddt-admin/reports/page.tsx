@@ -13,7 +13,12 @@ export default async function ReportsPage() {
     return (
         <>
             <AdminHeader pageTitle="Denúncias" />
-            <ReportsList initialData={initialData} initialStats={initialStats} />
+            <ReportsList 
+                initialData={initialData.data} 
+                initialNextCursor={initialData.nextCursor}
+                initialHasMore={initialData.hasMore}
+                initialStats={initialStats} 
+            />
         </>
     )
 }
