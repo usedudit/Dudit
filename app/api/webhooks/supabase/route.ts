@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
+import { syncPartnerItemsToExploreRedis, syncToExploreRedis, removeFromExploreRedis } from '@/lib/redis-sync'
 import { revalidateExploreSearch, revalidateProducts, revalidatePartnerProfile } from '@/lib/utils/revalidation'
 
 // Secret header to prevent unauthorized access
@@ -59,6 +59,7 @@ export async function POST(req: Request) {
             await removeFromExploreRedis(id, 'loja')
           } else if (type === 'INSERT' || type === 'UPDATE') {
             await syncToExploreRedis({ id: id, type: 'loja', data: {} })
+            await syncPartnerItemsToExploreRedis(id)
           }
         }
 

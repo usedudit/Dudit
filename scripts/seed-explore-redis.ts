@@ -102,7 +102,7 @@ async function seedRedis() {
             const globalId = `produto:${item.id}`
 
             // Salvar Data JSON
-            pipeline.set(`data:${globalId}`, JSON.stringify(produtoNormalizado))
+            pipeline.set(`data:v2:${globalId}`, JSON.stringify(produtoNormalizado))
             // Salvar no index específico
             pipeline.zadd("explore:index:produtos", { score, member: globalId })
             // Salvar no index ALL
@@ -138,7 +138,7 @@ async function seedRedis() {
             const score = new Date(item.created_at).getTime()
             const globalId = `servico:${item.id}`
 
-            pipeline.set(`data:${globalId}`, JSON.stringify(servicoNormalizado))
+            pipeline.set(`data:v2:${globalId}`, JSON.stringify(servicoNormalizado))
             pipeline.zadd("explore:index:servicos", { score, member: globalId })
             pipeline.zadd("explore:index:all", { score, member: globalId })
             
@@ -152,18 +152,21 @@ async function seedRedis() {
     console.log("Buscando Vitrines...")
     const { data: vitrines } = await supabase
         .from("partners")
-        .select(`id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)`)
+        .select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, addresses(city, state)`)
         .eq("is_active", true)
 
     if (vitrines) {
         for (const item of vitrines) {
             const vitrineNormalizada = {
                 id: item.id, name: item.store_name, description: item.store_description,
-                images: [item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
                 rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
                 partners: {
                     id: item.id, store_name: item.store_name,
                     store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    banner_url: item.banner_url || null,
+                    logo_moderation_status: item.logo_moderation_status || "approved",
+                    banner_moderation_status: item.banner_moderation_status || "approved",
                     latitude: item.latitude, longitude: item.longitude,
                     city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                 }
@@ -171,7 +174,7 @@ async function seedRedis() {
             const score = new Date(item.created_at).getTime()
             const globalId = `loja:${item.id}`
 
-            pipeline.set(`data:${globalId}`, JSON.stringify(vitrineNormalizada))
+            pipeline.set(`data:v2:${globalId}`, JSON.stringify(vitrineNormalizada))
             pipeline.zadd("explore:index:vitrines", { score, member: globalId })
             pipeline.zadd("explore:index:all", { score, member: globalId })
             

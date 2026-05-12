@@ -15,6 +15,8 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { geocodeAddress } from "@/lib/services/location.service"
+import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
+import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
 // --- CLIENTES ---
 
@@ -59,7 +61,27 @@ async function _getPartnerProfile(partnerId: string) {
     }
   }
 
+  if (data && !data.banner_url) {
+    const bannerUrl = await getDefaultPartnerBannerUrl(data.store_name || "Vendedor", data.store_image_url)
+    const { error: bannerError } = await supabase
+      .from("partners")
+      .update({ banner_url: bannerUrl, banner_moderation_status: "approved" })
+      .eq("id", partnerId)
+
+    if (!bannerError) {
+      data.banner_url = bannerUrl
+      data.banner_moderation_status = "approved"
+      await syncToExploreRedis({ id: partnerId, type: "loja", data: {}, silent: true })
+    }
+  }
+
   return data
+}
+
+async function getDefaultPartnerBannerUrl(storeName: string, storeImageUrl?: string | null) {
+  if (storeImageUrl) return getRandomDefaultBanner()
+  const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
+  return getBannerUrlByColor(getAvatarColor(storeName))
 }
 
 import { getCurrentUser } from "@/lib/auth/server-user"
@@ -315,7 +337,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, business_info, store_name, banner_url")
+    .select("user_id, business_info, store_name, store_image_url, banner_url")
     .eq("id", partnerId)
     .single()
 
@@ -381,10 +403,8 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     
     // Se o banner for removido ou for nulo, gera um padrão baseado no nome
     if (!data.bannerUrl) {
-      const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
       const storeNameForBanner = data.storeName || partnerCheck?.store_name || "Vendedor"
-      const avatarColor = getAvatarColor(storeNameForBanner)
-      updateData.banner_url = getBannerUrlByColor(avatarColor)
+      updateData.banner_url = await getDefaultPartnerBannerUrl(storeNameForBanner, data.storeImageUrl ?? partnerCheck?.store_image_url)
     } else {
       updateData.banner_url = data.bannerUrl
     }
@@ -484,6 +504,8 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
 
   await revalidatePartnerProfile(partnerId)
+  await syncToExploreRedis({ id: partnerId, type: "loja", data: {}, silent: true })
+  await syncPartnerItemsToExploreRedis(partnerId)
   revalidatePath("/erp/settings")
 
   return { success: true }
@@ -562,10 +584,7 @@ export async function registerPartner(data: any) {
       return { success: false, error: "Formato de imagem inválido (base64 não permitido)" }
     }
 
-    // Gerar banner padrão baseado no nome se não houver banner
-    const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
-    const avatarColor = getAvatarColor(data.storeName)
-    const defaultBannerUrl = getBannerUrlByColor(avatarColor)
+    const defaultBannerUrl = await getDefaultPartnerBannerUrl(data.storeName, data.storeImageUrl)
 
     const insertPartnerData = {
       user_id: userId,

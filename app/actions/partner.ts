@@ -390,10 +390,7 @@ export async function updatePartnerAction(
 
   // Redis Sync for Marketplace Vitrines
   await syncToExploreRedis({ id: partnerId, type: "loja", data: {} })
-  
-  if (isSeoSensitiveChange) {
-    await syncPartnerItemsToExploreRedis(partnerId)
-  }
+  await syncPartnerItemsToExploreRedis(partnerId)
 
   return { success: true }
 }

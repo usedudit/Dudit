@@ -29,7 +29,7 @@ export async function GET(request: Request) {
         }
 
         // 2. MGET para tentar pegar objetos completos já do Redis
-        const dataKeys = ids.map((id: string) => `data:${id}`)
+        const dataKeys = ids.map((id: string) => `data:v2:${id}`)
         const cachedObjectsRaw = await redis.mget(...dataKeys)
         
         const cachedObjects = cachedObjectsRaw.map(obj => 
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, rating, created_at, addresses(city, state)
+                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, created_at, addresses(city, state)
                     `).in("id", lojasIds)
                 )
             }
@@ -94,11 +94,14 @@ export async function GET(request: Request) {
                 if (item.store_name) { // È Partner
                     return {
                         id: item.id, name: item.store_name, description: item.store_description,
-                        images: [item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                        images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
                         rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
                         partners: {
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                            banner_url: item.banner_url || null,
+                            logo_moderation_status: item.logo_moderation_status || "approved",
+                            banner_moderation_status: item.banner_moderation_status || "approved",
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                         }
                     }
@@ -140,7 +143,7 @@ export async function GET(request: Request) {
                     const normalized = normalizeRecord(found)
                     cachedObjects[idx] = normalized
                     // Cache Aside (Lazy Update)
-                    pipeline.set(`data:${globalId}`, JSON.stringify(normalized))
+                    pipeline.set(`data:v2:${globalId}`, JSON.stringify(normalized))
                     shouldExec = true
                 }
             }

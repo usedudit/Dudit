@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check } from "@/lib/icons"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -598,16 +598,17 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
-    const partnerProfileImageUrl = getImageUrl(
-        partner.store_avatar || 
-        partner.store_image_url || 
-        partner.profile_image_url || 
-        partner.storeImageUrl || 
-        "https://img.dudit.com.br/static/Placeholder.png"
-    )
-    const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
-        ? getImageUrl(partner.banner_url)
-        : (partner.banner_url || getRandomDefaultBanner())
+    const partnerRawImage =
+        partner.store_avatar ||
+        partner.store_image_url ||
+        partner.profile_image_url ||
+        partner.storeImageUrl ||
+        null
+    const partnerProfileImageUrl = getImageUrl(partnerRawImage)
+    const fallbackBanner = partnerRawImage
+        ? getRandomDefaultBanner()
+        : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
+    const bannerImage = partner.banner_url ? getImageUrl(partner.banner_url) : fallbackBanner
     const currentTags = useMemo(
         () => ["todos", ...(activeContext === "Produtos" ? productCategories : serviceCategories)],
         [activeContext, productCategories, serviceCategories]

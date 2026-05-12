@@ -140,7 +140,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("partners")
           .select(`
-            id, store_name, store_image_url, rating, latitude, longitude, created_at, updated_at,
+            id, store_name, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, updated_at,
             addresses(city, state)
           `)
           .eq("id", id)
@@ -152,7 +152,7 @@ export async function syncToExploreRedis({
           finalData = { 
             id: dbData.id, 
             name: dbData.store_name, 
-            images: [dbData.store_image_url], 
+            images: [dbData.banner_url || dbData.store_image_url], 
             partners: { ...dbData, city, state },
             created_at: dbData.created_at,
             updated_at: dbData.updated_at

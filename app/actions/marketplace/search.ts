@@ -297,7 +297,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)
+                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, addresses(city, state)
                     `).in("id", lojasIds)
                 )
             }
@@ -313,11 +313,14 @@ async function _searchMarketplaceInternal(
                 if (item.store_name) {
                     return {
                         id: item.id, name: item.store_name, description: item.store_description,
-                        images: [item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                        images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
                         rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
                         partners: {
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+                            banner_url: item.banner_url || null,
+                            logo_moderation_status: item.logo_moderation_status || "approved",
+                            banner_moderation_status: item.banner_moderation_status || "approved",
                             latitude: item.latitude, longitude: item.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                         }, created_at: item.created_at
@@ -402,7 +405,7 @@ async function searchMarketplacePostgresFTS(
 
     try {
         if (type === 'tudo' || type === 'vitrines') {
-            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, rating, latitude, longitude, created_at, addresses(city, state)`).eq("is_active", true)
+            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, addresses(city, state)`).eq("is_active", true)
             let reqJoined = req
             if (qRaw) {
                 let orFilter = `store_name.ilike.%${qRaw}%,store_description.ilike.%${qRaw}%,store_name.ilike.%${qClean}%`
@@ -420,11 +423,14 @@ async function searchMarketplacePostgresFTS(
             if (partData) {
                 results.push(...partData.map((item: any) => ({
                     id: item.id, name: item.store_name, description: item.store_description,
-                    images: [item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                    images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
                     rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
                     partners: {
                         id: item.id, store_name: item.store_name,
                         store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                        banner_url: item.banner_url || null,
+                        logo_moderation_status: item.logo_moderation_status || "approved",
+                        banner_moderation_status: item.banner_moderation_status || "approved",
                         latitude: item.latitude, longitude: item.longitude,
                         city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                     }

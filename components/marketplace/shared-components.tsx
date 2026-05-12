@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
@@ -129,18 +129,20 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
     const storeName = partner.store_name || vitrine.name || "Vendedor"
-    const storeAvatar = getR2ImageUrl(
-        partner.store_avatar || 
-        partner.store_image_url || 
-        partner.profile_image_url || 
-        "https://img.dudit.com.br/static/Placeholder.png"
-    )
+    const rawStoreAvatar =
+        partner.store_avatar ||
+        partner.store_image_url ||
+        partner.profile_image_url ||
+        null
+    const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar) : null
+    const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
     
-    // Resolve banner logic
+    // Resolve banner logic using the same R2 URL helper used by products/logos.
     const bannerUrl = partner.banner_url || (Array.isArray(vitrine.images) ? vitrine.images[0] : null)
-    const bannerImage = (bannerUrl && partner.banner_moderation_status === 'approved')
-        ? getR2ImageUrl(bannerUrl)
-        : (bannerUrl || getRandomDefaultBanner())
+    const fallbackBanner = hasPartnerLogo
+        ? getRandomDefaultBanner()
+        : getBannerUrlByColor(getAvatarColor(storeName))
+    const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl) : fallbackBanner
     const distance = partner.distance_km_formatted || null
     const city = partner.city || ""
     const state = partner.state || ""
@@ -164,7 +166,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
             <div className="flex items-start gap-3 px-1">
                 <UserProfileImage
                     fullName={storeName}
-                    imageUrl={storeAvatar.includes("Placeholder.png") ? null : storeAvatar}
+                    imageUrl={storeAvatar && !storeAvatar.includes("Placeholder.png") ? storeAvatar : null}
                     className="w-12 h-12 border-2 border-white shrink-0 bg-white shadow-sm"
                 />
                 <div className="flex-1 min-w-0">
@@ -301,6 +303,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
     const imageUrl = getProductImageUrl(product.images)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
+    const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
+    const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
 
     return (
         <div
@@ -353,11 +357,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                     <div className="flex items-start gap-2 pt-1">
                         <UserProfileImage
                             fullName={partner?.store_name || 'Vendedor'}
-                            imageUrl={
-                                (partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url)?.includes("https://") 
-                                ? getR2ImageUrl(partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url) 
-                                : (partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url)
-                            }
+                            imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
                             className="w-6 h-6 md:w-8 md:h-8 border border-gray-100 shrink-0 bg-gray-50 mt-0.5"
                         />
                         <div className="flex flex-col min-w-0">
