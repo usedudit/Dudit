@@ -80,7 +80,7 @@ async function _getPartnerProfile(partnerId: string) {
 
 async function getDefaultPartnerBannerUrl(storeName: string, storeImageUrl?: string | null) {
   if (storeImageUrl) return getRandomDefaultBanner()
-  const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
+  const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/avatar")
   return getBannerUrlByColor(getAvatarColor(storeName))
 }
 

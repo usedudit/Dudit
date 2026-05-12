@@ -34,6 +34,7 @@ import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import type { BusinessMode } from "@/lib/business-info"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 const SELLS_OPTIONS = [
     {
@@ -150,13 +151,13 @@ export const BusinessDataSubPage = ({
         handleNavigation(onBack)
     }, [handleNavigation, onBack])
 
-    const [imagePreview, setImagePreview] = useState<string | null>(partner.store_image_url || null)
+    const [imagePreview, setImagePreview] = useState<string | null>(partner.store_image_url ? getR2ImageUrl(partner.store_image_url) : null)
     const [cropModalOpen, setCropModalOpen] = useState(false)
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const [imageUploading, setImageUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const [bannerPreview, setBannerPreview] = useState<string | null>(partner.banner_url || null)
+    const [bannerPreview, setBannerPreview] = useState<string | null>(partner.banner_url ? getR2ImageUrl(partner.banner_url) : null)
     const [bannerCropModalOpen, setBannerCropModalOpen] = useState(false)
     const [tempBannerFile, setTempBannerFile] = useState<File | null>(null)
     const [bannerUploading, setBannerUploading] = useState(false)

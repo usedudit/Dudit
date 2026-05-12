@@ -43,7 +43,10 @@ const ImageCropperModal = memo(({
 }: Props) => {
 
   const isDesktop = useMediaQuery("(min-width: 1024px)")
-  const SIZE = isDesktop ? 800 : 400
+  const isWideCrop = !!aspectRatio && aspectRatio > 1
+  const SIZE = isDesktop ? (isWideCrop ? 640 : 420) : 360
+  const cropperWidth = SIZE
+  const cropperHeight = isWideCrop ? Math.round(SIZE / aspectRatio) : SIZE
 
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -69,6 +72,7 @@ const ImageCropperModal = memo(({
   const [zoom, setZoom] = useState(1)
   const [minZoom, setMinZoom] = useState(1)
   const [rotation, setRotation] = useState(0)
+  const [imageBaseSize, setImageBaseSize] = useState<{ width: number; height: number } | null>(null)
 
   const [imagePos, setImagePos] = useState({ x: 0, y: 0 })
   const imagePosRef = useRef(imagePos)
@@ -123,20 +127,22 @@ const ImageCropperModal = memo(({
 
   const reset = () => {
 
-    setZoom(minZoom)
+    setZoom(1)
+    setMinZoom(1)
     setRotation(0)
     setImagePos({ x: 0, y: 0 })
+    setImageBaseSize(null)
 
     if (aspectRatio) {
-      let w = SIZE
-      let h = SIZE / aspectRatio
-      if (h > SIZE) {
-        h = SIZE
-        w = SIZE * aspectRatio
+      let w = cropperWidth
+      let h = cropperWidth / aspectRatio
+      if (h > cropperHeight) {
+        h = cropperHeight
+        w = cropperHeight * aspectRatio
       }
       setCrop({
-        x: (SIZE - w) / 2,
-        y: (aspectRatio > 1 ? (SIZE / aspectRatio - h) / 2 : (SIZE - h) / 2),
+        x: (cropperWidth - w) / 2,
+        y: (cropperHeight - h) / 2,
         width: w,
         height: h
       })
@@ -144,8 +150,8 @@ const ImageCropperModal = memo(({
       setCrop({
         x: 0,
         y: 0,
-        width: SIZE,
-        height: SIZE
+        width: cropperWidth,
+        height: cropperHeight
       })
     }
 
@@ -155,15 +161,20 @@ const ImageCropperModal = memo(({
 
   const onImageLoad = () => {
 
-    const rect = imgRef.current!.getBoundingClientRect()
+    const img = imgRef.current!
 
-    const needed = Math.max(
-      SIZE / rect.width,
-      SIZE / rect.height
+    const fit = Math.min(
+      cropperWidth / img.naturalWidth,
+      cropperHeight / img.naturalHeight
     )
+    const baseScale = Number.isFinite(fit) && fit > 0 ? fit : 1
 
-    setZoom(needed)
-    setMinZoom(needed * 0.5) // permite reduzir até 50%
+    setImageBaseSize({
+      width: img.naturalWidth * baseScale,
+      height: img.naturalHeight * baseScale,
+    })
+    setZoom(1)
+    setMinZoom(1)
     setImagePos({ x: 0, y: 0 })
 
   }
@@ -259,11 +270,11 @@ const ImageCropperModal = memo(({
 
       if (aspectRatio) {
         if (drag.current.type === "se" || drag.current.type === "ne" || drag.current.type === "e") {
-          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), SIZE - c.x)
+          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), cropperWidth - c.x)
           c.height = c.width / aspectRatio
           
-          if (c.y + c.height > SIZE) {
-            c.height = SIZE - c.y
+          if (c.y + c.height > cropperHeight) {
+            c.height = cropperHeight - c.y
             c.width = c.height * aspectRatio
           }
 
@@ -283,8 +294,8 @@ const ImageCropperModal = memo(({
           c.width = Math.min(desiredW, maxWidthAllowedByX)
           c.height = c.width / aspectRatio
           
-          if (c.y + c.height > SIZE) {
-            c.height = SIZE - c.y
+          if (c.y + c.height > cropperHeight) {
+            c.height = cropperHeight - c.y
             c.width = c.height * aspectRatio
           }
 
@@ -302,10 +313,10 @@ const ImageCropperModal = memo(({
             }
           }
         } else if (drag.current.type === "s") {
-          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), SIZE - c.y)
+          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), cropperHeight - c.y)
           c.width = c.height * aspectRatio
-          if (c.x + c.width > SIZE) {
-            c.width = SIZE - c.x
+          if (c.x + c.width > cropperWidth) {
+            c.width = cropperWidth - c.x
             c.height = c.width / aspectRatio
           }
         } else if (drag.current.type === "n") {
@@ -314,8 +325,8 @@ const ImageCropperModal = memo(({
           c.height = Math.min(desiredH, maxHeightAllowedByY)
           c.width = c.height * aspectRatio
           
-          if (c.x + c.width > SIZE) {
-            c.width = SIZE - c.x
+          if (c.x + c.width > cropperWidth) {
+            c.width = cropperWidth - c.x
             c.height = c.width / aspectRatio
           }
 
@@ -323,10 +334,10 @@ const ImageCropperModal = memo(({
         }
       } else {
         if (drag.current.type.includes("e"))
-          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), SIZE - c.x)
+          c.width = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.width + dx), cropperWidth - c.x)
 
         if (drag.current.type.includes("s"))
-          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), SIZE - c.y)
+          c.height = Math.min(Math.max(MIN_CROP, drag.current.initialCrop.height + dy), cropperHeight - c.y)
 
         if (drag.current.type.includes("w")) {
           const maxWidthAllowedByX = drag.current.initialCrop.x + drag.current.initialCrop.width
@@ -449,7 +460,7 @@ const ImageCropperModal = memo(({
       isOpen={isOpen}
       onClose={onClose}
       title="Recortar imagem"
-      maxWidth="4xl"
+      maxWidth={isWideCrop ? "3xl" : "2xl"}
       icon={<UploadIcon className="w-5 h-5" />}
       footer={
         <div className="flex gap-2 justify-end">
@@ -491,8 +502,8 @@ const ImageCropperModal = memo(({
         <div
           ref={containerRef}
           style={{
-            width: SIZE,
-            height: aspectRatio && aspectRatio > 1 ? SIZE / aspectRatio : SIZE,
+            width: cropperWidth,
+            height: cropperHeight,
             touchAction: "none"
           }}
           className="relative overflow-hidden border rounded-lg bg-gray-100"
@@ -520,6 +531,8 @@ const ImageCropperModal = memo(({
             crossOrigin={imageSrc.startsWith("http") ? "anonymous" : undefined}
             className="absolute top-1/2 left-1/2 transition-transform duration-200 ease-out will-change-transform select-none"
             style={{
+              width: imageBaseSize?.width,
+              height: imageBaseSize?.height,
               transform:
                 `translate(-50%,-50%)
                  translate(${imagePos.x}px,${imagePos.y}px)

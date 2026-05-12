@@ -136,7 +136,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
         null
     const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar) : null
     const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
-    
+
     // Resolve banner logic using the same R2 URL helper used by products/logos.
     const bannerUrl = partner.banner_url || (Array.isArray(vitrine.images) ? vitrine.images[0] : null)
     const fallbackBanner = hasPartnerLogo
@@ -167,7 +167,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
                 <UserProfileImage
                     fullName={storeName}
                     imageUrl={storeAvatar && !storeAvatar.includes("Placeholder.png") ? storeAvatar : null}
-                    className="w-12 h-12 border-2 border-white shrink-0 bg-white shadow-sm"
+                    className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50"
                 />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">

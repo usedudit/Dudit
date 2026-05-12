@@ -1,66 +1,8 @@
 "use client"
 
-/**
- * Generate user initials from full name
- * @param fullName - User's full name
- * @returns Two letters representing the user's initials
- */
-export function getUserInitials(fullName: string): string {
-  const names = fullName.trim().split(" ").filter(n => n.length > 0)
-  if (names.length === 0) return "?"
-  if (names.length === 1) {
-    return names[0][0].toUpperCase()
-  }
-  return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-}
+import { getAvatarColor, getUserInitials } from "@/lib/utils/avatar"
 
-/**
- * Generate a consistent background color based on user name
- * Uses hash function to ensure same name always gets same color
- * @param name - User's name
- * @returns Tailwind background color class
- */
-export const AVATAR_COLORS = [
-    "bg-red-400",
-    "bg-orange-400",
-    "bg-yellow-400",
-    "bg-green-400",
-    "bg-blue-400",
-    "bg-indigo-400",
-    "bg-purple-400",
-    "bg-pink-400",
-]
-
-/**
- * Generate a consistent background color based on user name
- * Uses hash function to ensure same name always gets same color
- * @param name - User's name
- * @returns Tailwind background color class
- */
-export function getAvatarColor(name: string): string {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-/**
- * Maps an avatar background color to a corresponding default banner URL
- * @param colorClass - The Tailwind background color class
- * @returns A URL string for the corresponding banner
- */
-export function getBannerUrlByColor(colorClass: string): string {
-  if (colorClass.includes("red")) return "https://img.dudit.com.br/static/banners/default/Red.png"
-  if (colorClass.includes("orange")) return "https://img.dudit.com.br/static/banners/default/Orange.png"
-  if (colorClass.includes("yellow")) return "https://img.dudit.com.br/static/banners/default/Yellow.png"
-  if (colorClass.includes("green")) return "https://img.dudit.com.br/static/banners/default/Green.png"
-  if (colorClass.includes("blue")) return "https://img.dudit.com.br/static/banners/default/Blue.png"
-  if (colorClass.includes("indigo") || colorClass.includes("purple")) return "https://img.dudit.com.br/static/banners/default/Purple.png"
-  if (colorClass.includes("pink")) return "https://img.dudit.com.br/static/banners/default/Pink.png"
-  return "https://img.dudit.com.br/static/banners/default/Blue.png" // Fallback
-}
+export { AVATAR_COLORS, getAvatarColor, getBannerUrlByColor, getUserInitials } from "@/lib/utils/avatar"
 
 /**
  * Avatar component using user initials and dynamic color
