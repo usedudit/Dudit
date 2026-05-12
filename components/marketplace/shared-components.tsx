@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
@@ -125,8 +126,15 @@ interface VitrineCardProps {
 
 export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
     // Resolve partner object (handle array or object)
-    const partner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : (vitrine.partners || vitrine)
-    const storeAvatar = getR2ImageUrl(partner.store_avatar || partner.profile_image_url || partner.store_image_url || "https://img.dudit.com.br/static/Logo.png")
+    const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
+    const partner = rawPartner || {}
+    const storeName = partner.store_name || vitrine.name || "Vendedor"
+    const storeAvatar = getR2ImageUrl(
+        partner.store_avatar || 
+        partner.store_image_url || 
+        partner.profile_image_url || 
+        "https://img.dudit.com.br/static/Placeholder.png"
+    )
     
     // Resolve banner logic
     const bannerUrl = partner.banner_url || (Array.isArray(vitrine.images) ? vitrine.images[0] : null)
@@ -154,17 +162,15 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
             </div>
 
             <div className="flex items-start gap-3 px-1">
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shrink-0 bg-white">
-                    <img
-                        src={storeAvatar}
-                        alt={vitrine.name}
-                        className="w-full h-full object-cover"
-                    />
-                </div>
+                <UserProfileImage
+                    fullName={storeName}
+                    imageUrl={storeAvatar.includes("Placeholder.png") ? null : storeAvatar}
+                    className="w-12 h-12 border-2 border-white shrink-0 bg-white shadow-sm"
+                />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                         <h3 className="font-bold text-brand-dark text-base truncate">
-                            {vitrine.name}
+                            {storeName}
                         </h3>
                         {(vitrine.rating ?? 0) > 0 && (
                             <div className="flex items-center gap-1 shrink-0">
@@ -294,6 +300,7 @@ interface ItemCardProps {
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
     const imageUrl = getProductImageUrl(product.images)
     const distance = product.partners?.distance_km_formatted || null
+    const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
 
     return (
         <div
@@ -344,18 +351,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                     <div className="border-t border-gray-100 my-2" />
 
                     <div className="flex items-start gap-2 pt-1">
-                        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden border border-gray-100 shrink-0 bg-gray-50 mt-0.5">
-                            <img
-                                src={getR2ImageUrl(
-                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_avatar || 
-                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.profile_image_url || 
-                                    (Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_image_url || 
-                                    'https://img.dudit.com.br/static/Logo.png'
-                                )}
-                                alt={(Array.isArray(product.partners) ? product.partners[0] : product.partners)?.store_name}
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
+                        <UserProfileImage
+                            fullName={partner?.store_name || 'Vendedor'}
+                            imageUrl={
+                                (partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url)?.includes("https://") 
+                                ? getR2ImageUrl(partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url) 
+                                : (partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url)
+                            }
+                            className="w-6 h-6 md:w-8 md:h-8 border border-gray-100 shrink-0 bg-gray-50 mt-0.5"
+                        />
                         <div className="flex flex-col min-w-0">
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">
                                 {product.partners?.store_name || 'Vendedor'}

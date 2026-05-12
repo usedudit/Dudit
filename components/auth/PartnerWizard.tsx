@@ -177,8 +177,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 return
             }
 
-            if (data.success && data.publicUrl) {
-                setPartnerData(p => ({ ...p, storeImageUrl: data.publicUrl }))
+            if (data.success && data.key) {
+                setPartnerData(p => ({ ...p, storeImageUrl: data.key }))
                 toast.success("Logo enviada com sucesso!")
             } else {
                 setImagePreview(null)

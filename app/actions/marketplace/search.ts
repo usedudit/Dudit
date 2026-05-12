@@ -39,8 +39,8 @@ export const searchMarketplaceDirect = cache(async (
 
     const sessionData = await getUserSessionData(user.id)
     const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
-      ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
-      : null
+        ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+        : null
 
     return enrichMarketplaceDistance(results || [], coords)
 })
@@ -79,8 +79,8 @@ export const searchMarketplace = async (
     const user = await getCurrentUser()
     const sessionData = user ? await getUserSessionData(user.id) : null
     const coords = sessionData?.profile?.latitude && sessionData?.profile?.longitude
-      ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
-      : null
+        ? { lat: sessionData.profile.latitude, lng: sessionData.profile.longitude }
+        : null
     const resultsWithDistance = enrichMarketplaceDistance(results || [], coords)
 
     // Normalize pagination response to the app-wide standard.
@@ -96,10 +96,10 @@ export const searchMarketplace = async (
         type === "tudo"
             ? (limits.geral ?? 40)
             : type === "vitrines"
-              ? (limits.vitrines ?? 40) // Standardizing to 40 for client searches
-              : type === "produtos"
-                ? (limits.produtos ?? 20)
-                : (limits.servicos ?? 20)
+                ? (limits.vitrines ?? 40) // Standardizing to 40 for client searches
+                : type === "produtos"
+                    ? (limits.produtos ?? 20)
+                    : (limits.servicos ?? 20)
 
     const hasMore = items.length >= limitCount && !!nextCursor
     return { items, nextCursor, hasMore }
@@ -119,41 +119,41 @@ async function _searchMarketplaceCore(
     limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
-    
+
     // Inline version read
     const tV0 = performance.now()
     let version: number = 3 // Bumping to v3 for the latitude/longitude cache format change
-    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch {}
+    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch { }
     const tV1 = performance.now()
     if (tV1 - tV0 > 1000) console.warn(`[REDIS] SLOW VERSION READ: ${(tV1 - tV0).toFixed(1)}ms`)
-    
+
     const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
     const cacheKey = `mp:cache:v${version}:ids:${safeHash}` // Specific key for IDs
-    
+
     // 1. TRY CACHE HIT (IDs only)
     if (!isPagination) {
         try {
             const tR0 = performance.now()
             const cachedIds = await redis.get<string[]>(cacheKey)
             const tR1 = performance.now()
-            
+
             if (tR1 - tR0 > 1000) console.warn(`[REDIS] SLOW ID FETCH (${cacheKey}): ${(tR1 - tR0).toFixed(1)}ms`)
             if (cachedIds && Array.isArray(cachedIds)) {
                 console.log(`[REDIS] HIT (IDs) ${cacheKey} | Fetching ${cachedIds.length} objects...`)
-                
+
                 const dataKeys = cachedIds.map(id => `data:v2:${id}`)
                 const objectsRaw = await redis.mget(...dataKeys)
-                
+
                 const objects = objectsRaw
                     .map((obj: any) => typeof obj === 'string' ? JSON.parse(obj) : obj)
                     .filter(Boolean)
-                
+
                 // If we found ALL objects in Redis, we can return immediately (Instant Update!)
                 if (objects.length === cachedIds.length) {
                     return { results: objects, filteredIds: cachedIds }
                 }
-                
+
                 console.log(`[REDIS] Partial Miss (${objects.length}/${cachedIds.length}). Falling back to Internal Search.`)
             }
         } catch (err) {
@@ -163,7 +163,7 @@ async function _searchMarketplaceCore(
 
     // 2. CACHE MISS / PARTIAL MISS: Run heavy search logic
     const { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
-    
+
     // 3. WRITE TO CACHE (IDs only)
     if (!isPagination && filteredIds && filteredIds.length > 0) {
         try {
@@ -173,7 +173,7 @@ async function _searchMarketplaceCore(
             console.error("[REDIS] Error setting ID cache", err)
         }
     }
-    
+
     return { results, filteredIds }
 }
 
@@ -279,9 +279,9 @@ async function _searchMarketplaceInternal(
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
-                    .in("id", produtosIds)
-                    .eq("is_active", true)
-                    .eq("show_in_marketplace", true)
+                        .in("id", produtosIds)
+                        .eq("is_active", true)
+                        .eq("show_in_marketplace", true)
                 )
             }
             if (servicosIds.length > 0) {
@@ -290,8 +290,8 @@ async function _searchMarketplaceInternal(
                         id, name, description, price, images, rating, category, created_at,
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
                     `)
-                    .in("id", servicosIds)
-                    .eq("is_active", true)
+                        .in("id", servicosIds)
+                        .eq("is_active", true)
                 )
             }
             if (lojasIds.length > 0) {
@@ -317,7 +317,7 @@ async function _searchMarketplaceInternal(
                         rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
                         partners: {
                             id: item.id, store_name: item.store_name,
-                            store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                            store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
                             latitude: item.latitude, longitude: item.longitude,
                             city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
                         }, created_at: item.created_at
@@ -327,7 +327,7 @@ async function _searchMarketplaceInternal(
                 const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
                 const partner = rawPartner ? {
                     ...rawPartner,
-                    store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
                     latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                     city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                 } : null

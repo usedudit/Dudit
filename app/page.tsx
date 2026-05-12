@@ -11,10 +11,10 @@ import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { searchMarketplaceDirect } from "@/app/actions/marketplace/search"
 
 export const metadata: Metadata = {
-  title: "Dudit | Encontre produtos e serviços na sua cidade",
+  title: "Dudit | Encontre produtos e serviços perto de você",
   description: "Descubra produtos, serviços e até itens para aluguel perto de você. Explore negócios locais, fale direto com vendedores e encontre tudo na sua cidade em um só lugar.",
   openGraph: {
-    title: "Dudit | Encontre produtos e serviços na sua cidade",
+    title: "Dudit | Encontre produtos e serviços perto de você",
     description: "Encontre produtos e serviços na sua cidade. Explore negócios locais e fale direto com quem vende.",
     url: "https://dudit.com.br",
     siteName: "Dudit",

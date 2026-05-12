@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check } from "@/lib/icons"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -597,7 +598,13 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
-    const partnerProfileImageUrl = getImageUrl(partner.store_avatar || partner.profile_image_url || partner.storeImageUrl)
+    const partnerProfileImageUrl = getImageUrl(
+        partner.store_avatar || 
+        partner.store_image_url || 
+        partner.profile_image_url || 
+        partner.storeImageUrl || 
+        "https://img.dudit.com.br/static/Placeholder.png"
+    )
     const bannerImage = (partner.banner_url && partner.banner_moderation_status === 'approved')
         ? getImageUrl(partner.banner_url)
         : (partner.banner_url || getRandomDefaultBanner())
@@ -694,7 +701,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                     alt="Banner"
                     className="w-full h-full object-cover object-center"
                 />
-                <div className="absolute inset-0 bg-black/10" />
+                <div className="absolute inset-0" />
             </div>
 
             <div className="container mx-auto px-0">
@@ -703,10 +710,10 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <div className="w-[60px] h-[60px] lg:w-[96px] lg:h-[96px] rounded-full overflow-hidden shrink-0 border border-brand-border bg-white z-10">
-                                <img
-                                    src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
-                                    alt={partner.storeName}
-                                    className="w-full h-full object-cover"
+                                <UserProfileImage
+                                    fullName={partner.storeName}
+                                    imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl}
+                                    className="w-full h-full"
                                 />
                             </div>
                             <div>

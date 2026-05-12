@@ -315,7 +315,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   // Verify this partner belongs to the current user
   const { data: partnerCheck } = await supabase
     .from("partners")
-    .select("user_id, business_info")
+    .select("user_id, business_info, store_name, banner_url")
     .eq("id", partnerId)
     .single()
 
@@ -329,7 +329,12 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   // Mapeamento de campos da tabela PARTNERS
   if (data.storeName) updateData.store_name = data.storeName
   if (data.storeDescription !== undefined) updateData.store_description = data.storeDescription
-  if (data.storeImageUrl !== undefined) updateData.store_image_url = data.storeImageUrl
+  if (data.storeImageUrl !== undefined) {
+    if (data.storeImageUrl && data.storeImageUrl.startsWith("data:")) {
+      return { error: "Formato de imagem inválido (base64 não permitido)" }
+    }
+    updateData.store_image_url = data.storeImageUrl
+  }
   if (data.businessType) updateData.business_type = data.businessType
   if (data.cnpj !== undefined) {
     updateData.cnpj = data.cnpj ? data.cnpj.replace(/\D/g, "") : null
@@ -369,7 +374,21 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.inscricaoMunicipal !== undefined) updateData.inscricao_municipal = data.inscricaoMunicipal
   
   // Vitrine Online
-  if (data.bannerUrl !== undefined) updateData.banner_url = data.bannerUrl
+  if (data.bannerUrl !== undefined) {
+    if (data.bannerUrl && data.bannerUrl.startsWith("data:")) {
+      return { error: "Formato de banner inválido (base64 não permitido)" }
+    }
+    
+    // Se o banner for removido ou for nulo, gera um padrão baseado no nome
+    if (!data.bannerUrl) {
+      const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
+      const storeNameForBanner = data.storeName || partnerCheck?.store_name || "Vendedor"
+      const avatarColor = getAvatarColor(storeNameForBanner)
+      updateData.banner_url = getBannerUrlByColor(avatarColor)
+    } else {
+      updateData.banner_url = data.bannerUrl
+    }
+  }
   if (data.isShowcaseActive !== undefined) updateData.is_showcase_active = data.isShowcaseActive
   if (data.category !== undefined) updateData.category = data.category
   if (data.logoModerationStatus !== undefined) updateData.logo_moderation_status = data.logoModerationStatus
@@ -539,11 +558,21 @@ export async function registerPartner(data: any) {
     }
 
     // DADOS APENAS DA TABELA PARTNERS (Sem endereço aqui!)
+    if (data.storeImageUrl && data.storeImageUrl.startsWith("data:")) {
+      return { success: false, error: "Formato de imagem inválido (base64 não permitido)" }
+    }
+
+    // Gerar banner padrão baseado no nome se não houver banner
+    const { getAvatarColor, getBannerUrlByColor } = await import("@/lib/utils/UserProfileImage")
+    const avatarColor = getAvatarColor(data.storeName)
+    const defaultBannerUrl = getBannerUrlByColor(avatarColor)
+
     const insertPartnerData = {
       user_id: userId,
       store_name: data.storeName,
       store_description: data.storeDescription || "",
       store_image_url: data.storeImageUrl,
+      banner_url: data.bannerUrl || defaultBannerUrl,
       phone: normalizePhoneToE164(sanitizedPhone),
       business_type: data.businessType,
       cnpj: data.cnpj?.replace(/\D/g, "") || null,

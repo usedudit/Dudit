@@ -47,6 +47,22 @@ export function getAvatarColor(name: string): string {
 }
 
 /**
+ * Maps an avatar background color to a corresponding default banner URL
+ * @param colorClass - The Tailwind background color class
+ * @returns A URL string for the corresponding banner
+ */
+export function getBannerUrlByColor(colorClass: string): string {
+  if (colorClass.includes("red")) return "https://img.dudit.com.br/static/banners/default/Red.png"
+  if (colorClass.includes("orange")) return "https://img.dudit.com.br/static/banners/default/Orange.png"
+  if (colorClass.includes("yellow")) return "https://img.dudit.com.br/static/banners/default/Yellow.png"
+  if (colorClass.includes("green")) return "https://img.dudit.com.br/static/banners/default/Green.png"
+  if (colorClass.includes("blue")) return "https://img.dudit.com.br/static/banners/default/Blue.png"
+  if (colorClass.includes("indigo") || colorClass.includes("purple")) return "https://img.dudit.com.br/static/banners/default/Purple.png"
+  if (colorClass.includes("pink")) return "https://img.dudit.com.br/static/banners/default/Pink.png"
+  return "https://img.dudit.com.br/static/banners/default/Blue.png" // Fallback
+}
+
+/**
  * Avatar component using user initials and dynamic color
  * @param fullName - User's full name
  * @param className - Additional CSS classes

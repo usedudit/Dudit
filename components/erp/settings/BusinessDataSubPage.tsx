@@ -211,41 +211,56 @@ export const BusinessDataSubPage = ({
 
         setIsLoading(true)
         startTransition(async () => {
+            let finalLogoUrl = generalInfo.storeImageUrl
+            let finalBannerUrl = generalInfo.bannerUrl
+
+            // 1. Upload logo if it's base64
+            if (finalLogoUrl && finalLogoUrl.startsWith("data:")) {
+                setImageUploading(true)
+                try {
+                    const blob = await (await fetch(finalLogoUrl)).blob()
+                    const ext = blob.type === "image/png" ? "png" : "jpg"
+                    const file = new File([blob], `logo.${ext}`, { type: blob.type })
+                    const formData = new FormData()
+                    formData.append("file", file)
+                    const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-logo", { method: "POST", body: formData })
+                    const data = await res.json()
+                    if (data.success && data.key) {
+                        finalLogoUrl = data.key
+                    } else {
+                        notifyError(data.error || "Erro no upload da logo")
+                        setIsLoading(false); setImageUploading(false); return
+                    }
+                } catch {
+                    notifyError("Erro no upload da logo")
+                    setIsLoading(false); setImageUploading(false); return
+                } finally { setImageUploading(false) }
+            }
+
+            // 2. Upload banner if it's base64
+            if (finalBannerUrl && finalBannerUrl.startsWith("data:")) {
+                setBannerUploading(true)
+                try {
+                    const blob = await (await fetch(finalBannerUrl)).blob()
+                    const ext = blob.type === "image/png" ? "png" : "jpg"
+                    const file = new File([blob], `banner.${ext}`, { type: blob.type })
+                    const formData = new FormData()
+                    formData.append("file", file)
+                    const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-banner", { method: "POST", body: formData })
+                    const data = await res.json()
+                    if (data.success && data.key) {
+                        finalBannerUrl = data.key
+                    } else {
+                        notifyError(data.error || "Erro no upload do banner")
+                        setIsLoading(false); setBannerUploading(false); return
+                    }
+                } catch {
+                    notifyError("Erro no upload do banner")
+                    setIsLoading(false); setBannerUploading(false); return
+                } finally { setBannerUploading(false) }
+            }
+
             try {
-                let finalLogoUrl = generalInfo.storeImageUrl
-                let finalBannerUrl = generalInfo.bannerUrl
-
-                // Upload logo if it's base64
-                if (finalLogoUrl && finalLogoUrl.startsWith("data:")) {
-                    setImageUploading(true)
-                    try {
-                        const blob = await (await fetch(finalLogoUrl)).blob()
-                        const file = new File([blob], "logo.jpg", { type: "image/jpeg" })
-                        const formData = new FormData()
-                        formData.append("file", file)
-                        const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-logo", { method: "POST", body: formData })
-                        const data = await res.json()
-                        if (data.success) finalLogoUrl = data.publicUrl
-                    } finally {
-                        setImageUploading(false)
-                    }
-                }
-
-                // Upload banner if it's base64
-                if (finalBannerUrl && finalBannerUrl.startsWith("data:")) {
-                    setBannerUploading(true)
-                    try {
-                        const blob = await (await fetch(finalBannerUrl)).blob()
-                        const file = new File([blob], "banner.jpg", { type: "image/jpeg" })
-                        const formData = new FormData()
-                        formData.append("file", file)
-                        const res = await fetchWithCSRF("/api/upload-image?uploadType=partner-banner", { method: "POST", body: formData })
-                        const data = await res.json()
-                        if (data.success) finalBannerUrl = data.publicUrl
-                    } finally {
-                        setBannerUploading(false)
-                    }
-                }
 
                 const businessInfoData = {
                     sells: generalInfo.sells,
