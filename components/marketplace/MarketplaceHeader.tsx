@@ -49,6 +49,12 @@ interface HeaderProps {
   storeSearchPlaceholder?: string
   storeSearchValue?: string
   onStoreSearchChange?: (value: string) => void
+  vendorCategoryTitle?: string | null
+  vendorCategorySearchOpen?: boolean
+  vendorCategorySearchValue?: string
+  onVendorCategorySearchChange?: (value: string) => void
+  onVendorCategorySearchOpenChange?: (open: boolean) => void
+  onVendorCategoryBack?: () => void
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -64,6 +70,12 @@ const Header: React.FC<HeaderProps> = ({
   storeSearchPlaceholder,
   storeSearchValue,
   onStoreSearchChange,
+  vendorCategoryTitle,
+  vendorCategorySearchOpen,
+  vendorCategorySearchValue,
+  onVendorCategorySearchChange,
+  onVendorCategorySearchOpenChange,
+  onVendorCategoryBack,
 }) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
 
@@ -242,7 +254,7 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     return (
-      <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isProductDetail && !isScrolled ? "bg-transparent" : "bg-brand-dark"}`}>
+      <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isProductDetail && !isScrolled && !storeSearchPlaceholder ? "bg-transparent" : "bg-brand-dark"}`}>
         {/* standard logo header only if not product detail or if scrolled */}
         {isHome && (
           <div className={`flex items-center justify-between px-4 overflow-hidden transition-all duration-300 ease-in-out ${isScrolled ? "h-0 opacity-0" : "h-[50px] opacity-100 pt-3 pb-1"}`}>
@@ -265,10 +277,12 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3 relative min-h-[40px]">
             {/* Back Button / User Icon */}
             <button
-              className={`shrink-0 z-10 w-10 h-10 flex items-center justify-center transition-all duration-300 ${isProductDetail && !(storeSearchPlaceholder && isScrolled) ? "bg-white rounded-full shadow-md" : "bg-transparent"}`}
+              className={`shrink-0 z-10 w-10 h-10 flex items-center justify-center transition-all duration-300 ${isProductDetail && !storeSearchPlaceholder ? "bg-white rounded-full shadow-md" : "bg-transparent"}`}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isHome || isProductDetail) {
+                if (vendorCategoryTitle && onVendorCategoryBack) {
+                  onVendorCategoryBack()
+                } else if (!isHome || isProductDetail) {
                   handleGoBack()
                 } else {
                   user ? setIsMobileUserMenuOpen(true) : router.push("/auth/login")
@@ -276,7 +290,7 @@ const Header: React.FC<HeaderProps> = ({
               }}
             >
               {(!isHome || isProductDetail) ? (
-                <ChevronLeftIcon size={20} className={`${storeSearchPlaceholder && isScrolled ? "text-white" : isProductDetail && !isScrolled ? "text-brand-dark" : isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
+                <ChevronLeftIcon size={20} className={`${storeSearchPlaceholder ? "text-white" : isProductDetail && !isScrolled ? "text-brand-dark" : isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
               ) : user ? (
                 <img
                   src="https://img.dudit.com.br/static/Placeholder.png"
@@ -294,8 +308,24 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Middle Section: Search or Product Name */}
             <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
-              {isProductDetail && storeSearchPlaceholder ? (
-                <div className={`bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200 transition-all duration-300 ${isScrolled ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              {isProductDetail && vendorCategoryTitle ? (
+                <div className="relative w-full h-[38px] overflow-visible">
+                  <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${vendorCategorySearchOpen ? "opacity-0 -translate-x-6 pointer-events-none" : "opacity-100 translate-x-0"}`}>
+                    <h1 className="text-white font-bold text-[15px] truncate px-2">{vendorCategoryTitle}</h1>
+                  </div>
+                  <div className={`absolute inset-y-0 right-0 z-20 bg-white rounded-full flex items-center px-4 border border-gray-200 transition-all duration-300 ease-out ${vendorCategorySearchOpen ? "-left-[52px] opacity-100" : "left-full opacity-0 pointer-events-none"}`}>
+                    <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder={`Buscar em ${vendorCategoryTitle}`}
+                      className="bg-transparent border-none outline-none text-brand-dark text-[14px] w-full placeholder-gray-400 font-normal py-0"
+                      value={vendorCategorySearchValue ?? ""}
+                      onChange={(e) => onVendorCategorySearchChange?.(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : isProductDetail && storeSearchPlaceholder ? (
+                <div className="bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200 transition-all duration-300 opacity-100">
                   <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
                   <input
                     type="text"
@@ -328,8 +358,25 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Right Section: Actions (Share/Favorite) or Cart */}
             <div className="flex items-center gap-2 shrink-0 z-10">
-              {isProductDetail && storeSearchPlaceholder ? (
-                <div className="w-1" />
+              {isProductDetail && vendorCategoryTitle ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onVendorCategorySearchOpenChange?.(!vendorCategorySearchOpen)
+                  }}
+                  className="w-10 h-10 flex items-center justify-center text-white"
+                >
+                  {vendorCategorySearchOpen ? <span className="text-[22px] leading-none">×</span> : <SearchIcon size={20} />}
+                </button>
+              ) : isProductDetail && storeSearchPlaceholder ? (
+                onShare ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+                    className="w-10 h-10 flex items-center justify-center text-white"
+                  >
+                    <ShareIcon size={20} />
+                  </button>
+                ) : <div className="w-1" />
               ) : isProductDetail ? (
                 <>
                   {onShare && (

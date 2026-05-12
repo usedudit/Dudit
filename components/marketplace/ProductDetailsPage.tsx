@@ -72,18 +72,20 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 function ActionButtons({ isFavorite, onFavorite, onShareClick, className = "" }: { isFavorite: boolean, onFavorite: () => void, onShareClick: () => void, className?: string }) {
     return (
         <div className={`flex flex-col gap-3 ${className}`}>
-            <button
+            <Button
+                variant="filled"
                 onClick={(e) => { e.stopPropagation(); onFavorite(); }}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray shadow-sm transition-colors"
+                className="w-10 h-10 flex items-center justify-center"
             >
                 <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
-            </button>
-            <button
+            </Button>
+            <Button
+                variant="filled"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray shadow-sm transition-colors"
+                className="w-10 h-10 flex items-center justify-center"
             >
                 <ShareIcon className="w-5 h-5 text-brand-green" />
-            </button>
+            </Button>
         </div>
     )
 }
@@ -694,11 +696,11 @@ export function ProductDetailsPageClient({
             >
                 <div className="flex flex-col">
                     {/* Header with Dual Squares */}
-                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden" 
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden"
                         style={{ background: 'linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)' }}>
-                        <img 
-                            src="https://img.dudit.com.br/static/icons/Pagamento.png" 
-                            alt="Pagamento" 
+                        <img
+                            src="https://img.dudit.com.br/static/icons/Pagamento.png"
+                            alt="Pagamento"
                             className="w-64 h-auto object-contain transform translate-y-6"
                         />
                     </div>
@@ -890,14 +892,14 @@ export function ProductDetailsPageClient({
                                     </AnimatePresence>
                                     {productImages.length > 1 && (
                                         <>
-                                            <button onClick={() => lightboxNav(-1)}
-                                                className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                            <Button variant="filled" onClick={() => lightboxNav(-1)}
+                                                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
                                                 <ChevronLeftIcon size={26} />
-                                            </button>
-                                            <button onClick={() => lightboxNav(1)}
-                                                className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                            </Button>
+                                            <Button variant="filled" onClick={() => lightboxNav(1)}
+                                                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
                                                 <ChevronRightIcon size={26} />
-                                            </button>
+                                            </Button>
                                         </>
                                     )}
                                 </div>
