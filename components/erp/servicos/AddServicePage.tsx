@@ -240,7 +240,9 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const [blockedImages, setBlockedImages] = useState<Set<number>>(new Set())
 
     const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) { setSelectedImageForCrop(e.target.files[0]); setShowImageCropper(true) }
+        const file = e.target.files?.[0]
+        e.currentTarget.value = ""
+        if (file) { setSelectedImageForCrop(file); setShowImageCropper(true) }
     }, [])
 
     const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {

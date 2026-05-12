@@ -1,12 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check } from "@/lib/icons"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, Package } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { getProductUrl } from "@/lib/utils/url-generator"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
@@ -16,25 +13,11 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
-import { useTransitionDirection } from "@/providers/transition-provider"
-import { ShoppingBagIcon } from "@/lib/icons"
+import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button } from "@/components/reusable/Button"
-import { PackageIcon } from "lucide-react"
-import { DefaultModal } from "@/components/reusable"
+import { Button, DefaultModal, Input } from "@/components/reusable"
+import { ItemCard } from "./shared-components"
 
-const AVAILABLE_BRANDS = [
-    { id: "american_express", label: "American Express", image: "https://img.dudit.com.br/static/icons/payments/Amex.png" },
-    { id: "diners", label: "Diners Club", image: "https://img.dudit.com.br/static/icons/payments/Diners.png" },
-    { id: "discover", label: "Discover", image: "https://img.dudit.com.br/static/icons/payments/Discover.png" },
-    { id: "elo", label: "Elo", image: "https://img.dudit.com.br/static/icons/payments/Elo.png" },
-    { id: "hipercard", label: "Hipercard", image: "https://img.dudit.com.br/static/icons/payments/Hipercard.png" },
-    { id: "jcb", label: "JCB", image: "https://img.dudit.com.br/static/icons/payments/JCB.png" },
-    { id: "mastercard", label: "Mastercard", image: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" },
-    { id: "visa", label: "Visa", image: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
-]
-
-// --- TYPES ---
 interface VendorPageClientProps {
     partner: any
     products: any[]
@@ -44,77 +27,82 @@ interface VendorPageClientProps {
     ratingDistribution: { star: number; count: number }[]
     productCategories: string[]
     serviceCategories: string[]
+    coupons?: any[]
     userProfile?: any
     cartCount?: number
-}
-
-// --- CONSTANTS ---
-const SORT_OPTIONS = ["Mais recentes", "Mais vendidos", "Preço: menor para maior", "Preço: maior para menor"]
-
-const SORT_STRATEGIES: Record<string, (a: any, b: any) => number> = {
-    "Mais recentes": (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    "Mais vendidos": (a, b) => (b.sales_count || 0) - (a.sales_count || 0),
-    "Preço: menor para maior": (a, b) => (a.promotional_price || a.price) - (b.promotional_price || b.price),
-    "Preço: maior para menor": (a, b) => (b.promotional_price || b.price) - (a.promotional_price || a.price),
 }
 
 const getImageUrl = (path?: string | null) => getR2ImageUrl(path)
 
 const formatJoinDate = (createdAt: string | Date) => {
     const month = formatMonth(createdAt)
-    const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1)
-    return `Entrou em ${capitalizedMonth} de ${formatYear(createdAt)}`
+    return `Entrou em ${month.charAt(0).toUpperCase() + month.slice(1)} de ${formatYear(createdAt)}`
 }
 
 const openWhatsApp = (phone?: string, storeName?: string) => {
     const cleaned = phone?.replace(/\D/g, "") ?? ""
     const number = cleaned.startsWith("55") ? cleaned : `55${cleaned}`
-    const text = encodeURIComponent(`Olá, ${storeName || "tudo bem"}! Vi sua loja na Dudit e gostaria de saber mais. 😊`)
+    const text = encodeURIComponent(`Ola, ${storeName || "tudo bem"}! Vi sua loja na Dudit e gostaria de saber mais.`)
     window.open(`https://wa.me/${number}?text=${text}`, "_blank")
 }
 
-const formatOpeningHoursList = (hours: any) => {
-    if (typeof hours === 'string') return [];
-    if (!hours || typeof hours !== 'object' || Object.keys(hours).length === 0) {
-        return [];
+const normalizeItemForCard = (item: any, partner: any) => {
+    const price = (!item.promotional_price && item.fallback_variant_price)
+        ? item.fallback_variant_price
+        : (item.promotional_price || item.price || 0)
+
+    return {
+        ...item,
+        price,
+        originalPrice: item.promotional_price ? item.price : undefined,
+        images: item.images?.length ? item.images : item.fallback_variant_image ? [item.fallback_variant_image] : item.images,
+        partners: {
+            store_name: partner.storeName,
+            store_avatar: partner.storeImageUrl,
+            profile_image_url: partner.profile_image_url,
+            city: partner.city,
+            state: partner.state,
+            distance_km_formatted: partner.distance_km_formatted,
+        },
     }
-    const normalizedHours = normalizeOpeningHours(hours)
+}
 
-    const daysMap: Record<string, string> = {
-        monday: "Segunda-feira",
-        tuesday: "Terça-feira",
-        wednesday: "Quarta-feira",
-        thursday: "Quinta-feira",
-        friday: "Sexta-feira",
-        saturday: "Sábado",
-        sunday: "Domingo"
-    };
+const normalizeCategory = (category?: string | null) => (category || "Outros").trim()
+const categoryId = (category: string) => category.toLowerCase()
 
-    const currentDayIndex = new Date().getDay();
-    const daysKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const currentDayKey = daysKeys[currentDayIndex];
+const formatCouponValue = (coupon: any) => {
+    if (coupon.discount_type === "free_shipping") return "Frete gratis"
+    if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}% OFF`
+    return `${formatCurrency(Number(coupon.discount_value || 0))} OFF`
+}
 
-    return Object.entries(normalizedHours)
-        .sort((a, b) => {
-            const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-            return order.indexOf(a[0]) - order.indexOf(b[0]);
-        })
-        .map(([key, value]: [string, any]) => {
-            const dayName = daysMap[key] || key;
-            const isCurrentDay = key === currentDayKey;
-            const timeString = value?.enabled ? `${value.from} - ${value.to}` : "Fechado";
-            return { dayName, timeString, isCurrentDay };
-        });
-};
+const couponScopeLabel = (scope?: string) => {
+    if (scope === "products") return "Produtos selecionados"
+    if (scope === "services") return "Servicos selecionados"
+    if (scope === "categories") return "Categorias selecionadas"
+    return "Toda a loja"
+}
 
-// --- SUB-COMPONENTS ---
+const RatingInline = ({ rating, reviewsCount }: { rating: number; reviewsCount: number }) => (
+    <div className="flex items-center gap-1.5 text-[12px] lg:text-[13px] text-brand-dark">
+        <StarIcon size={14} className="text-brand-green fill-brand-green" />
+        {reviewsCount > 0 && rating > 0 ? (
+            <>
+                <span className="font-semibold">{formatNumber(rating, 1, 1)}</span>
+                <span className="text-brand-inactive-text">({reviewsCount} avaliacoes)</span>
+            </>
+        ) : (
+            <span className="text-brand-inactive-text">Sem avaliacoes</span>
+        )}
+    </div>
+)
 
 const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
     <div className="flex items-center justify-between mb-8">
         <StatItem
-            value={rating > 0 ? formatNumber(rating, 1, 1) : "-"}
-            label="Avaliação"
-            icon={rating > 0 ? <StarIcon size={14} fill="brand-green" className="text-brand-green" /> : null}
+            value={reviewsCount > 0 && rating > 0 ? formatNumber(rating, 1, 1) : "Sem avaliacoes"}
+            label="Avaliacao"
+            icon={<StarIcon size={14} className="text-brand-green fill-brand-green" />}
         />
         <div className="w-[1px] h-8 bg-brand-border" />
         <StatItem value={sales >= 1000 ? `${formatNumber(sales / 1000, 1, 1)}k` : sales} label="Vendas" />
@@ -124,45 +112,37 @@ const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
 )
 
 const StatItem = ({ value, label, icon }: any) => (
-    <div className="flex flex-col items-center flex-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-[16px] font-semibold text-brand-dark">{value}</span>
+    <div className="flex flex-col items-center flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
             {icon}
+            <span className="text-[14px] lg:text-[16px] font-semibold text-brand-dark truncate">{value}</span>
         </div>
-        <span className="text-[11px] text-brand-inactive-text font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] text-brand-inactive-text font-medium uppercase">{label}</span>
     </div>
 )
 
-const ProductCard = ({ item, partner }: { item: any; partner: any }) => {
-    const displayImage = item.images?.[0] ?? item.fallback_variant_image ?? null
-    const displayPrice = (!item.promotional_price && item.fallback_variant_price)
-        ? item.fallback_variant_price
-        : (item.promotional_price || item.price)
-
-    return (
-        <Link href={getProductUrl(item, partner)} prefetch={false} className="group cursor-pointer">
-            <div className="relative mb-3 overflow-hidden rounded-[16px]">
-                <div className="relative w-full aspect-square">
-                    <img
-                        src={getImageUrl(displayImage) || "https://img.dudit.com.br/static/Placeholder.png"}
-                        alt={item.name}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                </div>
-            </div>
-            <div className="px-1">
-                <h3 className="text-[14px] font-normal text-brand-dark mb-1 group-hover:text-brand-green transition-colors line-clamp-2">
-                    {item.name}
-                </h3>
-                <span className="text-[16px] font-bold text-brand-dark">
-                    {formatCurrency(displayPrice)}
-                </span>
-            </div>
-        </Link>
-    )
+const formatOpeningHoursList = (hours: any) => {
+    if (typeof hours === "string" || !hours || typeof hours !== "object") return []
+    const normalizedHours = normalizeOpeningHours(hours)
+    const daysMap: Record<string, string> = {
+        monday: "Segunda-feira",
+        tuesday: "Terca-feira",
+        wednesday: "Quarta-feira",
+        thursday: "Quinta-feira",
+        friday: "Sexta-feira",
+        saturday: "Sabado",
+        sunday: "Domingo",
+    }
+    const currentDayKey = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][new Date().getDay()]
+    return Object.entries(normalizedHours)
+        .sort((a, b) => ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].indexOf(a[0]) - ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].indexOf(b[0]))
+        .map(([key, value]: [string, any]) => ({
+            dayName: daysMap[key] || key,
+            timeString: value?.enabled ? `${value.from} - ${value.to}` : "Fechado",
+            isCurrentDay: key === currentDayKey,
+        }))
 }
 
-// Componente de Mapa utilizando Mapbox para melhor performance e estética
 const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; name?: string; address?: string }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<any>(null)
@@ -171,20 +151,13 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
     useEffect(() => {
         let cancelled = false
         const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-
         const initMap = async () => {
             if (cancelled || !mapContainerRef.current || !token) return
-
+            if (!lat || !lng || isNaN(Number(lat))) {
+                setIsMapping(false)
+                return
+            }
             try {
-                let finalLat = lat
-                let finalLng = lng
-
-                // Never geocode during page rendering; coordinates must already be persisted.
-                if (!finalLat || !finalLng || isNaN(Number(finalLat))) {
-                    setIsMapping(false)
-                    return
-                }
-                // Carrega CSS do Mapbox se necessário
                 if (!document.getElementById("mapbox-gl-css")) {
                     const link = document.createElement("link")
                     link.id = "mapbox-gl-css"
@@ -192,8 +165,6 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
                     link.href = "https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css"
                     document.head.appendChild(link)
                 }
-
-                // Carrega JS do Mapbox se necessário
                 if (!(window as any).mapboxgl) {
                     await new Promise((resolve, reject) => {
                         const script = document.createElement("script")
@@ -204,108 +175,45 @@ const MapboxMap = ({ lat, lng, name, address }: { lat?: number; lng?: number; na
                         document.head.appendChild(script)
                     })
                 }
-
                 if (cancelled || !mapContainerRef.current) return
-
                 const mapboxgl = (window as any).mapboxgl
                 mapboxgl.accessToken = token
-
-                // Inicializa o mapa com as coordenadas finais (geocodificadas ou passadas)
                 mapRef.current = new mapboxgl.Map({
                     container: mapContainerRef.current,
                     style: "mapbox://styles/mapbox/light-v11",
-                    center: [finalLng, finalLat],
+                    center: [lng, lat],
                     zoom: 15,
                     attributionControl: false,
                 })
-
-                // Adiciona marcador customizado
-                const marker = new mapboxgl.Marker({ color: "#059669" })
-                    .setLngLat([finalLng, finalLat])
-                    .addTo(mapRef.current)
-
-                // Adiciona Popup informativo
+                const marker = new mapboxgl.Marker({ color: "#059669" }).setLngLat([lng, lat]).addTo(mapRef.current)
                 if (name || address) {
-                    const popupContent = `
-            <div style="padding: 4px; font-family: system-ui, -apple-system, sans-serif;">
-              <h4 style="margin: 0 0 2px 0; font-size: 14px; font-weight: 700; color: #111827;">${name}</h4>
-              ${address ? `<p style="margin: 0; font-size: 12px; color: #4B5563; line-height: 1.4;">${address}</p>` : ""}
-            </div>
-          `
-                    const popup = new mapboxgl.Popup({ offset: 35, closeButton: false })
-                        .setHTML(popupContent)
-
-                    marker.setPopup(popup)
-
-                    // Abre o popup por padrão em telas maiores para facilitar a localização
-                    if (window.innerWidth > 1024) {
-                        marker.togglePopup()
-                    }
+                    marker.setPopup(new mapboxgl.Popup({ offset: 35, closeButton: false }).setHTML(`<div style="padding:4px;font-family:system-ui,sans-serif"><strong>${name}</strong><p style="margin:2px 0 0;font-size:12px;color:#4B5563">${address || ""}</p></div>`))
                 }
-
-            } catch (err) {
-                console.error("Mapbox initialization error:", err)
+            } catch {
+                setIsMapping(false)
             }
         }
-
         initMap()
-
         return () => {
             cancelled = true
-            if (mapRef.current) {
-                mapRef.current.remove()
-            }
+            mapRef.current?.remove()
         }
-    }, [lat, lng, address])
+    }, [lat, lng, name, address])
 
     if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
-        return (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center">
-                <p className="text-[12px] text-brand-inactive-text">Localização indisponível no mapa.</p>
-            </div>
-        )
+        return <div className="w-full h-full bg-gray-100 flex items-center justify-center p-4 text-center text-[12px] text-brand-inactive-text">Localizacao indisponivel no mapa.</div>
     }
-
     return <div ref={mapContainerRef} className="w-full h-full bg-gray-100" />
 }
 
-const InfoTab = ({ partner, stats }: any) => {
-    const hasDescription = Boolean(partner.storeDescription)
+const InfoTab = ({ partner, stats, onWhatsApp, showContact }: any) => {
     const hoursList = formatOpeningHoursList(partner.openingHours)
-    const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false)
-
-    // Extrai métodos de pagamento
     const paymentMethodsArr = partner.paymentMethods || []
-
-    const hasPix = paymentMethodsArr.some((pm: any) => pm.type === "pix" && pm.is_active)
-    const hasCash = paymentMethodsArr.some((pm: any) => pm.type === "cash" && pm.is_active)
-
-    const creditMethods = paymentMethodsArr.filter((pm: any) => pm.type === "credit_card" && pm.is_active)
-    const debitMethods = paymentMethodsArr.filter((pm: any) => pm.type === "debit_card" && pm.is_active)
-
-    const hasCredit = creditMethods.length > 0
-    const hasDebit = debitMethods.length > 0
-
-    const getUniqueBrands = (methods: any[]) => {
-        const all = methods.flatMap((pm: any) =>
-            (pm.card_brand || "").split(";").map((b: string) => b.trim().toLowerCase()).filter(Boolean)
-        )
-        return Array.from(new Set(all))
-    }
-
-    const creditoBrands = getUniqueBrands(creditMethods)
-    const debitoBrands = getUniqueBrands(debitMethods)
-
-    const hasMercadoPago = partner.businessInfo?.mercado_pago_connected || false
-
-    const displayPaymentIcons = []
-    if (hasPix) displayPaymentIcons.push({ id: "pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" })
-    if (hasCash) displayPaymentIcons.push({ id: "dinheiro", icon: "https://img.dudit.com.br/static/icons/payments/Dinheiro.png" })
-    if (hasCredit || hasDebit) {
-        displayPaymentIcons.push({ id: "mastercard", icon: "https://img.dudit.com.br/static/icons/payments/Mastercard.png" })
-        displayPaymentIcons.push({ id: "visa", icon: "https://img.dudit.com.br/static/icons/payments/Visa.png" })
-    }
-    if (hasMercadoPago) displayPaymentIcons.push({ id: "mercadopago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png" })
+    const paymentIcons = [
+        paymentMethodsArr.some((pm: any) => pm.type === "pix" && pm.is_active) && { id: "pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" },
+        paymentMethodsArr.some((pm: any) => pm.type === "cash" && pm.is_active) && { id: "dinheiro", icon: "https://img.dudit.com.br/static/icons/payments/Dinheiro.png" },
+        paymentMethodsArr.some((pm: any) => ["credit_card", "debit_card"].includes(pm.type) && pm.is_active) && { id: "visa", icon: "https://img.dudit.com.br/static/icons/payments/Visa.png" },
+    ].filter(Boolean) as Array<{ id: string; icon: string }>
 
     return (
         <div className="pb-10 space-y-8 animate-fade-in">
@@ -314,7 +222,7 @@ const InfoTab = ({ partner, stats }: any) => {
                 <div className="h-[1px] bg-brand-border w-full mb-8" />
             </div>
 
-            {hasDescription && (
+            {partner.storeDescription && (
                 <>
                     <div>
                         <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Sobre {partner.storeName}</h3>
@@ -324,20 +232,31 @@ const InfoTab = ({ partner, stats }: any) => {
                 </>
             )}
 
-            {displayPaymentIcons.length > 0 && (
+            <div>
+                <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Informacoes</h3>
+                <div className="space-y-3 text-[14px] text-brand-inactive-text">
+                    <p>{partner.city}, {partner.state}</p>
+                    {partner.neighborhood && <p>{partner.neighborhood}</p>}
+                </div>
+                {showContact && (
+                    <Button variant="filled" onClick={onWhatsApp} className="mt-5 rounded-full h-11 px-5 gap-2">
+                        <WhatsappIcon size={18} /> Contato
+                    </Button>
+                )}
+            </div>
+            <div className="h-[1px] bg-brand-border w-full" />
+
+            {paymentIcons.length > 0 && (
                 <>
                     <div>
                         <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Formas de pagamento</h3>
-                        <div className="flex items-center gap-2 mb-3 overflow-x-auto hide-scrollbar">
-                            {displayPaymentIcons.map(pm => (
+                        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                            {paymentIcons.map(pm => (
                                 <div key={pm.id} className="w-[42px] h-[30px] rounded-[4px] border border-brand-border bg-white flex items-center justify-center p-1 shrink-0">
                                     <img src={pm.icon} alt={pm.id} className="w-full h-full object-contain" />
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => setIsPaymentSheetOpen(true)} className="text-[14px] font-semibold text-brand-green">
-                            Ver mais detalhes
-                        </button>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
                 </>
@@ -346,16 +265,12 @@ const InfoTab = ({ partner, stats }: any) => {
             {hoursList.length > 0 && (
                 <>
                     <div>
-                        <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Horário de Funcionamento</h3>
+                        <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Horario de Funcionamento</h3>
                         <div className="space-y-3">
                             {hoursList.map((item: any) => (
                                 <div key={item.dayName} className="flex justify-between items-center text-[14px]">
-                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-dark"}>
-                                        {item.dayName}
-                                    </span>
-                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-inactive-text"}>
-                                        {item.timeString}
-                                    </span>
+                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-dark"}>{item.dayName}</span>
+                                    <span className={item.isCurrentDay ? "text-brand-green font-medium" : "text-brand-inactive-text"}>{item.timeString}</span>
                                 </div>
                             ))}
                         </div>
@@ -365,7 +280,7 @@ const InfoTab = ({ partner, stats }: any) => {
             )}
 
             <div>
-                <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Endereço</h3>
+                <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Endereco</h3>
                 <div className="flex items-start gap-3 mb-5">
                     <MapPinIcon size={20} className="text-brand-inactive-text mt-1 shrink-0" />
                     <div>
@@ -375,119 +290,24 @@ const InfoTab = ({ partner, stats }: any) => {
                     </div>
                 </div>
                 <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 shrink-0">
-                    <MapboxMap
-                        lat={partner.lat}
-                        lng={partner.lng}
-                        name={partner.storeName}
-                        address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}, CEP: ${partner.zipCode}`}
-                    />
+                    <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} />
                 </div>
             </div>
-
-            <DefaultModal
-                isOpen={isPaymentSheetOpen}
-                onClose={() => setIsPaymentSheetOpen(false)}
-                title="Formas de pagamento"
-                maxWidth="md"
-            >
-                <div className="space-y-6">
-                    <div>
-                        <h3 className="text-[16px] font-semibold text-brand-dark mb-3">Pagamento na entrega</h3>
-                        <p className="text-[14px] text-brand-inactive-text mb-4">Abaixo estão as formas de pagamento aceitas diretamente no estabelecimento.</p>
-                    </div>
-
-                    {hasDebit && (
-                        <div>
-                            <h4 className="text-[14px] text-brand-inactive-text mb-3">Cartão de débito</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {debitoBrands.map((brandId: string) => {
-                                    const brand = AVAILABLE_BRANDS.find(b => b.id === brandId)
-                                    if (!brand) return null
-                                    return (
-                                        <div key={brandId} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={brand.image} alt={brand.label} className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark">{brand.label}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {hasCredit && (
-                        <div>
-                            <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Cartão de crédito</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {creditoBrands.map((brandId: string) => {
-                                    const brand = AVAILABLE_BRANDS.find(b => b.id === brandId)
-                                    if (!brand) return null
-                                    return (
-                                        <div key={brandId} className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                            <img src={brand.image} alt={brand.label} className="h-4 object-contain" />
-                                            <span className="text-[14px] text-brand-dark">{brand.label}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {(hasPix || hasCash || hasMercadoPago) && (
-                        <div>
-                            <h4 className="text-[14px] text-brand-inactive-text mb-3 mt-5">Outros</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {hasPix && (
-                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                        <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="h-4 object-contain" />
-                                        <span className="text-[14px] text-brand-dark">Pix</span>
-                                    </div>
-                                )}
-                                {hasCash && (
-                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                        <img src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="h-4 object-contain" />
-                                        <span className="text-[14px] text-brand-dark">Dinheiro</span>
-                                    </div>
-                                )}
-                                {hasMercadoPago && (
-                                    <div className="h-10 px-3 rounded-[8px] border border-brand-border bg-white flex items-center gap-2">
-                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="h-4 object-contain" />
-                                        <span className="text-[14px] text-brand-dark">Mercado Pago</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </DefaultModal>
         </div>
     )
 }
 
 const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
     const hasReviews = reviews.length > 0
-
     return (
         <div className="pb-10 animate-fade-in">
             {hasReviews ? (
                 <>
                     <div className="bg-brand-gray rounded-[16px] p-5 mb-10 flex items-center justify-between max-w-[800px]">
                         <div className="flex flex-col items-center">
-                            <span className="text-[48px] font-semibold text-brand-dark leading-none">
-                                {partner.rating > 0 ? formatNumber(partner.rating, 1, 1) : "-"}
-                            </span>
-                            <div className="flex gap-0.5 my-2">
-                                {[...Array(5)].map((_, i) => (
-                                    <StarIcon
-                                        key={i}
-                                        size={20}
-                                        fill={i < Math.floor(partner.rating) ? "brand-green" : "transparent"}
-                                        className={i < Math.floor(partner.rating) ? "text-brand-green" : "text-brand-green"}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-[13px] text-brand-inactive-text font-medium">
-                                média de {stats.reviewsCount} avaliações
-                            </span>
+                            <span className="text-[48px] font-semibold text-brand-dark leading-none">{formatNumber(partner.rating, 1, 1)}</span>
+                            <RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} />
+                            <span className="text-[13px] text-brand-inactive-text font-medium mt-2">media de {stats.reviewsCount} avaliacoes</span>
                         </div>
                         <div className="flex-1 ml-10 space-y-1.5">
                             {ratingDistribution.map((row: any) => (
@@ -495,10 +315,7 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
                                     <span className="text-[12px] text-brand-inactive-text w-2">{row.star}</span>
                                     <StarIcon size={10} className="text-brand-inactive-text" />
                                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-brand-green rounded-full"
-                                            style={{ width: `${(row.count / stats.reviewsCount) * 100}%` }}
-                                        />
+                                        <div className="h-full bg-brand-green rounded-full" style={{ width: `${(row.count / stats.reviewsCount) * 100}%` }} />
                                     </div>
                                 </div>
                             ))}
@@ -507,42 +324,22 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
 
                     <div className="space-y-8">
                         {reviews.map((rev: any) => (
-                            <div key={rev.id} className="border-b border-brand-border pb-8 last:border-0 relative">
+                            <div key={rev.id} className="border-b border-brand-border pb-8 last:border-0">
                                 <div className="flex items-start gap-4 mb-3">
                                     <div className="w-[50px] h-[50px] rounded-full overflow-hidden shrink-0">
                                         <img src="https://img.dudit.com.br/static/Placeholder.png" className="w-full h-full object-cover" alt="" />
                                     </div>
                                     <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[15px] font-semibold text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
-                                                <span className="text-[10px] text-brand-inactive-text">·</span>
-                                                <span className="text-[13px] font-normal text-brand-inactive-text">{formatDate(rev.created_at)}</span>
-                                            </div>
-                                            <FlagIcon size={14} className="text-gray-300 cursor-pointer hover:text-[#d32f2f] transition-colors" />
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[15px] font-semibold text-brand-dark">{rev.profiles?.full_name || "Usuario"}</span>
+                                            <span className="text-[13px] text-brand-inactive-text">{formatDate(rev.created_at)}</span>
                                         </div>
                                         <div className="flex gap-0.5 mb-2">
                                             {[...Array(5)].map((_, i) => (
-                                                <StarIcon
-                                                    key={i}
-                                                    size={14}
-                                                    fill={i < rev.rating ? "brand-green" : "transparent"}
-                                                    className={i < rev.rating ? "text-brand-green" : "text-brand-green"}
-                                                />
+                                                <StarIcon key={i} size={14} className={i < rev.rating ? "text-brand-green fill-brand-green" : "text-gray-300 fill-gray-300"} />
                                             ))}
                                         </div>
-                                        {rev.comment && (
-                                            <p className="text-[15px] text-brand-inactive-text leading-relaxed mb-3">{rev.comment}</p>
-                                        )}
-                                        <div className="flex items-center gap-3 bg-brand-gray p-2 rounded-[8px] border border-brand-border w-fit cursor-pointer hover:bg-gray-100 transition-colors">
-                                            <div className="w-10 h-10 rounded-[6px] overflow-hidden bg-white border border-brand-border">
-                                                <img src="https://img.dudit.com.br/static/Placeholder.png" className="w-full h-full object-cover opacity-80" alt="Produto" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-[11px] text-brand-inactive-text font-normal leading-tight">Avaliação para:</span>
-                                                <span className="text-[13px] font-medium text-brand-dark leading-tight line-clamp-1 max-w-[250px]">{rev.products?.name}</span>
-                                            </div>
-                                        </div>
+                                        {rev.comment && <p className="text-[15px] text-brand-inactive-text leading-relaxed">{rev.comment}</p>}
                                     </div>
                                 </div>
                             </div>
@@ -550,249 +347,307 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
                     </div>
                 </>
             ) : (
-                <IconPlaceholder
-                    placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
-                    imageAlt="Sem avaliações"
-                    title="Ainda não temos avaliações por aqui"
-                    subtitle="Seja o primeiro a contar para a comunidade como foi sua experiência!"
-                />
+                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png" imageAlt="Sem avaliacoes" title="Ainda nao temos avaliacoes por aqui" subtitle="Seja o primeiro a contar para a comunidade como foi sua experiencia!" />
             )}
         </div>
     )
 }
 
-// Modal genérico de bottom-sheet mobile/desktop
+function CarouselNav({ targetRef, showSeeAll, onSeeAll }: { targetRef: React.RefObject<HTMLDivElement | null>; showSeeAll?: boolean; onSeeAll?: () => void }) {
+    const scroll = (dir: number) => targetRef.current?.scrollBy({ left: dir * 720, behavior: "smooth" })
+    return (
+        <div className="flex items-center gap-2">
+            {showSeeAll && <button onClick={onSeeAll} className="text-[13px] font-bold text-brand-green hover:underline px-2">Ver todos</button>}
+            <Button variant="filled" onClick={() => scroll(-1)} className="h-9 w-9 p-0 rounded-full bg-brand-gray text-brand-dark hover:bg-gray-200">
+                <ChevronLeftIcon size={18} />
+            </Button>
+            <Button variant="filled" onClick={() => scroll(1)} className="h-9 w-9 p-0 rounded-full">
+                <ChevronRightIcon size={18} />
+            </Button>
+        </div>
+    )
+}
 
-// --- MAIN COMPONENT ---
-export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, userProfile, cartCount }: VendorPageClientProps) {
-    const router = useRouter()
+function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: string; items: any[]; partner: any; onSeeAll?: () => void; sectionId?: string }) {
+    const ref = useRef<HTMLDivElement>(null)
+    if (!items.length) return null
+    return (
+        <section id={sectionId} data-category-section={sectionId} className="scroll-mt-[150px] mb-10 lg:mb-12">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[20px] lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
+                <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
+            </div>
+            <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">
+                {items.slice(0, 20).map(item => (
+                    <div key={item.id} className="snap-start">
+                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} />
+                    </div>
+                ))}
+            </div>
+        </section>
+    )
+}
+
+function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponClick: (coupon: any) => void }) {
+    const ref = useRef<HTMLDivElement>(null)
+    if (!coupons.length) return null
+    return (
+        <section id="coupons" className="mb-10 lg:mb-12 scroll-mt-[150px]">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[20px] lg:text-[22px] font-semibold text-brand-dark">Cupons do parceiro</h2>
+                <CarouselNav targetRef={ref} />
+            </div>
+            <div ref={ref} className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
+                {coupons.map(coupon => (
+                    <div key={coupon.id} className="w-[280px] lg:w-[340px] shrink-0 snap-start">
+                        <ListItem
+                            icon={<TagIcon size={22} className="text-brand-green" />}
+                            title={formatCouponValue(coupon)}
+                            description={`${coupon.code} - ${couponScopeLabel(coupon.apply_scope)}`}
+                            onClick={() => onCouponClick(coupon)}
+                            right={<span className="text-[12px] font-bold text-brand-green shrink-0">Ver</span>}
+                            className="p-4 rounded-[8px]"
+                        />
+                    </div>
+                ))}
+            </div>
+        </section>
+    )
+}
+
+export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info">("products")
-    const [activeContext, setActiveContext] = useState<"Produtos" | "Serviços">("Produtos")
+    const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos">("Produtos")
+    const [categoryView, setCategoryView] = useState<string | null>(null)
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
-    const [isSortOpen, setIsSortOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
     const [searchValue, setSearchValue] = useState("")
-    const [isDesktopSortOpen, setIsDesktopSortOpen] = useState(false)
-    const [selectedSort, setSelectedSort] = useState("Mais recentes")
     const [showShareModal, setShowShareModal] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
+    const [selectedCoupon, setSelectedCoupon] = useState<any>(null)
     const [isMounted, setIsMounted] = useState(false)
-    const [isScrolled, setIsScrolled] = useState(false)
-    const sortRef = useRef<HTMLDivElement>(null)
-    const { setDirection } = useTransitionDirection()
+    const [isStickyVisible, setIsStickyVisible] = useState(false)
+    const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
+    const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
+    const tabsScrollRef = useRef<HTMLDivElement>(null)
+    const topRef = useRef<HTMLDivElement>(null)
     const { user } = useSupabase()
     const isStoreOwner = user?.id === partner.userId || user?.id === partner.user_id
 
     useEffect(() => { setIsMounted(true) }, [])
 
-    // Removemos manipulação nativa de URL para não causar bugs de renderização/popstate.
-
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 10)
-        }
-        window.addEventListener("scroll", handleScroll, { passive: true })
-        return () => window.removeEventListener("scroll", handleScroll)
-    }, [])
-
-    const partnerRawImage =
-        partner.store_avatar ||
-        partner.store_image_url ||
-        partner.profile_image_url ||
-        partner.storeImageUrl ||
-        null
+    const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
-    const fallbackBanner = partnerRawImage
-        ? getRandomDefaultBanner()
-        : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
+    const fallbackBanner = partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
     const bannerImage = partner.banner_url ? getImageUrl(partner.banner_url) : fallbackBanner
-    const currentTags = useMemo(
-        () => ["todos", ...(activeContext === "Produtos" ? productCategories : serviceCategories)],
-        [activeContext, productCategories, serviceCategories]
-    )
 
-    const displayItems = useMemo(() => {
-        const items = activeContext === "Produtos" ? products : services
-        const sorter = SORT_STRATEGIES[selectedSort] ?? SORT_STRATEGIES["Mais recentes"]
-        return items
-            .filter(item =>
-                (activeTag === "todos" || item.category?.toLowerCase() === activeTag.toLowerCase()) &&
-                (!searchValue || item.name.toLowerCase().includes(searchValue.toLowerCase()))
-            )
-            .sort(sorter)
-    }, [products, services, activeContext, activeTag, searchValue, selectedSort])
+    const currentItems = activeContext === "Produtos" ? products : services
+    const currentCategories = activeContext === "Produtos" ? productCategories : serviceCategories
+    const filteredItems = useMemo(() => {
+        const search = searchValue.trim().toLowerCase()
+        return currentItems.filter(item => !search || item.name?.toLowerCase().includes(search))
+    }, [currentItems, searchValue])
 
-    const shareMessage = useMemo(() => {
-        return `🔥 Olha essa loja na Dudit!\n\n` +
-            `*${partner.storeName}*\n` +
-            `Confere aqui os produtos:`;
-    }, [partner.storeName])
-
-    // Lock scroll e z-index do header global quando modais estão abertos
-    useEffect(() => {
-        const locked = isContextModalOpen || isSortOpen || isAboutPageOpen
-        document.body.style.overflow = locked ? "hidden" : ""
-        document.querySelectorAll<HTMLElement>("header").forEach(h => {
-            h.style.zIndex = locked ? "0" : ""
+    const groupedItems = useMemo(() => {
+        const map = new Map<string, any[]>()
+        filteredItems.forEach(item => {
+            const name = normalizeCategory(item.category)
+            map.set(name, [...(map.get(name) || []), item])
         })
-        return () => { document.body.style.overflow = "" }
-    }, [isContextModalOpen, isSortOpen, isAboutPageOpen])
+        return Array.from(map.entries()).map(([name, items]) => ({ name, id: categoryId(name), items }))
+    }, [filteredItems])
 
-    // Fecha dropdown de sort ao clicar fora
+    const featuredItems = useMemo(() => {
+        const highlightedProducts = products.filter(item => item.is_featured || item.is_highlighted)
+        const highlightedServices = services.filter(item => item.highlight_service || item.is_featured || item.is_highlighted)
+        return (activeContext === "Produtos" ? highlightedProducts : highlightedServices)
+            .filter(item => !searchValue.trim() || item.name?.toLowerCase().includes(searchValue.trim().toLowerCase()))
+    }, [products, services, activeContext, searchValue])
+
+    const allTabs = useMemo(() => [
+        ...(featuredItems.length ? [{ id: "featured", label: "Itens destacados" }] : []),
+        { id: "todos", label: "Todos" },
+        ...groupedItems.map(group => ({ id: group.id, label: group.name })),
+    ], [featuredItems.length, groupedItems])
+
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (sortRef.current && !sortRef.current.contains(e.target as Node)) setIsDesktopSortOpen(false)
+        let ticking = false
+        const onScroll = () => {
+            if (ticking) return
+            window.requestAnimationFrame(() => {
+                const bottom = topRef.current?.getBoundingClientRect().bottom ?? 0
+                setIsStickyVisible(bottom < 0)
+                ticking = false
+            })
+            ticking = true
         }
-        document.addEventListener("mousedown", handler)
-        return () => document.removeEventListener("mousedown", handler)
+        onScroll()
+        window.addEventListener("scroll", onScroll, { passive: true })
+        return () => window.removeEventListener("scroll", onScroll)
     }, [])
 
-    const handleWhatsApp = useCallback(() => {
-        openWhatsApp(partner.phone, partner.storeName)
-    }, [partner.phone, partner.storeName])
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            const visible = entries
+                .filter(entry => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+            const id = visible?.target.getAttribute("data-category-section")
+            if (id) {
+                setActiveTag(id)
+                const tab = document.getElementById(`vendor-tab-${id}`)
+                tab?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })
+            }
+        }, { rootMargin: "-120px 0px -55% 0px", threshold: [0.1, 0.35, 0.6] })
 
-    const handleTagSelect = useCallback((tag: string) => {
-        setActiveTag(tag)
+        document.querySelectorAll("[data-category-section]").forEach(el => observer.observe(el))
+        return () => observer.disconnect()
+    }, [groupedItems, featuredItems.length, categoryView, activeContext])
+
+    const updateTabsScrollState = useCallback(() => {
+        const node = tabsScrollRef.current
+        if (!node) return
+        setCanScrollTabsLeft(node.scrollLeft > 4)
+        setCanScrollTabsRight(node.scrollLeft + node.clientWidth < node.scrollWidth - 4)
+    }, [])
+
+    useEffect(() => {
+        updateTabsScrollState()
+        const node = tabsScrollRef.current
+        node?.addEventListener("scroll", updateTabsScrollState, { passive: true })
+        window.addEventListener("resize", updateTabsScrollState)
+        return () => {
+            node?.removeEventListener("scroll", updateTabsScrollState)
+            window.removeEventListener("resize", updateTabsScrollState)
+        }
+    }, [updateTabsScrollState, allTabs.length])
+
+    const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.storeName), [partner.phone, partner.storeName])
+    const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const openCategory = (tag: string | null) => {
         setActiveSection("products")
-    }, [])
+        setCategoryView(tag)
+        setActiveTag(tag || "todos")
+        setTimeout(scrollToProducts, 0)
+    }
+    const selectTab = (tag: string) => {
+        if (tag === "todos") openCategory(null)
+        else if (tag === "featured") {
+            setCategoryView(null)
+            setActiveTag("featured")
+            document.getElementById("featured")?.scrollIntoView({ behavior: "smooth", block: "start" })
+        } else openCategory(tag)
+    }
 
-    // Detalhes agora renderizados pelo BottomSheet abaixo
+    const categoryItems = categoryView
+        ? groupedItems.find(group => group.id === categoryView)?.items || []
+        : []
+
+    const shareMessage = useMemo(() => `Olha essa loja na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto px-0 lg:px-6 max-w-[1300px] animate-fade-in lg:mt-6">
+        <div className="container mx-auto px-0 lg:px-4 max-w-[1300px] animate-fade-in lg:mt-6">
             <MarketplaceHeader
                 productName={partner.storeName}
-                onShare={() => setShowShareModal(true)}
+                storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
+                storeSearchValue={searchValue}
+                onStoreSearchChange={setSearchValue}
                 userProfile={userProfile}
                 cartCount={cartCount}
             />
 
-            {/* TABS STICKY MOBILE - Colado abaixo do header */}
-            <div className={`lg:hidden w-full fixed top-[55px] left-0 right-0 z-[45] bg-brand-dark transition-all duration-300 ${isScrolled ? "opacity-100 pointer-events-auto translate-y-0" : "opacity-0 pointer-events-none -translate-y-2 absolute"}`}>
-                <div className="flex items-center gap-3 px-4 py-2 border-t border-white/10 shadow-md">
-                    <Button
-                        variant="filled"
-                        onClick={() => setIsContextModalOpen(true)}
-                        className="h-10 w-10 shrink-0 p-0 rounded-xl flex items-center justify-center border-none shadow-none"
-                    >
-                        {activeContext === "Produtos" ? <PackageIcon size={18} /> : <HeartIcon size={18} />}
-                    </Button>
-                    <div className="w-[1px] h-6 bg-white/20 shrink-0" />
-                    <div className="flex-1 overflow-x-auto hide-scrollbar -mx-2 px-2">
-                        <Tabs value={activeTag} onValueChange={handleTagSelect}>
-                            <TabsList className="border-0 pb-0 pt-1 gap-5 bg-transparent">
-                                {currentTags.map(tag => (
-                                    <TabsTrigger key={tag} value={tag.toLowerCase()} className="pb-1 capitalize text-white/70 hover:text-white data-[state=active]:text-white data-[state=active]:font-bold transition-all bg-transparent data-[state=active]:bg-transparent">
-                                        {tag}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                        </Tabs>
+            <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
+                <div className="max-w-[1300px] mx-auto px-4 h-[76px] flex items-center gap-4">
+                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
+                    <div className="min-w-0">
+                        <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.storeName}</h2>
+                        <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text">
+                            <span>{partner.city}, {partner.state}</span>
+                            {partner.distance_km_formatted && <span>{partner.distance_km_formatted}</span>}
+                            <RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} />
+                        </div>
+                    </div>
+                    <div className="ml-auto w-[420px]">
+                        <Input variant="full-rounded" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder={`Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                     </div>
                 </div>
             </div>
 
-            {/* Banner - rounded a partir de lg, sem margem lateral no mobile para ocupar tudo sob o header */}
-            <div className="w-full h-[180px] lg:h-[220px] lg:rounded-[24px] lg:mb-4 overflow-hidden relative">
-                <img
-                    src={bannerImage}
-                    alt="Banner"
-                    className="w-full h-full object-cover object-center"
-                />
-                <div className="absolute inset-0" />
-            </div>
+            <div ref={topRef}>
+                <div className="w-full h-[180px] lg:h-[220px] lg:rounded-2xl lg:mb-4 overflow-hidden relative">
+                    <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
+                </div>
 
-            <div className="container mx-auto px-0">
-                {/* Header da loja */}
-                <div className="px-5 lg:px-0 py-5 lg:py-6 mb-2 lg:mb-4">
+                <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-[60px] h-[60px] lg:w-[96px] lg:h-[96px] rounded-full overflow-hidden shrink-0 border border-brand-border bg-white z-10">
-                                <UserProfileImage
-                                    fullName={partner.storeName}
-                                    imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl}
-                                    className="w-full h-full"
-                                />
-                            </div>
-                            <div>
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] lg:w-[80px] lg:h-[80px] border border-brand-border shrink-0 bg-gray-50" />
+                            <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-3 mb-1">
-                                    <h1 className="text-[20px] lg:text-[24px] font-semibold text-brand-dark leading-none">{partner.storeName}</h1>
+                                    <h1 className="text-[20px] lg:text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
                                     <button onClick={() => setShowShareModal(true)} className="hidden lg:flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
                                         <ShareIcon size={14} />
                                     </button>
                                 </div>
                                 <p className="text-[13px] lg:text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
-                                {/* Estrelas só aparecem se houver avaliações */}
-                                {partner.rating > 0 && (
-                                    <div className="flex items-center gap-1.5 mt-1.5">
-                                        <div className="flex gap-0.5">
-                                            {[...Array(5)].map((_, i) => (
-                                                <StarIcon key={i} size={14} fill="brand-green" className="text-brand-green" />
-                                            ))}
-                                        </div>
-                                        <span className="text-[12px] lg:text-[13px] font-semibold text-brand-dark pt-0.5">({stats.reviewsCount})</span>
-                                    </div>
-                                )}
+                                <div className="mt-1.5"><RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} /></div>
                             </div>
                         </div>
 
-                        {/* Ações desktop */}
+                        <div className="hidden lg:block w-[360px]">
+                            <Input variant="full-rounded" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder={`Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
+                        </div>
+
                         <div className="hidden lg:flex items-start gap-3">
                             <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
                                 <HeartIcon size={20} />
                             </button>
                             {!isStoreOwner && (
-                                <button
-                                    onClick={() => setShowReportModal(true)}
-                                    className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors"
-                                    title="Denunciar vendedor"
-                                >
+                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Denunciar vendedor">
                                     <FlagIcon size={20} />
                                 </button>
                             )}
-                            <button
-                                onClick={handleWhatsApp}
-                                className="h-[42px] px-6 bg-brand-green text-white rounded-full flex items-center gap-2 font-semibold text-[14px] hover:bg-[#047857] transition-colors shadow-sm"
-                            >
-                                <WhatsappIcon size={18} /> Contato
-                            </button>
                         </div>
 
-                        {/* Ações mobile */}
-                        <div className="lg:hidden flex flex-col items-end gap-3">
-                            <div className="flex items-center gap-3">
-                                {!isStoreOwner && (
-                                    <button
-                                        onClick={() => setShowReportModal(true)}
-                                        className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
-                                    >
-                                        <FlagIcon size={18} />
-                                    </button>
-                                )}
-                                <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
-                                    <ChevronRightIcon size={20} />
-                                </button>
-                            </div>
-                            <button onClick={handleWhatsApp} className="w-9 h-9 rounded-full bg-brand-green flex items-center justify-center text-white active:bg-[#047857] transition-colors shadow-sm">
-                                <WhatsappIcon size={18} />
+                        <div className="lg:hidden flex items-center gap-3">
+                            <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
+                                <InfoIcon size={18} />
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                {/* Layout principal */}
-                <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20">
-                    {/* Sidebar desktop */}
-                    <aside className="hidden lg:block w-[280px] shrink-0">
+            <div className={`lg:hidden fixed top-[55px] left-0 right-0 z-[45] bg-white border-b border-brand-border shadow-sm transition-all duration-200 ${isStickyVisible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+                <div className="flex items-center gap-1 px-3 py-2">
+                    <button onClick={() => setIsContextModalOpen(true)} className="w-9 h-9 shrink-0 flex items-center justify-center text-brand-dark">
+                        {activeContext === "Produtos" ? <Package size={19} /> : <HeartIcon size={19} />}
+                    </button>
+                    {canScrollTabsLeft && <button onClick={() => tabsScrollRef.current?.scrollBy({ left: -160, behavior: "smooth" })} className="w-8 h-9 shrink-0 flex items-center justify-center text-brand-dark"><ChevronLeftIcon size={18} /></button>}
+                    <div ref={tabsScrollRef} className="flex-1 overflow-x-auto hide-scrollbar">
+                        <Tabs value={activeTag} onValueChange={selectTab}>
+                            <TabsList className="border-0 pb-0 pt-0 gap-5 bg-transparent">
+                                {allTabs.map(tab => (
+                                    <TabsTrigger id={`vendor-tab-${tab.id}`} key={tab.id} value={tab.id} className="pb-1 whitespace-nowrap text-brand-inactive-text data-[state=active]:text-brand-green data-[state=active]:font-bold bg-transparent data-[state=active]:bg-transparent">
+                                        {tab.label}
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                    {canScrollTabsRight && <button onClick={() => tabsScrollRef.current?.scrollBy({ left: 160, behavior: "smooth" })} className="w-8 h-9 shrink-0 flex items-center justify-center text-brand-dark"><ChevronRightIcon size={18} /></button>}
+                </div>
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20">
+                <aside className="hidden lg:block w-[260px] shrink-0">
+                    <div className="sticky top-[198px] z-20 bg-white pt-0">
                         <div className="mb-8">
                             <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
                             <div className="flex flex-col gap-1">
-                                {([{ id: "reviews", label: "Avaliações" }, { id: "info", label: "Informações" }] as const).map(b => (
-                                    <button key={b.id} onClick={() => setActiveSection(b.id)}
-                                        className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                {([{ id: "reviews", label: "Avaliacoes" }, { id: "info", label: "Informacoes" }] as const).map(b => (
+                                    <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
                                         <span>{b.label}</span>
                                         {activeSection === b.id && <Check size={16} className="ml-auto" />}
                                     </button>
@@ -800,132 +655,101 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                             </div>
                         </div>
 
-                        <div className="sticky top-[100px] z-20 bg-white pt-0">
-                            <h3 className="font-normal text-brand-dark text-[16px] mb-4">Produtos</h3>
-                            <div className="flex flex-col gap-1 mb-8">
-                                {["todos", ...productCategories].map(tag => (
-                                    <button key={tag} onClick={() => handleTagSelect(tag.toLowerCase())}
-                                        className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === tag.toLowerCase() && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
-                                        <span className="capitalize">{tag}</span>
-                                        {activeTag === tag.toLowerCase() && activeSection === "products" && <Check size={16} />}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* Conteúdo principal */}
-                    <main className="flex-1 px-5 lg:px-0">
-                        {/* Grid de produtos (sempre visível em mobile; no desktop só quando activeSection === "products") */}
-                        <div className={activeSection !== "products" ? "hidden lg:hidden" : ""}>
-                            {/* Toolbar desktop */}
-                            <div className="hidden lg:flex items-center justify-between mb-4">
-                                <h2 className="text-[24px] font-normal text-brand-dark">{activeContext}</h2>
-                                <span className="text-brand-inactive-text text-[14px] font-medium">{displayItems.length} itens encontrados</span>
-                            </div>
-                            <div className="hidden lg:flex items-center gap-4 mb-8">
-                                <div className="relative flex-1">
-                                    <input
-                                        type="text"
-                                        placeholder={`Buscar em ${partner.storeName}`}
-                                        value={searchValue}
-                                        onChange={e => setSearchValue(e.target.value)}
-                                        className="w-full h-[42px] bg-white border border-brand-border rounded-[12px] pl-11 pr-4 text-[15px] outline-none focus:border-brand-green transition-colors"
-                                    />
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-inactive-text" size={20} />
-                                </div>
-                                <div className="relative" ref={sortRef}>
-                                    <button
-                                        onClick={() => setIsDesktopSortOpen(v => !v)}
-                                        className="flex items-center justify-between gap-3 bg-white border border-brand-border rounded-[12px] h-[42px] px-4 min-w-[220px] text-[14px] text-brand-dark hover:border-brand-green transition-colors"
-                                    >
-                                        <span className="font-medium">{selectedSort}</span>
-                                        {isDesktopSortOpen
-                                            ? <ChevronUpIcon size={20} className="text-brand-green" />
-                                            : <ChevronDownIcon size={20} className="text-brand-green" />}
-                                    </button>
-                                    {isDesktopSortOpen && (
-                                        <div className="absolute top-full right-0 w-full bg-white border border-brand-border rounded-[12px] shadow-[0_4px_20px_rgba(0,0,0,0.08)] mt-2 py-2 z-30 animate-fade-in">
-                                            {SORT_OPTIONS.map(opt => (
-                                                <div key={opt} onClick={() => { setSelectedSort(opt); setIsDesktopSortOpen(false) }}
-                                                    className="flex items-center justify-between px-4 py-2.5 hover:bg-brand-gray cursor-pointer">
-                                                    <span className={`text-[14px] ${selectedSort === opt ? "font-medium text-brand-dark" : "font-normal text-brand-inactive-text"}`}>{opt}</span>
-                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedSort === opt ? "border-brand-green" : "border-brand-border"}`}>
-                                                        {selectedSort === opt && <div className="w-2.5 h-2.5 bg-brand-green rounded-full" />}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Toolbar mobile */}
-                            <div className="lg:hidden flex items-center gap-3 mb-6">
-                                <div className="relative flex-1">
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar"
-                                        value={searchValue}
-                                        onChange={e => setSearchValue(e.target.value)}
-                                        className="w-full h-[42px] bg-white border border-brand-border rounded-[10px] pl-9 pr-4 text-[14px] outline-none focus:border-brand-green"
-                                    />
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-inactive-text" size={16} />
-                                </div>
-                                <button onClick={() => setIsSortOpen(true)} className="h-[42px] px-3 bg-white border border-brand-border rounded-[10px] flex items-center gap-1.5">
-                                    <span className="text-[13px] font-medium text-brand-dark">Ordenar</span>
-                                    <ChevronDownIcon size={14} className="text-brand-green" />
+                        <h3 className="font-normal text-brand-dark text-[16px] mb-4">{activeContext}</h3>
+                        <div className="flex flex-col gap-1 mb-8">
+                            {featuredItems.length > 0 && (
+                                <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                    <span>Itens destacados</span>
+                                    {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
                                 </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 lg:gap-x-6 gap-y-10 lg:gap-y-12 animate-fade-in">
-                                {displayItems.map(item => <ProductCard key={item.id} item={item} partner={partner} />)}
-                            </div>
-                        </div>
-
-                        {/* Seções do sidebar - desktop only */}
-                        <div className="hidden lg:block">
-                            {activeSection === "info" && (
-                                <div>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
-                                    <InfoTab partner={partner} stats={stats} />
-                                </div>
                             )}
-                            {activeSection === "reviews" && (
-                                <div>
-                                    <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
-                                    <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
-                                </div>
+                            <button onClick={() => openCategory(null)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                <span>Todos</span>
+                                {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
+                            </button>
+                            {groupedItems.map(group => (
+                                <button key={group.id} onClick={() => openCategory(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                    <span className="capitalize">{group.name}</span>
+                                    {activeTag === group.id && activeSection === "products" && <Check size={16} />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </aside>
+
+                <main id="vendor-products" className="flex-1 px-5 lg:px-0 scroll-mt-[170px]">
+                    {activeSection === "products" && (
+                        <div className="animate-fade-in">
+                            {categoryView ? (
+                                <section data-category-section={categoryView} className="scroll-mt-[150px]">
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <button onClick={() => openCategory(null)} className="w-9 h-9 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
+                                            <ArrowLeftIcon size={18} />
+                                        </button>
+                                        <div>
+                                            <p className="text-[13px] text-brand-inactive-text">Loja</p>
+                                            <h2 className="text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10">
+                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} />)}
+                                    </div>
+                                </section>
+                            ) : (
+                                <>
+                                    <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
+                                    <ItemsCarousel title="Produtos destacados" items={featuredItems} partner={partner} sectionId="featured" />
+                                    {groupedItems.map(group => (
+                                        <ItemsCarousel key={group.id} title={group.name} items={group.items} partner={partner} sectionId={group.id} onSeeAll={() => openCategory(group.id)} />
+                                    ))}
+                                    {!groupedItems.length && (
+                                        <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/Produtos.png" imageAlt="Sem itens" title="Nenhum item encontrado" subtitle="Tente buscar por outro termo." />
+                                    )}
+                                </>
                             )}
                         </div>
-                    </main>
-                </div>
+                    )}
+
+                    <div className="hidden lg:block">
+                        {activeSection === "info" && (
+                            <div>
+                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informacoes de {partner.storeName}</h2>
+                                <InfoTab partner={partner} stats={stats} onWhatsApp={handleWhatsApp} showContact />
+                            </div>
+                        )}
+                        {activeSection === "reviews" && (
+                            <div>
+                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliacoes</h2>
+                                <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
+                            </div>
+                        )}
+                    </div>
+                </main>
             </div>
 
-            <ShareModal
-                isOpen={showShareModal}
-                onClose={() => setShowShareModal(false)}
-                url={isMounted ? window.location.href : ""}
-                title={partner.storeName}
-                shareMessage={shareMessage}
-                label="Link da vitrine"
-            />
+            <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? window.location.href : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
+            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.id} targetName={partner.storeName} />
 
-            <ReportModal
-                isOpen={showReportModal}
-                onClose={() => setShowReportModal(false)}
-                targetType="partner"
-                targetId={partner.id}
-                targetName={partner.storeName}
-            />
+            <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">
+                {selectedCoupon && (
+                    <div className="space-y-4">
+                        <div className="rounded-[8px] bg-brand-gray p-4">
+                            <p className="text-[28px] font-bold text-brand-dark">{formatCouponValue(selectedCoupon)}</p>
+                            <p className="text-sm text-brand-inactive-text mt-1">{couponScopeLabel(selectedCoupon.apply_scope)}</p>
+                        </div>
+                        {Number(selectedCoupon.min_cart_value || 0) > 0 && <p className="text-sm text-brand-inactive-text">Pedido minimo de {formatCurrency(Number(selectedCoupon.min_cart_value))}.</p>}
+                        {Number(selectedCoupon.max_discount_value || 0) > 0 && <p className="text-sm text-brand-inactive-text">Desconto maximo de {formatCurrency(Number(selectedCoupon.max_discount_value))}.</p>}
+                        {selectedCoupon.first_purchase_only && <p className="text-sm text-brand-inactive-text">Valido apenas para primeira compra.</p>}
+                        {selectedCoupon.ends_at && <p className="text-sm text-brand-inactive-text">Valido ate {formatDate(selectedCoupon.ends_at)}.</p>}
+                    </div>
+                )}
+            </DefaultModal>
 
-            {/* Bottom-sheet modals mobile */}
             <BottomSheet isOpen={isContextModalOpen} onClose={() => setIsContextModalOpen(false)} title="Selecione">
                 <div className="px-5 pb-8">
-                    {["Produtos", "Serviços"].map((opt, i) => (
-                        <div key={opt} onClick={() => { setActiveContext(opt as any); setIsContextModalOpen(false) }}
-                            className={`flex items-center justify-between py-5 cursor-pointer ${i === 0 ? "border-b border-brand-border" : ""}`}>
-                            <span className={`text-[16px] ${activeContext === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt}</span>
+                    {["Produtos", "Servicos"].map((opt, i) => (
+                        <div key={opt} onClick={() => { setActiveContext(opt as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i === 0 ? "border-b border-brand-border" : ""}`}>
+                            <span className={`text-[16px] ${activeContext === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt === "Servicos" ? "Servicos" : opt}</span>
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt ? "border-brand-green" : "border-brand-border"}`}>
                                 {activeContext === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
                             </div>
@@ -934,53 +758,28 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                 </div>
             </BottomSheet>
 
-            <BottomSheet isOpen={isSortOpen} onClose={() => setIsSortOpen(false)} title="Ordenar por">
-                <div className="px-5 pb-8">
-                    {SORT_OPTIONS.map((opt, i) => (
-                        <div key={opt} onClick={() => { setSelectedSort(opt); setIsSortOpen(false) }}
-                            className={`flex items-center justify-between py-5 cursor-pointer ${i !== SORT_OPTIONS.length - 1 ? "border-b border-brand-border" : ""}`}>
-                            <span className={`text-[16px] ${selectedSort === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt}</span>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedSort === opt ? "border-brand-green" : "border-brand-border"}`}>
-                                {selectedSort === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </BottomSheet>
-
-            {/* Modal de Detalhes da Loja (Sobre) */}
             <BottomSheet isOpen={isAboutPageOpen} onClose={() => setIsAboutPageOpen(false)}>
                 <div className="flex flex-col">
                     <div className="px-1 py-2 flex flex-col items-center">
-                        <div className="w-[64px] h-[64px] rounded-full overflow-hidden border border-brand-border shrink-0 mb-3 shadow-sm">
-                            <img
-                                src={partnerProfileImageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
-                                alt={partner.storeName}
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
+                        <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[64px] h-[64px] border border-brand-border shrink-0 mb-3 bg-gray-50" />
                         <h2 className="text-[20px] font-bold text-brand-dark leading-none mb-1">{partner.storeName}</h2>
                         <p className="text-[13px] text-brand-inactive-text font-medium">{partner.city}, {partner.state}</p>
                     </div>
-
                     <div className="mt-4 mb-2 flex justify-center">
                         <StoreStats rating={partner.rating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={stats.reviewsCount} />
                     </div>
-
                     <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
                             <TabsList className="justify-center gap-8 bg-transparent">
-                                <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
-                                <TabsTrigger value="info" className="text-[15px] pb-3">Informações</TabsTrigger>
+                                <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliacoes</TabsTrigger>
+                                <TabsTrigger value="info" className="text-[15px] pb-3">Informacoes</TabsTrigger>
                             </TabsList>
                         </Tabs>
                     </div>
-
                     <div className="px-2 pb-6">
                         {mobileModalTab === "reviews"
                             ? <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
-                            : <InfoTab partner={partner} stats={stats} />
-                        }
+                            : <InfoTab partner={partner} stats={stats} onWhatsApp={handleWhatsApp} showContact={false} />}
                     </div>
                 </div>
             </BottomSheet>

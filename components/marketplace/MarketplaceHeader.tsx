@@ -46,6 +46,9 @@ interface HeaderProps {
   onFavorite?: () => void
   isFavorite?: boolean
   simpleTitle?: string
+  storeSearchPlaceholder?: string
+  storeSearchValue?: string
+  onStoreSearchChange?: (value: string) => void
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -57,7 +60,10 @@ const Header: React.FC<HeaderProps> = ({
   onShare,
   onFavorite,
   isFavorite,
-  simpleTitle
+  simpleTitle,
+  storeSearchPlaceholder,
+  storeSearchValue,
+  onStoreSearchChange,
 }) => {
   const { user, supabase, isLoading: isSupabaseLoading } = useSupabase()
 
@@ -259,7 +265,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3 relative min-h-[40px]">
             {/* Back Button / User Icon */}
             <button
-              className={`shrink-0 z-10 w-10 h-10 flex items-center justify-center transition-all duration-300 ${isProductDetail ? "bg-white rounded-full shadow-md" : "bg-transparent"}`}
+              className={`shrink-0 z-10 w-10 h-10 flex items-center justify-center transition-all duration-300 ${isProductDetail && !(storeSearchPlaceholder && isScrolled) ? "bg-white rounded-full shadow-md" : "bg-transparent"}`}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!isHome || isProductDetail) {
@@ -270,7 +276,7 @@ const Header: React.FC<HeaderProps> = ({
               }}
             >
               {(!isHome || isProductDetail) ? (
-                <ChevronLeftIcon size={20} className={`${isProductDetail && !isScrolled ? "text-brand-dark" : isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
+                <ChevronLeftIcon size={20} className={`${storeSearchPlaceholder && isScrolled ? "text-white" : isProductDetail && !isScrolled ? "text-brand-dark" : isScrolled ? "text-brand-dark" : "text-white"}`} strokeWidth={2.5} />
               ) : user ? (
                 <img
                   src="https://img.dudit.com.br/static/Placeholder.png"
@@ -288,7 +294,18 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Middle Section: Search or Product Name */}
             <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
-              {isProductDetail ? (
+              {isProductDetail && storeSearchPlaceholder ? (
+                <div className={`bg-white h-[38px] rounded-full flex items-center px-4 w-full border border-gray-200 transition-all duration-300 ${isScrolled ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                  <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder={storeSearchPlaceholder}
+                    className="bg-transparent border-none outline-none text-brand-dark text-[14px] w-full placeholder-gray-400 font-normal py-0"
+                    value={storeSearchValue ?? ""}
+                    onChange={(e) => onStoreSearchChange?.(e.target.value)}
+                  />
+                </div>
+              ) : isProductDetail ? (
                 <div className={`flex-1 flex items-center justify-start min-w-0 transition-all duration-300 ${isScrolled ? "opacity-100" : "opacity-0"}`}>
                   <h1 className={`font-bold text-[15px] truncate text-left px-2 transition-all duration-300 ${isScrolled ? "text-white" : "text-brand-dark"}`}>
                     {productName}
@@ -311,14 +328,18 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Right Section: Actions (Share/Favorite) or Cart */}
             <div className="flex items-center gap-2 shrink-0 z-10">
-              {isProductDetail ? (
+              {isProductDetail && storeSearchPlaceholder ? (
+                <div className="w-1" />
+              ) : isProductDetail ? (
                 <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                    className={`transition-all duration-300 flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-md text-brand-dark`}
-                  >
-                    <ShareIcon size={20} />
-                  </button>
+                  {onShare && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+                      className={`transition-all duration-300 flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-md text-brand-dark`}
+                    >
+                      <ShareIcon size={20} />
+                    </button>
+                  )}
                   {onFavorite && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}

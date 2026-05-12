@@ -297,9 +297,10 @@ interface ItemCardProps {
         }
     }
     userCoords?: { lat: number; lng: number } | null
+    showSeller?: boolean
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true }) => {
     const imageUrl = getProductImageUrl(product.images)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
@@ -352,9 +353,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                         )}
                     </div>
 
-                    <div className="border-t border-gray-100 my-2" />
+                    {showSeller && <div className="border-t border-gray-100 my-2" />}
 
-                    <div className="flex items-start gap-2 pt-1">
+                    {showSeller && <div className="flex items-start gap-2 pt-1">
                         <UserProfileImage
                             fullName={partner?.store_name || 'Vendedor'}
                             imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
@@ -370,7 +371,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords }) => {
                                 {distance}
                             </p>
                         </div>
-                    </div>
+                    </div>}
                 </div>
             </Link>
         </div>

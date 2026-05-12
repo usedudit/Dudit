@@ -14,6 +14,7 @@ import {
   getPartnerServices,
   getPartnerReviews,
   getPartnerStats,
+  getPartnerPublicCoupons,
 } from "@/app/actions/marketplace/partners"
 
 // Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
@@ -63,13 +64,14 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
   // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
-  const [user, partner, products, services, reviews, statsBase] = await Promise.all([
+  const [user, partner, products, services, reviews, statsBase, coupons] = await Promise.all([
     getCurrentUser(),
     getPartnerProfile(id),
     getPartnerProducts(id),
     getPartnerServices(id),
     getPartnerReviews(id),
     getPartnerStats(id),
+    getPartnerPublicCoupons(id),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
@@ -174,7 +176,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     number: partner.addresses?.[0]?.number || partner.number || "",
     neighborhood: partner.addresses?.[0]?.neighborhood || partner.neighborhood || "",
     zipCode: partner.addresses?.[0]?.zip_code || partner.zip_code || "",
-    rating: Number(partner.rating) || 5.0,
+    rating: Number(partner.rating) || 0,
     createdAt: partner.created_at,
     offeringType: partner.offering_type,
     openingHours: partner.opening_hours,
@@ -206,6 +208,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           ratingDistribution={ratingDistribution}
           productCategories={productCategories}
           serviceCategories={serviceCategories}
+          coupons={coupons || []}
           userProfile={userProfile}
           cartCount={cartCount}
         />

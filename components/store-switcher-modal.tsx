@@ -29,6 +29,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.currentTarget.value = ""
     if (!file) return
 
     // Validate file size (3MB max)

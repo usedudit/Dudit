@@ -100,6 +100,8 @@ const ImageCropperModal = memo(({
 
     if (!isOpen) return
 
+    setImageBaseSize(null)
+
     if (imageSrcProp) {
       setImageSrc(
         imageSrcProp.startsWith("http")
@@ -131,7 +133,6 @@ const ImageCropperModal = memo(({
     setMinZoom(1)
     setRotation(0)
     setImagePos({ x: 0, y: 0 })
-    setImageBaseSize(null)
 
     if (aspectRatio) {
       let w = cropperWidth
@@ -173,9 +174,7 @@ const ImageCropperModal = memo(({
       width: img.naturalWidth * baseScale,
       height: img.naturalHeight * baseScale,
     })
-    setZoom(1)
-    setMinZoom(1)
-    setImagePos({ x: 0, y: 0 })
+    reset()
 
   }
 

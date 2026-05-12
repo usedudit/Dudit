@@ -694,24 +694,13 @@ export function ProductDetailsPageClient({
             >
                 <div className="flex flex-col">
                     {/* Header with Dual Squares */}
-                    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
-                        <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
-                            <MoneyIcon size={32} className="text-brand-green" />
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
-                                <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                            </div>
-                        </div>
-
-                        <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3 overflow-hidden">
-                            <UserProfileImage
-                                fullName={partner.store_name}
-                                imageUrl={partnerProfileImageUrl.includes("Placeholder.png") ? null : partnerProfileImageUrl}
-                                className="w-full h-full rounded-lg"
-                            />
-                        </div>
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden" 
+                        style={{ background: 'linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)' }}>
+                        <img 
+                            src="https://img.dudit.com.br/static/icons/Pagamento.png" 
+                            alt="Pagamento" 
+                            className="w-64 h-auto object-contain transform translate-y-6"
+                        />
                     </div>
 
                     <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Onde vai o seu dinheiro?</h4>

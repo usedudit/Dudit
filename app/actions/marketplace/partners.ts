@@ -172,12 +172,50 @@ async function _getPartnerStats(partnerId: string) {
   }
 }
 
+async function _getPartnerPublicCoupons(partnerId: string) {
+  const supabase = getAdminClient()
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from("coupons")
+    .select(`
+      id,
+      code,
+      discount_type,
+      discount_value,
+      apply_scope,
+      min_cart_value,
+      max_discount_value,
+      usage_limit,
+      usage_per_customer,
+      first_purchase_only,
+      starts_at,
+      ends_at,
+      customer_scope,
+      is_automatic,
+      is_active
+    `)
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .or(`starts_at.is.null,starts_at.lte.${now}`)
+    .or(`ends_at.is.null,ends_at.gte.${now}`)
+    .order("created_at", { ascending: false })
+    .limit(12)
+
+  if (error) {
+    console.error(`[Partner] Coupons fetch error for ${partnerId}:`, error.message)
+    return []
+  }
+
+  return data || []
+}
+
 // React cache() wrappers - deduplicate within SSR request
 export const getPartnerProfile = cache(_getPartnerProfile)
 export const getPartnerProducts = cache(_getPartnerProducts)
 export const getPartnerServices = cache(_getPartnerServices)
 export const getPartnerReviews = cache(_getPartnerReviews)
 export const getPartnerStats = cache(_getPartnerStats)
+export const getPartnerPublicCoupons = cache(_getPartnerPublicCoupons)
 
 // ==========================================
 // CACHED FUNCTIONS (kept for other pages)

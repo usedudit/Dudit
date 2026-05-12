@@ -150,6 +150,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
+        e.currentTarget.value = ""
         if (!file) return
         if (file.size > 3 * 1024 * 1024) return void toast.error("Máximo 3MB")
         setTempImageFile(file)

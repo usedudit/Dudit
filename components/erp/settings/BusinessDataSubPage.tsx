@@ -324,6 +324,7 @@ export const BusinessDataSubPage = ({
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
+        e.currentTarget.value = ""
         if (!file) return
         if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB")
         setTempImageFile(file)
@@ -339,6 +340,7 @@ export const BusinessDataSubPage = ({
 
     const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
+        e.currentTarget.value = ""
         if (!file) return
         if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB")
         setTempBannerFile(file)
