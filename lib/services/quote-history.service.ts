@@ -15,6 +15,7 @@ export interface QuoteHistoryEntry {
   actor_user_id: string | null
   entry_type: string
   change_lines: string[]
+  metadata?: Record<string, any> | null
   created_at: string
 }
 
@@ -42,7 +43,7 @@ async function fetchQuoteHistoryEntries(quoteId: string, partnerId: string, limi
       .limit(cappedLimit),
     supabase
       .from("audit_logs")
-      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id")
+      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
       .eq("partner_id", partnerId)
       .eq("entity_type", "quote")
       .eq("entity_id", quoteId)
@@ -76,6 +77,7 @@ async function fetchQuoteHistoryEntries(quoteId: string, partnerId: string, limi
     actor_user_id: entry.actor_user_id,
     entry_type: entry.action_type,
     change_lines: entry.change_lines || [],
+    metadata: entry.metadata,
     created_at: entry.created_at,
   }))
 

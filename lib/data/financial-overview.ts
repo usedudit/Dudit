@@ -217,7 +217,7 @@ export const getFinancialOverviewData = cache(async (partnerId: string): Promise
         id, description, category, amount, original_amount, fee_amount, due_date, payment_date, created_at, status, payment_type,
         transaction_type, refund_kind, reference_note, origin, account_id,
         transaction_contacts(name),
-        finance_accounts(name)
+        finance_accounts!transactions_account_id_fkey(name)
       `)
       .eq("partner_id", partnerId)
       .or(`status.eq.pending,payment_date.gte.${since},due_date.gte.${today},created_at.gte.${since}`)
