@@ -187,10 +187,10 @@ export default function GoalsPage(props: {
                 <div className="min-h-[420px] flex items-center justify-center">
                   <IconPlaceholder
                     placeholderType="image"
-                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                    imageSrc={search.trim().length > 0 ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png" : "https://img.dudit.com.br/static/mascots/Metas.png"}
                     imageAlt="Sem metas"
-                    title="Nenhuma meta encontrada"
-                    subtitle="Crie metas para acompanhar e premiar o desempenho da equipe."
+                    title={search.trim().length > 0 ? "Nenhuma meta encontrada" : "Nenhuma meta criada"}
+                    subtitle={search.trim().length > 0 ? "Ajuste os filtros ou tente outra busca." : "Crie metas para acompanhar e premiar o desempenho da equipe."}
                     itemButton={{ text: "Nova meta", action: () => router.push("/erp/goals/new") }}
                   />
                 </div>

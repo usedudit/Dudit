@@ -95,15 +95,17 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
     }, [partnerId])
 
     // Filtered Data
-    const filteredItems = useMemo(() => {
-        let items: any[] = []
-        if (activeTab === "categories") items = metadata.categories.filter(c => !c.parent_id)
-        else if (activeTab === "subcategories") items = metadata.categories.filter(c => c.parent_id)
+    const tabItems = useMemo(() => {
+        if (activeTab === "categories") return metadata.categories.filter(c => !c.parent_id)
+        if (activeTab === "subcategories") return metadata.categories.filter(c => c.parent_id)
+        return []
+    }, [activeTab, metadata])
 
-        return items.filter(item =>
+    const filteredItems = useMemo(() => {
+        return tabItems.filter(item =>
             item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
         )
-    }, [activeTab, metadata, debouncedSearch])
+    }, [tabItems, debouncedSearch])
 
     // Pagination
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
@@ -280,13 +282,17 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
                                     imageSrc={
                                         planGate
                                             ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                            : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            : debouncedSearch.trim().length > 0
+                                                ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                : "https://img.dudit.com.br/static/mascots/CadastrosServicos.png"
                                     }
-                                    title={planGate ? "Plano necessário" : "Nenhum item encontrado"}
+                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhuma categoria realizada")}
                                     subtitle={
                                         planGate
                                             ? planGate.message
-                                            : "Ajuste os filtros ou adicione uma nova categoria."
+                                            : debouncedSearch.trim().length > 0
+                                                ? "Ajuste os filtros ou tente outra busca."
+                                                : "Adicione uma nova categoria para começar a gerenciar seus serviços."
                                     }
                                     itemButton={
                                         planGate ? {

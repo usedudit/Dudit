@@ -94,7 +94,7 @@ const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Trigg
           // Base styles (hover, text color)
           "font-medium text-brand-inactive-text dark:text-dark-body hover:text-gray-700 dark:hover:text-gray-300",
           // Active text styles (removed border styles here, controlled by motion div below)
-          "data-[state=active]:text-brand-dark dark:data-[state=active]:text-white",
+          "data-[state=active]:font-semibold data-[state=active]:text-brand-dark dark:data-[state=active]:text-white",
           className
         )}
         {...props}

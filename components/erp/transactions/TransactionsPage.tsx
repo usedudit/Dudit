@@ -143,6 +143,9 @@ export default function TransactionsPage({
     recurringTemplates = [],
     paymentMethods = [],
     planGate,
+    forcedTab,
+    pageTitle,
+    pageSubtitle,
 }: {
     initialItems: ERPTransaction[]
     initialNextCursor: FinancialTransactionCursor | null
@@ -154,6 +157,12 @@ export default function TransactionsPage({
     recurringTemplates?: any[]
     paymentMethods?: any[]
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
+    /** When set, locks the page to a specific tab and hides the tab selector */
+    forcedTab?: TransactionTab
+    /** Custom page title (used when forcedTab splits the page) */
+    pageTitle?: string
+    /** Custom page subtitle */
+    pageSubtitle?: string
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -162,7 +171,8 @@ export default function TransactionsPage({
 
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
-    const [activeTab, setActiveTab] = useState<TransactionTab>("Transações")
+    const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
+    const setActiveTab = forcedTab ? () => {} : setActiveTabState
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -689,6 +699,46 @@ export default function TransactionsPage({
         isDatePeriodFilterActive(filters.datePeriod)
     const hasTransactions = loadedTransactions.length > 0
 
+    // ── Summary cards for Recebimentos / Pagamentos pages ──────────────
+    const summaryCards = useMemo(() => {
+        if (!forcedTab || forcedTab === "Transações") return null
+
+        const nowMs = Date.now()
+        const nowYmd = msToBrazilYmd(nowMs)
+        const currentMonth = nowYmd.slice(0, 7) // "YYYY-MM"
+
+        let totalPending = 0
+        let totalOverdue = 0
+        let totalCompletedThisMonth = 0
+
+        for (const item of filteredTransactions) {
+            const status = String(item.rawStatus || "").toLowerCase()
+            const isPaid = status === "paid" || item.status.toLowerCase() === "recebido" || item.status.toLowerCase() === "pago"
+
+            if (isPaid) {
+                // Check if paid this month
+                const payYmd = ymdFromRaw(item.paymentDateRaw) || ymdFromRaw(item.createdAtRaw)
+                if (payYmd && payYmd.startsWith(currentMonth)) {
+                    totalCompletedThisMonth += item.amount
+                }
+            } else if (item.isOverdue || item.status.toLowerCase() === "atrasado" || (item.daysUntilDue !== undefined && item.daysUntilDue < 0)) {
+                totalOverdue += item.amount
+            } else {
+                totalPending += item.amount
+            }
+        }
+
+        const isReceivables = forcedTab === "A receber"
+        return {
+            pending: { label: "Pendente", value: totalPending },
+            overdue: { label: "Vencido", value: totalOverdue },
+            completed: {
+                label: isReceivables ? "Recebido no mês" : "Pago no mês",
+                value: totalCompletedThisMonth,
+            },
+        }
+    }, [forcedTab, filteredTransactions])
+
     const refreshTransactionsNow = useCallback(async () => {
         // Invalidate cache + list via the entity page pattern (same as Products)
         afterMutation()
@@ -1205,10 +1255,10 @@ export default function TransactionsPage({
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
                         <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Transações Financeiras
+                            {pageTitle || "Transações Financeiras"}
                         </h1>
                         <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Acompanhe contas a pagar, receber e movimentações do financeiro.
+                            {pageSubtitle || "Acompanhe contas a pagar, receber e movimentações do financeiro."}
                         </p>
                     </div>
 
@@ -1237,7 +1287,38 @@ export default function TransactionsPage({
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
                     addDisabled={false}
+                    hideTabs={!!forcedTab}
                 />
+
+                {/* ── Summary cards (Recebimentos / Pagamentos only) ── */}
+                {summaryCards && hasTransactions && (
+                    <div className="grid grid-cols-3 gap-3 md:gap-4 mb-5 px-4 md:px-8">
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
+                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
+                                {summaryCards.pending.label}
+                            </p>
+                            <p className="text-lg md:text-xl font-bold text-orange-500">
+                                {formatCurrency(summaryCards.pending.value)}
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
+                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
+                                {summaryCards.overdue.label}
+                            </p>
+                            <p className="text-lg md:text-xl font-bold text-brand-red">
+                                {formatCurrency(summaryCards.overdue.value)}
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 md:p-4 transition-colors">
+                            <p className="text-[11px] md:text-xs font-bold text-brand-inactive-text uppercase tracking-wider mb-1">
+                                {summaryCards.completed.label}
+                            </p>
+                            <p className="text-lg md:text-xl font-bold text-brand-green">
+                                {formatCurrency(summaryCards.completed.value)}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
                     <AnimatePresence mode="wait">

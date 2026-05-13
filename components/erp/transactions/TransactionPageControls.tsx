@@ -49,6 +49,8 @@ interface TransactionPageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     addDisabled?: boolean
+    /** When true, hides the tab selector (used when the tab is forced by the route) */
+    hideTabs?: boolean
 }
 
 const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
@@ -64,6 +66,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     addDisabled = false,
+    hideTabs = false,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -140,21 +143,23 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
 
     return (
         <>
-            <div className="mb-6 px-4 md:px-8">
-                <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as TransactionTab)}>
-                    <TabsList className="px-0">
-                        <TabsTrigger value="Transações" icon={ListIcon}>
-                            Transações
-                        </TabsTrigger>
-                        <TabsTrigger value="A pagar" icon={ArrowDownIcon}>
-                            A pagar
-                        </TabsTrigger>
-                        <TabsTrigger value="A receber" icon={ArrowUpIcon}>
-                            A receber
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-            </div>
+            {!hideTabs && (
+                <div className="mb-6 px-4 md:px-8">
+                    <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as TransactionTab)}>
+                        <TabsList className="px-0">
+                            <TabsTrigger value="Transações" icon={ListIcon}>
+                                Transações
+                            </TabsTrigger>
+                            <TabsTrigger value="A pagar" icon={ArrowDownIcon}>
+                                A pagar
+                            </TabsTrigger>
+                            <TabsTrigger value="A receber" icon={ArrowUpIcon}>
+                                A receber
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
                 <div className="md:hidden flex items-center gap-2 w-full">

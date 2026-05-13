@@ -32,6 +32,8 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 interface SubMenuItem {
     label: string
     href: string
+    /** When true, renders as a disabled "Em breve" item */
+    comingSoon?: boolean
 }
 
 interface NavItem {
@@ -97,12 +99,14 @@ const navItems: NavItem[] = [
     {
         icon: MoneyIcon,
         label: "Financeiro",
-        href: "/erp/financial/transactions",
+        href: "/erp/financial/recebimentos",
         submenu: [
-            { label: "Transações", href: "/erp/financial/transactions" },
+            { label: "Recebimentos", href: "/erp/financial/recebimentos" },
+            { label: "Pagamentos", href: "/erp/financial/pagamentos" },
+            { label: "Movimentações", href: "/erp/financial/transactions" },
             { label: "Caixa (PDV)", href: "/erp/cash-register" },
-            { label: "Fluxo de Caixa", href: "/" },
-            { label: "DRE Gerencial", href: "/" },
+            { label: "Fluxo de Caixa", href: "/", comingSoon: true },
+            { label: "DRE Gerencial", href: "/", comingSoon: true },
             { label: "Cadastros financeiros", href: "/erp/financial/cadastros-financeiro" },
         ],
     },
@@ -270,7 +274,7 @@ export function ERPSidebar() {
 
                 // Submenu item - filter sub-items and hide if none remain
                 if (newItem.submenu) {
-                    const filteredSub = newItem.submenu.filter((sub) => canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
+                    const filteredSub = newItem.submenu.filter((sub) => sub.comingSoon || canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
                     if (filteredSub.length === 0) return null
                     return {
                         ...newItem,
@@ -568,16 +572,30 @@ export function ERPSidebar() {
                                                                         )}
                                                                     </div>
 
-                                                                    <ErpPlanGatedNavItem
-                                                                        href={subItem.href}
-                                                                        label={subItem.label}
-                                                                        planSlug={planSlug}
-                                                                        itemClass={cn(
-                                                                            "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
-                                                                            isActive ? activeClasses : inactiveClasses
-                                                                        )}
-                                                                        onNavigate={() => setIsMobileOpen(false)}
-                                                                    />
+                                                                    {subItem.comingSoon ? (
+                                                                        <span
+                                                                            className={cn(
+                                                                                "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
+                                                                                "text-brand-inactive-text/50 cursor-default"
+                                                                            )}
+                                                                        >
+                                                                            <span className="flex items-center gap-2">
+                                                                                <span>{subItem.label}</span>
+                                                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-dark-border/50 text-brand-inactive-text/70 px-1.5 py-0.5 rounded-md">Em breve</span>
+                                                                            </span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <ErpPlanGatedNavItem
+                                                                            href={subItem.href}
+                                                                            label={subItem.label}
+                                                                            planSlug={planSlug}
+                                                                            itemClass={cn(
+                                                                                "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
+                                                                                isActive ? activeClasses : inactiveClasses
+                                                                            )}
+                                                                            onNavigate={() => setIsMobileOpen(false)}
+                                                                        />
+                                                                    )}
                                                                 </li>
                                                             )
                                                         })}
@@ -607,6 +625,19 @@ export function ERPSidebar() {
                                                         {hasSubmenu ? (
                                                             item.submenu!.map((subItem) => {
                                                                 const isActive = isActivePath(subItem.href)
+                                                                if (subItem.comingSoon) {
+                                                                    return (
+                                                                        <span
+                                                                            key={subItem.label}
+                                                                            className="w-full text-left px-4 py-2.5 text-sm text-brand-inactive-text/40 flex items-center justify-between cursor-default"
+                                                                        >
+                                                                            <span className="flex items-center gap-2">
+                                                                                <span>{subItem.label}</span>
+                                                                                <span className="text-[9px] font-bold uppercase tracking-wider bg-dark-border/50 text-brand-inactive-text/60 px-1.5 py-0.5 rounded-md">Em breve</span>
+                                                                            </span>
+                                                                        </span>
+                                                                    )
+                                                                }
                                                                 return (
                                                                     <ErpPlanGatedNavItem
                                                                         key={subItem.href}
@@ -696,17 +727,27 @@ export function ERPSidebar() {
                                             {hasSubmenu && isMenuExpanded && (
                                                 <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
                                                     {item.submenu!.map((sub) => (
-                                                        <ErpPlanGatedNavItem
-                                                            key={sub.href}
-                                                            href={sub.href}
-                                                            label={sub.label}
-                                                            planSlug={planSlug}
-                                                            itemClass={cn(
-                                                                "py-2 px-3 rounded-lg text-sm transition-colors",
-                                                                isActivePath(sub.href) ? activeClasses : inactiveClasses
-                                                            )}
-                                                            onNavigate={() => setIsMobileOpen(false)}
-                                                        />
+                                                        sub.comingSoon ? (
+                                                            <span
+                                                                key={sub.label}
+                                                                className="py-2 px-3 rounded-lg text-sm text-brand-inactive-text/40 cursor-default flex items-center gap-2"
+                                                            >
+                                                                <span>{sub.label}</span>
+                                                                <span className="text-[9px] font-bold uppercase tracking-wider bg-dark-border/50 text-brand-inactive-text/60 px-1.5 py-0.5 rounded-md">Em breve</span>
+                                                            </span>
+                                                        ) : (
+                                                            <ErpPlanGatedNavItem
+                                                                key={sub.href}
+                                                                href={sub.href}
+                                                                label={sub.label}
+                                                                planSlug={planSlug}
+                                                                itemClass={cn(
+                                                                    "py-2 px-3 rounded-lg text-sm transition-colors",
+                                                                    isActivePath(sub.href) ? activeClasses : inactiveClasses
+                                                                )}
+                                                                onNavigate={() => setIsMobileOpen(false)}
+                                                            />
+                                                        )
                                                     ))}
                                                 </div>
                                             )}

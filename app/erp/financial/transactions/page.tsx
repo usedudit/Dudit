@@ -4,7 +4,6 @@ import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { getPartnerPlan } from "@/lib/services/subscription.service"
 import {
   getTransactionsData,
   getCategoriesData,
@@ -25,14 +24,13 @@ export default async function FinancialTransactionsRoute() {
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
 
-  const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult, plan] = await Promise.all([
+  const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
     getTransactionsData(partnerId),
     getCategoriesData(partnerId),
     getAccountsData(partnerId),
     getRecurringOccurrencesData(partnerId),
     getRecurringTemplatesData(partnerId),
     getPaymentMethodsData(partnerId),
-    getPartnerPlan(partnerId),
   ])
 
   if (!txResult.success) {
@@ -45,10 +43,9 @@ export default async function FinancialTransactionsRoute() {
   const recurringTemplates = recurringTemplatesResult?.success ? recurringTemplatesResult.data : []
   const paymentMethods = paymentMethodsResult?.methods || []
 
-
   return (
     <>
-      <ERPPageHeader title="Transações" />
+      <ERPPageHeader title="Movimentações" />
       <FadeIn className="p-4">
         <TransactionsPage
           initialItems={txResult.items}
@@ -60,6 +57,9 @@ export default async function FinancialTransactionsRoute() {
           recurringOccurrences={recurringOccurrences}
           recurringTemplates={recurringTemplates as any}
           paymentMethods={paymentMethods as any}
+          forcedTab="Transações"
+          pageTitle="Movimentações"
+          pageSubtitle="Extrato financeiro com todas as movimentações realizadas."
         />
       </FadeIn>
     </>

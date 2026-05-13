@@ -206,14 +206,15 @@ export default function FinancialCategoriesPage({
             })()
     }, [activeTab, partnerId])
 
-    const filteredCategoryItems = useMemo(() => {
-        const items =
-            activeTab === "categories"
-                ? categories.filter((c) => !c.parent_id)
-                : categories.filter((c) => c.parent_id)
+    const tabCategoryItems = useMemo(() => {
+        return activeTab === "categories"
+            ? categories.filter((c) => !c.parent_id)
+            : categories.filter((c) => c.parent_id)
+    }, [activeTab, categories])
 
-        return items.filter((item) => item.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
-    }, [activeTab, categories, debouncedSearch])
+    const filteredCategoryItems = useMemo(() => {
+        return tabCategoryItems.filter((item) => item.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
+    }, [tabCategoryItems, debouncedSearch])
 
     const filteredAccounts = useMemo(() => {
         const q = debouncedSearch.toLowerCase()
@@ -578,13 +579,17 @@ export default function FinancialCategoriesPage({
                                     imageSrc={
                                         planGate
                                             ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                            : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            : debouncedSearch.trim().length > 0
+                                                ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                : "https://img.dudit.com.br/static/mascots/CadastrosFinanceiro.png"
                                     }
-                                    title={planGate ? "Plano necessário" : "Nenhum item encontrado"}
+                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhum cadastro realizado")}
                                     subtitle={
                                         planGate
                                             ? planGate.message
-                                            : "Ajuste os filtros ou adicione um novo cadastro."
+                                            : debouncedSearch.trim().length > 0
+                                                ? "Ajuste os filtros ou tente outra busca."
+                                                : "Adicione um novo cadastro financeiro para começar a organizar suas finanças."
                                     }
                                     itemButton={
                                         planGate ? {

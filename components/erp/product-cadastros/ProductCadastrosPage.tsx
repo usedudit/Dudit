@@ -97,17 +97,19 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
     }, [partnerId])
 
     // Filtered Data
-    const filteredItems = useMemo(() => {
-        let items: any[] = []
-        if (activeTab === "categories") items = metadata.categories.filter(c => !c.parent_id)
-        else if (activeTab === "subcategories") items = metadata.categories.filter(c => c.parent_id)
-        else if (activeTab === "brands") items = metadata.brands
-        else if (activeTab === "locations") items = metadata.locations
+    const tabItems = useMemo(() => {
+        if (activeTab === "categories") return metadata.categories.filter(c => !c.parent_id)
+        if (activeTab === "subcategories") return metadata.categories.filter(c => c.parent_id)
+        if (activeTab === "brands") return metadata.brands
+        if (activeTab === "locations") return metadata.locations
+        return []
+    }, [activeTab, metadata])
 
-        return items.filter(item =>
+    const filteredItems = useMemo(() => {
+        return tabItems.filter(item =>
             item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
         )
-    }, [activeTab, metadata, debouncedSearch])
+    }, [tabItems, debouncedSearch])
 
     // Pagination
     const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE)
@@ -302,13 +304,17 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
                                     imageSrc={
                                         planGate
                                             ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                            : "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                            : debouncedSearch.trim().length > 0
+                                                ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                : "https://img.dudit.com.br/static/mascots/CadastrosProdutos.png"
                                     }
-                                    title={planGate ? "Plano necessário" : "Nenhum item encontrado"}
+                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhum cadastro realizado")}
                                     subtitle={
                                         planGate
                                             ? planGate.message
-                                            : "Ajuste os filtros ou adicione um novo cadastro."
+                                            : debouncedSearch.trim().length > 0
+                                                ? "Ajuste os filtros ou tente outra busca."
+                                                : "Adicione um novo cadastro para começar a gerenciar seu inventário."
                                     }
                                     itemButton={
                                         planGate ? {
