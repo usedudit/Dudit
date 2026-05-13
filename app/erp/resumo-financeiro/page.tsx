@@ -4,6 +4,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getFinancialOverviewData } from "@/lib/data/financial-overview"
+import { FadeIn } from "@/components/animations/FadeIn"
 
 export const dynamic = "force-dynamic"
 
@@ -24,7 +25,9 @@ export default async function FinancialOverviewRoute() {
   return (
     <>
       <ERPPageHeader title="Visão Geral" />
-      <FinancialOverviewPage data={result.data} />
+      <FadeIn className="p-4">
+        <FinancialOverviewPage data={result.data} />
+      </FadeIn>
     </>
   )
 }
