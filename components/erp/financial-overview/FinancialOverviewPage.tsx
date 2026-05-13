@@ -1,21 +1,21 @@
 "use client"
- 
+
 import { useState } from "react"
 import type { ReactNode } from "react"
 
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { cn, formatCurrency } from "@/lib/utils"
-import { 
-    ArrowDownIcon, 
-    ArrowUpIcon, 
-    ArrowLeftRightIcon, 
-    BankIcon, 
-    ChartIcon, 
-    ClockIcon, 
-    MoneyIcon, 
-    EyeIcon, 
-    SparklesIcon, 
+import {
+    ArrowDownIcon,
+    ArrowUpIcon,
+    ArrowLeftRightIcon,
+    BankIcon,
+    ChartIcon,
+    ClockIcon,
+    MoneyIcon,
+    EyeIcon,
+    SparklesIcon,
     TrendingUpIcon,
     ArrowRightIcon
 } from "@/lib/icons"
@@ -57,7 +57,7 @@ function formatDate(ymd: string) {
 
 function SectionCard({ className, children }: { className?: string; children: ReactNode }) {
     return (
-        <section className={cn("bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] overflow-hidden shadow-sm shadow-brand-dark/5", className)}>
+        <section className={cn("bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden", className)}>
             {children}
         </section>
     )
@@ -105,11 +105,11 @@ function CashCard({ value }: { value: number }) {
                     <BankIcon className="w-5 h-5 text-white" />
                 </div>
             </div>
-            
+
             <div className="relative z-10">
                 <p className="text-[15px] font-semibold text-brand-inactive-text dark:text-dark-body mb-1">Em caixa</p>
                 <div className="flex items-center justify-between">
-                    <p className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-tight tracking-tight">
+                    <p className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-tight">
                         {formatCurrency(value)}
                     </p>
                     <button className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors p-2">
@@ -123,54 +123,19 @@ function CashCard({ value }: { value: number }) {
 
 function SummaryMetricCard({ title, value, tone, icon: Icon }: { title: string; value: number; tone: "green" | "red"; icon: any }) {
     return (
-        <SectionCard className="p-5 flex flex-col gap-4">
+        <SectionCard className="p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
                 <span className="text-[15px] font-semibold text-brand-inactive-text dark:text-dark-body">{title}</span>
                 <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", tone === "green" ? "bg-brand-green/10 text-brand-green" : "bg-brand-red/10 text-brand-red")}>
                     <Icon className="w-4 h-4" />
                 </div>
             </div>
-            <div className="bg-brand-gray/40 dark:bg-dark-background/50 rounded-[20px] p-5">
-                <p className="text-[28px] font-bold text-brand-dark dark:text-dark-heading tracking-tight">
+            <div className="bg-white dark:bg-dark-background/50 rounded-xl p-2">
+                <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
                     {formatCurrency(value)}
                 </p>
             </div>
         </SectionCard>
-    )
-}
-
-function AngelinaBanner() {
-    return (
-        <FadeIn className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm shadow-brand-dark/5">
-            <div className="flex items-center gap-4">
-                <div className="relative w-14 h-14 shrink-0">
-                    <img 
-                        src="https://img.dudit.com.br/static/mascots/Angelina.png" 
-                        alt="Angelina IA" 
-                        className="w-full h-full object-cover rounded-full border-2 border-brand-green/20"
-                        onError={(e) => {
-                            (e.target as any).src = "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                        }}
-                    />
-                    <div className="absolute -top-1 -right-1 bg-brand-green text-white p-0.5 rounded-full border-2 border-white dark:border-dark-surface">
-                        <SparklesIcon className="w-3 h-3" />
-                    </div>
-                </div>
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px]">Angelina</span>
-                        <Badge variant="green" className="text-[10px] py-0 px-2 h-4 leading-none font-bold uppercase tracking-wider">IA</Badge>
-                    </div>
-                    <p className="text-[14px] text-brand-inactive-text dark:text-dark-body mt-0.5 leading-snug">
-                        <span className="font-bold text-brand-dark dark:text-dark-heading">23 contas vencidas somam R$ 24.380.</span> Envie cobranças via WhatsApp agora e aumente a taxa de recuperação em até 40%
-                    </p>
-                </div>
-            </div>
-            <Button variant="outline" className="rounded-xl px-5 border-brand-border h-10 shrink-0 font-bold flex items-center gap-2 bg-white dark:bg-dark-surface hover:bg-brand-gray/50 transition-all">
-                <SparklesIcon className="w-4 h-4 text-brand-primary" />
-                Análise completa
-            </Button>
-        </FadeIn>
     )
 }
 
@@ -197,7 +162,7 @@ function ListContainer({ title, children, subtitle, headerControls }: { title: s
 
 function StandardListRow({ left, middle, right, onClick }: { left: ReactNode; middle?: ReactNode; right: ReactNode; onClick?: () => void }) {
     return (
-        <tr 
+        <tr
             className="group hover:bg-brand-gray/40 dark:hover:bg-dark-border/10 transition-colors cursor-pointer border-b border-brand-border last:border-0 dark:border-dark-border bg-white dark:bg-dark-surface"
             onClick={onClick}
         >
@@ -233,30 +198,22 @@ function ProjectionCard({ data }: { data: FinancialOverviewData["projection"] })
                     ]}
                 />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-auto">
                 <div className="flex flex-col gap-1">
                     <p className="text-[14px] font-semibold text-brand-inactive-text dark:text-dark-body">Entradas esperadas</p>
-                    <p className="text-[24px] font-bold text-brand-dark/70 dark:text-dark-heading/70 tracking-tight">{formatCurrency(current.inflow)}</p>
+                    <p className="text-[24px] font-bold text-brand-dark/70 dark:text-dark-heading/70">{formatCurrency(current.inflow)}</p>
                 </div>
                 <div className="flex flex-col gap-1">
                     <p className="text-[14px] font-semibold text-brand-inactive-text dark:text-dark-body">Despesas previstas</p>
-                    <p className="text-[24px] font-bold text-brand-dark/70 dark:text-dark-heading/70 tracking-tight">{formatCurrency(current.outflow)}</p>
+                    <p className="text-[24px] font-bold text-brand-dark/70 dark:text-dark-heading/70">{formatCurrency(current.outflow)}</p>
                 </div>
                 <div className="flex flex-col gap-1">
                     <p className="text-[14px] font-semibold text-brand-inactive-text dark:text-dark-body">Saldo líquido</p>
-                    <p className={cn("text-[24px] font-bold tracking-tight", current.net >= 0 ? "text-brand-green" : "text-brand-red")}>
+                    <p className={cn("text-[24px] font-bold", current.net >= 0 ? "text-brand-green" : "text-brand-red")}>
                         {current.net >= 0 ? "+" : ""}{formatCurrency(current.net)}
                     </p>
                 </div>
-            </div>
-
-            <div className="flex items-center gap-3 mt-10">
-                <Button variant="outline" className="rounded-xl px-6 border-brand-border h-11 font-bold bg-white dark:bg-dark-surface hover:bg-brand-gray/50 transition-all">Detalhes</Button>
-                <Button variant="outline" className="rounded-xl px-6 border-brand-border h-11 flex items-center gap-2 group bg-white dark:bg-dark-surface hover:bg-brand-gray/50 transition-all">
-                    <SparklesIcon className="w-4 h-4 text-brand-primary group-hover:scale-110 transition-transform" />
-                    <span className="font-bold">Análise financeira</span>
-                </Button>
             </div>
         </SectionCard>
     )
@@ -296,19 +253,19 @@ function RevenueEvolution({ data }: { data: FinancialOverviewData["revenueEvolut
                                     <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(value || 0))}</span>
                                 </div>
                             )} />} />
-                            <Line 
-                                type="monotone" 
-                                dataKey="gross" 
-                                stroke="#0066FF" 
-                                strokeWidth={2.5} 
-                                dot={{ fill: '#0066FF', strokeWidth: 2, r: 4, stroke: '#fff' }} 
+                            <Line
+                                type="monotone"
+                                dataKey="gross"
+                                stroke="#0066FF"
+                                strokeWidth={2.5}
+                                dot={{ fill: '#0066FF', strokeWidth: 2, r: 4, stroke: '#fff' }}
                                 activeDot={{ r: 6, strokeWidth: 0 }}
                             />
-                            <Line 
-                                type="monotone" 
-                                dataKey="net" 
-                                stroke="#E11D48" 
-                                strokeWidth={2.5} 
+                            <Line
+                                type="monotone"
+                                dataKey="net"
+                                stroke="#E11D48"
+                                strokeWidth={2.5}
                                 strokeDasharray="5 5"
                                 dot={{ fill: '#E11D48', strokeWidth: 2, r: 4, stroke: '#fff' }}
                                 activeDot={{ r: 6, strokeWidth: 0 }}
@@ -328,7 +285,7 @@ function RevenueEvolution({ data }: { data: FinancialOverviewData["revenueEvolut
 function RevenueDistribution({ data }: { data: FinancialOverviewData["revenueDistribution"] }) {
     const [period, setPeriod] = useState<FinancialOverviewPeriod>("daily")
     const total = data.reduce((acc, item) => acc + item.value, 0)
-    
+
     return (
         <SectionCard>
             <div className="px-6 py-5 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
@@ -353,7 +310,7 @@ function RevenueDistribution({ data }: { data: FinancialOverviewData["revenueDis
                     <div key={item.label} className="grid grid-cols-[1fr_auto_60px_auto] items-center gap-4 text-sm">
                         <span className="font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">{item.label}</span>
                         <div className="w-full min-w-[100px] md:min-w-[160px] h-2.5 rounded-full bg-brand-gray dark:bg-dark-border overflow-hidden">
-                            <div className="h-full rounded-full bg-[#0066FF] shadow-[0_0_8px_rgba(0,102,255,0.3)] transition-all duration-500" style={{ width: `${Math.min(100, item.percentage)}%` }} />
+                            <div className="h-full rounded-full bg-[#0066FF] transition-all duration-500" style={{ width: `${Math.min(100, item.percentage)}%` }} />
                         </div>
                         <span className="text-brand-inactive-text dark:text-dark-body font-bold text-right tabular-nums">{item.percentage}%</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading text-right min-w-[100px]">{formatCurrency(item.value)}</span>
@@ -384,7 +341,7 @@ function LatestMovements({ data }: { data: FinancialOverviewData["latestMovement
                             </div>
                         }
                         middle={
-                            <Badge variant="gray" className="text-[10px] uppercase font-bold tracking-wider">
+                            <Badge variant="gray" className="text-[10px] uppercase font-bold">
                                 {item.status}
                             </Badge>
                         }
@@ -421,9 +378,9 @@ function DueAccounts({ data }: { data: FinancialOverviewData["dueAccounts"] }) {
                         </div>
                     }
                     middle={
-                        <Badge 
+                        <Badge
                             variant={item.dueKind === "overdue" ? "red" : item.dueKind === "today" ? "orange" : "gray"}
-                            className="text-[10px] uppercase font-bold tracking-wider"
+                            className="text-[10px] uppercase font-bold"
                         >
                             {dueLabel(item)}
                         </Badge>
@@ -457,31 +414,28 @@ function EmptyState({ text, className }: { text: string; className?: string }) {
 
 export default function FinancialOverviewPage({ data }: { data: FinancialOverviewData }) {
     return (
-        <div className="mx-auto w-full max-w-[1600px] p-4 md:p-8 space-y-8 bg-[#F8FAFC] dark:bg-dark-background min-h-screen">
+        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
             {/* Top Grid: Cash, Metrics, Projection */}
             <div className="grid grid-cols-1 md:grid-cols-[1fr_0.8fr_1.5fr] gap-6">
                 <CashCard value={data.totals.cash} />
-                
+
                 <div className="grid grid-cols-1 gap-6">
-                    <SummaryMetricCard 
-                        title="A receber" 
-                        value={data.totals.receivable} 
-                        tone="green" 
-                        icon={ArrowUpIcon} 
+                    <SummaryMetricCard
+                        title="A receber"
+                        value={data.totals.receivable}
+                        tone="green"
+                        icon={ArrowUpIcon}
                     />
-                    <SummaryMetricCard 
-                        title="Despesas" 
-                        value={data.totals.payable} 
-                        tone="red" 
-                        icon={ArrowDownIcon} 
+                    <SummaryMetricCard
+                        title="Despesas"
+                        value={data.totals.payable}
+                        tone="red"
+                        icon={ArrowDownIcon}
                     />
                 </div>
 
                 <ProjectionCard data={data.projection} />
             </div>
-
-            {/* AI Banner */}
-            <AngelinaBanner />
 
             {/* Secondary Grid: Distribution & Evolution */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

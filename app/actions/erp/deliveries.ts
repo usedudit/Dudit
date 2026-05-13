@@ -9,6 +9,8 @@ import {
   estimateDeliveryTime,
   geocodeAddress,
 } from "@/lib/services/location.service"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -33,6 +35,16 @@ type CreateDeliveryPayload = {
 
 const DEFAULT_PAGE_SIZE = 100
 const ACTIVE_DELIVERY_STATUSES = ["pending", "not_sent", "preparing", "sent", "pickup_available"] as const
+
+function revalidateDeliveryDashboard(partnerId: string) {
+  // @ts-ignore - Next 15 accepts profile as the second argument.
+  revalidateTag(DASHBOARD_TAGS.general(partnerId), "max")
+  // @ts-ignore
+  revalidateTag(DASHBOARD_TAGS.financial(partnerId), "max")
+  // @ts-ignore
+  revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
+  revalidatePath("/erp/dashboard")
+}
 
 async function getDeliveryActorScope(partnerId: string) {
   const access = await requirePartnerRouteAccess(partnerId, "logistics")
@@ -375,6 +387,7 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     return { success: false as const, error: linkError.message }
   }
 
+  revalidateDeliveryDashboard(payload.partnerId)
   return { success: true as const, deliveryId: created.id }
 }
 
@@ -614,6 +627,7 @@ export async function updateERPDeliveryStatusAction(params: {
     })
   }
 
+  revalidateDeliveryDashboard(params.partnerId)
   return { success: true as const }
 }
 
@@ -690,5 +704,6 @@ export async function updateERPDeliveryAction(payload: {
   const { error: insertLinksError } = await supabase.from("delivery_orders").insert(nextLinks)
   if (insertLinksError) return { success: false as const, error: insertLinksError.message }
 
+  revalidateDeliveryDashboard(payload.partnerId)
   return { success: true as const }
 }

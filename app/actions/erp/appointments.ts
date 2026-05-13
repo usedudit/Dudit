@@ -14,6 +14,7 @@ import { getAdminTimeline } from "@/lib/services/timeline.service"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -565,6 +566,11 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
     // Revalidation — once at the end, not per-row
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
     return { success: true, created: data || [] }
@@ -690,6 +696,11 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
 
     await revalidateEntityTimeline("appointment", appointmentId)
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
     return { success: true, item: syncedAppointment || updated }
@@ -846,6 +857,10 @@ export async function deleteAppointmentAction(appointmentId: string) {
     if (error) throw error
 
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    revalidatePath("/erp/dashboard")
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao excluir agendamento" }
@@ -877,6 +892,10 @@ export async function deleteUnavailableSeriesAction(partnerId: string, serviceNa
     })
 
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    revalidatePath("/erp/dashboard")
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao excluir série" }

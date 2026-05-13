@@ -3,6 +3,7 @@
 import { revalidateTag, revalidatePath } from "next/cache"
 import { TAGS } from "./revalidation-tags"
 import { redis } from "@/lib/redis"
+import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
@@ -19,6 +20,9 @@ export async function revalidateProducts(partnerId: string, productId?: string) 
   // Limpa a lista de produtos desse parceiro
   if (partnerId) {
     safeRevalidateTag(TAGS.products(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
     safeRevalidateTag(partnerId) // Tag genérica do parceiro
     safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
   }
@@ -38,6 +42,10 @@ export async function revalidateProducts(partnerId: string, productId?: string) 
 export async function revalidateOrders(partnerId: string) {
   if (partnerId) {
     safeRevalidateTag(TAGS.orders(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
     safeRevalidateTag(partnerId)
     safeRevalidateTag(`partner-${partnerId}-orders`)
   }
@@ -45,6 +53,7 @@ export async function revalidateOrders(partnerId: string) {
 
   // Clear router cache for relevant pages
   revalidatePath("/erp/orders")
+  revalidatePath("/erp/dashboard")
   revalidatePath("/pedidos")
   revalidatePath("/", "layout")
 }
@@ -138,6 +147,9 @@ export async function revalidateSuppliers(partnerId: string) {
 export async function revalidateStockMovements(partnerId: string) {
   if (partnerId) {
     safeRevalidateTag(TAGS.stockMovements(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
   }
   safeRevalidateTag("stock-movements")
 }
@@ -148,9 +160,12 @@ export async function revalidateStockMovements(partnerId: string) {
 export async function revalidateTransactions(partnerId: string) {
   if (partnerId) {
     safeRevalidateTag(TAGS.transactions(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
   }
   safeRevalidateTag("transactions")
   revalidatePath("/erp/resumo-financeiro")
+  revalidatePath("/erp/dashboard")
   revalidatePath("/erp/transactions")
   revalidatePath("/erp/contas-a-pagar")
   revalidatePath("/erp/contas-a-receber")
