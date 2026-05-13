@@ -4,22 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import {
-    ShoppingCartIcon,
-    SettingsIcon,
-    XIcon,
-    ChevronRightIcon,
-    ChevronDownIcon,
-    HomeIcon,
-    StoreIcon,
-    Package,
-    MegaphoneIcon,
-    MoneyIcon,
-    Users,
-    GridIcon,
-    ChartIcon,
-    WrenchIcon
-} from "@/lib/icons"
+import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, StoreIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePermissions } from "@/lib/permission-context"
@@ -85,9 +70,9 @@ const navItems: NavItem[] = [
         label: "Serviços",
         href: "/erp/servicos",
         submenu: [
+            { label: "Catálogo de Serviços", href: "/erp/servicos" },
             { label: "Agendamentos", href: "/erp/agendamentos" },
             { label: "Ordens de Serviço", href: "/" },
-            { label: "Catálogo de Serviços", href: "/erp/servicos" },
             { label: "Cadastros de Serviços", href: "/erp/servicos/cadastros" },
         ],
     },
@@ -99,15 +84,14 @@ const navItems: NavItem[] = [
     {
         icon: MoneyIcon,
         label: "Financeiro",
-        href: "/erp/financial/recebimentos",
+        href: "/erp/resumo-financeiro",
         submenu: [
-            { label: "Recebimentos", href: "/erp/financial/recebimentos" },
-            { label: "Pagamentos", href: "/erp/financial/pagamentos" },
-            { label: "Movimentações", href: "/erp/financial/transactions" },
+            { label: "Visão Geral", href: "/erp/resumo-financeiro" },
+            { label: "Movimentações", href: "/erp/transactions" },
+            { label: "Contas a Pagar", href: "/erp/contas-a-pagar" },
+            { label: "Contas a Receber", href: "/erp/contas-a-receber" },
             { label: "Caixa (PDV)", href: "/erp/cash-register" },
-            { label: "Fluxo de Caixa", href: "/", comingSoon: true },
-            { label: "DRE Gerencial", href: "/", comingSoon: true },
-            { label: "Cadastros financeiros", href: "/erp/financial/cadastros-financeiro" },
+            { label: "Cadastros financeiros", href: "/erp/transactions/cadastros-financeiro" },
         ],
     },
     {
@@ -143,7 +127,7 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/logistics": "crescer",
     "/erp/products/cadastros": "crescer",
     "/erp/servicos/cadastros": "crescer",
-    "/erp/financial/cadastros-financeiro": "crescer",
+    "/erp/transactions/cadastros-financeiro": "crescer",
 }
 
 function ErpPlanGatedNavItem({
@@ -663,7 +647,6 @@ export function ERPSidebar() {
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
-
                                     </div>
                                 </li>
                             )

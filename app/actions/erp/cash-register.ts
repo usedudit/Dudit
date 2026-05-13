@@ -614,7 +614,7 @@ export async function createCashMovementAction(input: {
     })
     await revalidateEntityTimeline("cash_session", sessionId)
     revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/financial/transactions")
+    revalidatePath("/erp/transactions")
 
     console.log("[cash-register] createCashMovementAction OK (fallback path)", {
       partnerId: input.partnerId,
@@ -640,7 +640,7 @@ export async function createCashMovementAction(input: {
   })
   await revalidateEntityTimeline("cash_session", sessionId)
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/financial/transactions")
+  revalidatePath("/erp/transactions")
 
   const { data: movement } = await supabase
     .from("cash_movements")
@@ -718,7 +718,7 @@ export async function reverseCashMovementAction(input: {
     }
 
     revalidatePath("/erp/cash-register")
-    revalidatePath("/erp/financial/transactions")
+    revalidatePath("/erp/transactions")
 
     return fallbackResult
   }
@@ -745,7 +745,7 @@ export async function reverseCashMovementAction(input: {
   }
 
   revalidatePath("/erp/cash-register")
-  revalidatePath("/erp/financial/transactions")
+  revalidatePath("/erp/transactions")
 
   return { success: true as const, data: rpcData }
 }

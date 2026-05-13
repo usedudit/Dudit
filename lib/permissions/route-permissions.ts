@@ -90,19 +90,19 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
     // ── Financeiro
     financial_transactions: {
-        key: "financial_transactions", path: "/erp/financial/transactions", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
+        key: "financial_transactions", path: "/erp/transactions", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_approve_payment", "can_view_reports"],
     },
     cash_register: {
         key: "cash_register", path: "/erp/cash-register", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_open_cash", "can_close_cash"],
     },
-    financial_dashboard: { key: "financial_dashboard", path: "/erp/financial/dashboard", label: "Fluxo de caixa", category: "Financeiro", legacyCategory: "financial" },
+    financial_dashboard: { key: "financial_dashboard", path: "/erp/resumo-financeiro", label: "Visão Geral", category: "Financeiro", legacyCategory: "financial" },
     financial_dre: {
         key: "financial_dre", path: "/erp/financial/dre", label: "DRE Gerencial", category: "Financeiro", legacyCategory: "financial",
         specificPermissions: ["can_view_dre"],
     },
-    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/financial/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
+    cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transactions/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
 
     // ── Minha Vitrine
     store_customize: {

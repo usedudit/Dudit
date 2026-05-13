@@ -452,8 +452,8 @@ const PaymentModal = ({
     const basisForMethodCalc = useMemo(() => {
         const raw = Math.max(0, Number(paymentBaseAmount || 0));
         if (view === 'split' || editingPaymentIndex !== null) return raw;
-        if (view === 'card' || view === 'pix') return Math.max(0, Number(chargeTarget || 0));
-        return Math.min(raw, Math.max(0, Number(chargeTarget || 0)));
+        if (view === 'money') return Math.min(raw, Math.max(0, Number(chargeTarget || 0)));
+        return raw > 0.009 ? raw : Math.max(0, Number(chargeTarget || 0));
     }, [view, editingPaymentIndex, paymentBaseAmount, chargeTarget]);
 
     useEffect(() => {
@@ -576,6 +576,11 @@ const PaymentModal = ({
         setPaymentBaseAmount(val);
     };
 
+    const handleMoneyInputSync = (val: number) => {
+        setPaymentBaseAmount(val);
+        setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
+    };
+
     const handleCashNumpadInput = (key: string) => {
         const nextRaw = key === '.'
             ? (cashCalculatorInput.includes('.') ? cashCalculatorInput : `${cashCalculatorInput || '0'}.`)
@@ -630,10 +635,7 @@ const PaymentModal = ({
         return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
 
-    const isAllocationUnderpaid =
-        (view === 'card' || view === 'pix') && editingPaymentIndex === null && legFinalCharged != null
-            ? legFinalCharged < finalDueForLeg - 0.01
-            : allocationTotal < chargeTarget - 0.01;
+    const isAllocationUnderpaid = allocationTotal < chargeTarget - 0.01;
     const isUnderpaid = isAllocationUnderpaid;
     const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.01;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
@@ -1170,8 +1172,14 @@ const PaymentModal = ({
                                                         calculation={paymentCalculation}
                                                         baseAllocated={basisForMethodCalc}
                                                     />
-                                                    <div className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading">
-                                                        {formatCalculatorAmount(paymentBaseAmount)}
+                                                    <div className="flex justify-center mt-2">
+                                                        <MoneyInput
+                                                            value={paymentBaseAmount}
+                                                            onChange={handleMoneyInputSync}
+                                                            className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading border-none bg-transparent h-auto py-0 focus:ring-0 focus:border-none shadow-none"
+                                                            prefix=""
+                                                            autoFocus
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>

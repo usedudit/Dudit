@@ -423,7 +423,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Devoluções</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalRefunds)}</span></div>
                                             <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
                                                 <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={() => notifyError("Reimpressão em breve.")}>{isOpen ? "Reimprimir cupom de abertura" : "Reimprimir cupom de fechamento"}</button>
-                                                <Link href="/erp/financial/transactions" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
+                                                <Link href="/erp/transactions" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
                                             </div>
                                         </div>
                                     </div>

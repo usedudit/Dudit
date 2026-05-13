@@ -150,6 +150,10 @@ export async function revalidateTransactions(partnerId: string) {
     safeRevalidateTag(TAGS.transactions(partnerId))
   }
   safeRevalidateTag("transactions")
+  revalidatePath("/erp/resumo-financeiro")
+  revalidatePath("/erp/transactions")
+  revalidatePath("/erp/contas-a-pagar")
+  revalidatePath("/erp/contas-a-receber")
 }
 
 /**
