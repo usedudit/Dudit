@@ -17,7 +17,8 @@ import {
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard, DefaultModal, DropdownItem } from '@/components/reusable';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
-import { QuoteHistoryTab, type QuoteHistoryEntryRow } from "./QuoteHistoryTab"
+import { QuoteHistoryTab } from "./QuoteHistoryTab"
+import { type HistoryEntry as QuoteHistoryEntryRow } from "@/components/erp/shared/HistoryTimeline"
 import { useNotification } from "@/hooks/use-notification";
 import CustomerCard from '@/components/reusable/CustomerCard';
 import { useSidebar } from "@/lib/sidebar-context";
