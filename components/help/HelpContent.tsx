@@ -97,7 +97,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 elements.push(
                     <div key={i} className="mb-8 rounded-xl overflow-hidden border border-brand-border dark:border-dark-border bg-gray-50 dark:bg-dark-surface">
                         <img src={url} alt={alt} className="w-full h-auto block dark:opacity-90" />
-                        {alt && <div className="px-4 py-2 bg-white dark:bg-dark-surface text-[11px] text-brand-inactive-text dark:text-dark-body font-medium border-t border-gray-100 dark:border-dark-border text-center uppercase tracking-wider">{alt}</div>}
+                        {alt && <div className="px-4 py-2 bg-white dark:bg-dark-surface text-sm text-brand-inactive-text dark:text-dark-body font-medium border-t border-gray-100 dark:border-dark-border text-center uppercase tracking-wider">{alt}</div>}
                     </div>
                 )
             }
