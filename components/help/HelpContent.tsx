@@ -57,20 +57,20 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 const cleanRows = tableRows.filter(row => !row.some(cell => cell.includes("---")))
 
                 elements.push(
-                    <div key={`table-wrapper-${key}`} className="overflow-x-auto mb-8 border border-gray-100 dark:border-dark-border rounded-xl">
+                    <div key={`table-wrapper-${key}`} className="overflow-x-auto mb-8 border border-brand-border dark:border-dark-border rounded-xl">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border">
+                            <thead className="bg-brand-border dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
                                 <tr>
                                     {cleanRows[0].map((cell, i) => (
-                                        <th key={i} className="px-6 py-4 font-bold text-gray-900 dark:text-dark-heading">{cell.trim()}</th>
+                                        <th key={i} className="px-6 py-4 font-bold text-brand-dark dark:text-dark-heading">{cell.trim()}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
+                            <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                                 {cleanRows.slice(1).map((row, ri) => (
-                                    <tr key={ri} className="hover:bg-gray-50/50 dark:hover:bg-dark-surface/50 transition-colors">
+                                    <tr key={ri} className="hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors">
                                         {row.map((cell, ci) => (
-                                            <td key={ci} className="px-6 py-4 text-gray-600 dark:text-dark-body leading-relaxed">
+                                            <td key={ci} className="px-6 py-4 text-gray-600 dark:text-dark-body">
                                                 {parseInline(cell.trim())}
                                             </td>
                                         ))}
@@ -95,9 +95,9 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 const alt = trimmedLine.match(/\[(.*?)\]/)?.[1] || ""
                 const url = trimmedLine.match(/\((.*?)\)/)?.[1] || ""
                 elements.push(
-                    <div key={i} className="mb-8 rounded-xl overflow-hidden border border-gray-100 dark:border-dark-border shadow-sm bg-gray-50 dark:bg-dark-surface">
+                    <div key={i} className="mb-8 rounded-xl overflow-hidden border border-brand-border dark:border-dark-border shadow-sm bg-gray-50 dark:bg-dark-surface">
                         <img src={url} alt={alt} className="w-full h-auto block dark:opacity-90" />
-                        {alt && <div className="px-4 py-2 bg-white dark:bg-dark-surface text-[11px] text-gray-400 dark:text-dark-body font-medium border-t border-gray-100 dark:border-dark-border text-center uppercase tracking-wider">{alt}</div>}
+                        {alt && <div className="px-4 py-2 bg-white dark:bg-dark-surface text-[11px] text-brand-inactive-text dark:text-dark-body font-medium border-t border-gray-100 dark:border-dark-border text-center uppercase tracking-wider">{alt}</div>}
                     </div>
                 )
             }
@@ -110,9 +110,9 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 const id = text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-")
 
                 if (level === 2) {
-                    elements.push(<h2 id={id} key={i} className="text-2xl font-bold text-gray-900 dark:text-dark-heading mt-12 mb-6 scroll-mt-24">{text}</h2>)
+                    elements.push(<h2 id={id} key={i} className="text-2xl font-bold text-brand-dark dark:text-dark-heading mt-12 mb-6 scroll-mt-24">{text}</h2>)
                 } else {
-                    elements.push(<h3 id={id} key={i} className="text-xl font-bold text-gray-900 dark:text-dark-heading mt-8 mb-4 scroll-mt-24">{text}</h3>)
+                    elements.push(<h3 id={id} key={i} className="text-xl font-bold text-brand-dark dark:text-dark-heading mt-8 mb-4 scroll-mt-24">{text}</h3>)
                 }
             }
             // Lists
@@ -170,12 +170,12 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
     return (
         <div className="max-w-3xl mx-auto py-8 lg:py-12 px-6 lg:px-12">
             {/* Breadcrumbs */}
-            <nav className="flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-dark-body mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
+            <nav className="flex items-center gap-2 text-xs font-medium text-brand-text-inactive dark:text-dark-body mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
                 <span>Central de Ajuda</span>
                 <ChevronRightIcon size={12} />
                 <span className="capitalize">{article.category.replace("-", " ")}</span>
                 <ChevronRightIcon size={12} />
-                <span className="text-gray-900 dark:text-dark-heading font-bold">{article.title}</span>
+                <span className="text-brand-dark dark:text-dark-heading font-bold">{article.title}</span>
             </nav>
 
             {/* Header */}
@@ -203,11 +203,11 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         )}
                     </Button>
                 </div>
-                <h1 className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-dark-heading mb-4 tracking-tight leading-tight">
+                <h1 className="text-4xl font-black text-brand-dark dark:text-dark-heading mb-4">
                     {article.title}
                 </h1>
                 {article.description && (
-                    <p className="text-xl text-gray-500 dark:text-dark-body font-medium leading-relaxed">
+                    <p className="text-xl text-brand-text-inactive dark:text-dark-body font-medium leading-relaxed">
                         {article.description}
                     </p>
                 )}
@@ -219,13 +219,13 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
             </article>
 
             {/* Footer Navigation */}
-            <div className="mt-20 pt-10 border-t border-gray-100 dark:border-dark-border flex justify-between items-center gap-4">
+            <div className="mt-20 pt-10 border-t border-brand-border dark:border-dark-border flex justify-between items-center gap-4">
                 {prevArticle ? (
                     <Link
                         href={`/ajuda/${prevArticle.category}/${prevArticle.slug}`}
                         className="flex flex-col gap-1 group max-w-[45%]"
                     >
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase tracking-widest">Anterior</span>
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Anterior</span>
                         <span className="text-sm font-bold text-brand-green group-hover:underline truncate">
                             {prevArticle.title}
                         </span>
@@ -237,7 +237,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         href={`/ajuda/${nextArticle.category}/${nextArticle.slug}`}
                         className="flex flex-col gap-1 text-right group max-w-[45%]"
                     >
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase tracking-widest">Próximo</span>
+                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Próximo</span>
                         <span className="text-sm font-bold text-brand-green group-hover:underline truncate">
                             {nextArticle.title}
                         </span>
