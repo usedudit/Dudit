@@ -38,7 +38,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
             const parts = text.split(/(\*\*.*?\*\*)/g)
             return parts.map((part, i) => {
                 if (part.startsWith("**") && part.endsWith("**")) {
-                    return <strong key={i} className="font-bold text-gray-900 dark:text-dark-heading">{part.slice(2, -2)}</strong>
+                    return <strong key={i} className="font-bold text-brand-dark dark:text-dark-heading">{part.slice(2, -2)}</strong>
                 }
                 return part
             })
