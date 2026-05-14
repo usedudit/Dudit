@@ -154,7 +154,7 @@ async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData
       const next7 = addDays(today, 7)
 
       const [orders, appointments, transactions, products] = await Promise.all([
-        supabase.from("orders").select("id, order_number, customer_name, total_amount, payment_status, order_status, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(120),
+        supabase.from("orders").select("id, order_number, customer_name, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(120),
         supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, status, price, staff_name, source").eq("partner_id", partnerId).gte("start_date", today).lte("start_date", next7).order("start_date").order("start_time").limit(60),
         supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type").eq("partner_id", partnerId).or(`created_at.gte.${from}T00:00:00,due_date.gte.${today}`).order("created_at", { ascending: false }).limit(400),
         supabase.from("products").select("id, name, stock_quantity, category, is_active").eq("partner_id", partnerId).eq("is_active", true).order("stock_quantity").limit(80),
@@ -203,7 +203,7 @@ async function getCachedGeneral(partnerId: string): Promise<GeneralDashboardData
           subtitle: order.customer_name || "Cliente não informado",
           meta: dateLabel(order.created_at),
           value: brl(order.total_amount),
-          tone: isPaid(order.payment_status) ? "green" : "orange",
+          tone: isPaid(order.situation) ? "green" : "orange",
         })),
         nextAppointments: appointmentRows.slice(0, 6).map((item: any) => ({
           id: item.id,
@@ -243,7 +243,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
       const from = addDays(today, -29)
       const [products, orders, items] = await Promise.all([
         supabase.from("products").select("id, name, stock_quantity, category, price, is_active, created_at").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(300),
-        supabase.from("orders").select("id, total_amount, order_status, payment_status, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).order("created_at", { ascending: false }).limit(300),
+        supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).order("created_at", { ascending: false }).limit(300),
         supabase.from("order_items").select("product_name, quantity, total_price, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(600),
       ])
       if (products.error) throw products.error
@@ -253,7 +253,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
       const orderRows = orders.data || []
       const itemRows = items.error ? [] : items.data || []
       const revenue = orderRows.reduce((acc: number, order: any) => acc + money(order.total_amount), 0)
-      const completed = orderRows.filter((order: any) => ["completed", "concluído", "concluido", "paid", "pago"].includes(String(order.order_status || order.payment_status).toLowerCase()))
+      const completed = orderRows.filter((order: any) => ["completed", "concluído", "concluido", "paid", "pago"].includes(String(order.situation).toLowerCase()))
       const out = productRows.filter((p: any) => Number(p.stock_quantity || 0) <= 0)
       const low = productRows.filter((p: any) => Number(p.stock_quantity || 0) > 0 && Number(p.stock_quantity || 0) <= 5)
       const sold = new Map<string, number>()

@@ -57,7 +57,7 @@ function formatDate(ymd: string) {
 
 function SectionCard({ className, children }: { className?: string; children: ReactNode }) {
     return (
-        <section className={cn("bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden", className)}>
+        <section className={cn("bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border rounded-xl overflow-hidden", className)}>
             {children}
         </section>
     )

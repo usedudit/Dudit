@@ -101,7 +101,7 @@ export async function fetchStoreOrders(partnerId: string, storeId: string | null
   // supabase singleton imported directly
 
   let query = supabase.from("orders")
-    .select("id, order_number, customer_name, total_amount, situation, delivery_status, payment_status, payment_method, created_at, store_id, partner_id, source")
+    .select("id, order_number, customer_name, total_amount, situation, delivery_status, payment_method, created_at, store_id, partner_id, source")
     .eq("partner_id", partnerId)
 
   if (storeId) {
