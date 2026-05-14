@@ -60,8 +60,9 @@ export default function HelpTOC({ content }: { content: string }) {
     }
 
     return (
-        <aside className="hidden xl:block w-64 shrink-0 py-8 px-6 sticky top-0 h-fit">
+        <aside className="hidden xl:block w-64 shrink-0 py-8 px-6 sticky top-[72px] h-[calc(100vh-72px)] overflow-y-auto custom-scrollbar">
             <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+
                 <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M4 6h16M4 12h16M4 18h7" />
                 </svg>

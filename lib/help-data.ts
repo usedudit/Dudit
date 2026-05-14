@@ -29,6 +29,8 @@ export const helpCategories: HelpCategory[] = [
                 content: `
 ## Como fazer login na plataforma pela primeira vez?
 
+![Primeiro acesso ao Portal](https://img.dudit.com.br/static/Help_Login_FirstAccess.png)
+
 ### Primeiro acesso ao Portal
 
 Se este é o seu primeiro acesso, você precisará criar uma senha.
@@ -55,6 +57,8 @@ Apenas acesse a página do portal gestor clicando aqui: https://dudit.com.br/aut
                 content: `
 ## Visão geral
 O acesso à plataforma Dudit é o ponto de partida para gerenciar seu negócio ou realizar compras. Oferecemos métodos de autenticação seguros e rápidos para garantir que você chegue ao que importa com poucos cliques.
+
+![Tela de Login](https://img.dudit.com.br/static/Help_Login_Screen.png)
 
 ## O que é possível fazer
 *   Entrar com E-mail e Senha.
@@ -106,6 +110,8 @@ Certifique-se de que o *Caps Lock* não está ativado. Se persistir, utilize a o
 ## Visão geral
 Seja você um cliente em busca de produtos locais ou um empreendedor pronto para abrir sua loja, o primeiro passo é criar sua conta na Dudit. O processo é simples e focado na segurança dos seus dados.
 
+![Tela de Cadastro](https://img.dudit.com.br/static/Help_Signup_Screen.png)
+
 ## O que é possível fazer
 *   Criar uma conta nova usando seu e-mail.
 *   Utilizar sua conta Google para cadastro instantâneo.
@@ -153,6 +159,8 @@ Aguarde alguns minutos. Verifique o **Spam**. Tente "Reenviar e-mail" após 60 s
 ## Visão geral
 O **Assistente de Cadastro de Parceiro** guia você por 4 etapas simples para configurar sua vitrine e painel de gestão.
 
+![Wizard de Cadastro](https://img.dudit.com.br/static/Help_PartnerWizard.png)
+
 ## Como usar (Passo a Passo)
 
 ### Etapa 1: Criar sua conta
@@ -182,6 +190,7 @@ Informe o endereço completo. Digite o **CEP** para preenchimento automático.
             }
         ]
     },
+
     {
         id: "gestao",
         title: "GESTÃO",

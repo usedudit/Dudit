@@ -14,8 +14,10 @@ export default function HelpCenterPage() {
     const params = useParams()
     const router = useRouter()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const [searchQuery, setSearchQuery] = useState("")
     
     // Slug handling: can be undefined (home), or an array [category, article]
+
     const slugArray = params.slug as string[] | undefined
     const articleSlug = slugArray?.[slugArray.length - 1]
     
@@ -49,12 +51,17 @@ export default function HelpCenterPage() {
             <HelpHeader 
                 onToggleMenu={() => setMobileMenuOpen(!mobileMenuOpen)} 
                 menuOpen={mobileMenuOpen}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
             />
 
             <div className="flex-1 flex w-full max-w-[1440px] mx-auto relative h-[calc(100vh-72px)] overflow-hidden">
                 
                 {/* Desktop Sidebar */}
-                <HelpSidebar className="hidden lg:flex w-72 shrink-0 border-r border-gray-100" />
+                <HelpSidebar 
+                    className="hidden lg:flex w-72 shrink-0 border-r border-gray-100" 
+                    searchQuery={searchQuery}
+                />
 
                 {/* Mobile Sidebar (Drawer) */}
                 <AnimatePresence>
@@ -74,11 +81,15 @@ export default function HelpCenterPage() {
                                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
                                 className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 lg:hidden shadow-2xl"
                             >
-                                <HelpSidebar className="w-full h-full border-none" />
+                                <HelpSidebar 
+                                    className="w-full h-full border-none" 
+                                    searchQuery={searchQuery}
+                                />
                             </motion.div>
                         </>
                     )}
                 </AnimatePresence>
+
 
                 {/* Main View Area */}
                 <main className="flex-1 overflow-y-auto scroll-smooth custom-scrollbar relative">

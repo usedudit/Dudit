@@ -8,10 +8,15 @@ import { helpCategories, HelpCategory, HelpArticle } from "@/lib/help-data"
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
-export default function HelpSidebar({ className }: { className?: string }) {
+export default function HelpSidebar({ 
+    className,
+    searchQuery
+}: { 
+    className?: string,
+    searchQuery: string
+}) {
     const params = useParams()
     const currentSlug = params.slug?.[params.slug.length - 1]
-    const [searchQuery, setSearchQuery] = useState("")
     const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
         "boas-vindas": true,
         "login-registro": true,
@@ -26,32 +31,16 @@ export default function HelpSidebar({ className }: { className?: string }) {
         ...cat,
         articles: cat.articles.filter(art => 
             art.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            (art as any).description?.toLowerCase().includes(searchQuery.toLowerCase())
+            art.description.toLowerCase().includes(searchQuery.toLowerCase())
         )
     })).filter(cat => cat.articles.length > 0)
 
     return (
-        <aside className={cn("flex flex-col h-full bg-white border-r border-gray-100 overflow-y-auto custom-scrollbar", className)}>
-            {/* Search Bar */}
-            <div className="p-4 sticky top-0 bg-white z-10">
-                <div className="relative">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Perguntar ou buscar..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green transition-all"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded bg-white pointer-events-none">
-                        Ctrl K
-                    </div>
-                </div>
-            </div>
-
+        <aside className={cn("flex flex-col h-[calc(100vh-72px)] bg-white border-r border-gray-100 overflow-y-auto custom-scrollbar sticky top-[72px]", className)}>
             {/* Navigation */}
-            <nav className="flex-1 px-2 pb-8">
+            <nav className="flex-1 px-2 pt-4 pb-8">
                 {filteredCategories.map(category => (
+
                     <div key={category.id} className="mb-2">
                         <button
                             onClick={() => toggleCategory(category.id)}
