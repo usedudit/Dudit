@@ -80,6 +80,7 @@ function buildLimitsDisplay(limits: Record<string, any>): string[] {
 
 interface PlanCardProps {
     name: string
+    slug: string
     objective: string
     price: number
     features: string[]
@@ -88,11 +89,13 @@ interface PlanCardProps {
     isCurrent: boolean
     isDowngrade: boolean
     isLoading: boolean
+    billingCycle: "monthly" | "annually"
     onAction: () => void
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({
     name,
+    slug,
     objective,
     price,
     features,
@@ -101,91 +104,106 @@ const PlanCard: React.FC<PlanCardProps> = ({
     isCurrent,
     isDowngrade,
     isLoading,
+    billingCycle,
     onAction,
-}) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className={`rounded-[32px] p-6 flex flex-col h-full relative border transition-all duration-300 bg-white dark:bg-dark-surface ${popular
-            ? "border-brand-green shadow-[0_20px_50px_rgba(5,150,105,0.15)] z-10"
-            : "border-brand-border dark:border-dark-border"
-            }`}
-    >
-        {popular && (
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-green text-white text-[10px] font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
-                Mais popular
-                <CheckCircleIcon size={12} className="text-white fill-white/20" />
-            </div>
-        )}
+}) => {
+    // Calculate display price
+    const displayPrice = billingCycle === "annually" ? price * 0.8 : price
+    const showTwelveInstallments = billingCycle === "annually" && price > 0
 
-        {/* Header */}
-        <div className="mb-6 pt-2">
-            <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">
-                {name}
-            </h3>
-            
-            <div className="mb-4">
-                {price > 0 && <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">12x de</span>}
-                <div className="flex items-baseline gap-1 mt-1">
-                    <span className={`${price > 0 ? "text-2xl" : "text-xl"} font-bold text-brand-dark dark:text-dark-heading`}>
-                        {price > 0 ? formatCurrency(price) : "Grátis"}
-                    </span>
-                    {price > 0 && <span className="text-sm text-brand-inactive-text">/mês</span>}
+    // Dynamic features header
+    let featuresHeader = "Itens inclusos"
+    if (slug === "crescer") featuresHeader = "Tudo do Começar e mais:"
+    else if (slug === "escalar") featuresHeader = "Tudo do Crescer e mais:"
+    else if (slug === "profissional") featuresHeader = "Tudo do Escalar e mais:"
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className={`rounded-3xl p-6 flex flex-col h-full relative transition-all duration-300 bg-white dark:bg-dark-surface ${popular
+                ? "border-2 border-brand-green z-10"
+                : "border border-brand-border dark:border-dark-border"
+                }`}
+        >
+            {popular && (
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                    Mais popular
+                </div>
+            )}
+
+            {/* Header */}
+            <div className="mb-6 pt-2">
+                <h3 className="text-brand-inactive-text dark:text-dark-body text-md font-medium mb-1">
+                    {name}
+                </h3>
+
+                <div className="mb-4">
+                    {showTwelveInstallments && <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">12x de</span>}
+                    <div className="flex items-baseline gap-1 mt-1">
+                        <span className={`${price > 0 ? "text-2xl" : "text-xl"} font-bold text-brand-dark dark:text-dark-heading`}>
+                            {price > 0 ? formatCurrency(displayPrice) : "Grátis"}
+                        </span>
+                        {price > 0 && <span className="text-sm text-brand-inactive-text">/mês</span>}
+                    </div>
+                </div>
+
+                <Button
+                    variant={popular ? "default" : "outline"}
+                    className={`w-full h-12 rounded-xl text-base font-bold transition-all duration-300 ${popular ? "bg-brand-green text-white hover:bg-brand-green/90 border-0" : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface/50"}`}
+                    onClick={onAction}
+                    disabled={isLoading || isCurrent}
+                >
+                    {isLoading ? (
+                        <Loader2 size={18} className="animate-spin mr-2" />
+                    ) : isCurrent ? (
+                        "Plano Atual"
+                    ) : isDowngrade ? (
+                        "Fazer downgrade"
+                    ) : price === 0 ? (
+                        "Começar"
+                    ) : (
+                        "Assinar"
+                    )}
+                </Button>
+
+                <p className="text-center text-xs text-brand-inactive-text mt-3">
+                    Cancele quando quiser
+                </p>
+            </div>
+
+            <div className="w-full h-px bg-brand-border dark:bg-dark-border mb-6" />
+
+            {/* Features */}
+            <div className="flex-1 space-y-6">
+                <div>
+                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">{featuresHeader}</p>
+                    <ul className="space-y-3.5">
+                        {features.map((feature, i) => (
+                            <li key={`feat-${i}`} className="flex items-start gap-3 text-sm">
+                                <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
+                                <span className="text-brand-dark/80 dark:text-dark-body">{feature}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
 
-            <Button
-                variant={popular ? "default" : "outline"}
-                className={`w-full h-12 rounded-xl text-base font-bold transition-all duration-300 ${popular ? "bg-brand-green text-white hover:bg-brand-green/90 border-0" : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface/50"
-                    }`}
-                onClick={onAction}
-                disabled={isLoading || isCurrent}
-            >
-                {isLoading ? (
-                    <Loader2 size={18} className="animate-spin mr-2" />
-                ) : isCurrent ? (
-                    "Plano Atual"
-                ) : isDowngrade ? (
-                    "Fazer downgrade"
-                ) : price === 0 ? (
-                    "Começar"
-                ) : (
-                    "Assinar"
-                )}
-            </Button>
-            
-            <p className="text-center text-[10px] text-brand-inactive-text mt-3">
-                Cancele quando quiser
-            </p>
-        </div>
-
-        <div className="w-full h-px bg-brand-border dark:bg-dark-border mb-6" />
-
-        {/* Features */}
-        <div className="flex-1 space-y-6">
-            <div>
-                <p className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-4">Itens inclusos</p>
-                <ul className="space-y-3.5">
-                    {/* Limits as part of features but highlighted if necessary */}
+            {/* Limits at the bottom */}
+            <div className="mt-8 pt-6 border-t border-brand-border dark:border-dark-border">
+                <ul className="space-y-2.5">
                     {limits.map((limit, i) => (
-                        <li key={`limit-${i}`} className="flex items-start gap-3 text-sm">
-                            <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                            <span className="text-brand-dark/80 dark:text-dark-body font-medium">{limit}</span>
-                        </li>
-                    ))}
-                    
-                    {features.map((feature, i) => (
-                        <li key={`feat-${i}`} className="flex items-start gap-3 text-sm">
-                            <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                            <span className="text-brand-dark/80 dark:text-dark-body">{feature}</span>
+                        <li key={`limit-${i}`} className="flex items-center gap-2.5 text-xs">
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand-green/40 shrink-0" />
+                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">{limit}</span>
                         </li>
                     ))}
                 </ul>
             </div>
-        </div>
-    </motion.div>
-)
+        </motion.div>
+    )
+}
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 
@@ -199,6 +217,36 @@ const PlanCardSkeleton = () => (
             ))}
         </div>
         <div className="h-11 bg-gray-200 dark:bg-gray-700 rounded-lg mt-10" />
+    </div>
+)
+
+// ─── Billing Toggle ────────────────────────────────────────────────────────
+
+const BillingToggle = ({ value, onChange }: { value: "monthly" | "annually", onChange: (v: "monthly" | "annually") => void }) => (
+    <div className="flex justify-center mb-10">
+        <div className="bg-brand-gray dark:bg-dark-surface p-1 rounded-2xl border border-brand-border dark:border-dark-border flex items-center shadow-sm">
+            <button
+                onClick={() => onChange("monthly")}
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${value === "monthly"
+                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
+                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                    }`}
+            >
+                Mensal
+            </button>
+            <button
+                onClick={() => onChange("annually")}
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 ${value === "annually"
+                    ? "bg-white dark:bg-zinc-800 text-brand-dark dark:text-dark-heading shadow-md"
+                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                    }`}
+            >
+                Anual
+                <span className="bg-brand-green/10 text-brand-green text-[10px] px-2 py-0.5 rounded-full">
+                    20% OFF
+                </span>
+            </button>
+        </div>
     </div>
 )
 
@@ -249,6 +297,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
     })
 
     const [cancelModal, setCancelModal] = useState(false)
+    const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("annually")
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -494,6 +543,9 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                             </motion.div>
                         )}
 
+                        {/* Billing Toggle */}
+                        <BillingToggle value={billingCycle} onChange={setBillingCycle} />
+
                         {/* Plans Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-12 items-stretch">
                             {loading ? (
@@ -512,6 +564,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                     return (
                                         <PlanCard
                                             key={plan.id}
+                                            slug={plan.slug}
                                             name={getHardcodedPlan(plan.slug).name}
                                             objective={getHardcodedPlan(plan.slug).objective}
                                             price={plan.price}
@@ -521,6 +574,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                                             isCurrent={isCurrent}
                                             isDowngrade={isDowngrade}
                                             isLoading={actionLoading === plan.id}
+                                            billingCycle={billingCycle}
                                             onAction={() => handlePlanAction(plan)}
                                         />
                                     )

@@ -192,7 +192,7 @@ export const SaveIcon = CreateIcon(FloppyDiskIcon)
 
 export const UploadIcon = CreateIcon(ImageUploadIcon)
 export const ExportFileIcon = CreateIcon(FileUploadIcon)
-export const TrendingUpIcon = CreateIcon(AnalyticsIcon)
+export const TrendingUpIcon = CreateIcon(AnalyticsUpIcon)
 export const ShieldIcon = CreateIcon(Shield01Icon)
 
 // ============================
