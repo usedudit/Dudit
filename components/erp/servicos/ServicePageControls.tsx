@@ -15,7 +15,7 @@ import {
     ExportFileIcon,
     Settings2Icon,
     UploadIcon,
-    AllProductsIcon,
+    PackageIcon,
     MoneyIcon,
     InfoIcon,
     GridIcon as CategoryIcon
@@ -124,7 +124,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as "all" | "active" | "inactive")}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={AllProductsIcon}>
+                        <TabsTrigger value="all" icon={PackageIcon}>
                             Todos
                         </TabsTrigger>
                         <TabsTrigger value="active" icon={InfoIcon}>

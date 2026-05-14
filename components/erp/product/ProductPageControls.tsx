@@ -15,7 +15,7 @@ import {
     ExportFileIcon,
     Settings2Icon,
     UploadIcon,
-    AllProductsIcon,
+    PackageIcon,
     NormalProductsIcon,
     LowProductsIcon,
     OutProductsIcon,
@@ -123,7 +123,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     const BadgeList = () => (
         <AnimatePresence>
             {renderGroupedBadge("Status", filters.status, "status", <InfoIcon size={12} />)}
-            {renderGroupedBadge("Estoque", filters.stocks, "stocks", <AllProductsIcon size={12} />)}
+            {renderGroupedBadge("Estoque", filters.stocks, "stocks", <PackageIcon size={12} />)}
             {renderGroupedBadge("Categoria", filters.categories, "categories", <GridIcon size={12} />)}
             {renderGroupedBadge("Marca", filters.brands, "brands", <TagIcon size={12} />)}
             {renderGroupedBadge("Unidade", filters.units, "units", <BoxIcon size={12} />)}
@@ -140,7 +140,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                     onValueChange={(val) => setActiveTab(val as "all" | "normal" | "low" | "out_of_stock")}
                 >
                     <TabsList className="px-0">
-                        <TabsTrigger value="all" icon={AllProductsIcon}>
+                        <TabsTrigger value="all" icon={PackageIcon}>
                             Todos
                         </TabsTrigger>
                         <TabsTrigger value="normal" icon={NormalProductsIcon}>

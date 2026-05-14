@@ -9,7 +9,7 @@ import {
     CheckCircleIcon,
     CancelCircleIcon,
     AlertTriangleIcon,
-    AllProductsIcon
+    PackageIcon
 } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 
@@ -59,7 +59,7 @@ const ReportsPageControls: React.FC<ReportsPageControlsProps> = ({
                         <TabsTrigger value="spam" icon={AlertTriangleIcon}>
                             Spam ({stats.spam})
                         </TabsTrigger>
-                        <TabsTrigger value="all" icon={AllProductsIcon}>
+                        <TabsTrigger value="all" icon={PackageIcon}>
                             Todas
                         </TabsTrigger>
                     </TabsList>

@@ -6,7 +6,7 @@ import {
     ShieldIcon,
     UserIcon,
     StoreIcon,
-    AllProductsIcon,
+    PackageIcon,
     FilterIcon,
     SearchIcon,
     SettingsIcon
@@ -38,7 +38,7 @@ const AuditLogPageControls = ({
         { value: "all", label: "Todos", icon: ShieldIcon },
         { value: "user", label: "Usuário", icon: UserIcon },
         { value: "partner", label: "Parceiro", icon: StoreIcon },
-        { value: "product", label: "Produto", icon: AllProductsIcon },
+        { value: "product", label: "Produto", icon: PackageIcon },
         { value: "system", label: "Sistema", icon: SettingsIcon },
     ] as const
 

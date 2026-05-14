@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import Image from "next/image"
 import {
     InfoIcon, AlertTriangleIcon, CheckCircleIcon, CancelCircleIcon,
-    ReturnIcon, ShieldIcon, AllProductsIcon, StoreIcon, ClockIcon, XIcon
+    ReturnIcon, ShieldIcon, PackageIcon, StoreIcon, ClockIcon, XIcon
 } from "@/lib/icons"
 
 import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
@@ -607,7 +607,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                 ) : targetDetails ? (
                     <div className="p-4 bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-2xl space-y-4">
                         <h4 className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-widest flex items-center gap-2">
-                            {report.target_type === 'product' ? <AllProductsIcon size={14} /> : <StoreIcon size={14} />}
+                            {report.target_type === 'product' ? <PackageIcon size={14} /> : <StoreIcon size={14} />}
                             Detalhes do Alvo
                         </h4>
 
@@ -617,7 +617,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
                                     {targetDetails.images?.[0] ? (
                                         <Image src={targetDetails.images[0]} alt="Produto" fill className="object-cover" />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><AllProductsIcon size={24} /></div>
+                                        <div className="w-full h-full flex items-center justify-center bg-brand-gray text-brand-inactive-text"><PackageIcon size={24} /></div>
                                     )}
                                 </div>
                                 <div className="flex flex-col gap-1 min-w-0">

@@ -4,6 +4,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { DashboardTabs } from "@/components/erp/dashboard/widgets/DashboardTabs"
+import { ChevronDownIcon as ChevronDown } from "@/lib/icons"
 import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { ProductsTab } from "@/components/erp/dashboard/widgets/ProductsTab"
 import { ServicesTab } from "@/components/erp/dashboard/widgets/ServicesTab"
@@ -27,12 +28,14 @@ const validTabs = new Set<DashboardTab>(["geral", "produtos", "servicos", "finan
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="h-32 animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/60 dark:border-dark-border dark:bg-dark-border/20" />
-        ))}
+      {/* Metrics Card Skeleton */}
+      <div className="h-[120px] animate-pulse rounded-2xl border border-brand-border bg-brand-gray/60 dark:border-dark-border dark:bg-dark-border/20" />
+      
+      {/* Charts Skeleton */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="h-72 animate-pulse rounded-2xl border border-brand-border bg-brand-gray/60 dark:border-dark-border dark:bg-dark-border/20 xl:col-span-2" />
+        <div className="h-72 animate-pulse rounded-2xl border border-brand-border bg-brand-gray/60 dark:border-dark-border dark:bg-dark-border/20" />
       </div>
-      <div className="h-72 animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/60 dark:border-dark-border dark:bg-dark-border/20" />
     </div>
   )
 }
@@ -73,10 +76,17 @@ export default async function ERPDashboardPage({
       <ERPPageHeader title={activeStore?.storeName ?? "Dashboard"} />
       <FadeIn className="min-h-svh bg-white p-4 dark:bg-dark-background md:p-6">
         <div className="mx-auto w-full max-w-[1600px] space-y-6">
-          <header className="flex flex-col gap-3">
+          <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
-              <h1 className="text-[24px] font-bold tracking-tight text-brand-dark dark:text-dark-heading">Dashboard</h1>
-              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">Central operacional da loja</p>
+              <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                Dashboard
+                <button className="p-1 rounded-full border border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </h1>
+              <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
             </div>
             <DashboardTabs active={activeTab} />
           </header>

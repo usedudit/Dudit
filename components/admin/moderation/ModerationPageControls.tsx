@@ -7,7 +7,7 @@ import {
     ClockIcon,
     AlertTriangleIcon,
     ImageOffIcon,
-    AllProductsIcon,
+    PackageIcon,
 } from "@/lib/icons"
 
 interface ModerationPageControlsProps {
@@ -25,7 +25,7 @@ const ModerationPageControls: React.FC<ModerationPageControlsProps> = ({
 }) => {
 
     const FILTERS = [
-        { value: "all", label: "Todos", icon: AllProductsIcon },
+        { value: "all", label: "Todos", icon: PackageIcon },
         { value: "pending_moderation", label: "Pendentes", icon: ClockIcon },
         { value: "flagged", label: "Flagged", icon: AlertTriangleIcon },
         { value: "needs_images", label: "Sem imagens", icon: ImageOffIcon },

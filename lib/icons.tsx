@@ -18,7 +18,7 @@ import {
     ColumnInsertIcon,
     Settings01Icon,
     FilterHorizontalIcon,
-    PackageIcon,
+    PackageIcon as PackageIcon01,
     PackageDeliveredIcon,
     PackageReceiveIcon as PackageReceiveIcon01,
     PackageRemoveIcon,
@@ -272,7 +272,7 @@ export const ShoppingBagIcon = CreateIcon(ShoppingBag01Icon)
 export const Package = CreateIcon(DeliveryBox01Icon)
 export const BoxIcon = CreateIcon(DeliveryBox01Icon)
 
-export const AllProductsIcon = CreateIcon(PackageIcon)
+export const PackageIcon = CreateIcon(PackageIcon01)
 export const NormalProductsIcon = CreateIcon(PackageDeliveredIcon)
 export const LowProductsIcon = CreateIcon(PackageReceiveIcon01)
 export const OutProductsIcon = CreateIcon(PackageRemoveIcon)

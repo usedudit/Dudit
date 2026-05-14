@@ -297,7 +297,7 @@ async function getCachedServices(partnerId: string): Promise<ServicesDashboardDa
       const from = addDays(today, -29)
       const [appointments, services] = await Promise.all([
         supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from).order("start_date", { ascending: false }).order("start_time").limit(400),
-        supabase.from("services").select("id, name, category, price, duration_minutes, is_active").eq("partner_id", partnerId).eq("is_active", true).limit(300),
+        supabase.from("services").select("id, name, category_id, price, duration_minutes, is_active, service_categories(name)").eq("partner_id", partnerId).eq("is_active", true).limit(300),
       ])
       if (appointments.error) throw appointments.error
       if (services.error) throw services.error
@@ -319,7 +319,10 @@ async function getCachedServices(partnerId: string): Promise<ServicesDashboardDa
         }
       }
       const categories = new Map<string, number>()
-      for (const service of services.data || []) categories.set(service.category || "Sem categoria", (categories.get(service.category || "Sem categoria") || 0) + 1)
+      for (const service of services.data || []) {
+        const catName = (service as any).service_categories?.name || "Sem categoria"
+        categories.set(catName, (categories.get(catName) || 0) + 1)
+      }
       const rowFrom = ([name, value]: [string, { count: number; revenue: number; minutes: number; cancelled: number }]): DashboardListItem => ({
         id: name,
         title: name,
