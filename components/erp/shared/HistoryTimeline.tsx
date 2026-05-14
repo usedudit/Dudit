@@ -101,10 +101,10 @@ export function HistoryTimeline({
                         >
                             {/* Icon Circle */}
                             <div className={cn(
-                                "w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors"
+                                "w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0"
                             )}>
                                 <Icon
-                                    size={18}
+                                    size={16}
                                     className="text-brand-dark dark:text-dark-heading"
                                 />
                             </div>
