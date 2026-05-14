@@ -7,6 +7,12 @@ import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 
 export const DASHBOARD_TAGS = {
   general: (partnerId: string) => `dashboard-general:${partnerId}`,
+  metrics: (partnerId: string) => `dashboard-metrics:${partnerId}`,
+  alerts: (partnerId: string) => `dashboard-alerts:${partnerId}`,
+  revenue: (partnerId: string) => `dashboard-revenue:${partnerId}`,
+  revenueOrigin: (partnerId: string) => `dashboard-revenue-origin:${partnerId}`,
+  activity: (partnerId: string) => `dashboard-activity:${partnerId}`,
+  categories: (partnerId: string) => `dashboard-categories:${partnerId}`,
   products: (partnerId: string) => `dashboard-products:${partnerId}`,
   services: (partnerId: string) => `dashboard-services:${partnerId}`,
   financial: (partnerId: string) => `dashboard-financial:${partnerId}`,
@@ -43,6 +49,23 @@ export type GeneralDashboardData = {
   nextAppointments: DashboardListItem[]
   dueAccounts: DashboardListItem[]
   criticalStock: DashboardListItem[]
+}
+
+export type AlertItem = {
+  id: string
+  message: string
+  count: number
+  tone: "red" | "orange" | "blue"
+  icon: string
+}
+
+export type ActivityItem = {
+  id: string
+  title: string
+  description: string
+  time: string
+  icon: string
+  tone: "green" | "blue" | "orange" | "red" | "default"
 }
 
 export type ProductsDashboardData = {
@@ -501,4 +524,274 @@ export async function getDashboardFinancialData(partnerId: string) {
 export async function getDashboardOperationsData(partnerId: string) {
   await requirePartnerAccessWithPermission(partnerId, "delivery", "view")
   return getCachedOperations(partnerId)
+}
+
+// ============================================================================
+// MODULAR GENERAL TAB — independent queries with granular cache tags
+// ============================================================================
+
+async function getCachedGeneralMetrics(partnerId: string): Promise<{ metrics: Metric[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const today = getTodayYmdSaoPaulo()
+      const from = addDays(today, -29)
+      const previousFrom = addDays(today, -59)
+
+      const [orders, transactions] = await Promise.all([
+        supabase.from("orders").select("id, total_amount, customer_name, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${previousFrom}T00:00:00`).order("created_at", { ascending: false }).limit(300),
+        supabase.from("transactions").select("id, amount, status, transaction_type, payment_date, created_at").eq("partner_id", partnerId).eq("transaction_type", "income").gte("created_at", `${from}T00:00:00`).limit(400),
+      ])
+      if (orders.error) throw orders.error
+      if (transactions.error) throw transactions.error
+
+      const orderRows = orders.data || []
+      const txRows = transactions.data || []
+      const periodOrders = orderRows.filter((o: any) => String(o.created_at).slice(0, 10) >= from)
+      const previousOrders = orderRows.filter((o: any) => String(o.created_at).slice(0, 10) < from)
+      const paidIncome = txRows.filter((tx: any) => isPaid(tx.status))
+      const revenue = paidIncome.reduce((acc: number, tx: any) => acc + money(tx.amount), 0)
+      const previousRevenue = previousOrders.reduce((acc: number, o: any) => acc + money(o.total_amount), 0)
+      const ticket = periodOrders.length ? revenue / periodOrders.length : 0
+      const uniqueCustomers = new Set(periodOrders.map((o: any) => (o.customer_name || "").toLowerCase().trim()).filter(Boolean))
+
+      return {
+        metrics: [
+          { title: "Receita do período", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs período anterior`, tone: "green" as const },
+          { title: "Pedidos do período", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs período anterior`, tone: "blue" as const },
+          { title: "Ticket médio", value: brl(ticket), detail: "últimos 30 dias", tone: "default" as const },
+          { title: "Clientes atendidos", value: String(uniqueCustomers.size), detail: "últimos 30 dias", tone: "default" as const },
+        ],
+      }
+    },
+    ["dashboard-metrics", partnerId],
+    { tags: [DASHBOARD_TAGS.metrics(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
+  )()
+}
+
+async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promise<{ alerts: AlertItem[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const today = getTodayYmdSaoPaulo()
+      const next7 = addDays(today, 7)
+      const alerts: AlertItem[] = []
+
+      // Always check: overdue accounts
+      const { data: txData } = await supabase.from("transactions").select("id, status, due_date, amount, transaction_type").eq("partner_id", partnerId).lte("due_date", next7).gte("due_date", today).limit(100)
+      const pendingAccounts = (txData || []).filter((tx: any) => statusPending(tx.status))
+      if (pendingAccounts.length > 0) {
+        alerts.push({ id: "due-accounts", message: `${pendingAccounts.length} conta${pendingAccounts.length > 1 ? "s" : ""} vencendo esta semana`, count: pendingAccounts.length, tone: "orange", icon: "credit-card" })
+      }
+
+      // Always check: pending orders
+      const { data: orderData } = await supabase.from("orders").select("id, situation").eq("partner_id", partnerId).gte("created_at", `${addDays(today, -7)}T00:00:00`).limit(200)
+      const pendingOrders = (orderData || []).filter((o: any) => statusPending(o.situation))
+      if (pendingOrders.length > 0) {
+        alerts.push({ id: "pending-orders", message: `${pendingOrders.length} pedido${pendingOrders.length > 1 ? "s" : ""} aguardando pagamento`, count: pendingOrders.length, tone: "blue", icon: "cart" })
+      }
+
+      // Conditional: low stock (only if sells products)
+      if (sells.includes("products")) {
+        const { data: prodData } = await supabase.from("products").select("id, stock_quantity").eq("partner_id", partnerId).eq("is_active", true).lte("stock_quantity", 5).limit(50)
+        const lowStock = (prodData || []).filter((p: any) => p.stock_quantity != null)
+        if (lowStock.length > 0) {
+          alerts.push({ id: "low-stock", message: `${lowStock.length} produto${lowStock.length > 1 ? "s" : ""} com estoque baixo`, count: lowStock.length, tone: "red", icon: "package" })
+        }
+      }
+
+      // Conditional: pending appointments (only if sells services)
+      if (sells.includes("services")) {
+        const { data: aptData } = await supabase.from("appointments").select("id, status, source").eq("partner_id", partnerId).eq("start_date", today).limit(50)
+        const pendingApts = (aptData || []).filter((a: any) => a.source !== "unavailable" && String(a.status || "").toLowerCase().includes("aguard"))
+        if (pendingApts.length > 0) {
+          alerts.push({ id: "pending-appointments", message: `${pendingApts.length} agendamento${pendingApts.length > 1 ? "s" : ""} pendente${pendingApts.length > 1 ? "s" : ""}`, count: pendingApts.length, tone: "orange", icon: "calendar" })
+        }
+      }
+
+      // Conditional: late deliveries
+      const { data: delData } = await supabase.from("deliveries").select("id, status, created_at").eq("partner_id", partnerId).in("status", ["pending", "not_sent", "preparing", "sent"]).lt("created_at", `${today}T00:00:00`).limit(20)
+      const lateDeliveries = delData || []
+      if (lateDeliveries.length > 0) {
+        alerts.push({ id: "late-deliveries", message: `${lateDeliveries.length} entrega${lateDeliveries.length > 1 ? "s" : ""} atrasada${lateDeliveries.length > 1 ? "s" : ""}`, count: lateDeliveries.length, tone: "red", icon: "truck" })
+      }
+
+      return { alerts }
+    },
+    ["dashboard-alerts", partnerId, sells.sort().join(",")],
+    { tags: [DASHBOARD_TAGS.alerts(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
+  )()
+}
+
+async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenue: ChartPoint[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const today = getTodayYmdSaoPaulo()
+      const from = addDays(today, -29)
+      const { data, error } = await supabase.from("transactions").select("amount, payment_date, status, transaction_type").eq("partner_id", partnerId).eq("transaction_type", "income").gte("created_at", `${from}T00:00:00`).limit(400)
+      if (error) throw error
+      const paidIncome = (data || []).filter((tx: any) => isPaid(tx.status))
+      return { revenue: bucketByDate(paidIncome, "payment_date", "amount") }
+    },
+    ["dashboard-revenue", partnerId],
+    { tags: [DASHBOARD_TAGS.revenue(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+  )()
+}
+
+async function getCachedGeneralRevenueOrigin(partnerId: string): Promise<{ origins: ChartPoint[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const today = getTodayYmdSaoPaulo()
+      const from = addDays(today, -29)
+      const { data, error } = await supabase.from("orders").select("id, total_amount, source").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
+      if (error) throw error
+      const originMap = new Map<string, number>()
+      for (const order of data || []) {
+        const src = String(order.source || "manual").toLowerCase()
+        let label = "Manual"
+        if (src.includes("pdv") || src.includes("pos")) label = "PDV"
+        else if (src.includes("online") || src.includes("web") || src.includes("ecommerce")) label = "Online"
+        else if (src.includes("marketplace") || src.includes("vitrine")) label = "Marketplace"
+        else if (src.includes("whatsapp") || src.includes("wpp")) label = "WhatsApp"
+        originMap.set(label, (originMap.get(label) || 0) + money(order.total_amount))
+      }
+      const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)
+      return { origins }
+    },
+    ["dashboard-revenue-origin", partnerId],
+    { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+  )()
+}
+
+async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: ActivityItem[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const { data, error } = await supabase.from("audit_logs").select("id, entity_type, action_type, change_lines, created_at").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(10)
+      if (error || !data?.length) return { activity: [] }
+
+      const actionLabel: Record<string, string> = {
+        created: "criado", updated: "atualizado", paid: "pago", cancelled: "cancelado",
+        received: "recebido", deleted: "removido", refunded: "reembolsado",
+        sale_created: "venda criada", cash_opened: "caixa aberto", cash_closed: "caixa fechado",
+      }
+      const entityLabel: Record<string, string> = {
+        order: "Pedido", transaction: "Transação", product: "Produto", appointment: "Agendamento",
+        service: "Serviço", customer: "Cliente", delivery: "Entrega", quote: "Orçamento",
+      }
+      const entityIcon: Record<string, string> = {
+        order: "cart", transaction: "money", product: "package", appointment: "calendar",
+        service: "wrench", customer: "user", delivery: "truck", quote: "file",
+      }
+      const entityTone: Record<string, ActivityItem["tone"]> = {
+        created: "green", paid: "green", received: "green", sale_created: "green",
+        cancelled: "red", deleted: "red", refunded: "orange",
+        updated: "blue", cash_opened: "blue", cash_closed: "blue",
+      }
+
+      const activity: ActivityItem[] = data.map((row: any) => {
+        const action = String(row.action_type || "").toLowerCase()
+        const entity = String(row.entity_type || "").toLowerCase()
+        const lines = Array.isArray(row.change_lines) ? row.change_lines : []
+        const desc = lines.length > 0 ? String(lines[0]).slice(0, 80) : (actionLabel[action] || action)
+        const timeStr = (() => {
+          try { return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(new Date(row.created_at)) } catch { return "" }
+        })()
+        return {
+          id: row.id,
+          title: `${entityLabel[entity] || entity} ${actionLabel[action] || action}`,
+          description: desc,
+          time: timeStr,
+          icon: entityIcon[entity] || "file",
+          tone: entityTone[action] || "default",
+        }
+      })
+
+      return { activity }
+    },
+    ["dashboard-activity", partnerId],
+    { tags: [DASHBOARD_TAGS.activity(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 60 },
+  )()
+}
+
+async function getCachedGeneralTopCategories(partnerId: string, sells: string[]): Promise<{ categories: ChartPoint[] }> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient()
+      const today = getTodayYmdSaoPaulo()
+      const from = addDays(today, -29)
+      const categoryMap = new Map<string, number>()
+
+      if (sells.includes("products")) {
+        const { data } = await supabase.from("order_items").select("product_name, quantity, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
+        // Get product categories
+        const productNames = [...new Set((data || []).map((i: any) => i.product_name).filter(Boolean))]
+        if (productNames.length > 0) {
+          const { data: products } = await supabase.from("products").select("name, category").eq("partner_id", partnerId).in("name", productNames.slice(0, 50)).limit(50)
+          const nameToCategory = new Map<string, string>()
+          for (const p of products || []) nameToCategory.set(p.name, p.category || "Sem categoria")
+          for (const item of data || []) {
+            const cat = nameToCategory.get(item.product_name) || "Sem categoria"
+            categoryMap.set(cat, (categoryMap.get(cat) || 0) + money(item.quantity))
+          }
+        }
+      }
+
+      if (sells.includes("services")) {
+        const { data } = await supabase.from("appointments").select("service_name, price, status, source").eq("partner_id", partnerId).gte("start_date", from).limit(200)
+        const rows = (data || []).filter((a: any) => a.source !== "unavailable" && isPaid(a.status))
+        // Get service categories
+        const serviceNames = [...new Set(rows.map((r: any) => r.service_name).filter(Boolean))]
+        if (serviceNames.length > 0) {
+          const { data: services } = await supabase.from("services").select("name, service_categories(name)").eq("partner_id", partnerId).in("name", serviceNames.slice(0, 50)).limit(50)
+          const nameToCategory = new Map<string, string>()
+          for (const s of services || []) nameToCategory.set(s.name, (s as any).service_categories?.name || "Sem categoria")
+          for (const row of rows) {
+            const cat = nameToCategory.get(row.service_name) || "Sem categoria"
+            categoryMap.set(cat, (categoryMap.get(cat) || 0) + money(row.price))
+          }
+        }
+      }
+
+      return { categories: topFromMap(categoryMap) }
+    },
+    ["dashboard-categories", partnerId, sells.sort().join(",")],
+    { tags: [DASHBOARD_TAGS.categories(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },
+  )()
+}
+
+// ============================================================================
+// PUBLIC EXPORTS — Modular General Tab
+// ============================================================================
+
+export async function getGeneralMetrics(partnerId: string) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralMetrics(partnerId)
+}
+
+export async function getGeneralAlerts(partnerId: string, sells: string[]) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralAlerts(partnerId, sells)
+}
+
+export async function getGeneralRevenueChart(partnerId: string) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralRevenueChart(partnerId)
+}
+
+export async function getGeneralRevenueOrigin(partnerId: string) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralRevenueOrigin(partnerId)
+}
+
+export async function getGeneralActivity(partnerId: string) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralActivity(partnerId)
+}
+
+export async function getGeneralTopCategories(partnerId: string, sells: string[]) {
+  await requirePartnerAccessWithPermission(partnerId, "dashboard", "view")
+  return getCachedGeneralTopCategories(partnerId, sells)
 }

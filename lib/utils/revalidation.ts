@@ -23,6 +23,8 @@ export async function revalidateProducts(partnerId: string, productId?: string) 
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
     safeRevalidateTag(partnerId) // Tag genérica do parceiro
     safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
   }
@@ -46,6 +48,12 @@ export async function revalidateOrders(partnerId: string) {
     safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.revenueOrigin(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
     safeRevalidateTag(partnerId)
     safeRevalidateTag(`partner-${partnerId}-orders`)
   }
@@ -150,6 +158,7 @@ export async function revalidateStockMovements(partnerId: string) {
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
   }
   safeRevalidateTag("stock-movements")
 }
@@ -162,6 +171,10 @@ export async function revalidateTransactions(partnerId: string) {
     safeRevalidateTag(TAGS.transactions(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
+    safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
   }
   safeRevalidateTag("transactions")
   revalidatePath("/erp/resumo-financeiro")
