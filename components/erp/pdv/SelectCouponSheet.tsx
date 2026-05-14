@@ -115,7 +115,7 @@ const SelectCouponSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Cupom</h2>
-        <Button variant="ghost" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>
@@ -181,15 +181,15 @@ const SelectCouponSheet = ({
                     onClose()
                   }}
                   className={`group flex items-center gap-4 rounded-xl border p-3 text-left transition-all ${isApplied
-                      ? "border-brand-green bg-green-50/50 dark:bg-green-900/10"
-                      : isBlocked
-                        ? "border-brand-border/60 bg-brand-gray/20 opacity-80 cursor-not-allowed"
-                        : "border-transparent hover:border-brand-border hover:bg-brand-gray/30 dark:hover:border-dark-border dark:hover:bg-dark-border/30"
+                    ? "border-brand-green bg-green-50/50 dark:bg-green-900/10"
+                    : isBlocked
+                      ? "border-brand-border/60 bg-brand-gray/20 opacity-80 cursor-not-allowed"
+                      : "border-transparent hover:border-brand-border hover:bg-brand-gray/30 dark:hover:border-dark-border dark:hover:bg-dark-border/30"
                     }`}
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-full border ${isApplied
-                      ? "border-brand-green bg-green-100 text-brand-green dark:bg-green-900/20"
-                      : "border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-gray-800"
+                    ? "border-brand-green bg-green-100 text-brand-green dark:bg-green-900/20"
+                    : "border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-gray-800"
                     }`}>
                     {isApplied ? <CheckCircleIcon size={20} /> : <TagIcon size={20} />}
                   </div>

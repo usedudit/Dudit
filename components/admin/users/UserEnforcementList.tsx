@@ -375,7 +375,7 @@ function UserDetailsSheet({ user, isOpen, onClose }: UserDetailsSheetProps) {
             {/* Header */}
             <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
                 <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes do Usuário</h2>
-                <Button variant="ghost" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>

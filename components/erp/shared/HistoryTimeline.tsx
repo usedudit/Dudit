@@ -1,16 +1,9 @@
 "use client"
 
-import React from "react"
 import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import {
-    MoneyIcon,
-    ClockIcon,
-    FileIcon,
-    BlockedIcon,
-    InfoIcon,
-} from "@/lib/icons"
+import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon } from "@/lib/icons"
 import { formatDateTime, cn } from "@/lib/utils"
 
 export interface HistoryEntry {
@@ -46,9 +39,9 @@ function getEntryIcon(entry: HistoryEntry) {
 
     // Priority 2: Money related
     if (
-        type.includes("paid") || type.includes("payment") || type.includes("price") || 
-        type.includes("money") || type.includes("total") || type.includes("discount") || 
-        type.includes("shipping") || content.includes("valor") || content.includes("pago") || 
+        type.includes("paid") || type.includes("payment") || type.includes("price") ||
+        type.includes("money") || type.includes("total") || type.includes("discount") ||
+        type.includes("shipping") || content.includes("valor") || content.includes("pago") ||
         content.includes("preço") || content.includes("desconto") || content.includes("frete")
     ) {
         return MoneyIcon
@@ -108,12 +101,11 @@ export function HistoryTimeline({
                         >
                             {/* Icon Circle */}
                             <div className={cn(
-                                "absolute left-0 top-0 w-10 h-10 rounded-full border-2 bg-white dark:bg-dark-surface flex items-center justify-center z-10 transition-colors duration-200",
-                                "border-brand-border dark:border-dark-border group-hover:border-brand-green dark:group-hover:border-brand-green-medium"
+                                "w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors"
                             )}>
-                                <Icon 
-                                    size={18} 
-                                    className="text-brand-inactive-text dark:text-dark-body group-hover:text-brand-green dark:group-hover:text-brand-green-medium transition-colors duration-200" 
+                                <Icon
+                                    size={18}
+                                    className="text-brand-dark dark:text-dark-heading"
                                 />
                             </div>
 
@@ -133,7 +125,7 @@ export function HistoryTimeline({
 
                                 <div className="space-y-1.5">
                                     {entry.change_lines.map((line, lIdx) => (
-                                        <p 
+                                        <p
                                             key={`${entry.id}-line-${lIdx}`}
                                             className="text-[14px] leading-relaxed text-brand-dark/90 dark:text-dark-body"
                                         >

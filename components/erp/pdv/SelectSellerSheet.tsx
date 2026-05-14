@@ -86,7 +86,7 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Vendedor</h2>
-        <Button variant="ghost" onClick={onClose} size="icon">
+        <Button variant="filled" onClick={onClose} size="icon">
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

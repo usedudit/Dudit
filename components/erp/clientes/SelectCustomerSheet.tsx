@@ -172,7 +172,7 @@ const SelectCustomerSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
-        <Button variant="ghost" onClick={handleSafeClose} size="icon" disabled={isCloseLocked}>
+        <Button variant="filled" onClick={handleSafeClose} size="icon" disabled={isCloseLocked}>
           <XIcon className="h-5 w-5" />
         </Button>
       </header>
@@ -324,7 +324,7 @@ const SelectCustomerSheet = ({
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo cliente</h2>
-        <Button variant="ghost" onClick={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }} size="icon" disabled={isCloseLocked}>
+        <Button variant="filled" onClick={() => { if (!isCloseLocked) setIsNewCustomerSheetOpen(false) }} size="icon" disabled={isCloseLocked}>
           <XIcon className="h-5 w-5" />
         </Button>
       </header>

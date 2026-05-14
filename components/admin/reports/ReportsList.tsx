@@ -575,7 +575,7 @@ function ReportDetailsSheet({ report, isOpen, onClose, onResolve, onDismiss, onS
             {/* Header */}
             <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
                 <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Denúncia</h2>
-                <Button variant="ghost" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>
@@ -777,7 +777,7 @@ function AuditHistorySheet({ targetId, isOpen, onClose }: { targetId: string, is
                     </h2>
                     <p className="text-[10px] font-bold text-brand-inactive-text opacity-70 tracking-widest uppercase font-mono truncate max-w-[200px]">ID: {targetId}</p>
                 </div>
-                <Button variant="ghost" onClick={onClose} size="icon">
+                <Button variant="filled" onClick={onClose} size="icon">
                     <XIcon className="w-5 h-5" />
                 </Button>
             </header>

@@ -107,97 +107,82 @@ const PlanCard: React.FC<PlanCardProps> = ({
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className={`rounded-3xl p-8 flex flex-col h-full relative border overflow-hidden ${popular
-            ? "bg-brand-dark border-brand-dark md:-translate-y-4 shadow-xl"
-            : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border hover:border-brand-green/30 transition-all duration-300"
+        className={`rounded-[32px] p-6 flex flex-col h-full relative border transition-all duration-300 bg-white dark:bg-dark-surface ${popular
+            ? "border-brand-green shadow-[0_20px_50px_rgba(5,150,105,0.15)] z-10"
+            : "border-brand-border dark:border-dark-border"
             }`}
     >
         {popular && (
-            <div className="absolute top-6 -right-12 bg-brand-green text-white text-xs font-bold py-1 w-40 text-center transform rotate-45">
-                Mais Popular
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-green text-white text-[10px] font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                Mais popular
+                <CheckCircleIcon size={12} className="text-white fill-white/20" />
             </div>
         )}
 
         {/* Header */}
-        <div className="mb-8">
-            <h3 className={`text-xl font-bold mb-1 ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
+        <div className="mb-6 pt-2">
+            <h3 className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mb-1">
                 {name}
             </h3>
-            <p className={`text-[10px] font-bold mb-6 ${popular ? "text-brand-green" : "text-brand-green"}`}>
-                {objective}
-            </p>
-            <div className="flex items-baseline gap-1">
-                <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>R$</span>
-                <span className={`text-5xl font-bold ${popular ? "text-white" : "text-brand-dark dark:text-dark-heading"}`}>
-                    {price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </span>
-                <span className={`text-sm ${popular ? "text-brand-inactive-text/80" : "text-brand-inactive-text"}`}>/mês</span>
+            
+            <div className="mb-4">
+                {price > 0 && <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">12x de</span>}
+                <div className="flex items-baseline gap-1 mt-1">
+                    <span className={`${price > 0 ? "text-2xl" : "text-xl"} font-bold text-brand-dark dark:text-dark-heading`}>
+                        {price > 0 ? formatCurrency(price) : "Grátis"}
+                    </span>
+                    {price > 0 && <span className="text-sm text-brand-inactive-text">/mês</span>}
+                </div>
             </div>
+
+            <Button
+                variant={popular ? "default" : "outline"}
+                className={`w-full h-12 rounded-xl text-base font-bold transition-all duration-300 ${popular ? "bg-brand-green text-white hover:bg-brand-green/90 border-0" : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface/50"
+                    }`}
+                onClick={onAction}
+                disabled={isLoading || isCurrent}
+            >
+                {isLoading ? (
+                    <Loader2 size={18} className="animate-spin mr-2" />
+                ) : isCurrent ? (
+                    "Plano Atual"
+                ) : isDowngrade ? (
+                    "Fazer downgrade"
+                ) : price === 0 ? (
+                    "Começar"
+                ) : (
+                    "Assinar"
+                )}
+            </Button>
+            
+            <p className="text-center text-[10px] text-brand-inactive-text mt-3">
+                Cancele quando quiser
+            </p>
         </div>
+
+        <div className="w-full h-px bg-brand-border dark:bg-dark-border mb-6" />
 
         {/* Features */}
-        <div className="space-y-6 flex-1">
+        <div className="flex-1 space-y-6">
             <div>
-                <p className="text-xs font-bold uppercase mb-4 text-brand-green">O que está incluso:</p>
-                <ul className="space-y-3">
-                    {features.map((feature, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm">
-                            <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
-                            <span className={popular ? "text-gray-300" : "text-brand-dark/80 dark:text-dark-body"}>{feature}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            {/* Limits */}
-            <div className={`pt-6 border-t ${popular ? "border-white/10" : "border-brand-border dark:border-dark-border"}`}>
-                <p className={`text-xs font-bold uppercase mb-3 ${popular ? "text-gray-400" : "text-brand-inactive-text"}`}>
-                    Limites do plano:
-                </p>
-                <ul className="space-y-2">
+                <p className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-4">Itens inclusos</p>
+                <ul className="space-y-3.5">
+                    {/* Limits as part of features but highlighted if necessary */}
                     {limits.map((limit, i) => (
-                        <li key={i} className="flex items-center gap-2 text-xs">
-                            <div className={`w-1 h-1 rounded-full ${popular ? "bg-brand-green" : "bg-brand-green/40"}`} />
-                            <span className={popular ? "text-brand-inactive-text" : "text-brand-inactive-text dark:text-dark-body"}>
-                                {limit}
-                            </span>
+                        <li key={`limit-${i}`} className="flex items-start gap-3 text-sm">
+                            <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
+                            <span className="text-brand-dark/80 dark:text-dark-body font-medium">{limit}</span>
+                        </li>
+                    ))}
+                    
+                    {features.map((feature, i) => (
+                        <li key={`feat-${i}`} className="flex items-start gap-3 text-sm">
+                            <CheckCircleIcon size={16} className="text-brand-green mt-0.5 shrink-0" />
+                            <span className="text-brand-dark/80 dark:text-dark-body">{feature}</span>
                         </li>
                     ))}
                 </ul>
             </div>
-        </div>
-
-        <div className="mt-10">
-            {isCurrent ? (
-                <Button
-                    variant="outline"
-                    className="w-full border-brand-green/30 text-brand-green font-bold cursor-default"
-                    disabled
-                >
-                    <ShieldCheck size={16} className="mr-2" />
-                    Plano Atual
-                </Button>
-            ) : (
-                <Button
-                    variant={popular ? "default" : "outline"}
-                    className={`w-full h-11 transition-all duration-300 ${popular ? "bg-brand-green text-white hover:bg-brand-green/90 border-0" : ""}`}
-                    onClick={onAction}
-                    disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <Loader2 size={16} className="animate-spin mr-2" />
-                    ) : isDowngrade ? (
-                        "Fazer downgrade"
-                    ) : price === 0 ? (
-                        "Começar Grátis"
-                    ) : (
-                        <>
-                            <Zap size={16} className="mr-2" />
-                            Assinar plano
-                        </>
-                    )}
-                </Button>
-            )}
         </div>
     </motion.div>
 )
