@@ -52,8 +52,14 @@ export default function HelpTOC({ content }: { content: string }) {
     const scrollTo = (id: string) => {
         const element = document.getElementById(id)
         if (element) {
+            const offset = 100
+            const bodyRect = document.body.getBoundingClientRect().top
+            const elementRect = element.getBoundingClientRect().top
+            const elementPosition = elementRect - bodyRect
+            const offsetPosition = elementPosition - offset
+
             window.scrollTo({
-                top: element.offsetTop - 100,
+                top: offsetPosition,
                 behavior: "smooth"
             })
         }
@@ -61,8 +67,7 @@ export default function HelpTOC({ content }: { content: string }) {
 
     return (
         <aside className="hidden xl:block w-64 shrink-0 py-8 px-6 sticky top-[72px] h-[calc(100vh-72px)] overflow-y-auto custom-scrollbar">
-            <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-
+            <h4 className="text-[11px] font-bold text-gray-400 dark:text-dark-body uppercase tracking-widest mb-4 flex items-center gap-2">
                 <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M4 6h16M4 12h16M4 18h7" />
                 </svg>
@@ -81,7 +86,7 @@ export default function HelpTOC({ content }: { content: string }) {
                                 "text-[13px] text-left transition-colors hover:text-brand-green",
                                 activeId === item.id 
                                     ? "text-brand-green font-medium" 
-                                    : "text-gray-500"
+                                    : "text-gray-500 dark:text-dark-body"
                             )}
                         >
                             {item.text}
@@ -90,13 +95,13 @@ export default function HelpTOC({ content }: { content: string }) {
                 ))}
             </ul>
 
-            <div className="mt-10 pt-8 border-t border-gray-100">
-                <p className="text-[13px] text-gray-500 mb-4">Isto foi útil?</p>
+            <div className="mt-10 pt-8 border-t border-gray-100 dark:border-dark-border">
+                <p className="text-[13px] text-gray-500 dark:text-dark-body mb-4">Isto foi útil?</p>
                 <div className="flex gap-2">
                     {["😊", "😐", "🙁"].map((emoji, i) => (
                         <button 
                             key={i} 
-                            className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all hover:scale-110 active:scale-95"
+                            className="w-10 h-10 rounded-full border border-gray-100 dark:border-dark-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-dark-surface transition-all hover:scale-110 active:scale-95 text-xl"
                         >
                             {emoji}
                         </button>

@@ -645,16 +645,17 @@ async function getCachedGeneralRevenueOrigin(partnerId: string): Promise<{ origi
       const supabase = createAdminClient()
       const today = getTodayYmdSaoPaulo()
       const from = addDays(today, -29)
-      const { data, error } = await supabase.from("orders").select("id, total_amount, source").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
+      const { data, error } = await supabase.from("orders").select("id, total_amount, order_source").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
       if (error) throw error
       const originMap = new Map<string, number>()
       for (const order of data || []) {
-        const src = String(order.source || "manual").toLowerCase()
+        const src = String((order as any).order_source || "Manual").toLowerCase()
         let label = "Manual"
-        if (src.includes("pdv") || src.includes("pos")) label = "PDV"
+        if (src.includes("presencial") || src.includes("pdv") || src.includes("pos")) label = "PDV"
         else if (src.includes("online") || src.includes("web") || src.includes("ecommerce")) label = "Online"
         else if (src.includes("marketplace") || src.includes("vitrine")) label = "Marketplace"
         else if (src.includes("whatsapp") || src.includes("wpp")) label = "WhatsApp"
+        else if (src.includes("delivery") || src.includes("entrega")) label = "Delivery"
         originMap.set(label, (originMap.get(label) || 0) + money(order.total_amount))
       }
       const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)

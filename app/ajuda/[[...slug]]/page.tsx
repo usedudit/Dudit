@@ -47,7 +47,7 @@ export default function HelpCenterPage() {
     }
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-sans">
+        <div className="min-h-screen bg-white dark:bg-dark-bg flex flex-col font-sans">
             <HelpHeader 
                 onToggleMenu={() => setMobileMenuOpen(!mobileMenuOpen)} 
                 menuOpen={mobileMenuOpen}
@@ -55,11 +55,11 @@ export default function HelpCenterPage() {
                 setSearchQuery={setSearchQuery}
             />
 
-            <div className="flex-1 flex w-full max-w-[1440px] mx-auto relative h-[calc(100vh-72px)] overflow-hidden">
+            <div className="flex-1 flex w-full max-w-[1440px] mx-auto relative">
                 
                 {/* Desktop Sidebar */}
                 <HelpSidebar 
-                    className="hidden lg:flex w-72 shrink-0 border-r border-gray-100" 
+                    className="hidden lg:flex w-72 shrink-0 border-r border-gray-100 dark:border-dark-border" 
                     searchQuery={searchQuery}
                 />
 
@@ -72,14 +72,14 @@ export default function HelpCenterPage() {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 onClick={() => setMobileMenuOpen(false)}
-                                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+                                className="fixed inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm z-40 lg:hidden"
                             />
                             <motion.div 
                                 initial={{ x: "-100%" }}
                                 animate={{ x: 0 }}
                                 exit={{ x: "-100%" }}
                                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                                className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 lg:hidden shadow-2xl"
+                                className="fixed inset-y-0 left-0 w-[280px] bg-white dark:bg-dark-surface z-50 lg:hidden shadow-2xl"
                             >
                                 <HelpSidebar 
                                     className="w-full h-full border-none" 
@@ -90,9 +90,8 @@ export default function HelpCenterPage() {
                     )}
                 </AnimatePresence>
 
-
                 {/* Main View Area */}
-                <main className="flex-1 overflow-y-auto scroll-smooth custom-scrollbar relative">
+                <main className="flex-1 min-w-0 relative">
                     <div className="flex w-full min-h-full">
                         {/* Content */}
                         <div className="flex-1 min-w-0">
@@ -104,15 +103,7 @@ export default function HelpCenterPage() {
                     </div>
                 </main>
             </div>
-
-            {/* Floating Mobile TOC / Action Button - Optional improvement */}
-            <div className="fixed bottom-6 right-6 lg:hidden z-30">
-                <button className="w-12 h-12 rounded-full bg-brand-green text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-                    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M4 6h16M4 12h16M4 18h7" />
-                    </svg>
-                </button>
-            </div>
         </div>
     )
 }
+
