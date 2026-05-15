@@ -1,15 +1,15 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import type { ChartPoint } from "@/lib/data/dashboard"
 
 const config = {
-  value: { label: "Este Período", color: "var(--brand-dark)" },
+  value: { label: "Este Período", color: "var(--brand-green)" },
   secondary: { label: "Período Anterior", color: "#D1D5DB" },
 } satisfies ChartConfig
 
-export const CHART_COLORS = ["#003D32", "#059669", "#0FA96B", "#0fa96b", "#bcf49d", "#fff085"]
+export const CHART_COLORS = ["#059669", "#003D32", "#0FA96B", "#bcf49d", "#fff085"]
 
 function formatCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0)
@@ -21,39 +21,39 @@ export function DashboardLineChart({ data }: { data: any[] }) {
       <ChartContainer config={config} className="h-full w-full">
         <LineChart data={data} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis 
-            dataKey="label" 
-            tickLine={false} 
-            axisLine={false} 
-            tickMargin={12} 
-            minTickGap={30} 
-            style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }} 
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={12}
+            minTickGap={30}
+            style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }}
           />
-          <YAxis 
-            tickFormatter={formatCompact} 
-            tickLine={false} 
-            axisLine={false} 
-            width={60} 
-            style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }} 
+          <YAxis
+            tickFormatter={formatCompact}
+            tickLine={false}
+            axisLine={false}
+            width={60}
+            style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }}
           />
           <ChartTooltip content={<ChartTooltipContent />} />
           {/* Secondary Line (Previous Period) */}
-          <Line 
-            type="monotone" 
-            dataKey="secondary" 
-            stroke="#D1D5DB" 
-            strokeWidth={2} 
-            dot={false} 
-            activeDot={{ r: 4 }} 
+          <Line
+            type="monotone"
+            dataKey="secondary"
+            stroke="#D1D5DB"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
           />
           {/* Primary Line (Current Period) */}
-          <Line 
-            type="monotone" 
-            dataKey="value" 
-            stroke="var(--brand-dark)" 
-            strokeWidth={3} 
-            dot={false} 
-            activeDot={{ r: 6 }} 
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke="var(--brand-green)"
+            strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 6 }}
           />
         </LineChart>
       </ChartContainer>
@@ -70,7 +70,7 @@ export function DashboardBarChart({ data }: { data: ChartPoint[] }) {
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={10} minTickGap={14} style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }} />
           <YAxis tickFormatter={formatCompact} tickLine={false} axisLine={false} width={60} style={{ fontSize: 11, fontWeight: 500, fill: "#94a3b8" }} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="var(--brand-dark)" />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="var(--brand-green)" />
         </BarChart>
       </ChartContainer>
     </div>
@@ -83,7 +83,16 @@ export function DashboardPieChart({ data }: { data: ChartPoint[] }) {
       <ChartContainer config={config} className="h-full w-full">
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-          <Pie data={data} dataKey="value" nameKey="label" innerRadius={60} outerRadius={85} paddingAngle={2}>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="label"
+            innerRadius={65}
+            outerRadius={90}
+            paddingAngle={2}
+            cx="50%"
+            cy="50%"
+          >
             {data.map((_, index) => <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
           </Pie>
         </PieChart>

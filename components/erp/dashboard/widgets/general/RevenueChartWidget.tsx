@@ -13,7 +13,6 @@ export async function RevenueChartWidget({ partnerId }: { partnerId: string }) {
     return (
         <DashboardSectionCard
             title={<>Receita Total <HelpCircleIcon className="h-3.5 w-3.5 text-brand-inactive-text cursor-help" /></>}
-            icon={MoneyIcon}
             className="xl:col-span-2"
             action={<PeriodSelector />}
         >

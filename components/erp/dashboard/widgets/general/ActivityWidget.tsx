@@ -36,7 +36,7 @@ export async function ActivityWidget({ partnerId }: { partnerId: string }) {
     if (activity.length === 0) return null
 
     return (
-        <DashboardSectionCard title="Atividade recente" icon={ClockIcon}>
+        <DashboardSectionCard title="Atividade recente" className="h-full">
             <div className="space-y-0 -mx-6 -mb-6">
                 {activity.map((item, i) => {
                     const Icon = iconMap[item.icon] || FileIcon
@@ -55,9 +55,13 @@ export async function ActivityWidget({ partnerId }: { partnerId: string }) {
                                 <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
                                     {item.title}
                                 </p>
-                                <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                    {item.description}
-                                </p>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                    {item.user && (
+                                        <span className="text-brand-green font-bold shrink-0">{item.user}</span>
+                                    )}
+                                    {item.user && item.description && <span className="opacity-40 shrink-0">·</span>}
+                                    <span className="truncate">{item.description}</span>
+                                </div>
                             </div>
                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body whitespace-nowrap shrink-0">
                                 {item.time}

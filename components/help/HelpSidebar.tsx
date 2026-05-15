@@ -9,10 +9,10 @@ import { ChevronDownIcon, ChevronRightIcon, InstagramIcon, FacebookIcon } from "
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/reusable"
 
-export default function HelpSidebar({ 
+export default function HelpSidebar({
     className,
     searchQuery
-}: { 
+}: {
     className?: string,
     searchQuery: string
 }) {
@@ -30,8 +30,8 @@ export default function HelpSidebar({
 
     const filteredCategories = helpCategories.map(cat => ({
         ...cat,
-        articles: cat.articles.filter(art => 
-            art.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        articles: cat.articles.filter(art =>
+            art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             art.description.toLowerCase().includes(searchQuery.toLowerCase())
         )
     })).filter(cat => cat.articles.length > 0)
@@ -55,8 +55,8 @@ export default function HelpSidebar({
                         <button
                             onClick={() => toggleCategory(category.id)}
                             className={cn(
-                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold text-gray-400 dark:text-dark-body uppercase tracking-wider transition-all group cursor-pointer",
-                                "hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold text-brand-dark dark:text-dark-heading transition-all group cursor-pointer",
+                                "hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-brand-dark dark:hover:text-dark-heading"
                             )}
                         >
                             <div className="flex items-center gap-2">
@@ -86,24 +86,24 @@ export default function HelpSidebar({
                                                         href={`/ajuda/${category.id}/${article.slug}`}
                                                         className={cn(
                                                             "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative cursor-pointer",
-                                                            isActive 
-                                                                ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium" 
+                                                            isActive
+                                                                ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium"
                                                                 : "text-gray-600 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
                                                         )}
                                                     >
                                                         {isActive && (
-                                                            <motion.div 
+                                                            <motion.div
                                                                 layoutId="active-indicator"
-                                                                className="absolute left-0 w-1 h-4 bg-brand-green rounded-r-full" 
+                                                                className="absolute left-0 w-1 h-4 bg-brand-green rounded-r-full"
                                                             />
                                                         )}
                                                         <span className="flex-1 truncate">{article.title}</span>
-                                                        <ChevronRightIcon 
-                                                            size={14} 
+                                                        <ChevronRightIcon
+                                                            size={14}
                                                             className={cn(
                                                                 "opacity-0 group-hover:opacity-100 transition-opacity",
                                                                 isActive ? "text-brand-green" : "text-gray-300 dark:text-dark-border"
-                                                            )} 
+                                                            )}
                                                         />
                                                     </Link>
                                                 </li>
@@ -120,15 +120,15 @@ export default function HelpSidebar({
             {/* Footer with Socials */}
             <div className="p-4 mt-auto border-t border-gray-100 dark:border-dark-border">
                 <div className="flex items-center justify-center gap-3">
-                    <Button 
-                        variant="outline" 
+                    <Button
+                        variant="outline"
                         className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
                         onClick={() => window.open("https://instagram.com", "_blank")}
                     >
                         <InstagramIcon size={18} />
                     </Button>
-                    <Button 
-                        variant="outline" 
+                    <Button
+                        variant="outline"
                         className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
                         onClick={() => window.open("https://facebook.com", "_blank")}
                     >

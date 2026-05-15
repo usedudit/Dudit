@@ -29,7 +29,7 @@ BEGIN
   END IF;
 
   INSERT INTO products (
-    id, partner_id, store_id, name, description, sku, gtin, brand, category, subcategory, subcategory_id, condition, unit, product_type, location, cost_price, price, promotional_price, min_stock, max_stock, stock_quantity, is_active, is_on_promotion, show_price_in_store, images, is_featured, availability_value, availability_unit, warranty, video_url, technical_specs, tags, moderation_status, created_at, updated_at
+    id, partner_id, store_id, name, description, sku, gtin, brand, brand_id, category, category_id, subcategory, subcategory_id, condition, unit, product_type, location, location_id, cost_price, price, promotional_price, min_stock, max_stock, stock_quantity, is_active, is_on_promotion, show_price_in_store, show_in_marketplace, images, is_featured, availability_value, availability_unit, warranty, video_url, technical_specs, delivery_format, tags, allow_sell_without_stock, moderation_status, created_at, updated_at
   ) VALUES (
     COALESCE((p_product_data->>'id')::UUID, gen_random_uuid()),
     v_partner_id,
@@ -39,13 +39,16 @@ BEGIN
     p_product_data->>'sku',
     p_product_data->>'gtin',
     p_product_data->>'brand',
+    CASE WHEN p_product_data->>'brand_id' IS NOT NULL AND p_product_data->>'brand_id' <> '' THEN (p_product_data->>'brand_id')::UUID ELSE NULL END,
     p_product_data->>'category',
+    CASE WHEN p_product_data->>'category_id' IS NOT NULL AND p_product_data->>'category_id' <> '' THEN (p_product_data->>'category_id')::UUID ELSE NULL END,
     p_product_data->>'subcategory',
-    (p_product_data->>'subcategory_id')::UUID,
+    CASE WHEN p_product_data->>'subcategory_id' IS NOT NULL AND p_product_data->>'subcategory_id' <> '' THEN (p_product_data->>'subcategory_id')::UUID ELSE NULL END,
     p_product_data->>'condition',
     p_product_data->>'unit',
     p_product_data->>'product_type',
     p_product_data->>'location',
+    CASE WHEN p_product_data->>'location_id' IS NOT NULL AND p_product_data->>'location_id' <> '' THEN (p_product_data->>'location_id')::UUID ELSE NULL END,
     (p_product_data->>'cost_price')::NUMERIC,
     COALESCE((p_product_data->>'price')::NUMERIC, 0),
     (p_product_data->>'promotional_price')::NUMERIC,
@@ -55,6 +58,7 @@ BEGIN
     (p_product_data->>'is_active')::BOOLEAN,
     (p_product_data->>'is_on_promotion')::BOOLEAN,
     (p_product_data->>'show_price_in_store')::BOOLEAN,
+    COALESCE((p_product_data->>'show_in_marketplace')::BOOLEAN, true),
     COALESCE(p_product_data->'images', '[]'::JSONB),
     (p_product_data->>'is_featured')::BOOLEAN,
     COALESCE((p_product_data->>'availability_value')::INTEGER, 0),
@@ -62,7 +66,9 @@ BEGIN
     p_product_data->>'warranty',
     p_product_data->>'video_url',
     COALESCE(p_product_data->'technical_specs', '{}'::JSONB),
+    p_product_data->>'delivery_format',
     (SELECT ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_product_data->'tags', '[]'::JSONB))::TEXT)),
+    COALESCE((p_product_data->>'allow_sell_without_stock')::BOOLEAN, false),
     COALESCE(p_product_data->>'moderation_status', 'approved'),
     COALESCE((p_product_data->>'created_at')::TIMESTAMPTZ, NOW()),
     COALESCE((p_product_data->>'updated_at')::TIMESTAMPTZ, NOW())
@@ -150,13 +156,16 @@ BEGIN
       sku = CASE WHEN p_product_data ? 'sku' THEN p_product_data->>'sku' ELSE sku END,
       gtin = CASE WHEN p_product_data ? 'gtin' THEN p_product_data->>'gtin' ELSE gtin END,
       brand = CASE WHEN p_product_data ? 'brand' THEN p_product_data->>'brand' ELSE brand END,
+      brand_id = CASE WHEN p_product_data ? 'brand_id' THEN CASE WHEN p_product_data->>'brand_id' IS NOT NULL AND p_product_data->>'brand_id' <> '' THEN (p_product_data->>'brand_id')::UUID ELSE NULL END ELSE brand_id END,
       category = CASE WHEN p_product_data ? 'category' THEN p_product_data->>'category' ELSE category END,
+      category_id = CASE WHEN p_product_data ? 'category_id' THEN CASE WHEN p_product_data->>'category_id' IS NOT NULL AND p_product_data->>'category_id' <> '' THEN (p_product_data->>'category_id')::UUID ELSE NULL END ELSE category_id END,
       subcategory = CASE WHEN p_product_data ? 'subcategory' THEN p_product_data->>'subcategory' ELSE subcategory END,
-      subcategory_id = CASE WHEN p_product_data ? 'subcategory_id' THEN (p_product_data->>'subcategory_id')::UUID ELSE subcategory_id END,
+      subcategory_id = CASE WHEN p_product_data ? 'subcategory_id' THEN CASE WHEN p_product_data->>'subcategory_id' IS NOT NULL AND p_product_data->>'subcategory_id' <> '' THEN (p_product_data->>'subcategory_id')::UUID ELSE NULL END ELSE subcategory_id END,
       condition = CASE WHEN p_product_data ? 'condition' THEN p_product_data->>'condition' ELSE condition END,
       unit = CASE WHEN p_product_data ? 'unit' THEN p_product_data->>'unit' ELSE unit END,
       product_type = CASE WHEN p_product_data ? 'product_type' THEN p_product_data->>'product_type' ELSE product_type END,
       location = CASE WHEN p_product_data ? 'location' THEN p_product_data->>'location' ELSE location END,
+      location_id = CASE WHEN p_product_data ? 'location_id' THEN CASE WHEN p_product_data->>'location_id' IS NOT NULL AND p_product_data->>'location_id' <> '' THEN (p_product_data->>'location_id')::UUID ELSE NULL END ELSE location_id END,
       cost_price = CASE WHEN p_product_data ? 'cost_price' THEN (p_product_data->>'cost_price')::NUMERIC ELSE cost_price END,
       price = CASE WHEN p_product_data ? 'price' THEN (p_product_data->>'price')::NUMERIC ELSE price END,
       promotional_price = CASE WHEN p_product_data ? 'promotional_price' THEN (p_product_data->>'promotional_price')::NUMERIC ELSE promotional_price END,
@@ -166,6 +175,7 @@ BEGIN
       is_active = CASE WHEN p_product_data ? 'is_active' THEN (p_product_data->>'is_active')::BOOLEAN ELSE is_active END,
       is_on_promotion = CASE WHEN p_product_data ? 'is_on_promotion' THEN (p_product_data->>'is_on_promotion')::BOOLEAN ELSE is_on_promotion END,
       show_price_in_store = CASE WHEN p_product_data ? 'show_price_in_store' THEN (p_product_data->>'show_price_in_store')::BOOLEAN ELSE show_price_in_store END,
+      show_in_marketplace = CASE WHEN p_product_data ? 'show_in_marketplace' THEN (p_product_data->>'show_in_marketplace')::BOOLEAN ELSE show_in_marketplace END,
       images = CASE WHEN p_product_data ? 'images' THEN p_product_data->'images' ELSE images END,
       is_featured = CASE WHEN p_product_data ? 'is_featured' THEN (p_product_data->>'is_featured')::BOOLEAN ELSE is_featured END,
       availability_value = CASE WHEN p_product_data ? 'availability_value' THEN (p_product_data->>'availability_value')::INTEGER ELSE availability_value END,
@@ -173,7 +183,9 @@ BEGIN
       warranty = CASE WHEN p_product_data ? 'warranty' THEN p_product_data->>'warranty' ELSE warranty END,
       video_url = CASE WHEN p_product_data ? 'video_url' THEN p_product_data->>'video_url' ELSE video_url END,
       technical_specs = CASE WHEN p_product_data ? 'technical_specs' THEN p_product_data->'technical_specs' ELSE technical_specs END,
+      delivery_format = CASE WHEN p_product_data ? 'delivery_format' THEN p_product_data->>'delivery_format' ELSE delivery_format END,
       tags = CASE WHEN p_product_data ? 'tags' THEN (SELECT ARRAY(SELECT jsonb_array_elements_text(p_product_data->'tags')::TEXT)) ELSE tags END,
+      allow_sell_without_stock = CASE WHEN p_product_data ? 'allow_sell_without_stock' THEN (p_product_data->>'allow_sell_without_stock')::BOOLEAN ELSE allow_sell_without_stock END,
       moderation_status = CASE WHEN p_product_data ? 'moderation_status' THEN p_product_data->>'moderation_status' ELSE moderation_status END,
       updated_at = NOW()
     WHERE id = p_product_id

@@ -23,9 +23,14 @@ export default function HelpHeader({
 }) {
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
     const [isSearchFocused, setIsSearchFocused] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
     const router = useRouter()
     const { theme, setTheme } = useTheme()
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     // Filter results for the dropdown
     const filteredResults = searchQuery.trim() ? helpCategories.flatMap(cat =>
@@ -180,7 +185,7 @@ export default function HelpHeader({
                             className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-border"
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                         >
-                            {theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+                            {mounted && (theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />)}
                         </Button>
                     </div>
                 </div>

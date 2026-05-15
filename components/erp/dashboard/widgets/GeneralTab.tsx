@@ -25,18 +25,16 @@ export function GeneralTab({ partnerId, sells }: { partnerId: string; sells: str
                 </Suspense>
             </div>
 
-            {/* Contextual Alerts */}
-            <Suspense fallback={<AlertsSkeleton />}>
-                <AlertsWidget partnerId={partnerId} sells={sells} />
-            </Suspense>
-
-            {/* Activity + Categories Row */}
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <Suspense fallback={<ListSkeleton />}>
-                    <ActivityWidget partnerId={partnerId} />
-                </Suspense>
+            {/* Activity & Contextual Row */}
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <Suspense fallback={<ChartSkeleton />}>
                     <TopCategoriesWidget partnerId={partnerId} sells={sells} />
+                </Suspense>
+                <Suspense fallback={<AlertsSkeleton />}>
+                    <AlertsWidget partnerId={partnerId} sells={sells} />
+                </Suspense>
+                <Suspense fallback={<ListSkeleton />}>
+                    <ActivityWidget partnerId={partnerId} />
                 </Suspense>
             </div>
         </div>

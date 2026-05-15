@@ -13,30 +13,31 @@ export async function RevenueOriginWidget({ partnerId }: { partnerId: string }) 
     const totalValue = origins.reduce((acc, o) => acc + money(o.value), 0)
 
     return (
-        <DashboardSectionCard title="Origem da receita" icon={ChartIcon}>
-            <div className="flex flex-col xl:flex-row items-center gap-4">
-                <div className="flex-1 w-full">
+        <DashboardSectionCard title="Origem da receita">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 md:gap-12 py-4">
+                {/* Chart Container */}
+                <div className="w-full max-w-[240px] h-[240px] flex items-center justify-center">
                     <DashboardPieChart data={origins} />
                 </div>
                 
-                {/* Legends */}
-                <div className="flex flex-col gap-2.5 min-w-[140px] w-full xl:w-auto">
+                {/* Legends Container */}
+                <div className="flex flex-col gap-4 min-w-[160px]">
                     {origins.map((o, index) => {
                         const percent = totalValue > 0 ? (money(o.value) / totalValue) * 100 : 0
                         return (
-                            <div key={o.label} className="flex items-center justify-between xl:justify-start gap-3">
-                                <div className="flex items-center gap-2">
-                                    <div 
-                                        className="h-2.5 w-2.5 rounded-full shrink-0" 
-                                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
-                                    />
-                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[100px]">
+                            <div key={o.label} className="flex items-center gap-4">
+                                <div 
+                                    className="h-3 w-3 rounded-full shrink-0" 
+                                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading leading-tight">
                                         {o.label}
                                     </span>
+                                    <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body">
+                                        {Math.round(percent)}%
+                                    </span>
                                 </div>
-                                <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body ml-auto">
-                                    {Math.round(percent)}%
-                                </span>
                             </div>
                         )
                     })}

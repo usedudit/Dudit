@@ -1,9 +1,10 @@
 import { getGeneralAlerts, type AlertItem } from "@/lib/data/dashboard"
+import { DashboardSectionCard } from "../../cards/DashboardSectionCard"
 import {
     AlertCircleIcon,
     CreditCardIcon,
     ShoppingCartIcon,
-    Package as PackageIcon,
+    PackageIcon,
     CalendarIcon,
     TruckIcon,
     CheckCircleIcon,
@@ -34,8 +35,8 @@ export async function AlertsWidget({ partnerId, sells }: { partnerId: string; se
 
     if (alerts.length === 0) {
         return (
-            <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm shadow-brand-dark/5 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center gap-3 px-6 py-5">
+            <DashboardSectionCard title="Precisa de atenção">
+                <div className="flex items-center gap-3 py-1">
                     <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
                         <CheckCircleIcon className="h-5 w-5 text-brand-green" />
                     </div>
@@ -44,27 +45,21 @@ export async function AlertsWidget({ partnerId, sells }: { partnerId: string; se
                         <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum alerta no momento</p>
                     </div>
                 </div>
-            </div>
+            </DashboardSectionCard>
         )
     }
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm shadow-brand-dark/5 dark:border-dark-border dark:bg-dark-surface">
-            <div className="flex items-center gap-3 px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
-                    <AlertCircleIcon className="h-5 w-5 text-brand-dark dark:text-dark-heading" />
-                </div>
-                <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Precisa de atenção</h2>
-            </div>
-            <div className="divide-y divide-brand-border dark:divide-dark-border">
+        <DashboardSectionCard title="Precisa de atenção" className="h-full">
+            <div className="divide-y divide-brand-border dark:divide-dark-border -mx-6 -mb-6 border-t border-brand-border dark:border-dark-border">
                 {alerts.map((alert) => {
                     const Icon = iconMap[alert.icon] || AlertCircleIcon
                     return (
-                        <div key={alert.id} className="flex items-center gap-4 px-6 py-3.5">
+                        <div key={alert.id} className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-brand-gray/50 dark:hover:bg-dark-border/10">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${toneBg[alert.tone]}`}>
                                 <Icon className={`h-4 w-4 ${toneColors[alert.tone]}`} />
                             </div>
-                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading flex-1">
+                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading flex-1 truncate">
                                 {alert.message}
                             </span>
                             <span className={`text-[14px] font-bold tabular-nums ${toneColors[alert.tone]}`}>
@@ -74,6 +69,6 @@ export async function AlertsWidget({ partnerId, sells }: { partnerId: string; se
                     )
                 })}
             </div>
-        </div>
+        </DashboardSectionCard>
     )
 }

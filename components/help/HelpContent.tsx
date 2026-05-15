@@ -211,7 +211,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         )}
                     </Button>
                 </div>
-                <h1 className="text-4xl font-black text-brand-dark dark:text-dark-heading mb-4">
+                <h1 className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-4">
                     {article.title}
                 </h1>
                 {article.description && (

@@ -40,7 +40,7 @@ const LIST_COLUMNS = [
     { id: "name", label: "Método", align: "left" as const },
     { id: "type", label: "Tipo", align: "left" as const },
     { id: "discount", label: "Desconto", align: "left" as const },
-    { id: "fees", label: "Taxas", align: "left" as const },
+    { id: "finance_account", label: "Conta Financeira", align: "left" as const },
     { id: "status", label: "Status", align: "center" as const },
     { id: "actions", label: "Ações", align: "center" as const },
 ]
@@ -200,6 +200,12 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     }, [])
 
     const togglePaymentStatus = async (method: PaymentMethodListItem, checked: boolean) => {
+        const rawType = String(method.type || method.payment_type || "").toLowerCase()
+        if (rawType === "cash" || rawType === "dinheiro") {
+            notifyError("Ação não permitida", "Este método deve permanecer sempre ativo.")
+            return
+        }
+
         const originalStatus = method.is_active
         const optimisticMethods = methods.map((current) => current.id === method.id ? { ...current, is_active: checked } : current)
 
@@ -277,6 +283,17 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
     const runBulkStatus = useCallback(async (ids: string[], nextValue: boolean) => {
         if (ids.length === 0) return
 
+        const targetIds = ids.filter(id => {
+            const method = methods.find(m => m.id === id)
+            const rawType = String(method?.type || method?.payment_type || "").toLowerCase()
+            return rawType !== "cash" && rawType !== "dinheiro"
+        })
+
+        if (targetIds.length === 0) {
+            if (ids.length > 0) notifyError("Ação não permitida", "O método Dinheiro deve permanecer sempre ativo.")
+            return
+        }
+
         setProcessingModal({
             open: true,
             text: nextValue ? "Ativando métodos de pagamento..." : "Desativando métodos de pagamento...",
@@ -284,16 +301,16 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
 
         setIsTogglingStatus((prev) => {
             const next = new Set(prev)
-            ids.forEach((id) => next.add(id))
+            targetIds.forEach((id) => next.add(id))
             return next
         })
 
         const snapshot = methods
 
-        setMethods((prev) => prev.map((method) => ids.includes(method.id) ? { ...method, is_active: nextValue } : method))
+        setMethods((prev) => prev.map((method) => targetIds.includes(method.id) ? { ...method, is_active: nextValue } : method))
 
         try {
-            const results = await Promise.all(ids.map(async (id) => ({ id, result: await updatePaymentMethodAction(id, { isActive: nextValue }) })))
+            const results = await Promise.all(targetIds.map(async (id) => ({ id, result: await updatePaymentMethodAction(id, { isActive: nextValue }) })))
             const failedIds = results.filter((entry) => !entry.result.success).map((entry) => entry.id)
             const successIds = results.filter((entry) => entry.result.success).map((entry) => entry.id)
 
@@ -331,7 +348,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
             setProcessingModal({ open: false, text: "" })
             setIsTogglingStatus((prev) => {
                 const next = new Set(prev)
-                ids.forEach((id) => next.delete(id))
+                targetIds.forEach((id) => next.delete(id))
                 return next
             })
         }
@@ -480,7 +497,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                                 {getBrandsLabel(method) || getPaymentTypeLabel(method)}
                                             </span>
                                         </div>
-                                        <Badge variant={method.is_active ? "green" : "red"} icon={null} className="shrink-0 text-[10px] h-5 px-2">
+                                        <Badge variant={method.is_active ? "green" : "red"} className="shrink-0 text-[10px] h-5 px-2">
                                             {method.is_active ? "Ativo" : "Inativo"}
                                         </Badge>
                                     </div>
@@ -490,7 +507,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                                 {getPaymentTypeLabel(method)}
                                             </Badge>
                                             {method.discount_percent ? (
-                                                <Badge variant="blue" icon={null} className="text-[10px] h-5 px-2">
+                                                <Badge variant="orange" icon={null} className="text-[10px] h-5 px-2">
                                                     -{method.discount_percent}%
                                                 </Badge>
                                             ) : null}
@@ -583,7 +600,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-                            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                                 <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                                     {/* Back button - desktop only */}
@@ -666,6 +683,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 <PaymentMethodEditPage
                     partnerId={partner.id}
                     editingMethod={normalizedEditingMethod}
+                    existingMethods={methods}
                     onBack={async (shouldReload) => {
                         setCurrentView("list")
                         if (shouldReload) {

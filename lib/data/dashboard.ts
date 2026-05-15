@@ -66,6 +66,7 @@ export type ActivityItem = {
   time: string
   icon: string
   tone: "green" | "blue" | "orange" | "red" | "default"
+  user?: string
 }
 
 export type ProductsDashboardData = {
@@ -692,26 +693,53 @@ async function getCachedGeneralRevenueOrigin(partnerId: string): Promise<{ origi
   )()
 }
 
+
 async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: ActivityItem[] }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      const { data, error } = await supabase.from("audit_logs").select("id, entity_type, action_type, change_lines, created_at").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(10)
+      
+      // Fetch logs and join with profiles to get user names
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select(`
+          id, 
+          entity_type, 
+          action_type, 
+          change_lines, 
+          created_at, 
+          user_id,
+          profiles:user_id (full_name)
+        `)
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: false })
+        .limit(10)
+
       if (error || !data?.length) return { activity: [] }
 
-      const actionLabel: Record<string, string> = {
-        created: "criado", updated: "atualizado", paid: "pago", cancelled: "cancelado",
-        received: "recebido", deleted: "removido", refunded: "reembolsado",
-        sale_created: "venda criada", cash_opened: "caixa aberto", cash_closed: "caixa fechado",
+      const entityMeta: Record<string, { label: string; gender: "m" | "f"; icon: string }> = {
+        order: { label: "Pedido", gender: "m", icon: "cart" },
+        transaction: { label: "Transação", gender: "f", icon: "money" },
+        product: { label: "Produto", gender: "m", icon: "package" },
+        appointment: { label: "Agendamento", gender: "m", icon: "calendar" },
+        service: { label: "Serviço", gender: "m", icon: "wrench" },
+        customer: { label: "Cliente", gender: "m", icon: "user" },
+        delivery: { label: "Entrega", gender: "f", icon: "truck" },
+        quote: { label: "Orçamento", gender: "m", icon: "file" },
+        cash_session: { label: "Sessão de Caixa", gender: "f", icon: "money" },
+        coupon: { label: "Cupom", gender: "m", icon: "tag" },
       }
-      const entityLabel: Record<string, string> = {
-        order: "Pedido", transaction: "Transação", product: "Produto", appointment: "Agendamento",
-        service: "Serviço", customer: "Cliente", delivery: "Entrega", quote: "Orçamento",
+
+      const actionLabels: Record<string, { m: string; f: string }> = {
+        created: { m: "criado", f: "criada" },
+        updated: { m: "atualizado", f: "atualizada" },
+        paid: { m: "pago", f: "paga" },
+        cancelled: { m: "cancelado", f: "cancelada" },
+        received: { m: "recebido", f: "recebida" },
+        deleted: { m: "removido", f: "removida" },
+        refunded: { m: "reembolsado", f: "reembolsada" },
       }
-      const entityIcon: Record<string, string> = {
-        order: "cart", transaction: "money", product: "package", appointment: "calendar",
-        service: "wrench", customer: "user", delivery: "truck", quote: "file",
-      }
+
       const entityTone: Record<string, ActivityItem["tone"]> = {
         created: "green", paid: "green", received: "green", sale_created: "green",
         cancelled: "red", deleted: "red", refunded: "orange",
@@ -722,17 +750,42 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
         const action = String(row.action_type || "").toLowerCase()
         const entity = String(row.entity_type || "").toLowerCase()
         const lines = Array.isArray(row.change_lines) ? row.change_lines : []
-        const desc = lines.length > 0 ? String(lines[0]).slice(0, 80) : (actionLabel[action] || action)
+        
+        let title = ""
+        let icon = entityMeta[entity]?.icon || "file"
+        
+        // Special mapping for cash sessions as requested
+        if (entity === "cash_session") {
+          if (action === "cash_opened" || action === "opened") title = "Abertura de caixa"
+          else if (action === "cash_closed" || action === "closed") title = "Fechamento de caixa"
+          else title = "Sessão de caixa"
+        } else if (action === "sale_created") {
+          title = "Venda realizada"
+        } else {
+          const meta = entityMeta[entity]
+          const actionLbl = actionLabels[action]
+          if (meta && actionLbl) {
+            title = `${meta.label} ${actionLbl[meta.gender]}`
+          } else {
+            title = `${entityMeta[entity]?.label || entity} ${action}`
+          }
+        }
+
+        const desc = lines.length > 0 ? String(lines[0]).slice(0, 80) : ""
         const timeStr = (() => {
-          try { return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(new Date(row.created_at)) } catch { return "" }
+          try { return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(row.created_at)) } catch { return "" }
         })()
+
+        const userName = (row.profiles as any)?.full_name || "Sistema"
+
         return {
           id: row.id,
-          title: `${entityLabel[entity] || entity} ${actionLabel[action] || action}`,
+          title,
           description: desc,
           time: timeStr,
-          icon: entityIcon[entity] || "file",
+          icon,
           tone: entityTone[action] || "default",
+          user: userName.split(" ")[0], // First name for compact view
         }
       })
 

@@ -124,8 +124,13 @@ import {
     SplitIcon,
     Target02Icon,
     PlayIcon as PlayIcon01,
-    ThumbsUpIcon
+    ThumbsUpIcon,
+    Rocket01Icon,
+    Briefcase01Icon,
+    File02Icon as File02Icon01,
+    Key01Icon
 } from "@hugeicons/core-free-icons"
+
 
 interface IconProps {
     icon?: any
@@ -319,6 +324,11 @@ export const MonitorIcon = CreateIcon(ComputerIcon01)
 export const TerminalIcon = CreateIcon(ComputerTerminal01Icon)
 export const DatabaseIcon = CreateIcon(DatabaseIcon01)
 export const GlobeIcon = CreateIcon(GlobeIcon01)
+export const FileTextIcon = CreateIcon(File02Icon01)
+export const RocketIcon = CreateIcon(Rocket01Icon)
+export const BriefcaseIcon = CreateIcon(Briefcase01Icon)
+export const KeyIcon = CreateIcon(Key01Icon)
+
 
 // ============================
 // SYSTEM / MISC

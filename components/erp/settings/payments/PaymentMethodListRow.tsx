@@ -20,6 +20,7 @@ export interface PaymentMethodListItem {
     fixed_amount?: number | null
     is_active?: boolean | null
     is_online_default?: boolean | null
+    finance_account_name?: string | null
 }
 
 interface ColumnDef {
@@ -124,8 +125,8 @@ const PaymentMethodListRow = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
                                     {method.name || "Método sem nome"}
                                 </span>
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                    {getBrandsLabel(method) || `Tipo ${getPaymentTypeLabel(method)}`}
+                                <span className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body/60 tracking-wider uppercase">
+                                    ID: {method.id.slice(0, 5).toUpperCase()}
                                 </span>
                             </div>
                         </div>
@@ -133,9 +134,16 @@ const PaymentMethodListRow = React.memo(
 
                 case "type":
                     return (
-                        <Badge variant="gray" className="capitalize" icon={null}>
-                            {getPaymentTypeLabel(method)}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="gray" className="capitalize" icon={null}>
+                                {getPaymentTypeLabel(method)}
+                            </Badge>
+                            {method.is_online_default && (
+                                <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
+                                    Padrão
+                                </Badge>
+                            )}
+                        </div>
                     )
 
                 case "discount":
@@ -145,18 +153,11 @@ const PaymentMethodListRow = React.memo(
                         </span>
                     )
 
-                case "fees":
+                case "finance_account":
                     return (
-                        <div className="flex flex-col text-left">
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                {getFeeLabel(method)}
-                            </span>
-                            {method.max_installments && method.max_installments > 1 ? (
-                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                    Até {method.max_installments}x
-                                </span>
-                            ) : null}
-                        </div>
+                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                            {method.finance_account_name || "-"}
+                        </span>
                     )
 
                 case "status":

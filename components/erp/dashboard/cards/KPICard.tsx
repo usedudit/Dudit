@@ -24,9 +24,9 @@ export function KPICard({ title, value, trend, isLast, className }: KPICardProps
     const trendLabel = trendParts.slice(1).join(" ")
 
     return (
-        <div className={cn("relative flex flex-col gap-1.5 p-6 flex-1 min-w-0", className)}>
+        <div className={cn("relative flex flex-col gap-3 p-6 flex-1 min-w-0", className)}>
             {/* Title */}
-            <span className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body truncate uppercase tracking-tight">
+            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
                 {title}
             </span>
 
@@ -56,12 +56,12 @@ export function KPICard({ title, value, trend, isLast, className }: KPICardProps
 
             {/* Vertical Divider (Desktop) */}
             {!isLast && (
-                <div className="hidden md:block absolute right-0 top-8 bottom-8 w-px bg-brand-border/60 dark:bg-dark-border/40" />
+                <div className="hidden md:block absolute right-0 top-4 bottom-4 w-px bg-brand-border dark:bg-dark-border" />
             )}
 
             {/* Horizontal Divider (Mobile) */}
             {!isLast && (
-                <div className="md:hidden absolute bottom-0 left-8 right-8 h-px bg-brand-border/60 dark:bg-dark-border/40" />
+                <div className="md:hidden absolute bottom-0 left-4 right-4 h-px bg-brand-border dark:bg-dark-border" />
             )}
         </div>
     )

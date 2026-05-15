@@ -8,12 +8,13 @@ import {
     RadioButton,
     AlertModal,
     SavingStatusModal,
-    Badge,
     FormSection,
     FormDropdown,
     DefaultModal,
     MoneyInput,
     PercentageInput,
+    ListItem,
+    IconPlaceholder,
 } from "@/components/reusable"
 import {
     CpfCnpjInput,
@@ -28,7 +29,7 @@ import {
     getPaymentMethodDetailsAction,
     getPartnerFinanceAccountsForPaymentMethodsAction
 } from "@/app/actions/erp/payment-methods"
-import { ChevronLeftIcon, SaveIcon, InfoIcon, MoneyIcon, CreditCardIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, InfoIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 const AVAILABLE_BRANDS = [
@@ -76,10 +77,11 @@ interface PaymentMethod {
 interface PaymentMethodEditPageProps {
     partnerId: string
     editingMethod: PaymentMethod | null
+    existingMethods?: any[]
     onBack: (shouldReload?: boolean) => void
 }
 
-export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: PaymentMethodEditPageProps) {
+export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethods = [], onBack }: PaymentMethodEditPageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -134,6 +136,11 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                     default_finance_account_id: "",
                     installment_fees: [],
                 }
+
+                // Initial online default check for the default type "credit_card"
+                const hasDefault = existingMethods.some(m => (m.type === "credit_card" || m.payment_type === "credit_card") && m.is_online_default)
+                initial.is_online_default = !hasDefault
+
                 setFormData(initial)
                 setBaselineFormData(JSON.parse(JSON.stringify(initial)))
                 return
@@ -329,109 +336,156 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                             errorMessage={fieldErrors.name}
                                         />
 
-                                        <div>
-                                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Tipo de método</label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <RadioButton
-                                                    name="type"
-                                                    value="credit_card"
-                                                    checked={formData.type === "credit_card"}
-                                                    onChange={() => setFormData({ ...formData, type: "credit_card", supports_installments: true })}
-                                                    label="Crédito"
-                                                />
-                                                <RadioButton
-                                                    name="type"
-                                                    value="debit_card"
-                                                    checked={formData.type === "debit_card"}
-                                                    onChange={() => setFormData({ ...formData, type: "debit_card", supports_installments: false, max_installments: 1 })}
-                                                    label="Débito"
-                                                />
-                                                <RadioButton
-                                                    name="type"
-                                                    value="pix"
-                                                    checked={formData.type === "pix"}
-                                                    onChange={() => setFormData({ ...formData, type: "pix", supports_installments: false, max_installments: 1 })}
-                                                    label="Pix"
-                                                />
-                                                <RadioButton
-                                                    name="type"
-                                                    value="bank_transfer"
-                                                    checked={formData.type === "bank_transfer"}
-                                                    onChange={() => setFormData({ ...formData, type: "bank_transfer", supports_installments: false, max_installments: 1 })}
-                                                    label="Transferência Bancária"
-                                                />
-                                            </div>
-                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <FormDropdown
+                                                label="Tipo de método"
+                                                placeholder="Selecione o tipo"
+                                                value={formData.type}
+                                                setValue={(val) => {
+                                                    const updates: any = { type: val }
+                                                    if (val === "cash") updates.is_active = true
+                                                    if (val === "credit_card") updates.supports_installments = true
+                                                    else {
+                                                        updates.supports_installments = false
+                                                        updates.max_installments = 1
+                                                    }
 
-                                        <FormDropdown
-                                            label="Conta Financeira (Opcional)"
-                                            placeholder="Selecione uma conta"
-                                            value={formData.default_finance_account_id}
-                                            setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
-                                            options={[
-                                                { value: "", label: "Nenhuma (não vincular)" },
-                                                ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
-                                            ]}
-                                        />
+                                                    // Online default logic for new methods
+                                                    if (!editingMethod) {
+                                                        const hasDefault = existingMethods.some(m => (m.type === val || m.payment_type === val) && m.is_online_default)
+                                                        updates.is_online_default = !hasDefault
+                                                    }
+
+                                                    setFormData({ ...formData, ...updates })
+                                                }}
+                                                options={[
+                                                    { value: "credit_card", label: "Crédito" },
+                                                    { value: "debit_card", label: "Débito" },
+                                                    { value: "pix", label: "Pix" },
+                                                    { value: "bank_transfer", label: "Transferência Bancária" },
+                                                    { value: "cash", label: "Dinheiro" },
+                                                ]}
+                                            />
+
+                                            <FormDropdown
+                                                label="Conta Financeira (Opcional)"
+                                                placeholder="Selecione uma conta"
+                                                value={formData.default_finance_account_id}
+                                                setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
+                                                options={[
+                                                    { value: "", label: "Nenhuma (não vincular)" },
+                                                    ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
+                                                ]}
+                                            />
+                                        </div>
                                     </div>
                                 </FormSection>
 
                                 {isCard && (
-                                    <FormSection title="Configurações do Cartão">
+                                    <FormSection className="mt-8" title="Configurações do Cartão">
+                                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+
                                         <div className="grid grid-cols-1 gap-6">
                                             {isCredit && (
                                                 <div className="space-y-6">
-                                                    <div>
-                                                        <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Modo de Pagamento</label>
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <RadioButton
-                                                                name="supports_installments"
-                                                                value="single"
-                                                                checked={!formData.supports_installments}
-                                                                onChange={() => setFormData({ ...formData, supports_installments: false, max_installments: 1 })}
-                                                                label="Pagamento Único"
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <FormDropdown
+                                                            label="Modo de Pagamento"
+                                                            placeholder="Selecione o modo"
+                                                            value={formData.supports_installments ? "installments" : "single"}
+                                                            setValue={(val) => {
+                                                                const isInstallments = val === "installments"
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    supports_installments: isInstallments,
+                                                                    max_installments: isInstallments ? formData.max_installments : 1
+                                                                })
+                                                            }}
+                                                            options={[
+                                                                { value: "single", label: "Pagamento Único" },
+                                                                { value: "installments", label: "Permitir Parcelamento" },
+                                                            ]}
+                                                        />
+
+                                                        {formData.supports_installments && (
+                                                            <FormDropdown
+                                                                label="Parcelamento Máximo"
+                                                                placeholder="Selecione o limite"
+                                                                value={String(formData.max_installments)}
+                                                                setValue={(val) => {
+                                                                    const n = Number(val)
+                                                                    setFormData(prev => {
+                                                                        const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n);
+                                                                        for (let i = 1; i <= n; i++) {
+                                                                            if (!newFees.find(f => f.installmentNumber === i)) {
+                                                                                newFees.push({ installmentNumber: i, feePercent: 0 })
+                                                                            }
+                                                                        }
+                                                                        newFees.sort((a, b) => a.installmentNumber - b.installmentNumber);
+                                                                        return { ...prev, max_installments: n, installment_fees: newFees }
+                                                                    })
+                                                                }}
+                                                                options={[
+                                                                    { value: "1", label: "1x" },
+                                                                    { value: "2", label: "2x" },
+                                                                    { value: "3", label: "3x" },
+                                                                    { value: "4", label: "4x" },
+                                                                    { value: "6", label: "6x" },
+                                                                    { value: "10", label: "10x" },
+                                                                    { value: "12", label: "12x" },
+                                                                    { value: "18", label: "18x" },
+                                                                    { value: "24", label: "24x" },
+                                                                ]}
                                                             />
-                                                            <RadioButton
-                                                                name="supports_installments"
-                                                                value="installments"
-                                                                checked={formData.supports_installments}
-                                                                onChange={() => setFormData({ ...formData, supports_installments: true })}
-                                                                label="Permitir Parcelamento"
-                                                            />
-                                                        </div>
+                                                        )}
                                                     </div>
 
                                                     {formData.supports_installments && (
                                                         <div className="space-y-4">
                                                             <div className="flex items-center justify-between">
-                                                                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Parcelamento Máximo</label>
-                                                                <Button variant="outline" size="sm" onClick={() => setIsInstallmentModalOpen(true)}>
-                                                                    Configurar Taxas
-                                                                </Button>
-                                                            </div>
-                                                            <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                                                                {[1, 2, 3, 4, 6, 10, 12, 18, 24].map((n) => (
-                                                                    <Button
-                                                                        key={n}
-                                                                        variant={formData.max_installments === n ? "default" : "outline"}
-                                                                        className="h-10 text-xs font-bold"
-                                                                        onClick={() => {
-                                                                            setFormData(prev => {
-                                                                                const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n);
-                                                                                for (let i = 1; i <= n; i++) {
-                                                                                    if (!newFees.find(f => f.installmentNumber === i)) {
-                                                                                        newFees.push({ installmentNumber: i, feePercent: 0 })
-                                                                                    }
-                                                                                }
-                                                                                newFees.sort((a, b) => a.installmentNumber - b.installmentNumber);
-                                                                                return { ...prev, max_installments: n, installment_fees: newFees }
-                                                                            })
-                                                                        }}
-                                                                    >
-                                                                        {n}x
+                                                                <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Taxas por Parcela</label>
+                                                                {formData.installment_fees.length > 0 && formData.installment_fees.some(f => f.feePercent > 0) && (
+                                                                    <Button variant="link" size="sm" onClick={() => setIsInstallmentModalOpen(true)} className="p-0 h-auto font-bold text-brand-green">
+                                                                        Configurar Taxas
                                                                     </Button>
-                                                                ))}
+                                                                )}
                                                             </div>
+
+                                                            {formData.installment_fees.length === 0 || !formData.installment_fees.some(f => f.feePercent > 0) ? (
+                                                                <div className="bg-brand-gray/20 dark:bg-dark-surface/50 rounded-2xl border border-dashed border-brand-border dark:border-dark-border p-8 flex flex-col items-center text-center">
+                                                                    <IconPlaceholder
+                                                                        icon={InfoIcon}
+                                                                        containerSize="w-16 h-16"
+                                                                        iconSize="w-8 h-8"
+                                                                        title="Taxas não configuradas"
+                                                                        subtitle="Você ainda não definiu as taxas para cada parcela deste método."
+                                                                        itemButton={{
+                                                                            text: "Configurar Taxas",
+                                                                            action: () => setIsInstallmentModalOpen(true),
+                                                                            variant: "outline"
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
+                                                                    <table className="w-full text-left border-separate border-spacing-0">
+                                                                        <thead>
+                                                                            <tr className="bg-brand-gray/50 dark:bg-dark-border/10">
+                                                                                <th className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">Parcela</th>
+                                                                                <th className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-right">Juros (%)</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {formData.installment_fees.map((fee, idx) => (
+                                                                                <tr key={fee.installmentNumber} className="border-b border-brand-border/50 dark:border-dark-border/30 last:border-0 hover:bg-brand-gray/20 transition-colors">
+                                                                                    <td className="py-3 px-6 text-[13px] font-bold text-brand-dark dark:text-dark-heading">{fee.installmentNumber}x</td>
+                                                                                    <td className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-right">{fee.feePercent}%</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -439,14 +493,13 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
 
                                             <div className="space-y-4">
                                                 <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Bandeiras Aceitas</label>
-                                                <div className="grid grid-cols-2 gap-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     {AVAILABLE_BRANDS.map((brand) => (
-                                                        <div
+                                                        <ListItem
                                                             key={brand.id}
-                                                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${formData.card_brand?.includes(brand.id)
-                                                                ? "bg-brand-green/10 border-brand-green text-brand-green"
-                                                                : "bg-white dark:bg-dark-surface border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body"
-                                                                }`}
+                                                            title={brand.name}
+                                                            left={<img src={brand.image} alt={brand.name} className="w-5 h-5 object-contain opacity-80" />}
+                                                            right={<Checkbox checked={!!formData.card_brand?.includes(brand.id)} onChange={() => { }} />}
                                                             onClick={() => {
                                                                 const current = formData.card_brand ? formData.card_brand.split(",") : []
                                                                 const next = current.includes(brand.id)
@@ -454,11 +507,8 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                                                     : [...current, brand.id]
                                                                 setFormData({ ...formData, card_brand: next.join(",") || null })
                                                             }}
-                                                        >
-                                                            <Checkbox checked={!!formData.card_brand?.includes(brand.id)} onChange={() => { }} />
-                                                            <img src={brand.image} alt={brand.name} className="w-4 h-4 object-contain opacity-80" />
-                                                            <span className="text-sm font-medium">{brand.name}</span>
-                                                        </div>
+                                                            className="px-4 py-3"
+                                                        />
                                                     ))}
                                                 </div>
                                             </div>
@@ -573,21 +623,22 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, onBack }: Paym
                                 <SidebarCard>
                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Preferências</h3>
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                        <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativo</p>
-                                                <p className="text-[11px] text-brand-inactive-text">Disponível para seleção nas vendas</p>
+                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Ativo</p>
+                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Disponível para seleção nas vendas</p>
                                             </div>
                                             <Checkbox
                                                 checked={formData.is_active}
+                                                disabled={formData.type === "cash"}
                                                 onChange={(checked) => setFormData({ ...formData, is_active: checked })}
                                             />
                                         </div>
 
-                                        <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border">
+                                        <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Padrão Online</p>
-                                                <p className="text-[11px] text-brand-inactive-text">Pré-selecionado na vitrine do marketplace</p>
+                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Padrão Online</p>
+                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Pré-selecionado na vitrine do marketplace</p>
                                             </div>
                                             <Checkbox
                                                 checked={formData.is_online_default}

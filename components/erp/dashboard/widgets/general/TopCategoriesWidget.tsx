@@ -9,7 +9,7 @@ export async function TopCategoriesWidget({ partnerId, sells }: { partnerId: str
     if (categories.length === 0) return null
 
     return (
-        <DashboardSectionCard title="Top categorias" icon={TagIcon}>
+        <DashboardSectionCard title="Top categorias" className="h-full">
             <DashboardBarChart data={categories} />
         </DashboardSectionCard>
     )

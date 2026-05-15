@@ -274,16 +274,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
                         {activeTab === "adicionais" && (
                           <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {showVitrine && (
-                              <ListItem
-                                icon={Store}
-                                title="Minha Vitrine"
-                                description="Configure o link, cores e produtos visíveis no seu catálogo online."
-                                onClick={() => setActivePage("vitrine")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
                             {showOS && (
                               <ListItem
                                 icon={WrenchIcon}
