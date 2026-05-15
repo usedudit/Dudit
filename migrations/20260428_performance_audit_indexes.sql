@@ -60,7 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_employee_commissions_partner_user_role
 CREATE INDEX IF NOT EXISTS idx_audit_logs_partner_entity
   ON public.audit_logs(partner_id, entity_type, entity_id);
 
--- 11. (Removed — sale_id column does not exist on orders table)
+-- 11. (Removed - sale_id column does not exist on orders table)
 
 -- 12. Payment methods: partner + active status (checkout, POS initial data)
 --     Used by: getPOSInitialDataAction, applyPaymentMethodPricingToTotal

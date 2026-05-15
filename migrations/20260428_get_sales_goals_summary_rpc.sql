@@ -4,7 +4,7 @@
 -- server-side aggregation. Returns JSON with pre-computed sums.
 --
 -- Safety: SECURITY DEFINER with explicit partner_id parameter.
--- No cross-partner data exposure — every sub-query is scoped.
+-- No cross-partner data exposure - every sub-query is scoped.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION get_sales_goals_summary(p_partner_id UUID)

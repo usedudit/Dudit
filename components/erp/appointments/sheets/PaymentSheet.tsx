@@ -221,7 +221,7 @@ const normalizeMethodType = (value?: string | null) => {
     return "other";
 };
 
-/** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) — manter os mesmos significados. */
+/** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) - manter os mesmos significados. */
 export type PaymentModalProps = {
     isOpen: boolean
     onClose: () => void
@@ -245,7 +245,7 @@ export type PaymentModalProps = {
     onSuccess?: () => void
 }
 
-/** Mesmo texto em PDV e venda manual — importe nos pais para garantir paridade. */
+/** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
 export const PAYMENT_MODAL_HEADER_SUBTITLE = "Venda de Itens"
 
 const PaymentModal = ({
@@ -476,7 +476,7 @@ const PaymentModal = ({
                 partnerId: String(partnerId),
                 baseTotal: Math.max(0, Number(chargeTarget || 0)),
                 legs: activeSplitLegs.map((p) => ({
-                    method: p.method || '—',
+                    method: p.method || '-',
                     baseAmount: p.amount,
                     paymentMethodId: p.paymentMethodId,
                     installmentNumber: Math.max(1, p.installmentNumber || 1),

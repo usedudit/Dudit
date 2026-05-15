@@ -50,6 +50,11 @@ CREATE POLICY "Partners can manage their own categories" ON public.product_categ
             SELECT 1 FROM partners
             WHERE partners.id = product_categories.partner_id AND partners.user_id = auth.uid()
         )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users
+            WHERE partner_users.partner_id = product_categories.partner_id AND partner_users.user_id = auth.uid()
+        )
     );
 
 -- Brands
@@ -60,6 +65,11 @@ CREATE POLICY "Partners can manage their own brands" ON public.brands
             SELECT 1 FROM partners
             WHERE partners.id = brands.partner_id AND partners.user_id = auth.uid()
         )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users
+            WHERE partner_users.partner_id = brands.partner_id AND partner_users.user_id = auth.uid()
+        )
     );
 
 -- Storage Locations
@@ -69,6 +79,11 @@ CREATE POLICY "Partners can manage their own locations" ON public.storage_locati
         EXISTS (
             SELECT 1 FROM partners
             WHERE partners.id = storage_locations.partner_id AND partners.user_id = auth.uid()
+        )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users
+            WHERE partner_users.partner_id = storage_locations.partner_id AND partner_users.user_id = auth.uid()
         )
     );
 

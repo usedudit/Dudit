@@ -355,7 +355,7 @@ export async function middleware(request: NextRequest) {
                 // Ban expirado e limpo, segue normal
               } else {
                 // Ativamente banido (permanente ou ainda não expirou)
-                console.log(`[MIDDLEWARE] User ${user.id} is BANNED — redirecting to /banned`)
+                console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
                 const bannedUrl = new URL("/banned", request.url)
                 return NextResponse.redirect(bannedUrl)
               }

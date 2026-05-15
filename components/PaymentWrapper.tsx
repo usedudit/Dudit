@@ -711,7 +711,7 @@ export function PaymentWrapper({
                                             <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-2">
                                                 <MapPinIcon size={16} className="text-brand-inactive-text" /> Endereço de Entrega
                                             </h3>
-                                            <p className="text-sm text-brand-inactive-text leading-relaxed bg-brand-gray/30 dark:bg-dark-bg p-3 rounded-xl border border-brand-border dark:border-dark-border">
+                                            <p className="text-sm text-brand-inactive-text leading-relaxed bg-brand-gray/30 dark:bg-dark-surface p-3 rounded-xl border border-brand-border dark:border-dark-border">
                                                 {orderDetails.deliveryAddress}
                                             </p>
                                         </div>

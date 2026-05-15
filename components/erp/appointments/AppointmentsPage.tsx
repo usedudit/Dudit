@@ -43,7 +43,7 @@ import SavingStatusModal from '@/components/reusable/SavingStatusModal';
 
 /**
  * Compute the visible date range based on the current view and date.
- * All filtering happens at the DB level — this determines the query bounds.
+ * All filtering happens at the DB level - this determines the query bounds.
  */
 function computeVisibleDateRange(date: Date, view: ViewType): { startDate: string; endDate: string } {
     if (view === 'day') {
@@ -54,7 +54,7 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
         const days = getWeekDays(date);
         return { startDate: formatDateStr(days[0]), endDate: formatDateStr(days[6]) };
     }
-    // month — include full grid (may show days from prev/next month)
+    // month - include full grid (may show days from prev/next month)
     const y = date.getFullYear();
     const m = date.getMonth();
     const firstDay = new Date(y, m, 1);
@@ -160,7 +160,7 @@ const AppointmentsPage = ({
         recurrence: (row.recurrence as any) || 'none'
     }), []);
 
-    // Catalogs come from SSR props — only refresh unavailable types when needed
+    // Catalogs come from SSR props - only refresh unavailable types when needed
     const refreshUnavailableTypes = useCallback(async () => {
         const unavailRes = await getUnavailableTypesAction(partnerId);
         if (unavailRes?.success) {
@@ -265,7 +265,7 @@ const AppointmentsPage = ({
             setAppointments(stale.data);
             setIsLoadingAppointments(false);
         } else {
-            // Cold fetch — show loading skeleton
+            // Cold fetch - show loading skeleton
             setIsLoadingAppointments(true);
         }
 
@@ -335,7 +335,7 @@ const AppointmentsPage = ({
             return;
         }
 
-        // Open sheet INSTANTLY — never block the UI
+        // Open sheet INSTANTLY - never block the UI
         setSheetMode('view');
         setSelectedAppointment(appointment);
         setIsSheetOpen(true);
@@ -1014,7 +1014,7 @@ const AppointmentsPage = ({
                                                     const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
                                                     repeatCount = Math.min(365, Math.floor(diffDays / stepDays) + 1);
                                                 } else {
-                                                    // 'never' — use sensible defaults
+                                                    // 'never' - use sensible defaults
                                                     repeatCount = item.recurrence === 'daily' ? 30 : 12;
                                                 }
                                             }

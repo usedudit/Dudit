@@ -2,16 +2,16 @@
  * Production-grade SSRF (Server-Side Request Forgery) protection module.
  *
  * Defense-in-depth layers:
- * 1. URL parsing via `new URL()` — catches malformed/smuggled URLs
- * 2. Protocol enforcement — only http: and https:
- * 3. Credential rejection — no user:pass in URLs
- * 4. Hostname allowlist — strict allowlist of known API domains
- * 5. Raw IP detection — blocks decimal, hex, octal IP bypasses
- * 6. DNS resolution — resolves hostname and validates resolved IP
- * 7. Private IP blocking — blocks loopback, link-local, RFC1918, metadata
- * 8. Manual redirect following — re-validates every redirect target
- * 9. Timeout enforcement — AbortController-based hard timeout
- * 10. Response size cap — prevents streaming/memory abuse
+ * 1. URL parsing via `new URL()` - catches malformed/smuggled URLs
+ * 2. Protocol enforcement - only http: and https:
+ * 3. Credential rejection - no user:pass in URLs
+ * 4. Hostname allowlist - strict allowlist of known API domains
+ * 5. Raw IP detection - blocks decimal, hex, octal IP bypasses
+ * 6. DNS resolution - resolves hostname and validates resolved IP
+ * 7. Private IP blocking - blocks loopback, link-local, RFC1918, metadata
+ * 8. Manual redirect following - re-validates every redirect target
+ * 9. Timeout enforcement - AbortController-based hard timeout
+ * 10. Response size cap - prevents streaming/memory abuse
  *
  * @module ssrf-guard
  */
@@ -60,7 +60,7 @@ const ALLOWED_HOSTNAMES: ReadonlySet<string> = new Set([
 
 /**
  * Hostnames allowed specifically for image URL moderation (Sightengine).
- * Only our own CDN domain — never allow arbitrary external image URLs.
+ * Only our own CDN domain - never allow arbitrary external image URLs.
  */
 const IMAGE_URL_ALLOWED_HOSTNAMES: ReadonlySet<string> = new Set([
   "img.dudit.com.br",
@@ -85,14 +85,14 @@ export class SSRFError extends Error {
  * Check if an IPv4 address is in a private/reserved range.
  *
  * Blocked ranges:
- * - 0.0.0.0/8        — "This network"
- * - 10.0.0.0/8       — Private (RFC 1918)
- * - 127.0.0.0/8      — Loopback
- * - 169.254.0.0/16   — Link-local (includes AWS metadata 169.254.169.254)
- * - 172.16.0.0/12    — Private (RFC 1918)
- * - 192.168.0.0/16   — Private (RFC 1918)
- * - 224.0.0.0/4      — Multicast
- * - 240.0.0.0/4      — Reserved
+ * - 0.0.0.0/8        - "This network"
+ * - 10.0.0.0/8       - Private (RFC 1918)
+ * - 127.0.0.0/8      - Loopback
+ * - 169.254.0.0/16   - Link-local (includes AWS metadata 169.254.169.254)
+ * - 172.16.0.0/12    - Private (RFC 1918)
+ * - 192.168.0.0/16   - Private (RFC 1918)
+ * - 224.0.0.0/4      - Multicast
+ * - 240.0.0.0/4      - Reserved
  */
 function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split(".")
@@ -119,11 +119,11 @@ function isPrivateIPv4(ip: string): boolean {
  * Check if an IPv6 address is private/reserved.
  *
  * Blocked:
- * - ::1              — Loopback
- * - ::               — Unspecified
- * - fe80::/10        — Link-local
- * - fc00::/7         — Unique local (fd00::/8 included)
- * - ::ffff:x.x.x.x  — IPv4-mapped (checked recursively)
+ * - ::1              - Loopback
+ * - ::               - Unspecified
+ * - fe80::/10        - Link-local
+ * - fc00::/7         - Unique local (fd00::/8 included)
+ * - ::ffff:x.x.x.x  - IPv4-mapped (checked recursively)
  */
 function isPrivateIPv6(ip: string): boolean {
   // Strip zone ID (%25... or %...) before analysis
@@ -203,9 +203,9 @@ interface UrlValidationResult {
  * Validate a URL against SSRF rules.
  *
  * Steps:
- * 1. Parse with `new URL()` — rejects malformed URLs, normalizes encoding
- * 2. Protocol check — only http: and https:
- * 3. No embedded credentials — rejects user:pass@host
+ * 1. Parse with `new URL()` - rejects malformed URLs, normalizes encoding
+ * 2. Protocol check - only http: and https:
+ * 3. No embedded credentials - rejects user:pass@host
  * 4. Non-empty hostname
  * 5. Raw IP detection + private IP check
  * 6. Hostname allowlist enforcement
@@ -214,7 +214,7 @@ function validateUrl(
   rawUrl: string,
   allowedHostnames: ReadonlySet<string>,
 ): UrlValidationResult {
-  // 1. Parse URL — catches protocol smuggling, malformed encoding
+  // 1. Parse URL - catches protocol smuggling, malformed encoding
   let parsed: URL
   try {
     parsed = new URL(rawUrl)
@@ -225,7 +225,7 @@ function validateUrl(
     }
   }
 
-  // 2. Protocol check — REJECT everything except http: and https:
+  // 2. Protocol check - REJECT everything except http: and https:
   // WHY: Blocks file://, gopher://, ftp://, data:, javascript:, etc.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return {
@@ -234,7 +234,7 @@ function validateUrl(
     }
   }
 
-  // 3. No credentials in URL — prevents user@attacker.com confusion
+  // 3. No credentials in URL - prevents user@attacker.com confusion
   if (parsed.username || parsed.password) {
     return {
       valid: false,
@@ -263,7 +263,7 @@ function validateUrl(
     // Even non-private raw IPs should be in the allowlist
   }
 
-  // 6. Hostname allowlist — the strongest single defense
+  // 6. Hostname allowlist - the strongest single defense
   if (!allowedHostnames.has(hostname)) {
     return {
       valid: false,
@@ -285,7 +285,7 @@ function validateUrl(
  * to an internal IP at request time. Also catches misconfigured DNS.
  *
  * Falls back gracefully in Edge runtime (where `dns` module is unavailable)
- * — in that case, the hostname allowlist is the sole defense (which is
+ * - in that case, the hostname allowlist is the sole defense (which is
  * sufficient since all our Edge-runtime fetches go to hardcoded public APIs).
  */
 async function resolveAndValidateIP(
@@ -298,7 +298,7 @@ async function resolveAndValidateIP(
     if (typeof process !== "undefined" && process.env.NEXT_RUNTIME === "edge") {
       return { valid: true }
     }
-    
+
     const dnsStr = "dns"
     const dnsModule = await import(/* webpackIgnore: true */ dnsStr)
     const { address } = await dnsModule.promises.lookup(hostname)
@@ -312,7 +312,7 @@ async function resolveAndValidateIP(
 
     return { valid: true, ip: address }
   } catch (err: any) {
-    // Edge runtime: dns module not available — acceptable, rely on allowlist
+    // Edge runtime: dns module not available - acceptable, rely on allowlist
     if (
       err?.code === "MODULE_NOT_FOUND" ||
       err?.code === "ERR_MODULE_NOT_FOUND" ||
@@ -355,7 +355,7 @@ async function readResponseWithSizeLimit(
     }
   }
 
-  // No body — return as-is
+  // No body - return as-is
   if (!response.body) return response
 
   const reader = response.body.getReader()
@@ -400,7 +400,7 @@ function isRedirectStatus(status: number): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SAFE FETCH — Main export
+// SAFE FETCH - Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface SafeFetchOptions extends Omit<RequestInit, "redirect"> {
@@ -432,7 +432,7 @@ export interface SafeFetchOptions extends Omit<RequestInit, "redirect"> {
  *
  * @example
  * ```ts
- * // Basic usage — validates hostname is in allowlist
+ * // Basic usage - validates hostname is in allowlist
  * const res = await safeFetch("https://api.mercadopago.com/v1/payments", {
  *   method: "POST",
  *   headers: { Authorization: `Bearer ${token}` },
@@ -508,7 +508,7 @@ export async function safeFetch(
 
       const location = response.headers.get("location")
       if (!location) {
-        break // No Location header — stop redirecting
+        break // No Location header - stop redirecting
       }
 
       // Resolve relative redirect URLs against the original URL

@@ -220,7 +220,7 @@ const normalizeMethodType = (value?: string | null) => {
     return "other";
 };
 
-/** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) — manter os mesmos significados. */
+/** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) - manter os mesmos significados. */
 export type PaymentModalProps = {
     isOpen: boolean
     onClose: () => void
@@ -243,7 +243,7 @@ export type PaymentModalProps = {
     originalPaymentMethod?: string
 }
 
-/** Mesmo texto em PDV e venda manual — importe nos pais para garantir paridade. */
+/** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
 export const PAYMENT_MODAL_HEADER_SUBTITLE = "Venda de Itens"
 
 const PaymentModal = ({
@@ -474,7 +474,7 @@ const PaymentModal = ({
                 partnerId: String(partnerId),
                 baseTotal: Math.max(0, Number(chargeTarget || 0)),
                 legs: activeSplitLegs.map((p) => ({
-                    method: p.method || '—',
+                    method: p.method || '-',
                     baseAmount: p.amount,
                     paymentMethodId: p.paymentMethodId,
                     installmentNumber: Math.max(1, p.installmentNumber || 1),
@@ -1102,29 +1102,29 @@ const PaymentModal = ({
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
-                                                <PaymentMethodCard 
-                                                    icon={MoneyIcon} 
-                                                    label="Dinheiro" 
+                                                <PaymentMethodCard
+                                                    icon={MoneyIcon}
+                                                    label="Dinheiro"
                                                     disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
-                                                    onClick={() => openMethodTypeSelection("cash")} 
+                                                    onClick={() => openMethodTypeSelection("cash")}
                                                 />
-                                                <PaymentMethodCard 
-                                                    icon={QRCodeIcon} 
-                                                    label="Pix" 
+                                                <PaymentMethodCard
+                                                    icon={QRCodeIcon}
+                                                    label="Pix"
                                                     disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
-                                                    onClick={() => openMethodTypeSelection("pix")} 
+                                                    onClick={() => openMethodTypeSelection("pix")}
                                                 />
-                                                <PaymentMethodCard 
-                                                    icon={CreditCardIcon} 
-                                                    label="Cartão" 
+                                                <PaymentMethodCard
+                                                    icon={CreditCardIcon}
+                                                    label="Cartão"
                                                     disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão'}
-                                                    onClick={() => openMethodTypeSelection("card")} 
+                                                    onClick={() => openMethodTypeSelection("card")}
                                                 />
-                                                <PaymentMethodCard 
-                                                    icon={SplitIcon} 
-                                                    label="Dividir" 
+                                                <PaymentMethodCard
+                                                    icon={SplitIcon}
+                                                    label="Dividir"
                                                     disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin'}
-                                                    onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }} 
+                                                    onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                 />
                                             </div>
 

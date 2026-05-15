@@ -58,7 +58,7 @@ async function _fetchSellerNameMap(partnerId: string) {
 }
 
 /**
- * Cached seller name resolver — avoids 2 DB queries per call.
+ * Cached seller name resolver - avoids 2 DB queries per call.
  * TTL: 5 minutes, scoped by partner_id.
  * Invalidated when goals are revalidated.
  */
@@ -85,13 +85,13 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
       .order("created_at", { ascending: false })
 
     const goalIds = (goals || []).map((g: any) => g.id)
-    
+
     const [progressRowsRes, sellerNameMap] = await Promise.all([
-      goalIds.length > 0 
+      goalIds.length > 0
         ? supabase
-            .from("sales_goal_progress")
-            .select("id, goal_id, user_id, current_amount, achieved, achieved_at")
-            .in("goal_id", goalIds)
+          .from("sales_goal_progress")
+          .select("id, goal_id, user_id, current_amount, achieved, achieved_at")
+          .in("goal_id", goalIds)
         : Promise.resolve({ data: [] }),
       resolveSellerNameMap(partnerId),
     ])
@@ -121,8 +121,8 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
         scope_user_name: goal.user_id ? sellerNameMap.get(String(goal.user_id)) || "Vendedor" : null,
         assigned_user_names: Array.isArray(goal.assigned_user_ids)
           ? goal.assigned_user_ids
-              .map((id: string) => sellerNameMap.get(String(id)))
-              .filter(Boolean)
+            .map((id: string) => sellerNameMap.get(String(id)))
+            .filter(Boolean)
           : [],
       }
     })
@@ -221,19 +221,19 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
   const { startDate, endDate, periodType } = resolveRankingRange(filter)
 
   const salesQuery = admin
-      .from("sales")
-      .select("finalized_by_user_id, final_amount, created_at")
-      .eq("partner_id", partnerId)
-      .in("payment_status", ["paid", "partially_paid"])
-      .gte("created_at", `${startDate}T00:00:00.000Z`)
-      .lte("created_at", `${endDate}T23:59:59.999Z`)
+    .from("sales")
+    .select("finalized_by_user_id, final_amount, created_at")
+    .eq("partner_id", partnerId)
+    .in("payment_status", ["paid", "partially_paid"])
+    .gte("created_at", `${startDate}T00:00:00.000Z`)
+    .lte("created_at", `${endDate}T23:59:59.999Z`)
 
   let goalsQuery = admin
-      .from("sales_goals")
-      .select("id, target_amount, applies_to, user_id")
-      .eq("partner_id", partnerId)
-      .lte("start_date", endDate)
-      .gte("end_date", startDate)
+    .from("sales_goals")
+    .select("id, target_amount, applies_to, user_id")
+    .eq("partner_id", partnerId)
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
   if (periodType) goalsQuery = goalsQuery.eq("period_type", periodType)
 
   const [{ data: sales }, sellerNameMap, { data: activeGoals }] = await Promise.all([
@@ -246,10 +246,10 @@ async function fetchRanking(partnerId: string, filter?: RankingPeriodFilter) {
   const goalIds = (activeGoals || []).map((g: any) => String(g.id))
   const goalProgress = goalIds.length > 0
     ? (await admin
-        .from("sales_goal_progress")
-        .select("goal_id, user_id, current_amount")
-        .in("goal_id", goalIds)
-      ).data
+      .from("sales_goal_progress")
+      .select("goal_id, user_id, current_amount")
+      .in("goal_id", goalIds)
+    ).data
     : []
 
   const totalByUser = new Map<string, number>()
@@ -315,7 +315,7 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
   await requirePartnerAccessWithPermission(partnerId, "goals", "view")
   const supabase = await getSupabaseServerClient()
 
-  // Try RPC first (single server-side aggregation — much faster)
+  // Try RPC first (single server-side aggregation - much faster)
   try {
     const { data: rpcResult, error: rpcError } = await supabase.rpc("get_sales_goals_summary", {
       p_partner_id: partnerId,
@@ -334,7 +334,7 @@ export async function getSalesGoalsSummaryAction(partnerId: string) {
       }
     }
   } catch {
-    // RPC not deployed yet — fall through to legacy multi-query
+    // RPC not deployed yet - fall through to legacy multi-query
   }
 
   // Fallback: original multi-query approach (removed once RPC is deployed)

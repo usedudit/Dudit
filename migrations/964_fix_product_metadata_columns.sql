@@ -1,0 +1,344 @@
+-- ============================================================================
+-- EXECUTE COMPLETO - Cola TUDO isso no SQL Editor do Supabase
+-- Resolve: categoria, subcategoria, marca e localização no produto
+-- ============================================================================
+
+-- ============================================================================
+-- PASSO 1: Criar tabelas de metadados (se não existem)
+-- ============================================================================
+
+-- 1. Categorias e Subcategorias
+CREATE TABLE IF NOT EXISTS public.product_categories (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    partner_id UUID NOT NULL REFERENCES public.partners(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    parent_id UUID NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT product_categories_pkey PRIMARY KEY (id),
+    CONSTRAINT product_categories_parent_fkey FOREIGN KEY (parent_id) REFERENCES public.product_categories(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_categories_partner ON public.product_categories(partner_id);
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON public.product_categories(parent_id);
+
+-- 2. Marcas
+CREATE TABLE IF NOT EXISTS public.brands (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    partner_id UUID NOT NULL REFERENCES public.partners(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT brands_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_brands_partner ON public.brands(partner_id);
+
+-- 3. Localização no Estoque
+CREATE TABLE IF NOT EXISTS public.storage_locations (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    partner_id UUID NOT NULL REFERENCES public.partners(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT storage_locations_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_locations_partner ON public.storage_locations(partner_id);
+
+-- ============================================================================
+-- PASSO 2: RLS nas tabelas de metadados
+-- ============================================================================
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.storage_locations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Partners can manage their own categories" ON public.product_categories;
+CREATE POLICY "Partners can manage their own categories" ON public.product_categories
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM partners WHERE partners.id = product_categories.partner_id AND partners.user_id = auth.uid()
+        )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users WHERE partner_users.partner_id = product_categories.partner_id AND partner_users.user_id = auth.uid()
+        )
+    );
+
+DROP POLICY IF EXISTS "Partners can manage their own brands" ON public.brands;
+CREATE POLICY "Partners can manage their own brands" ON public.brands
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM partners WHERE partners.id = brands.partner_id AND partners.user_id = auth.uid()
+        )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users WHERE partner_users.partner_id = brands.partner_id AND partner_users.user_id = auth.uid()
+        )
+    );
+
+DROP POLICY IF EXISTS "Partners can manage their own locations" ON public.storage_locations;
+CREATE POLICY "Partners can manage their own locations" ON public.storage_locations
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM partners WHERE partners.id = storage_locations.partner_id AND partners.user_id = auth.uid()
+        )
+        OR
+        EXISTS (
+            SELECT 1 FROM partner_users WHERE partner_users.partner_id = storage_locations.partner_id AND partner_users.user_id = auth.uid()
+        )
+    );
+
+-- ============================================================================
+-- PASSO 3: Adicionar colunas na tabela products (IF NOT EXISTS = seguro)
+-- ============================================================================
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.product_categories(id) ON DELETE SET NULL;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES public.brands(id) ON DELETE SET NULL;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES public.storage_locations(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_brand_id ON public.products(brand_id);
+CREATE INDEX IF NOT EXISTS idx_products_location_id ON public.products(location_id);
+
+-- PASSO 3.5: Adicionar is_active nas tabelas de metadados (o código TS seleciona is_active)
+ALTER TABLE public.product_categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.brands ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.storage_locations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+
+-- ============================================================================
+-- PASSO 4: RPCs corrigidas (CREATE + UPDATE)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION create_product_transaction(
+  p_product_data JSONB,
+  p_fiscal_data JSONB,
+  p_logistics_data JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_product_id UUID;
+  v_result JSONB;
+  v_partner_id UUID;
+BEGIN
+  v_partner_id := (p_product_data->>'partner_id')::UUID;
+
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Acesso negado: usuário não autenticado';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM partner_users 
+    WHERE partner_id = v_partner_id AND user_id = auth.uid()
+    UNION
+    SELECT 1 FROM partners
+    WHERE id = v_partner_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Acesso negado: você não tem permissão para adicionar produtos a esta loja (partner_id: %)', v_partner_id;
+  END IF;
+
+  INSERT INTO products (
+    id, partner_id, store_id, name, description, sku, gtin,
+    brand, brand_id, category, category_id, subcategory, subcategory_id,
+    condition, unit, product_type, location, location_id,
+    cost_price, price, promotional_price, min_stock, max_stock, stock_quantity,
+    is_active, is_on_promotion, show_price_in_store, show_in_marketplace,
+    images, is_featured, availability_value, availability_unit,
+    warranty, video_url, technical_specs, delivery_format,
+    tags, allow_sell_without_stock, moderation_status, created_at, updated_at
+  ) VALUES (
+    COALESCE((p_product_data->>'id')::UUID, gen_random_uuid()),
+    v_partner_id,
+    (p_product_data->>'store_id')::UUID,
+    p_product_data->>'name',
+    p_product_data->>'description',
+    p_product_data->>'sku',
+    p_product_data->>'gtin',
+    p_product_data->>'brand',
+    CASE WHEN p_product_data->>'brand_id' IS NOT NULL AND p_product_data->>'brand_id' <> '' THEN (p_product_data->>'brand_id')::UUID ELSE NULL END,
+    p_product_data->>'category',
+    CASE WHEN p_product_data->>'category_id' IS NOT NULL AND p_product_data->>'category_id' <> '' THEN (p_product_data->>'category_id')::UUID ELSE NULL END,
+    p_product_data->>'subcategory',
+    CASE WHEN p_product_data->>'subcategory_id' IS NOT NULL AND p_product_data->>'subcategory_id' <> '' THEN (p_product_data->>'subcategory_id')::UUID ELSE NULL END,
+    p_product_data->>'condition',
+    p_product_data->>'unit',
+    p_product_data->>'product_type',
+    p_product_data->>'location',
+    CASE WHEN p_product_data->>'location_id' IS NOT NULL AND p_product_data->>'location_id' <> '' THEN (p_product_data->>'location_id')::UUID ELSE NULL END,
+    (p_product_data->>'cost_price')::NUMERIC,
+    COALESCE((p_product_data->>'price')::NUMERIC, 0),
+    (p_product_data->>'promotional_price')::NUMERIC,
+    (p_product_data->>'min_stock')::INTEGER,
+    (p_product_data->>'max_stock')::INTEGER,
+    COALESCE((p_product_data->>'stock_quantity')::INTEGER, 0),
+    (p_product_data->>'is_active')::BOOLEAN,
+    (p_product_data->>'is_on_promotion')::BOOLEAN,
+    (p_product_data->>'show_price_in_store')::BOOLEAN,
+    COALESCE((p_product_data->>'show_in_marketplace')::BOOLEAN, true),
+    COALESCE(p_product_data->'images', '[]'::JSONB),
+    (p_product_data->>'is_featured')::BOOLEAN,
+    COALESCE((p_product_data->>'availability_value')::INTEGER, 0),
+    p_product_data->>'availability_unit',
+    p_product_data->>'warranty',
+    p_product_data->>'video_url',
+    COALESCE(p_product_data->'technical_specs', '{}'::JSONB),
+    p_product_data->>'delivery_format',
+    (SELECT ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_product_data->'tags', '[]'::JSONB))::TEXT)),
+    COALESCE((p_product_data->>'allow_sell_without_stock')::BOOLEAN, false),
+    COALESCE(p_product_data->>'moderation_status', 'approved'),
+    COALESCE((p_product_data->>'created_at')::TIMESTAMPTZ, NOW()),
+    COALESCE((p_product_data->>'updated_at')::TIMESTAMPTZ, NOW())
+  ) RETURNING id, row_to_json(products.*) INTO v_product_id, v_result;
+
+  -- Fiscal
+  IF jsonb_typeof(p_fiscal_data) = 'object' AND p_fiscal_data::text <> '{}' THEN
+    INSERT INTO product_fiscal_profiles (
+      product_id, ncm, cest, origin, item_type, cfop_internal, cfop_external, csosn, tax_percentage, pis_cst, pis_rate, cofins_cst, cofins_rate, ipi_cst, ipi_code, product_situation, c_benef, inf_ad_prod, fci_code
+    ) VALUES (
+      v_product_id,
+      p_fiscal_data->>'ncm', p_fiscal_data->>'cest', (p_fiscal_data->>'origin')::INTEGER,
+      p_fiscal_data->>'item_type', p_fiscal_data->>'cfop_internal', p_fiscal_data->>'cfop_external',
+      p_fiscal_data->>'csosn', (p_fiscal_data->>'tax_percentage')::NUMERIC,
+      p_fiscal_data->>'pis_cst', (p_fiscal_data->>'pis_rate')::NUMERIC,
+      p_fiscal_data->>'cofins_cst', (p_fiscal_data->>'cofins_rate')::NUMERIC,
+      p_fiscal_data->>'ipi_cst', p_fiscal_data->>'ipi_code',
+      p_fiscal_data->>'product_situation', p_fiscal_data->>'c_benef',
+      p_fiscal_data->>'inf_ad_prod', p_fiscal_data->>'fci_code'
+    );
+  END IF;
+
+  -- Logistics
+  IF jsonb_typeof(p_logistics_data) = 'object' AND p_logistics_data::text <> '{}' THEN
+    INSERT INTO product_logistics (
+      product_id, weight_gross, weight_net, width, height, length, packaging_type, preparation_days
+    ) VALUES (
+      v_product_id,
+      (p_logistics_data->>'weight_gross')::NUMERIC, (p_logistics_data->>'weight_net')::NUMERIC,
+      (p_logistics_data->>'width')::NUMERIC, (p_logistics_data->>'height')::NUMERIC,
+      (p_logistics_data->>'length')::NUMERIC, p_logistics_data->>'packaging_type',
+      (p_logistics_data->>'preparation_days')::INTEGER
+    );
+  END IF;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- UPDATE PRODUCT
+CREATE OR REPLACE FUNCTION update_product_transaction(
+  p_product_id UUID,
+  p_product_data JSONB,
+  p_fiscal_data JSONB,
+  p_logistics_data JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Acesso negado: usuário não autenticado';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM products p
+    LEFT JOIN partner_users pu ON p.partner_id = pu.partner_id
+    LEFT JOIN partners pt ON p.partner_id = pt.id
+    WHERE p.id = p_product_id AND (pu.user_id = auth.uid() OR pt.user_id = auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Acesso negado: você não tem permissão para editar este produto (%)', p_product_id;
+  END IF;
+
+  IF jsonb_typeof(p_product_data) = 'object' AND p_product_data::text <> '{}' THEN
+    UPDATE products SET
+      name = CASE WHEN p_product_data ? 'name' THEN p_product_data->>'name' ELSE name END,
+      description = CASE WHEN p_product_data ? 'description' THEN p_product_data->>'description' ELSE description END,
+      sku = CASE WHEN p_product_data ? 'sku' THEN p_product_data->>'sku' ELSE sku END,
+      gtin = CASE WHEN p_product_data ? 'gtin' THEN p_product_data->>'gtin' ELSE gtin END,
+      brand = CASE WHEN p_product_data ? 'brand' THEN p_product_data->>'brand' ELSE brand END,
+      brand_id = CASE WHEN p_product_data ? 'brand_id' THEN CASE WHEN p_product_data->>'brand_id' IS NOT NULL AND p_product_data->>'brand_id' <> '' THEN (p_product_data->>'brand_id')::UUID ELSE NULL END ELSE brand_id END,
+      category = CASE WHEN p_product_data ? 'category' THEN p_product_data->>'category' ELSE category END,
+      category_id = CASE WHEN p_product_data ? 'category_id' THEN CASE WHEN p_product_data->>'category_id' IS NOT NULL AND p_product_data->>'category_id' <> '' THEN (p_product_data->>'category_id')::UUID ELSE NULL END ELSE category_id END,
+      subcategory = CASE WHEN p_product_data ? 'subcategory' THEN p_product_data->>'subcategory' ELSE subcategory END,
+      subcategory_id = CASE WHEN p_product_data ? 'subcategory_id' THEN CASE WHEN p_product_data->>'subcategory_id' IS NOT NULL AND p_product_data->>'subcategory_id' <> '' THEN (p_product_data->>'subcategory_id')::UUID ELSE NULL END ELSE subcategory_id END,
+      condition = CASE WHEN p_product_data ? 'condition' THEN p_product_data->>'condition' ELSE condition END,
+      unit = CASE WHEN p_product_data ? 'unit' THEN p_product_data->>'unit' ELSE unit END,
+      product_type = CASE WHEN p_product_data ? 'product_type' THEN p_product_data->>'product_type' ELSE product_type END,
+      location = CASE WHEN p_product_data ? 'location' THEN p_product_data->>'location' ELSE location END,
+      location_id = CASE WHEN p_product_data ? 'location_id' THEN CASE WHEN p_product_data->>'location_id' IS NOT NULL AND p_product_data->>'location_id' <> '' THEN (p_product_data->>'location_id')::UUID ELSE NULL END ELSE location_id END,
+      cost_price = CASE WHEN p_product_data ? 'cost_price' THEN (p_product_data->>'cost_price')::NUMERIC ELSE cost_price END,
+      price = CASE WHEN p_product_data ? 'price' THEN (p_product_data->>'price')::NUMERIC ELSE price END,
+      promotional_price = CASE WHEN p_product_data ? 'promotional_price' THEN (p_product_data->>'promotional_price')::NUMERIC ELSE promotional_price END,
+      min_stock = CASE WHEN p_product_data ? 'min_stock' THEN (p_product_data->>'min_stock')::INTEGER ELSE min_stock END,
+      max_stock = CASE WHEN p_product_data ? 'max_stock' THEN (p_product_data->>'max_stock')::INTEGER ELSE max_stock END,
+      stock_quantity = CASE WHEN p_product_data ? 'stock_quantity' THEN (p_product_data->>'stock_quantity')::INTEGER ELSE stock_quantity END,
+      is_active = CASE WHEN p_product_data ? 'is_active' THEN (p_product_data->>'is_active')::BOOLEAN ELSE is_active END,
+      is_on_promotion = CASE WHEN p_product_data ? 'is_on_promotion' THEN (p_product_data->>'is_on_promotion')::BOOLEAN ELSE is_on_promotion END,
+      show_price_in_store = CASE WHEN p_product_data ? 'show_price_in_store' THEN (p_product_data->>'show_price_in_store')::BOOLEAN ELSE show_price_in_store END,
+      show_in_marketplace = CASE WHEN p_product_data ? 'show_in_marketplace' THEN (p_product_data->>'show_in_marketplace')::BOOLEAN ELSE show_in_marketplace END,
+      images = CASE WHEN p_product_data ? 'images' THEN p_product_data->'images' ELSE images END,
+      is_featured = CASE WHEN p_product_data ? 'is_featured' THEN (p_product_data->>'is_featured')::BOOLEAN ELSE is_featured END,
+      availability_value = CASE WHEN p_product_data ? 'availability_value' THEN (p_product_data->>'availability_value')::INTEGER ELSE availability_value END,
+      availability_unit = CASE WHEN p_product_data ? 'availability_unit' THEN p_product_data->>'availability_unit' ELSE availability_unit END,
+      warranty = CASE WHEN p_product_data ? 'warranty' THEN p_product_data->>'warranty' ELSE warranty END,
+      video_url = CASE WHEN p_product_data ? 'video_url' THEN p_product_data->>'video_url' ELSE video_url END,
+      technical_specs = CASE WHEN p_product_data ? 'technical_specs' THEN p_product_data->'technical_specs' ELSE technical_specs END,
+      delivery_format = CASE WHEN p_product_data ? 'delivery_format' THEN p_product_data->>'delivery_format' ELSE delivery_format END,
+      tags = CASE WHEN p_product_data ? 'tags' THEN (SELECT ARRAY(SELECT jsonb_array_elements_text(p_product_data->'tags')::TEXT)) ELSE tags END,
+      allow_sell_without_stock = CASE WHEN p_product_data ? 'allow_sell_without_stock' THEN (p_product_data->>'allow_sell_without_stock')::BOOLEAN ELSE allow_sell_without_stock END,
+      moderation_status = CASE WHEN p_product_data ? 'moderation_status' THEN p_product_data->>'moderation_status' ELSE moderation_status END,
+      updated_at = NOW()
+    WHERE id = p_product_id
+    RETURNING row_to_json(products.*) INTO v_result;
+  ELSE
+    SELECT row_to_json(products.*) INTO v_result FROM products WHERE id = p_product_id;
+  END IF;
+
+  -- Upsert Fiscal
+  IF jsonb_typeof(p_fiscal_data) = 'object' AND p_fiscal_data::text <> '{}' THEN
+    INSERT INTO product_fiscal_profiles (
+      product_id, ncm, cest, origin, item_type, cfop_internal, cfop_external, csosn, tax_percentage, pis_cst, pis_rate, cofins_cst, cofins_rate, ipi_cst, ipi_code, product_situation, c_benef, inf_ad_prod, fci_code
+    ) VALUES (
+      p_product_id,
+      p_fiscal_data->>'ncm', p_fiscal_data->>'cest', (p_fiscal_data->>'origin')::INTEGER,
+      p_fiscal_data->>'item_type', p_fiscal_data->>'cfop_internal', p_fiscal_data->>'cfop_external',
+      p_fiscal_data->>'csosn', (p_fiscal_data->>'tax_percentage')::NUMERIC,
+      p_fiscal_data->>'pis_cst', (p_fiscal_data->>'pis_rate')::NUMERIC,
+      p_fiscal_data->>'cofins_cst', (p_fiscal_data->>'cofins_rate')::NUMERIC,
+      p_fiscal_data->>'ipi_cst', p_fiscal_data->>'ipi_code',
+      p_fiscal_data->>'product_situation', p_fiscal_data->>'c_benef',
+      p_fiscal_data->>'inf_ad_prod', p_fiscal_data->>'fci_code'
+    ) ON CONFLICT (product_id) DO UPDATE SET
+      ncm = EXCLUDED.ncm, cest = EXCLUDED.cest, origin = EXCLUDED.origin,
+      item_type = EXCLUDED.item_type, cfop_internal = EXCLUDED.cfop_internal,
+      cfop_external = EXCLUDED.cfop_external, csosn = EXCLUDED.csosn,
+      tax_percentage = EXCLUDED.tax_percentage, pis_cst = EXCLUDED.pis_cst,
+      pis_rate = EXCLUDED.pis_rate, cofins_cst = EXCLUDED.cofins_cst,
+      cofins_rate = EXCLUDED.cofins_rate, ipi_cst = EXCLUDED.ipi_cst,
+      ipi_code = EXCLUDED.ipi_code, product_situation = EXCLUDED.product_situation,
+      c_benef = EXCLUDED.c_benef, inf_ad_prod = EXCLUDED.inf_ad_prod,
+      fci_code = EXCLUDED.fci_code;
+  END IF;
+
+  -- Upsert Logistics
+  IF jsonb_typeof(p_logistics_data) = 'object' AND p_logistics_data::text <> '{}' THEN
+    INSERT INTO product_logistics (
+      product_id, weight_gross, weight_net, width, height, length, packaging_type, preparation_days
+    ) VALUES (
+      p_product_id,
+      (p_logistics_data->>'weight_gross')::NUMERIC, (p_logistics_data->>'weight_net')::NUMERIC,
+      (p_logistics_data->>'width')::NUMERIC, (p_logistics_data->>'height')::NUMERIC,
+      (p_logistics_data->>'length')::NUMERIC, p_logistics_data->>'packaging_type',
+      (p_logistics_data->>'preparation_days')::INTEGER
+    ) ON CONFLICT (product_id) DO UPDATE SET
+      weight_gross = EXCLUDED.weight_gross, weight_net = EXCLUDED.weight_net,
+      width = EXCLUDED.width, height = EXCLUDED.height,
+      length = EXCLUDED.length, packaging_type = EXCLUDED.packaging_type,
+      preparation_days = EXCLUDED.preparation_days;
+  END IF;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- PASSO 5: Permissões
+-- ============================================================================
+REVOKE EXECUTE ON FUNCTION public.create_product_transaction(JSONB, JSONB, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_product_transaction(JSONB, JSONB, JSONB) TO authenticated, service_role;
+
+REVOKE EXECUTE ON FUNCTION public.update_product_transaction(UUID, JSONB, JSONB, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.update_product_transaction(UUID, JSONB, JSONB, JSONB) TO authenticated, service_role;

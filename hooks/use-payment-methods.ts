@@ -25,7 +25,7 @@ export function usePaymentMethods(partnerId: string) {
             const res = await getPaymentMethodsAction(partnerId)
             return res
         },
-        staleTime: 60_000, // 1 minute — payment methods rarely change mid-session
+        staleTime: 60_000, // 1 minute - payment methods rarely change mid-session
         refetchOnWindowFocus: false,
         enabled: !!partnerId,
     })
@@ -36,7 +36,7 @@ export function usePaymentMethods(partnerId: string) {
         queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_KEY(partnerId) })
     }, [queryClient, partnerId])
 
-    /** Direct cache set — use when you already have fresh data (e.g., from SSR props). */
+    /** Direct cache set - use when you already have fresh data (e.g., from SSR props). */
     const setCache = useCallback(
         (freshMethods: any[]) => {
             queryClient.setQueryData(PAYMENT_METHODS_KEY(partnerId), { methods: freshMethods })

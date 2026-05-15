@@ -43,7 +43,7 @@ const WavesBackground = React.memo(() => (
         <img
             src="https://img.dudit.com.br/static/banners/WavesPattern.png"
             alt=""
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover opacity-20"
         />
     </div>
 ))

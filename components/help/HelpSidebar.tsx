@@ -47,7 +47,7 @@ export default function HelpSidebar({
     }
 
     return (
-        <aside className={cn("flex flex-col h-[calc(100vh-72px)] bg-white dark:bg-dark-bg border-r border-gray-100 dark:border-dark-border overflow-y-auto custom-scrollbar sticky top-[72px]", className)}>
+        <aside className={cn("flex flex-col h-[calc(100vh-72px)] bg-white dark:bg-dark-surface border-r border-gray-100 dark:border-dark-border overflow-y-auto custom-scrollbar sticky top-[72px]", className)}>
             {/* Navigation */}
             <nav className="flex-1 px-2 pt-4 pb-8">
                 {filteredCategories.map(category => (
@@ -55,8 +55,8 @@ export default function HelpSidebar({
                         <button
                             onClick={() => toggleCategory(category.id)}
                             className={cn(
-                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold text-brand-dark dark:text-dark-heading transition-all group cursor-pointer",
-                                "hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-brand-dark dark:hover:text-dark-heading"
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-black text-brand-dark dark:text-dark-heading transition-all group cursor-pointer uppercase tracking-tight",
+                                "hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                             )}
                         >
                             <div className="flex items-center gap-2">
@@ -85,16 +85,16 @@ export default function HelpSidebar({
                                                     <Link
                                                         href={`/ajuda/${category.id}/${article.slug}`}
                                                         className={cn(
-                                                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative cursor-pointer",
+                                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all group relative cursor-pointer",
                                                             isActive
-                                                                ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium"
-                                                                : "text-gray-600 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
+                                                                ? "bg-brand-green/10 text-brand-green font-bold"
+                                                                : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                                                         )}
                                                     >
                                                         {isActive && (
                                                             <motion.div
                                                                 layoutId="active-indicator"
-                                                                className="absolute left-0 w-1 h-4 bg-brand-green rounded-r-full"
+                                                                className="absolute left-0 w-1 h-5 bg-brand-green rounded-r-full"
                                                             />
                                                         )}
                                                         <span className="flex-1 truncate">{article.title}</span>

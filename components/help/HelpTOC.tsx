@@ -86,8 +86,8 @@ export default function HelpTOC({ content }: { content: string }) {
                                 className={cn(
                                     "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition-all cursor-pointer text-left group relative",
                                     isActive
-                                        ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium"
-                                        : "text-gray-500 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
+                                        ? "bg-brand-green/10 text-brand-green font-bold"
+                                        : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                                 )}
                             >
                                 {isActive && (

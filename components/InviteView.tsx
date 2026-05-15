@@ -9,10 +9,10 @@ import { Button, InfoCard } from "@/components/reusable"
 // ─── Background ──────────────────────────────────────────────────────────────
 const WavesBackground = React.memo(() => (
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <img 
-            src="https://img.dudit.com.br/static/banners/WavesPattern.png" 
-            alt="" 
-            className="w-full h-full object-cover"
+        <img
+            src="https://img.dudit.com.br/static/banners/WavesPattern.png"
+            alt=""
+            className="w-full h-full object-cover opacity-20"
         />
     </div>
 ))

@@ -193,7 +193,7 @@ Informe o endereço completo. Digite o **CEP** para preenchimento automático.
 
     {
         id: "gestao",
-        title: "GESTÃO",
+        title: "Gestão",
         articles: [
             { id: "pedidos", title: "Gestão de pedidos", description: "", slug: "pedidos", category: "gestao", content: "Conteúdo em breve..." },
             { id: "clientes", title: "Clientes", description: "", slug: "clientes", category: "gestao", content: "Conteúdo em breve..." },

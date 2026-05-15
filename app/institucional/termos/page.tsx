@@ -81,7 +81,7 @@ export default function TermsPage() {
                     <li><strong>• DUDIT:</strong> Plataforma tecnológica operada por [SEU NOME COMPLETO], que oferece ferramentas de gestão empresarial (ERP) e vitrine digital para conexão entre Parceiros e Usuários.</li>
                     <li><strong>• Parceiro:</strong> Pessoa física ou jurídica que utiliza a plataforma para anunciar, vender produtos ou prestar serviços. Também denominado Vendedor.</li>
                     <li><strong>• Usuário:</strong> Pessoa física que acessa a plataforma para buscar, visualizar ou adquirir produtos e serviços. Também denominado Comprador ou Consumidor Final.</li>
-                    <li><strong>• Plataforma:</strong> Conjunto de funcionalidades disponibilizadas pela DUDIT, incluindo ERP, vitrine digital, marketplace, ferramentas de gestão e demais recursos tecnológicos.</li>
+                    <li><strong>• Plataforma:</strong> Conjunto de funcionalidades disponibilizadas pela DUDIT, incluindo sistema de gestão, vitrine digital e demais recursos tecnológicos.</li>
                     <li><strong>• Gateway de Pagamento:</strong> Serviço terceirizado responsável pelo processamento de transações financeiras online (atualmente: Mercado Pago).</li>
                     <li><strong>• Plano:</strong> Modalidade de assinatura contratada pelo Parceiro, que determina os recursos e limites disponíveis na plataforma.</li>
                     <li><strong>• Anúncio:</strong> Publicação de produto ou serviço realizada pelo Parceiro na vitrine digital da plataforma.</li>
@@ -96,7 +96,7 @@ export default function TermsPage() {
                   CADASTRO E ACESSO
                 </h2>
                 <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
-                  <p><strong>2.1.</strong> Para utilizar a plataforma como Parceiro, são coletados os seguintes dados: Nome completo, Nome da Loja, CPF/CNPJ, Endereço, E-mail e Telefone. As condições completas de tratamento desses dados estão descritas na Política de Privacidade.</p>
+                  <p><strong>2.1.</strong> Para utilizar a plataforma como Parceiro, são coletados os seguintes dados: Nome completo, Nome da Loja, Endereço, E-mail e Telefone. As condições completas de tratamento desses dados estão descritas na Política de Privacidade.</p>
                   <p><strong>2.2.</strong> O Parceiro garante que as informações fornecidas são exatas, precisas e verdadeiras, e assume o compromisso de manter seus dados atualizados. A DUDIT não se responsabiliza por dados inseridos incorretamente pelo próprio usuário.</p>
                   <p><strong>2.3. Unicidade de Cadastro:</strong> Cada CPF/CNPJ pode ter apenas um cadastro ativo na plataforma como Parceiro. A criação de múltiplas contas para burlar suspensões ou limites é expressamente proibida.</p>
                   <p><strong>2.4. Colaboração com Autoridades:</strong> Em casos de suspeita de fraude, golpe ou falha na entrega por parte do Parceiro, a DUDIT reserva-se o direito de fornecer todos os dados cadastrais e de log (IP, data, hora) do Parceiro às autoridades competentes ou ao Usuário lesado, para que este possa buscar seus direitos judicialmente. O Parceiro concorda expressamente com esse compartilhamento em casos de litígio.</p>
@@ -111,7 +111,7 @@ export default function TermsPage() {
                   USO DA PLATAFORMA
                 </h2>
                 <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
-                  <p><strong>3.1. Natureza do Serviço:</strong> A DUDIT é uma plataforma tecnológica (modelo SaaS — Software as a Service) que fornece ferramentas de gestão empresarial (ERP) e uma vitrine digital para conectar Parceiros e Usuários.</p>
+                  <p><strong>3.1. Natureza do Serviço:</strong> A DUDIT é uma plataforma tecnológica (modelo SaaS - Software as a Service) que fornece ferramentas de gestão empresarial (ERP) e uma vitrine digital para conectar Parceiros e Usuários.</p>
                   <p><strong>3.2. Mero Intermediador:</strong> A DUDIT atua exclusivamente como provedora de infraestrutura tecnológica. A DUDIT não é proprietária, fornecedora, transportadora ou garantidora dos produtos ou serviços anunciados pelos Parceiros.</p>
                   <p><strong>3.3. Responsabilidade Integral do Parceiro:</strong> O Parceiro é o único e exclusivo responsável por:</p>
                   <ul className="list-disc pl-6 space-y-2">
@@ -177,7 +177,7 @@ export default function TermsPage() {
                 <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
                   <p><strong>6.1.</strong> O Parceiro pode cancelar a assinatura dos planos pagos a qualquer momento, sem multa de fidelidade.</p>
                   <p><strong>6.2.</strong> Após o cancelamento, o Parceiro terá até 3 (três) dias antes da migração automática para o Plano Gratuito.</p>
-                  <p><strong>6.3. Política de Downgrade:</strong> Caso o Parceiro retorne a um plano com limite inferior ao número de itens cadastrados, os itens excedentes serão automaticamente <strong>arquivados</strong> — não aparecerão na vitrine digital, mas permanecerão salvos no sistema. O Parceiro poderá gerenciar quais itens permanecem ativos dentro do limite do plano vigente. O critério padrão de arquivamento é por menor volume de vendas, mas o Parceiro pode alterar manualmente a seleção. A DUDIT não se responsabiliza por perda de vendas decorrente do arquivamento automático.</p>
+                  <p><strong>6.3. Política de Downgrade:</strong> Caso o Parceiro retorne a um plano com limite inferior ao número de itens cadastrados, os itens excedentes serão automaticamente <strong>arquivados</strong> - não aparecerão na vitrine digital, mas permanecerão salvos no sistema. O Parceiro poderá gerenciar quais itens permanecem ativos dentro do limite do plano vigente. O critério padrão de arquivamento é por menor volume de vendas, mas o Parceiro pode alterar manualmente a seleção. A DUDIT não se responsabiliza por perda de vendas decorrente do arquivamento automático.</p>
                   <p><strong>6.4. Exportação de Dados:</strong> O Parceiro poderá exportar seus dados cadastrados (produtos, clientes, pedidos) a qualquer momento antes do encerramento da conta, através das ferramentas disponíveis na plataforma.</p>
                   <p><strong>6.5. Reajuste de Valores:</strong> A DUDIT reserva-se o direito de alterar os valores dos planos mediante aviso prévio de 30 (trinta) dias. Assinantes ativos terão seus valores mantidos pelo período vigente da assinatura.</p>
                 </div>

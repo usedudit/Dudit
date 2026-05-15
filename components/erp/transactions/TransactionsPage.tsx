@@ -172,7 +172,7 @@ export default function TransactionsPage({
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
-    const setActiveTab = forcedTab ? () => {} : setActiveTabState
+    const setActiveTab = forcedTab ? () => { } : setActiveTabState
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -1173,7 +1173,7 @@ export default function TransactionsPage({
                                                     finalizationDate: row.paymentDate ? String(row.paymentDate) : null,
                                                     paymentType: row.paymentType ? String(row.paymentType) : null,
                                                     reason: String(installmentDetail.group?.description || "Parcela"),
-                                                    reference: String(row.description || "—"),
+                                                    reference: String(row.description || "-"),
                                                 }),
                                             )
                                         }
@@ -1198,7 +1198,7 @@ export default function TransactionsPage({
     }
 
     const isFormOpen = (entityState.isOpen && (entityState.action === "create" || entityState.action === "edit" || entityState.action === "duplicate")) || !!editingRecurringTemplateId
-    // Plain expression (NOT useMemo — can't use hooks after early returns)
+    // Plain expression (NOT useMemo - can't use hooks after early returns)
     const editingTx = (entityState.isOpen && entityState.action === "edit" && entityState.entityId)
         ? loadedTransactions.find((t: ERPTransaction) => t.id === entityState.entityId) || null
         : null

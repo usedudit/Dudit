@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { MenuIcon, XIcon, SearchIcon, MoonIcon, SunIcon, ChevronRightIcon, ChevronLeftIcon } from "@/lib/icons"
+import { MenuIcon, XIcon, SearchIcon, MoonIcon, SunIcon, ChevronRightIcon } from "@/lib/icons"
 import { Button, Input } from "@/components/reusable"
 import { helpCategories } from "@/lib/help-data"
 import { motion, AnimatePresence } from "framer-motion"
@@ -21,16 +21,54 @@ export default function HelpHeader({
     searchQuery: string,
     setSearchQuery: (val: string) => void
 }) {
-    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
-    const [isSearchFocused, setIsSearchFocused] = useState(false)
+    const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
+    const [isTransitioning, setIsTransitioning] = useState(false)
+    const [isSearchFocused, setIsSearchFocused] = useState(false)
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
     const router = useRouter()
-    const { theme, setTheme } = useTheme()
 
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    const handleThemeChange = (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (isTransitioning) return
+
+        // @ts-ignore
+        if (!document.startViewTransition) {
+            setTheme(theme === "dark" ? "light" : "dark")
+            return
+        }
+
+        const x = event.clientX
+        const y = event.clientY
+        const endRadius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+
+        setIsTransitioning(true)
+
+        // @ts-ignore
+        const transition = document.startViewTransition(() => {
+            setTheme(theme === "dark" ? "light" : "dark")
+        })
+
+        transition.ready.then(() => {
+            const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`]
+            document.documentElement.animate(
+                { clipPath: clipPath },
+                {
+                    duration: 500,
+                    easing: "ease-in-out",
+                    pseudoElement: "::view-transition-new(root)",
+                },
+            )
+        })
+
+        transition.finished.finally(() => {
+            setIsTransitioning(false)
+        })
+    }
 
     // Filter results for the dropdown
     const filteredResults = searchQuery.trim() ? helpCategories.flatMap(cat =>
@@ -64,8 +102,8 @@ export default function HelpHeader({
             {/* Desktop Search Overlay - Same as Marketplace */}
             <div
                 className={cn(
-                    "fixed inset-0 bg-black/60 z-[45] transition-opacity duration-300 ease-in-out pointer-events-none hidden lg:block",
-                    isSearchFocused ? "opacity-100" : "opacity-0"
+                    "fixed inset-0 bg-black/60 z-[45] transition-opacity duration-300 ease-in-out hidden lg:block",
+                    isSearchFocused ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                 )}
             />
 
@@ -82,11 +120,11 @@ export default function HelpHeader({
                             {menuOpen ? <XIcon /> : <MenuIcon />}
                         </button>
 
-                        <Link href="/" className="flex items-center gap-2 shrink-0">
+                        <Link href="/" className="hidden lg:flex items-center gap-2 shrink-0">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
-                                className="h-7 w-auto dark:brightness-0 dark:invert"
+                                className="h-7 w-auto"
                             />
                         </Link>
                     </div>
@@ -116,14 +154,13 @@ export default function HelpHeader({
                                         className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-dark-surface rounded-2xl shadow-xl border border-gray-100 dark:border-dark-border overflow-hidden z-[60]"
                                     >
                                         <div className="p-2">
-                                            <p className="px-4 py-2 text-[10px] font-bold text-gray-400 dark:text-dark-body uppercase tracking-widest">Resultados Sugeridos</p>
                                             {filteredResults.map((result) => (
                                                 <button
                                                     key={result.id}
                                                     onClick={() => handleResultClick(result.category, result.slug)}
                                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border rounded-xl transition-colors text-left group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-brand-green/10 dark:bg-brand-green/20 flex items-center justify-center text-brand-green shrink-0">
+                                                    <div className="w-8 h-8 rounded-full bg-brand-green/10 dark:bg-brand-green/20 flex items-center justify-center text-brand-green shrink-0">
                                                         <SearchIcon size={16} />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -146,15 +183,15 @@ export default function HelpHeader({
                                 "absolute inset-0 flex items-center justify-center transition-all duration-300",
                                 isMobileSearchOpen ? "opacity-0 -translate-x-6 pointer-events-none" : "opacity-100 translate-x-0"
                             )}>
-                                <h1 className="text-gray-900 dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
+                                <h1 className="text-brand-dark dark:text-dark-heading font-bold text-[15px] truncate px-2 whitespace-nowrap">
                                     Central de Ajuda
                                 </h1>
                             </div>
 
                             {/* Expandable Search Bar - Slides in from the right */}
                             <div className={cn(
-                                "absolute inset-y-0 right-0 z-20 bg-gray-50 dark:bg-dark-border rounded-full flex items-center px-4 border border-gray-200 dark:border-dark-border transition-all duration-300 ease-out",
-                                isMobileSearchOpen ? "-left-0 opacity-100" : "left-full opacity-0 pointer-events-none"
+                                "absolute inset-y-0 right-0 z-20 bg-white dark:bg-dark-surface rounded-full flex items-center px-4 border border-brand-border dark:border-dark-border transition-all duration-300 ease-out",
+                                isMobileSearchOpen ? "-left-[52px] opacity-100" : "left-full opacity-0 pointer-events-none"
                             )}>
                                 <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
                                 <input
@@ -174,16 +211,16 @@ export default function HelpHeader({
                         {/* Mobile Search Toggle */}
                         <button
                             onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-                            className="lg:hidden w-10 h-10 flex items-center justify-center text-gray-500 dark:text-dark-body"
+                            className="lg:hidden w-10 h-10 flex items-center justify-center text-brand-inactive-text dark:text-dark-body"
                         >
-                            {isMobileSearchOpen ? <XIcon size={22} className="text-gray-400" /> : <SearchIcon size={22} />}
+                            {isMobileSearchOpen ? <span className="text-[22px] leading-none text-brand-dark dark:text-dark-heading">×</span> : <SearchIcon size={22} />}
                         </button>
 
                         {/* Theme Toggle - Desktop & Mobile */}
                         <Button
                             variant="outline"
-                            className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-border"
-                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                            className="hidden lg:flex rounded-full w-10 h-10 p-0 border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border transition-all"
+                            onClick={handleThemeChange}
                         >
                             {mounted && (theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />)}
                         </Button>

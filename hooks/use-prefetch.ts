@@ -80,7 +80,7 @@ export function usePrefetch(options: UsePrefetchOptions): PrefetchProps {
 
 /**
  * Factory that creates prefetch props for a specific entity ID.
- * Used to avoid creating N hook instances in a list — instead creates lightweight handlers.
+ * Used to avoid creating N hook instances in a list - instead creates lightweight handlers.
  *
  * Usage:
  * ```tsx

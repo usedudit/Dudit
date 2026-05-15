@@ -96,7 +96,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
     const cacheKey = getCacheKey(entityType, partnerId)
     const cacheMap = getEntityCacheMap(cacheKey)
 
-    // Snapshot for useSyncExternalStore — uses global version counter
+    // Snapshot for useSyncExternalStore - uses global version counter
     const getSnapshot = useCallback(() => getVersion(cacheKey), [cacheKey])
     const subscribeFn = useCallback(
         (cb: () => void) => subscribe(cacheKey, cb),
@@ -137,7 +137,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             const isFresh = entry && !entry.partial && Date.now() - entry.timestamp < staleTime
             const needsFetch = !entry || entry.partial || Date.now() - entry.timestamp >= staleTime
 
-            // If fresh AND full (not partial), return immediately — no fetch
+            // If fresh AND full (not partial), return immediately - no fetch
             if (isFresh) {
                 return { data: entry!.data, isLoading: false, isStale: false }
             }
@@ -155,7 +155,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                             }
                         })
                         .catch(() => {
-                            // Silently fail — partial/stale data is still shown
+                            // Silently fail - partial/stale data is still shown
                         })
                         .finally(() => {
                             inFlightRequests.delete(flightKey)
@@ -192,7 +192,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                         notifySubscribers(cacheKey)
                     }
                 })
-                .catch(() => {})
+                .catch(() => { })
                 .finally(() => {
                     inFlightRequests.delete(flightKey)
                 })

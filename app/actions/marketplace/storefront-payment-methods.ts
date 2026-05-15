@@ -18,7 +18,7 @@ export interface StorefrontPaymentMethod {
 /**
  * Busca os métodos de pagamento ativos do vendedor para exibir na vitrine/checkout.
  * Agrupa por tipo canônico e retorna o "melhor" de cada tipo (maior desconto, menor taxa).
- * Não requer permissão de partner — qualquer usuário logado pode consultar (é dado público da vitrine).
+ * Não requer permissão de partner - qualquer usuário logado pode consultar (é dado público da vitrine).
  */
 export async function getStorefrontPaymentMethodsAction(partnerId: string) {
   await requireUser()

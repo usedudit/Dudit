@@ -10,7 +10,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 export const dynamic = "force-dynamic"
 
 /**
- * SSR catalog loader — fetches team, customers, services and unavailable types
+ * SSR catalog loader - fetches team, customers, services and unavailable types
  * in a single parallel batch with ONE auth context.
  * Replaces 4 separate client-side server actions that each did their own auth.
  */

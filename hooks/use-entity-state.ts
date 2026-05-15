@@ -72,7 +72,7 @@ export function useEntityState() {
     // multiple searchParams updates, each of which would trigger the sync effect.
     const pendingUserActionsRef = useRef(0)
 
-    // Timestamp of last user action — prevents stale searchParams from overriding
+    // Timestamp of last user action - prevents stale searchParams from overriding
     const lastUserActionRef = useRef(0)
 
     // ── SECONDARY: Sync from URL on browser back/forward ─────────────────

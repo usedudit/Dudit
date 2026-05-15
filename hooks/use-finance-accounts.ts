@@ -22,10 +22,10 @@ export function useFinanceAccounts(partnerId: string) {
     const { data, isLoading, error } = useQuery({
         queryKey: FINANCE_ACCOUNTS_KEY(partnerId),
         queryFn: async () => {
-                const res = await getFinanceAccountsAction(partnerId)
+            const res = await getFinanceAccountsAction(partnerId)
             return res
         },
-        staleTime: 60_000, // 1 minute — accounts rarely change mid-session
+        staleTime: 60_000, // 1 minute - accounts rarely change mid-session
         refetchOnWindowFocus: false,
         enabled: !!partnerId,
     })
@@ -36,7 +36,7 @@ export function useFinanceAccounts(partnerId: string) {
         queryClient.invalidateQueries({ queryKey: FINANCE_ACCOUNTS_KEY(partnerId) })
     }, [queryClient, partnerId])
 
-    /** Direct cache set — use when you already have fresh data (e.g., after create). */
+    /** Direct cache set - use when you already have fresh data (e.g., after create). */
     const setCache = useCallback(
         (freshAccounts: any[]) => {
             queryClient.setQueryData(FINANCE_ACCOUNTS_KEY(partnerId), {

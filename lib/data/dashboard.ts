@@ -528,7 +528,7 @@ export async function getDashboardOperationsData(partnerId: string) {
 }
 
 // ============================================================================
-// MODULAR GENERAL TAB — independent queries with granular cache tags
+// MODULAR GENERAL TAB - independent queries with granular cache tags
 // ============================================================================
 
 async function getCachedGeneralMetrics(partnerId: string): Promise<{ metrics: Metric[] }> {
@@ -698,7 +698,7 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
-      
+
       // Fetch logs and join with profiles to get user names
       const { data, error } = await supabase
         .from("audit_logs")
@@ -750,10 +750,10 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
         const action = String(row.action_type || "").toLowerCase()
         const entity = String(row.entity_type || "").toLowerCase()
         const lines = Array.isArray(row.change_lines) ? row.change_lines : []
-        
+
         let title = ""
         let icon = entityMeta[entity]?.icon || "file"
-        
+
         // Special mapping for cash sessions as requested
         if (entity === "cash_session") {
           if (action === "cash_opened" || action === "opened") title = "Abertura de caixa"
@@ -843,7 +843,7 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[])
 }
 
 // ============================================================================
-// PUBLIC EXPORTS — Modular General Tab
+// PUBLIC EXPORTS - Modular General Tab
 // ============================================================================
 
 export async function getGeneralMetrics(partnerId: string) {

@@ -182,7 +182,7 @@ export async function moderateImageWithBase64(
       method: 'POST',
       body: formData,
       timeoutMs: 15_000,
-      maxResponseBytes: 1 * 1024 * 1024, // 1 MB — API response is JSON
+      maxResponseBytes: 1 * 1024 * 1024, // 1 MB - API response is JSON
     })
 
     console.log('[SIGHTENGINE] Response status:', response.status)
@@ -282,7 +282,7 @@ export async function moderateImageWithUrl(
       {
         method: 'GET',
         timeoutMs: 15_000,
-        maxResponseBytes: 1 * 1024 * 1024, // 1 MB — API response is JSON
+        maxResponseBytes: 1 * 1024 * 1024, // 1 MB - API response is JSON
       }
     )
 

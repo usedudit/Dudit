@@ -145,7 +145,7 @@ export async function createTransactionFromOrder(
         const accountId = explicitAccountId || mercadoPagoAccountId || defaultSalesAccountId
 
         // Build deterministic reference_note keys for each entry.
-        // Format: "sale-tx:{order_number}:{index}" — unique per entry, stable across retries.
+        // Format: "sale-tx:{order_number}:{index}" - unique per entry, stable across retries.
         const entriesWithRef = entries.map((entry, index) => ({
             ...entry,
             referenceNote: `sale-tx:${orderData.order_number}:${index}`,

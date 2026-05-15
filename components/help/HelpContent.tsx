@@ -34,11 +34,13 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
         let tableRows: string[][] = []
 
         const parseInline = (text: string) => {
+            if (!text) return ""
             // Handle Bold: **text**
             const parts = text.split(/(\*\*.*?\*\*)/g)
             return parts.map((part, i) => {
                 if (part.startsWith("**") && part.endsWith("**")) {
-                    return <strong key={i} className="font-bold text-brand-dark dark:text-dark-heading">{part.slice(2, -2)}</strong>
+                    const content = part.slice(2, -2)
+                    return <strong key={i} className="font-extrabold text-brand-dark dark:text-dark-heading">{content}</strong>
                 }
                 return part
             })
@@ -54,7 +56,10 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
         const flushTable = (key: number) => {
             if (inTable && tableRows.length > 0) {
                 // Filter out separator rows like | :--- | :--- |
-                const cleanRows = tableRows.filter(row => !row.some(cell => cell.includes("---")))
+                const cleanRows = tableRows.filter(row => {
+                    const isSeparator = row.every(cell => /^[ \-:|]*$/.test(cell.trim()) && cell.includes("---"))
+                    return !isSeparator
+                })
 
                 elements.push(
                     <div key={`table-wrapper-${key}`} className="overflow-x-auto mb-8 border border-brand-border dark:border-dark-border rounded-xl">

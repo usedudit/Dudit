@@ -322,7 +322,7 @@ async function syncAppointmentReceivable(params: {
   return existingId
 }
 
-/** @deprecated Use getAppointmentsByDateRangeAction instead — this fetches ALL appointments with select(*) */
+/** @deprecated Use getAppointmentsByDateRangeAction instead - this fetches ALL appointments with select(*) */
 export async function getAppointmentsAction() {
   try {
     const { partnerId } = await getPartnerContextWithPermission("view")
@@ -350,7 +350,7 @@ const APPOINTMENT_LIST_COLUMNS = `
 
 /**
  * Fetch appointments within a date range, with optional staff filter.
- * All filtering is done at the database level — no in-memory filtering.
+ * All filtering is done at the database level - no in-memory filtering.
  *
  * Uses the standard interval overlap condition:
  *   start_date <= queryEnd AND end_date >= queryStart
@@ -406,7 +406,7 @@ const SLOT_INCREMENT_MINUTES = 15
  * - Buffer minutes between appointments
  * - Business hours (default 08:00–19:00, structured for future DB config)
  *
- * All computation is server-side — no client-side slot generation.
+ * All computation is server-side - no client-side slot generation.
  */
 export async function getAvailableTimeSlotsAction(
   date: string,
@@ -546,7 +546,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       )
     }
 
-    // Audit logs — run in parallel (each is an independent insert)
+    // Audit logs - run in parallel (each is an independent insert)
     await Promise.all(
       createdRows.map((row: any) =>
         logAuditEvent({
@@ -564,7 +564,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     // Increment usage counter for each created appointment
     increment_usage_counter(partnerId, "appointments_month_count", createdRows.length).catch(console.error)
 
-    // Revalidation — once at the end, not per-row
+    // Revalidation - once at the end, not per-row
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
     safeRevalidateTag(DASHBOARD_TAGS.services(partnerId))
