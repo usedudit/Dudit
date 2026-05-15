@@ -18,6 +18,8 @@ import {
     ColumnInsertIcon,
     Settings01Icon,
     FilterHorizontalIcon,
+    Sun03Icon,
+    TextFirstlineRightIcon as TextFirstlineRightIcon01,
     PackageIcon as PackageIcon01,
     PackageDeliveredIcon,
     PackageReceiveIcon as PackageReceiveIcon01,
@@ -325,6 +327,8 @@ export const GlobeIcon = CreateIcon(GlobeIcon01)
 export const SettingsIcon = CreateIcon(Settings01Icon)
 
 export const MoonIcon = CreateIcon(Moon02Icon)
+export const SunIcon = CreateIcon(Sun03Icon)
+export const TextFirstlineRightIcon = CreateIcon(TextFirstlineRightIcon01)
 
 export const ClockIcon = CreateIcon(Clock01Icon)
 export const MapPinIcon = CreateIcon(Location01Icon)

@@ -104,12 +104,12 @@ export type OperationsDashboardData = {
   serviceOrders: DashboardListItem[]
 }
 
-const money = (value: unknown) => {
+export const money = (value: unknown) => {
   const number = typeof value === "number" ? value : Number(String(value ?? 0).replace(",", "."))
   return Number.isFinite(number) ? number : 0
 }
 
-const brl = (value: unknown) =>
+export const brl = (value: unknown) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(money(value))
 
 const compact = (value: unknown) =>
@@ -557,10 +557,10 @@ async function getCachedGeneralMetrics(partnerId: string): Promise<{ metrics: Me
 
       return {
         metrics: [
-          { title: "Receita do período", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs período anterior`, tone: "green" as const },
-          { title: "Pedidos do período", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs período anterior`, tone: "blue" as const },
-          { title: "Ticket médio", value: brl(ticket), detail: "últimos 30 dias", tone: "default" as const },
-          { title: "Clientes atendidos", value: String(uniqueCustomers.size), detail: "últimos 30 dias", tone: "default" as const },
+          { title: "Desempenho de Vendas", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs mês passado`, tone: "green" as const },
+          { title: "Vendas Totais", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs mês passado`, tone: "blue" as const },
+          { title: "Pedido Médio", value: brl(ticket), trend: "0% vs mês passado", tone: "default" as const },
+          { title: "Clientes Atendidos", value: String(uniqueCustomers.size), trend: "0% vs mês passado", tone: "default" as const },
         ],
       }
     },
@@ -623,16 +623,42 @@ async function getCachedGeneralAlerts(partnerId: string, sells: string[]): Promi
   )()
 }
 
-async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenue: ChartPoint[] }> {
+async function getCachedGeneralRevenueChart(partnerId: string): Promise<{ revenue: any[]; total: number; trend: string }> {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient()
       const today = getTodayYmdSaoPaulo()
       const from = addDays(today, -29)
-      const { data, error } = await supabase.from("transactions").select("amount, payment_date, status, transaction_type").eq("partner_id", partnerId).eq("transaction_type", "income").gte("created_at", `${from}T00:00:00`).limit(400)
+      const prevFrom = addDays(from, -30)
+
+      const { data, error } = await supabase.from("transactions")
+        .select("amount, payment_date, status, transaction_type, created_at")
+        .eq("partner_id", partnerId)
+        .eq("transaction_type", "income")
+        .gte("created_at", `${prevFrom}T00:00:00`)
+        .limit(800)
+
       if (error) throw error
+
       const paidIncome = (data || []).filter((tx: any) => isPaid(tx.status))
-      return { revenue: bucketByDate(paidIncome, "payment_date", "amount") }
+
+      const currentRows = paidIncome.filter((tx: any) => String(tx.created_at).slice(0, 10) >= from)
+      const previousRows = paidIncome.filter((tx: any) => String(tx.created_at).slice(0, 10) < from)
+
+      const currentBucket = bucketByDate(currentRows, "payment_date", "amount", 30)
+      const previousBucket = bucketByDate(previousRows, "payment_date", "amount", 30)
+
+      const total = currentRows.reduce((acc: number, row: any) => acc + money(row.amount), 0)
+      const prevTotal = previousRows.reduce((acc: number, row: any) => acc + money(row.amount), 0)
+      const trend = percentTrend(total, prevTotal)
+
+      const revenue = currentBucket.map((p, i) => ({
+        label: p.label,
+        value: p.value,
+        secondary: previousBucket[i]?.value || 0
+      }))
+
+      return { revenue, total, trend }
     },
     ["dashboard-revenue", partnerId],
     { tags: [DASHBOARD_TAGS.revenue(partnerId), DASHBOARD_TAGS.general(partnerId)], revalidate: 120 },

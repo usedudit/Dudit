@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, InfoCard, DefaultModal } from "@/components/reusable"
+import { Button, Input, FormDropdown, InfoCard, DefaultModal, MoneyInput, IconPlaceholder, TimePicker } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, TrashIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -68,74 +68,76 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
     if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+        <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar"></div>
 
-                        {/* Back button - desktop only */}
-                        <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            </Button>
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                    {/* Back button - desktop only */}
+                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                        </Button>
+                    </div>
+
+                    {/* Title row */}
+                    <div className="hidden md:flex items-start justify-between mb-4">
+                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                            <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                <span className="truncate">Configurações de Entrega</span>
+                            </h1>
+
+                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                Gerencie taxas e regras de entrega
+                            </div>
                         </div>
 
-                        {/* Title row */}
-                        <div className="hidden md:flex items-start justify-between">
-                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    <span className="truncate">Configurações de Entrega</span>
-                                </h1>
-
-                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                    Gerencie taxas e regras de entrega
-                                </div>
-                            </div>
-
-                            {/* Desktop action buttons */}
-                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                <Button
-                                    disabled={saving || isFree}
-                                    onClick={async () => {
-                                        setSaving(true)
-                                        await upsertPartnerDeliveryConfigAction({
-                                            partnerId,
-                                            settings: {
-                                                baseFee: Number(settings.baseFee || 0),
-                                                includedKm: Number(settings.includedKm || 0),
-                                                extraKmPrice: Number(settings.extraKmPrice || 0),
-                                                maxDeliveryKm: settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
-                                                isDeliveryEnabled: settings.isDeliveryEnabled,
-                                            },
-                                        })
-                                        await reload()
-                                        setSaving(false)
-                                    }}
-                                >
-                                    {saving ? "Salvando..." : "Salvar"}
-                                </Button>
-                            </div>
+                        {/* Desktop action buttons */}
+                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                            <Button
+                                disabled={saving || isFree}
+                                onClick={async () => {
+                                    setSaving(true)
+                                    await upsertPartnerDeliveryConfigAction({
+                                        partnerId,
+                                        settings: {
+                                            baseFee: Number(settings.baseFee || 0),
+                                            includedKm: Number(settings.includedKm || 0),
+                                            extraKmPrice: Number(settings.extraKmPrice || 0),
+                                            maxDeliveryKm: settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
+                                            isDeliveryEnabled: settings.isDeliveryEnabled,
+                                        },
+                                    })
+                                    await reload()
+                                    setSaving(false)
+                                }}
+                            >
+                                {saving ? "Salvando..." : "Salvar"}
+                            </Button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Content Body */}
-            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+            <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
                 {isFree && <InfoCard color="yellow" title="Plano Começar" message="O recurso de entrega está indisponível neste plano." className="mb-6" />}
                 {upgradeHint && <InfoCard color="blue" title="Disponível no plano Escalar" message={`${upgradeHint} - Faça upgrade em Assinatura.`} className="mb-6" />}
 
                 <div className="flex flex-col gap-6">
                     {/* Geral */}
-                    <div className="flex flex-col gap-4">
-                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Geral</h2>
+                    <div className="flex flex-col">
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
 
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden divide-y divide-brand-border dark:divide-dark-border">
+                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Geral</h2>
+
+                        <div className="overflow-hidden">
                             {/* Entrega Ativa */}
-                            <div className="p-5 flex items-center justify-between gap-4">
+                            <div className="flex items-center justify-between gap-4">
                                 <div className="flex flex-col gap-1">
-                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Entrega ativa</span>
+                                    <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Entrega ativa</span>
                                     <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes selecionem entrega no checkout</span>
                                 </div>
                                 <Switch
@@ -146,16 +148,15 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             </div>
 
                             {/* Taxa Base */}
-                            <div className="p-5 flex items-center justify-between gap-4">
+                            <div className="flex items-center justify-between gap-4">
                                 <div className="flex flex-col gap-1 flex-1">
-                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Taxa base</span>
+                                    <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Taxa base</span>
                                     <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor fixo cobrado por cada entrega</span>
                                 </div>
                                 <div className="w-[120px]">
-                                    <Input
+                                    <MoneyInput
                                         value={settings.baseFee}
-                                        onChange={(e) => setSettings((s) => ({ ...s, baseFee: e.target.value }))}
-                                        placeholder="0,00"
+                                        onChange={(val) => setSettings((s) => ({ ...s, baseFee: String(val) }))}
                                         className="text-right"
                                     />
                                 </div>
@@ -164,13 +165,15 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                     </div>
 
                     {/* Distância */}
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col mt-8">
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+
                         <div className="flex flex-col gap-1">
                             <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Distância</h2>
                             <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega baseados na distância da loja.</p>
                         </div>
 
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-5">
+                        <div>
                             {!advancedEnabled && <p className="text-sm font-bold text-brand-primary mb-4 flex items-center gap-2">Recurso disponível no plano Escalar</p>}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <Input
@@ -196,9 +199,11 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                     </div>
 
                     {/* Regras por horário */}
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col mt-8">
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+
                         <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Regras por horário</h2>
+                            <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Regras por horário</h2>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -215,11 +220,11 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                 <p className="text-sm font-bold text-brand-primary">Recurso disponível no plano Escalar</p>
                             </div>
                         ) : rules.length === 0 ? (
-                            <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-2">
-                                <ClockIcon className="w-8 h-8 text-brand-inactive-text opacity-40" />
-                                <span className="font-bold text-brand-dark dark:text-dark-heading">Nenhuma regra cadastrada</span>
-                                <span className="text-sm text-brand-inactive-text max-w-[280px]">Adicione regras para alterar o valor da entrega em horários específicos.</span>
-                            </div>
+                            <IconPlaceholder
+                                icon={ClockIcon}
+                                title="Nenhuma regra cadastrada"
+                                subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
+                            />
                         ) : (
                             <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
                                 <div className="overflow-x-auto">
@@ -294,8 +299,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                 >
                     <div className="flex flex-col gap-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <Input label="Início" type="time" value={newRule.startTime} onChange={(e) => setNewRule((r) => ({ ...r, startTime: e.target.value }))} />
-                            <Input label="Fim" type="time" value={newRule.endTime} onChange={(e) => setNewRule((r) => ({ ...r, endTime: e.target.value }))} />
+                            <TimePicker label="Início" value={newRule.startTime} onChange={(time) => setNewRule((r) => ({ ...r, startTime: time }))} />
+                            <TimePicker label="Fim" value={newRule.endTime} onChange={(time) => setNewRule((r) => ({ ...r, endTime: time }))} />
                         </div>
                         <FormDropdown
                             label="Tipo de Taxa"
@@ -303,12 +308,22 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             setValue={(value) => setNewRule((r) => ({ ...r, type: value }))}
                             options={[{ value: "fixed", label: "Valor Fixo" }, { value: "multiplier", label: "Multiplicador (Taxa Base x Valor)" }]}
                         />
-                        <Input
-                            label="Valor"
-                            value={newRule.value}
-                            onChange={(e) => setNewRule((r) => ({ ...r, value: e.target.value }))}
-                            placeholder={newRule.type === "fixed" ? "0,00" : "1.5"}
-                        />
+                        {newRule.type === "fixed" ? (
+                            <MoneyInput
+                                label="Valor"
+                                value={newRule.value}
+                                onChange={(val) => setNewRule((r) => ({ ...r, value: String(val) }))}
+                            />
+                        ) : (
+                            <Input
+                                label="Valor"
+                                type="number"
+                                step="0.1"
+                                value={newRule.value}
+                                onChange={(e) => setNewRule((r) => ({ ...r, value: e.target.value }))}
+                                placeholder="1.5"
+                            />
+                        )}
                     </div>
                 </DefaultModal>
             </div>

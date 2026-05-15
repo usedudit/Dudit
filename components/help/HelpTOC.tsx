@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { TextFirstlineRightIcon } from "@/lib/icons"
 
 interface TOCItem {
     id: string
@@ -67,32 +68,36 @@ export default function HelpTOC({ content }: { content: string }) {
 
     return (
         <aside className="hidden xl:block w-64 shrink-0 py-8 px-6 sticky top-[72px] h-[calc(100vh-72px)] overflow-y-auto custom-scrollbar">
-            <h4 className="text-[11px] font-bold text-gray-400 dark:text-dark-body uppercase tracking-widest mb-4 flex items-center gap-2">
-                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 6h16M4 12h16M4 18h7" />
-                </svg>
+            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
+                <TextFirstlineRightIcon className="h-4 w-4" />
                 Nesta página
             </h4>
             
-            <ul className="space-y-3">
-                {items.map((item) => (
-                    <li 
-                        key={item.id} 
-                        style={{ paddingLeft: item.level === 3 ? "1rem" : "0" }}
-                    >
-                        <button
-                            onClick={() => scrollTo(item.id)}
-                            className={cn(
-                                "text-[13px] text-left transition-colors hover:text-brand-green",
-                                activeId === item.id 
-                                    ? "text-brand-green font-medium" 
-                                    : "text-gray-500 dark:text-dark-body"
-                            )}
+            <ul className="space-y-1">
+                {items.map((item) => {
+                    const isActive = activeId === item.id
+                    return (
+                        <li 
+                            key={item.id} 
+                            style={{ paddingLeft: item.level === 3 ? "0.75rem" : "0" }}
                         >
-                            {item.text}
-                        </button>
-                    </li>
-                ))}
+                            <button
+                                onClick={() => scrollTo(item.id)}
+                                className={cn(
+                                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition-all cursor-pointer text-left group relative",
+                                    isActive 
+                                        ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium" 
+                                        : "text-gray-500 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
+                                )}
+                            >
+                                {isActive && (
+                                    <div className="absolute left-0 w-1 h-3 bg-brand-green rounded-r-full" />
+                                )}
+                                <span className="truncate">{item.text}</span>
+                            </button>
+                        </li>
+                    )
+                })}
             </ul>
 
             <div className="mt-10 pt-8 border-t border-gray-100 dark:border-dark-border">

@@ -55,7 +55,11 @@ export default function HelpCenterPage() {
                 setSearchQuery={setSearchQuery}
             />
 
+            {/* Spacer for fixed header */}
+            <div className="h-[72px]" />
+
             <div className="flex-1 flex w-full max-w-[1440px] mx-auto relative">
+
                 
                 {/* Desktop Sidebar */}
                 <HelpSidebar 

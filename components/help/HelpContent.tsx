@@ -59,7 +59,7 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 elements.push(
                     <div key={`table-wrapper-${key}`} className="overflow-x-auto mb-8 border border-brand-border dark:border-dark-border rounded-xl">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-brand-border dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                            <thead className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
                                 <tr>
                                     {cleanRows[0].map((cell, i) => (
                                         <th key={i} className="px-6 py-4 font-bold text-brand-dark dark:text-dark-heading">{cell.trim()}</th>
@@ -181,13 +181,21 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
             {/* Header */}
             <header className="mb-12">
                 <div className="flex items-center gap-3 mb-6">
-                    <Badge variant="green" icon={null} className="px-3">
-                        🚀 {article.category.replace("-", " ")}
-                    </Badge>
+                    {(() => {
+                        const catName = article.category.replace(/-/g, " ");
+                        const formattedCat = catName.charAt(0).toUpperCase() + catName.slice(1);
+                        return (
+                            <Badge variant="green" icon={null} className="px-3">
+                                🚀 {formattedCat}
+                            </Badge>
+                        );
+                    })()}
+
+
 
                     <Button
                         variant="filled"
-                        className="ml-auto text-xs h-9 px-4 rounded-lg dark:bg-brand-green dark:text-white"
+                        className="ml-auto text-xs h-9 px-4"
                         onClick={handleCopyLink}
                     >
                         {copied ? (

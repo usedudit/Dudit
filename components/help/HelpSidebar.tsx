@@ -5,8 +5,9 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { helpCategories } from "@/lib/help-data"
-import { ChevronDownIcon, ChevronRightIcon } from "@/lib/icons"
+import { ChevronDownIcon, ChevronRightIcon, InstagramIcon, FacebookIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/reusable"
 
 export default function HelpSidebar({ 
     className,
@@ -35,21 +36,34 @@ export default function HelpSidebar({
         )
     })).filter(cat => cat.articles.length > 0)
 
+    // Helper to get emoji for categories that don't have one in data
+    const getCategoryEmoji = (id: string) => {
+        if (id === "boas-vindas") return "👋"
+        if (id === "login-registro") return "🔐"
+        if (id === "gestao") return "📊"
+        if (id === "pedidos") return "📦"
+        if (id === "financeiro") return "💰"
+        return "📁"
+    }
+
     return (
         <aside className={cn("flex flex-col h-[calc(100vh-72px)] bg-white dark:bg-dark-bg border-r border-gray-100 dark:border-dark-border overflow-y-auto custom-scrollbar sticky top-[72px]", className)}>
             {/* Navigation */}
             <nav className="flex-1 px-2 pt-4 pb-8">
                 {filteredCategories.map(category => (
-                    <div key={category.id} className="mb-2">
+                    <div key={category.id} className="mb-1">
                         <button
                             onClick={() => toggleCategory(category.id)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-400 dark:text-dark-body uppercase tracking-wider hover:text-gray-600 dark:hover:text-dark-heading transition-colors group"
+                            className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold text-gray-400 dark:text-dark-body uppercase tracking-wider transition-all group cursor-pointer",
+                                "hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
+                            )}
                         >
                             <div className="flex items-center gap-2">
-                                {category.icon && <span className="text-sm">{category.icon}</span>}
+                                <span className="text-sm">{category.icon || getCategoryEmoji(category.id)}</span>
                                 <span>{category.title}</span>
                             </div>
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="transition-transform duration-200">
                                 {openCategories[category.id] ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
                             </div>
                         </button>
@@ -71,7 +85,7 @@ export default function HelpSidebar({
                                                     <Link
                                                         href={`/ajuda/${category.id}/${article.slug}`}
                                                         className={cn(
-                                                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative",
+                                                            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative cursor-pointer",
                                                             isActive 
                                                                 ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium" 
                                                                 : "text-gray-600 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
@@ -103,19 +117,27 @@ export default function HelpSidebar({
                 ))}
             </nav>
 
-            {/* Footer */}
+            {/* Footer with Socials */}
             <div className="p-4 mt-auto border-t border-gray-100 dark:border-dark-border">
-                <div className="bg-gray-50 dark:bg-dark-surface rounded-xl p-3 flex items-center gap-3">
-                   <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-dark-border flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-500 dark:text-dark-body" fill="currentColor">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
-                        </svg>
-                   </div>
-                   <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-gray-900 dark:text-dark-heading">Fornecido por Dudit</p>
-                        <p className="text-[10px] text-gray-500 dark:text-dark-body">Versão 2.4.0</p>
-                   </div>
+                <div className="flex items-center justify-center gap-3">
+                    <Button 
+                        variant="outline" 
+                        className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
+                        onClick={() => window.open("https://instagram.com", "_blank")}
+                    >
+                        <InstagramIcon size={18} />
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
+                        onClick={() => window.open("https://facebook.com", "_blank")}
+                    >
+                        <FacebookIcon size={18} />
+                    </Button>
                 </div>
+                <p className="text-[10px] text-center text-gray-400 dark:text-dark-body mt-3 font-medium uppercase tracking-widest">
+                    Versão 2.4.0
+                </p>
             </div>
         </aside>
     )

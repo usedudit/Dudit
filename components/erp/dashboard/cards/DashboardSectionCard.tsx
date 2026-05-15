@@ -8,7 +8,7 @@ export function DashboardSectionCard({
     className,
     children,
 }: {
-    title: string
+    title: ReactNode
     icon?: ComponentType<{ className?: string }>
     action?: ReactNode
     className?: string
@@ -16,14 +16,12 @@ export function DashboardSectionCard({
 }) {
     return (
         <section className={cn("overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm shadow-brand-dark/5 dark:border-dark-border dark:bg-dark-surface", className)}>
-            <div className="flex min-h-16 items-center justify-between gap-3 px-6 py-4">
-                <div className="flex items-center gap-3">
-                    {Icon && (
-                        <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
-                            <Icon className="h-5 w-5 text-brand-dark dark:text-dark-heading" />
-                        </div>
-                    )}
-                    <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-5">
+                <div className="flex items-center gap-2">
+                    {Icon && <Icon className="h-5 w-5 text-brand-dark dark:text-dark-heading opacity-80" />}
+                    <h2 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                        {title}
+                    </h2>
                 </div>
                 {action}
             </div>
