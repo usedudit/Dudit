@@ -190,11 +190,11 @@ export const PartnerVisuals = React.memo(() => {
       {/* Footer */}
       <div className="absolute bottom-6 right-8 text-white/40 text-[11px]">
         © {new Date().getFullYear()} Dudit Inc.{" "}
-        <Link href="/terms" prefetch={false} className="hover:text-white ml-2">
+        <Link href="/institucional/termos" prefetch={false} className="hover:text-white ml-2">
           Termos
         </Link>{" "}
         &bull;{" "}
-        <Link href="/privacy" prefetch={false} className="hover:text-white">
+        <Link href="/institucional/privacidade" prefetch={false} className="hover:text-white">
           Privacidade
         </Link>
       </div>

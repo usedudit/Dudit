@@ -17,7 +17,7 @@ export default function HelpTOC({ content }: { content: string }) {
     useEffect(() => {
         // Simple regex to find markdown headings (## and ###)
         const headingLines = content.split("\n").filter(line => line.startsWith("## ") || line.startsWith("### "))
-        
+
         const tocItems = headingLines.map(line => {
             const level = line.startsWith("### ") ? 3 : 2
             const text = line.replace(/^#{2,3} /, "").trim()
@@ -72,21 +72,21 @@ export default function HelpTOC({ content }: { content: string }) {
                 <TextFirstlineRightIcon className="h-4 w-4" />
                 Nesta página
             </h4>
-            
+
             <ul className="space-y-1">
                 {items.map((item) => {
                     const isActive = activeId === item.id
                     return (
-                        <li 
-                            key={item.id} 
+                        <li
+                            key={item.id}
                             style={{ paddingLeft: item.level === 3 ? "0.75rem" : "0" }}
                         >
                             <button
                                 onClick={() => scrollTo(item.id)}
                                 className={cn(
                                     "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition-all cursor-pointer text-left group relative",
-                                    isActive 
-                                        ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium" 
+                                    isActive
+                                        ? "bg-brand-green/5 dark:bg-brand-green/10 text-brand-green font-medium"
                                         : "text-gray-500 dark:text-dark-body hover:bg-gray-50 dark:hover:bg-dark-surface hover:text-gray-900 dark:hover:text-dark-heading"
                                 )}
                             >
@@ -104,8 +104,8 @@ export default function HelpTOC({ content }: { content: string }) {
                 <p className="text-[13px] text-gray-500 dark:text-dark-body mb-4">Isto foi útil?</p>
                 <div className="flex gap-2">
                     {["😊", "😐", "🙁"].map((emoji, i) => (
-                        <button 
-                            key={i} 
+                        <button
+                            key={i}
                             className="w-10 h-10 rounded-full border border-gray-100 dark:border-dark-border flex items-center justify-center hover:bg-gray-50 dark:hover:bg-dark-surface transition-all hover:scale-110 active:scale-95 text-xl"
                         >
                             {emoji}

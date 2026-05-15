@@ -35,7 +35,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
 
                         {/* Coluna 1: Institucional */}
                         <div>
-                            <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Institucional</h4>
+                            <h4 className="text-sm font-medium text-white mb-6">Institucional</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
@@ -46,22 +46,21 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
 
                         {/* Coluna 2: Para Lojistas (O "ouro" do seu ERP) */}
                         <div>
-                            <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Para Lojistas</h4>
+                            <h4 className="text-sm font-medium text-white mb-6">Plataforma</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/erp/vender" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Como Vender</Link></li>
-                                <li><Link href="/erp/dashboard" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Painel de Gestão</Link></li>
-                                <li><Link href="/auth/login" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors font-bold text-brand-green">Cadastrar minha Loja</Link></li>
+                                <li><Link href="/erp/vender" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar</Link></li>
+                                <li><Link href="/erp/dashboard" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
                             </ul>
                         </div>
 
                         {/* Coluna 3: Suporte */}
                         <div>
-                            <h4 className="text-white font-semibold mb-6 uppercase tracking-wider text-xs">Suporte</h4>
+                            <h4 className="text-sm font-medium text-white mb-6">Suporte</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
                                 <li><Link href="/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
-                                <li><Link href="/status" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Status do Sistema</Link></li>
-                                <li><Link href="/faq" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Perguntas Frequentes</Link></li>
+                                <li><Link href="/institucional/termos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Termos de uso</Link></li>
+                                <li><Link href="/institucional/privacidade" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Política de Privacidade</Link></li>
                             </ul>
                         </div>
                     </div>
@@ -70,10 +69,6 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                 {/* Barra Inferior: Legal + Redes Sociais */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
                     <div className="text-center md:text-left order-2 md:order-1">
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 mb-3 text-sm text-gray-400">
-                            <Link href="/institucional/termos" prefetch={false} className="hover:text-brand-green transition-colors">Termos de Uso</Link>
-                            <Link href="/institucional/privacidade" prefetch={false} className="hover:text-brand-green transition-colors">Política de Privacidade</Link>
-                        </div>
                         <p className="text-gray-500 text-xs">
                             © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                         </p>

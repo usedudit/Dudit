@@ -2,31 +2,30 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { 
-    RocketIcon, 
-    SettingsIcon, 
-    PackageIcon, 
-    TruckIcon, 
-    UserIcon, 
-    ShoppingBagIcon, 
-    BriefcaseIcon, 
-    HomeIcon, 
-    MoneyIcon, 
-    FileTextIcon, 
-    HelpCircleIcon, 
-    MessageCircleIcon,
+import {
+    RocketIcon,
+    SettingsIcon,
+    PackageIcon,
+    TruckIcon,
+    UserIcon,
+    ShoppingBagIcon,
+    BriefcaseIcon,
+    HomeIcon,
+    MoneyIcon,
+    FileTextIcon,
+    HelpCircleIcon,
     ChevronRightIcon,
     SearchIcon,
-    KeyIcon
+    KeyIcon,
+    InfoIcon
 } from "@/lib/icons"
-import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { Button } from "@/components/reusable"
 
 export default function HelpHome() {
     return (
         <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-12 lg:py-20 animate-fade-in">
-            
+
             {/* HERO SECTION */}
             <header className="mb-20">
                 <div className="flex items-center gap-3 mb-6">
@@ -35,7 +34,7 @@ export default function HelpHome() {
                     </div>
                     <span className="text-sm font-bold text-brand-green uppercase tracking-widest">Boas-vindas à Dudit</span>
                 </div>
-                <h1 className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-dark-heading mb-6 leading-tight">
+                <h1 className="text-4xl lg:text-5xl font-black text-brand-dark dark:text-dark-heading mb-6 leading-tight">
                     Dudit — Descubra o que tem por aqui
                 </h1>
                 <p className="text-xl text-gray-500 dark:text-dark-body leading-relaxed max-w-2xl">
@@ -47,7 +46,7 @@ export default function HelpHome() {
             <section className="mb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-gray-50 dark:bg-dark-surface rounded-[32px] p-8 lg:p-12 border border-gray-100 dark:border-dark-border">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-heading mb-4">
+                        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4">
                             Simples de usar, pronto para vender
                         </h2>
                         <p className="text-gray-600 dark:text-dark-body leading-relaxed mb-6">
@@ -60,9 +59,9 @@ export default function HelpHome() {
                         </div>
                     </div>
                     <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white dark:border-dark-border">
-                        <img 
-                            src="https://img.dudit.com.br/static/Help_Home_Dashboard.png" 
-                            alt="Plataforma Dudit" 
+                        <img
+                            src="https://img.dudit.com.br/static/Help_Home_Dashboard.png"
+                            alt="Plataforma Dudit"
                             className="w-full h-full object-cover"
                         />
                     </div>
@@ -72,24 +71,24 @@ export default function HelpHome() {
             {/* SECTION: PARA CADA TIPO DE NEGÓCIO */}
             <section className="mb-24">
                 <div className="flex flex-col items-center text-center mb-12">
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-dark-heading mb-4">Qual o seu objetivo?</h2>
+                    <h2 className="text-3xl font-bold text-brand-dark dark:text-dark-heading mb-4">Qual o seu objetivo?</h2>
                     <p className="text-gray-500 dark:text-dark-body">Soluções pensadas para quem vende produtos, presta serviços ou aluga.</p>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <BusinessCard 
+                    <BusinessCard
                         icon={<ShoppingBagIcon />}
                         title="Vender Produtos"
                         description="Gire seu estoque rápido e venda direto para vizinhos, sem taxas abusivas."
                         short="Apareça pra quem tá perto e venda mais rápido na sua cidade"
                     />
-                    <BusinessCard 
+                    <BusinessCard
                         icon={<BriefcaseIcon />}
                         title="Prestar Serviços"
                         description="Pare de depender só de indicação. Divulgue seu trabalho e organize seus atendimentos."
                         short="Apareça pra mais clientes e organize seus atendimentos"
                     />
-                    <BusinessCard 
+                    <BusinessCard
                         icon={<HomeIcon />}
                         title="Alugar Itens"
                         description="Tem algo parado aí? Coloque para alugar e faça ele render com gente da sua cidade."
@@ -100,30 +99,30 @@ export default function HelpHome() {
 
             {/* SECTION: PRIMEIROS PASSOS */}
             <section className="mb-24">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-dark-heading mb-8 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-8 flex items-center gap-2">
                     <div className="w-2 h-6 bg-brand-green rounded-full" />
                     Primeiros Passos
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <OnboardingCard 
+                    <OnboardingCard
                         icon={<UserIcon size={20} />}
                         title="Acessando sua conta"
                         description="Veja como entrar na plataforma e configurar seu acesso inicial."
                         link="/ajuda/login-registro/acessando-conta"
                     />
-                    <OnboardingCard 
+                    <OnboardingCard
                         icon={<SettingsIcon size={20} />}
                         title="Configurando sua empresa"
                         description="Complete seu perfil e deixe sua vitrine pronta para o público."
                         link="/ajuda/login-registro/cadastro-parceiro"
                     />
-                    <OnboardingCard 
+                    <OnboardingCard
                         icon={<PackageIcon size={20} />}
                         title="Criando seus primeiros anúncios"
                         description="Adicione produtos ou serviços com fotos e descrições atraentes."
                         link="/ajuda/gestao/produtos"
                     />
-                    <OnboardingCard 
+                    <OnboardingCard
                         icon={<TruckIcon size={20} />}
                         title="Configurando delivery"
                         description="Defina taxas de entrega e horários de funcionamento."
@@ -134,7 +133,7 @@ export default function HelpHome() {
 
             {/* SECTION: MÓDULOS DA PLATAFORMA */}
             <section className="mb-24">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-dark-heading mb-8 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-8 flex items-center gap-2">
                     <div className="w-2 h-6 bg-brand-green rounded-full" />
                     Explore os Módulos
                 </h3>
@@ -154,13 +153,13 @@ export default function HelpHome() {
             <section className="bg-brand-green/5 dark:bg-brand-green/10 rounded-[32px] p-8 lg:p-12 border border-brand-green/10">
                 <div className="flex flex-col md:flex-row gap-12 items-center">
                     <div className="flex-1">
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-dark-heading mb-4">Ainda com dúvidas?</h2>
+                        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4">Ainda com dúvidas?</h2>
                         <p className="text-gray-600 dark:text-dark-body mb-8">
                             Nossa equipe está pronta para te ajudar a mostrar seu negócio na Dudit e resolver qualquer problema.
                         </p>
                         <div className="flex flex-wrap gap-4">
                             <Button variant="filled" className="rounded-full h-12 px-8">
-                                <MessageCircleIcon className="mr-2" size={18} /> Falar com suporte
+                                <InfoIcon className="mr-2" size={18} /> Falar com suporte
                             </Button>
                             <Button variant="outline" className="rounded-full h-12 px-8 border-brand-green/20 text-brand-green">
                                 Central de FAQ
@@ -206,7 +205,7 @@ function BusinessCard({ icon, title, description, short }: { icon: React.ReactNo
             <div className="w-12 h-12 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green mb-4">
                 {icon}
             </div>
-            <h4 className="text-lg font-bold text-gray-900 dark:text-dark-heading mb-2">{title}</h4>
+            <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">{title}</h4>
             <p className="text-sm text-gray-500 dark:text-dark-body mb-4 leading-relaxed">{description}</p>
             <div className="mt-auto pt-4 border-t border-gray-50 dark:border-dark-border">
                 <span className="text-[11px] font-bold text-brand-green uppercase tracking-wider">{short}</span>
@@ -222,7 +221,7 @@ function OnboardingCard({ icon, title, description, link }: { icon: React.ReactN
                 {icon}
             </div>
             <div>
-                <h4 className="text-[15px] font-bold text-gray-900 dark:text-dark-heading mb-1 group-hover:text-brand-green transition-colors">{title}</h4>
+                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1 group-hover:text-brand-green transition-colors">{title}</h4>
                 <p className="text-sm text-gray-500 dark:text-dark-body leading-relaxed">{description}</p>
             </div>
         </Link>

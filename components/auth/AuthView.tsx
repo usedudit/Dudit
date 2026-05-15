@@ -38,24 +38,16 @@ function getEmailProvider(email: string) {
 
 
 // Otimização: Static Background Memoized
-const CityBackground = React.memo(() => (
+const WavesBackground = React.memo(() => (
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <svg className="w-full h-full" preserveAspectRatio="xMidYMax slice" viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="410" cy="110" r="16" fill="white" opacity="0.2" />
-            <path d="M480 140 Q 500 110, 520 110 T 560 140 Z" fill="none" stroke="#044d4b" strokeWidth="2" />
-            <path d="M360 150 Q 375 130, 390 130 T 420 150 Z" fill="none" stroke="#044d4b" strokeWidth="2" transform="translate(0, 10)" />
-            <path d="M630 130 Q 650 110, 670 110 T 700 130 Z" fill="none" stroke="white" strokeWidth="2" opacity="0.3" />
-            <path d="M260 320 V190 H300 V320 M270 320 V200 M290 320 V200" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <path d="M690 320 V110 H715 V320 M720 320 V80 H750 V320" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <line x1="725" y1="90" x2="745" y2="90" stroke="#044d4b" strokeWidth="2" />
-            <line x1="725" y1="110" x2="745" y2="110" stroke="#044d4b" strokeWidth="2" />
-            <line x1="725" y1="130" x2="745" y2="130" stroke="#044d4b" strokeWidth="2" />
-            <path d="M760 320 V160 H775 V180 H780 V320" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <path d="M300 190 V140 H450 V200" stroke="#044d4b" strokeWidth="2" fill="none" />
-        </svg>
+        <img
+            src="https://img.dudit.com.br/static/banners/WavesPattern.png"
+            alt=""
+            className="w-full h-full object-cover"
+        />
     </div>
 ))
-CityBackground.displayName = "CityBackground"
+WavesBackground.displayName = "WavesBackground"
 
 // --- COMPONENTE PRINCIPAL ---
 export default function AuthView({
@@ -245,7 +237,7 @@ export default function AuthView({
                         <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={110} height={32} className="h-8 w-auto" />
                     </Link>
                     <nav>
-                        <Button onClick={onSwitchToPartner} className="h-10 px-6 text-sm font-medium">Seja Parceiro</Button>
+                        <Button onClick={onSwitchToPartner} className="h-10 px-6 text-sm font-medium">Anuncie grátis</Button>
                     </nav>
                 </div>
             </header>
@@ -253,7 +245,7 @@ export default function AuthView({
             {/* MAIN CONTENT */}
             <main className="flex-grow relative flex flex-col items-center">
                 <div className="w-full bg-[#003d32] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
-                    <CityBackground />
+                    <WavesBackground />
                     <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>
 
@@ -339,23 +331,24 @@ export default function AuthView({
 
                                     {error && <InfoCard message={error} color="red" />}
 
-                                    <div className="flex items-center justify-between pt-2">
+                                    <div className="flex items-center justify-between pt-2 gap-2">
                                         <Button
                                             variant="outlinered"
-                                            className="w-full sm:w-auto h-12 font-bold"
+                                            className="w-full sm:w-full h-[42px]"
                                             onClick={() => { setError(null); setMode("login") }}
                                         >
                                             Cancelar
                                         </Button>
-                                        <Button type="submit" disabled={isLoading} className="px-8 h-[42px]">
+                                        <Button type="submit" disabled={isLoading}
+                                            className="w-full sm:w-full h-[42px]">
                                             {isLoading ? <Spinner size={18} color="white" /> : "Redefinir senha"}
                                         </Button>
                                     </div>
                                 </form>
 
-                                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-                                    <p className="text-[13px] text-gray-500">
-                                        Precisa de ajuda? <a href="#" className="text-brand-green font-bold hover:underline">Fale com a gente</a>
+                                <div className="mt-8 pt-6 border-t border-brand-border text-center">
+                                    <p className="text-sm text-brand-inactive-text">
+                                        Precisa de ajuda? <a href="mailto:contato@dudit.com.br" className="text-brand-green font-bold hover:underline">Fale com a gente</a>
                                     </p>
                                 </div>
                             </motion.div>
@@ -424,7 +417,7 @@ export default function AuthView({
                                         {mode === "signup" && (
                                             <div className="flex items-center gap-2 pt-1">
                                                 <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
-                                                <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">Aceito os <Link href="/terms" prefetch={false} className="underline text-slate-800">Termos</Link></label>
+                                                <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-slate-800">Termos</Link></label>
                                             </div>
                                         )}
 
@@ -449,11 +442,6 @@ export default function AuthView({
                             </p>
                         </div>
                     )}
-
-                    <div className="mt-16 flex items-center text-gray-500 text-[14px]">
-                        <HelpCircleIcon className="mr-2 h-5 w-5" />
-                        <span>Precisa de ajuda? <a href="#" className="text-brand-green font-bold hover:underline">Fale com a gente</a></span>
-                    </div>
                 </div>
             </main>
 

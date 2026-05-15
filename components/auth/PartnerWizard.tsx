@@ -298,7 +298,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                     <div className="pt-1 flex items-center gap-2">
                                         <Checkbox id="termsAgreement" checked={acceptedTerms} onChange={setAcceptedTerms} />
                                         <label htmlFor="termsAgreement" className="text-sm text-gray-600 cursor-pointer">
-                                            Aceito os <Link href="/terms" prefetch={false} className="underline font-medium text-gray-800">Termos</Link>
+                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline font-medium text-gray-800">Termos</Link>
                                         </label>
                                     </div>
                                 </div>

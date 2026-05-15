@@ -7,24 +7,16 @@ import { Building2, User, CheckCircle2, LogOut, HelpCircleIcon } from "lucide-re
 import { Button, InfoCard } from "@/components/reusable"
 
 // ─── Background ──────────────────────────────────────────────────────────────
-const CityBackground = React.memo(() => (
+const WavesBackground = React.memo(() => (
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <svg className="w-full h-full" preserveAspectRatio="xMidYMax slice" viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="410" cy="110" r="16" fill="white" opacity="0.2" />
-            <path d="M480 140 Q 500 110, 520 110 T 560 140 Z" fill="none" stroke="#044d4b" strokeWidth="2" />
-            <path d="M360 150 Q 375 130, 390 130 T 420 150 Z" fill="none" stroke="#044d4b" strokeWidth="2" transform="translate(0, 10)" />
-            <path d="M630 130 Q 650 110, 670 110 T 700 130 Z" fill="none" stroke="white" strokeWidth="2" opacity="0.3" />
-            <path d="M260 320 V190 H300 V320 M270 320 V200 M290 320 V200" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <path d="M690 320 V110 H715 V320 M720 320 V80 H750 V320" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <line x1="725" y1="90" x2="745" y2="90" stroke="#044d4b" strokeWidth="2" />
-            <line x1="725" y1="110" x2="745" y2="110" stroke="#044d4b" strokeWidth="2" />
-            <line x1="725" y1="130" x2="745" y2="130" stroke="#044d4b" strokeWidth="2" />
-            <path d="M760 320 V160 H775 V180 H780 V320" stroke="#044d4b" strokeWidth="2" fill="none" />
-            <path d="M300 190 V140 H450 V200" stroke="#044d4b" strokeWidth="2" fill="none" />
-        </svg>
+        <img 
+            src="https://img.dudit.com.br/static/banners/WavesPattern.png" 
+            alt="" 
+            className="w-full h-full object-cover"
+        />
     </div>
 ))
-CityBackground.displayName = "CityBackground"
+WavesBackground.displayName = "WavesBackground"
 
 // ─── Shell compartilhado ─────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
@@ -40,7 +32,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
             <main className="flex-grow relative flex flex-col items-center">
                 <div className="w-full bg-[#003d32] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
-                    <CityBackground />
+                    <WavesBackground />
                     <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>
 
@@ -52,13 +44,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                     >
                         {children}
                     </motion.div>
-
-                    <div className="mt-16 flex items-center text-gray-500 text-[14px]">
-                        <HelpCircleIcon className="mr-2 h-5 w-5" />
-                        <span>Precisa de ajuda?{" "}
-                            <a href="#" className="text-brand-green font-bold hover:underline">Fale com a gente</a>
-                        </span>
-                    </div>
                 </div>
             </main>
 
