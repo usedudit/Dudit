@@ -173,7 +173,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">2.</span>
                                 COMO USAMOS OS DADOS
                             </h2>
-                            <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p>Os dados coletados são utilizados exclusivamente para as seguintes finalidades:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Execução do contrato:</strong> identificação, autenticação, processamento de pedidos, exibição na vitrine digital, comunicações operacionais e suporte ao Parceiro e ao Usuário.</li>
@@ -191,7 +191,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">3.</span>
                                 COMPARTILHAMENTO DE DADOS
                             </h2>
-                            <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p>A DUDIT <strong>não vende dados pessoais</strong> a terceiros. Os dados são compartilhados apenas nas seguintes situações:</p>
                                 <ul className="list-disc pl-6 space-y-4 text-brand-inactive-text">
                                     <li><strong className="text-brand-dark">Mercado Pago:</strong> dados necessários para processar pagamentos online (nome, e-mail, CPF, valor da transação);</li>
@@ -206,7 +206,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">4.</span>
                                 COOKIES E RASTREAMENTO
                             </h2>
-                            <div className="space-y-4 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p><strong>4.1.</strong> A DUDIT utiliza cookies técnicos essenciais para funcionamento da plataforma (autenticação, sessão) e cookies analíticos para melhoria da experiência (PostHog).</p>
                                 <p><strong>4.2.</strong> Não utilizamos cookies de publicidade ou rastreamento para fins de anúncios.</p>
                                 <p><strong>4.3.</strong> O usuário pode configurar seu navegador para bloquear cookies, mas isso pode afetar o funcionamento da plataforma.</p>
@@ -218,7 +218,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">5.</span>
                                 LOGS E SEGURANÇA
                             </h2>
-                            <div className="space-y-4 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p><strong>5.1.</strong> Os dados são armazenados em servidores seguros (Supabase/Vercel), com criptografia em trânsito (HTTPS/TLS) e em repouso.</p>
                                 <p><strong>5.2.</strong> Chaves e tokens sensíveis são armazenados com criptografia adicional, com sistema de rotação de chaves (master key versionada) para garantir que eventual comprometimento não exponha dados históricos.</p>
                                 <p><strong>5.3.</strong> Senhas nunca são armazenadas em texto simples - utilizamos hash seguro (bcrypt ou equivalente).</p>
@@ -266,7 +266,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">7.</span>
                                 DIREITOS LGPD
                             </h2>
-                            <div className="space-y-6 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p>Em conformidade com a LGPD, você tem direito a:</p>
                                 <ul className="list-disc pl-6 space-y-2 text-brand-inactive-text">
                                     <li><strong>Acesso:</strong> solicitar cópia dos seus dados pessoais armazenados;</li>
@@ -290,7 +290,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">8.</span>
                                 EXCLUSÃO E ANONIMIZAÇÃO
                             </h2>
-                            <div className="space-y-4 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p><strong>8.1.</strong> O Parceiro pode solicitar a exclusão da conta a qualquer momento através das configurações da plataforma ou pelo canal de suporte.</p>
                                 <p><strong>8.2.</strong> Após a solicitação, os dados serão anonimizados ou excluídos em até <strong>30 dias</strong>, exceto aqueles que precisam ser mantidos por obrigação legal (transações financeiras, logs de acesso).</p>
                                 <p><strong>8.3.</strong> Dados de pedidos já concluídos podem ser mantidos de forma anonimizada para fins estatísticos.</p>
@@ -312,7 +312,7 @@ export default function PrivacyPage() {
                                 <span className="text-brand-dark">10.</span>
                                 CONTATO E ENCARREGADO (DPO)
                             </h2>
-                            <div className="space-y-4 md:pl-14 pl-6 border-l-2 border-brand-gray">
+                            <div className="space-y-6 md:pl-12 pl-6">
                                 <p>Para dúvidas, solicitações ou reclamações sobre privacidade:</p>
                                 <p><strong>E-mail:</strong> [contato@dudit.com.br]<br />
                                     <strong>Responsável:</strong> [SEU NOME COMPLETO]</p>

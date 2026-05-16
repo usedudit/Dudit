@@ -493,13 +493,20 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                             <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate">
                                                 {method.name || "Sem nome"}
                                             </h3>
-                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body font-medium truncate mt-0.5">
-                                                {getBrandsLabel(method) || getPaymentTypeLabel(method)}
+                                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mt-0.5">
+                                                ID: {method.id.slice(0, 5).toUpperCase()}
                                             </span>
                                         </div>
-                                        <Badge variant={method.is_active ? "green" : "red"} className="shrink-0 text-[10px] h-5 px-2">
-                                            {method.is_active ? "Ativo" : "Inativo"}
-                                        </Badge>
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                            <Badge variant={method.is_active ? "green" : "red"} className="text-[10px] h-5 px-2">
+                                                {method.is_active ? "Ativo" : "Inativo"}
+                                            </Badge>
+                                            {method.is_online_default && (
+                                                <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
+                                                    Padrão
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex justify-between items-center mt-2">
                                         <div className="flex items-center gap-2">
@@ -550,7 +557,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                 <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                <div className="overflow-x-auto pb-4 no-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                <div className="overflow-x-auto pb-4 px-4 no-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
                     <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                         <thead>
                             <tr className="bg-brand-gray/50 dark:bg-dark-border/10">

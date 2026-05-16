@@ -125,7 +125,7 @@ const PaymentMethodListRow = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
                                     {method.name || "Método sem nome"}
                                 </span>
-                                <span className="text-[10px] font-bold text-brand-inactive-text dark:text-dark-body/60 tracking-wider uppercase">
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                     ID: {method.id.slice(0, 5).toUpperCase()}
                                 </span>
                             </div>

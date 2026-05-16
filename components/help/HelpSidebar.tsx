@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { helpCategories } from "@/lib/help-data"
-import { ChevronDownIcon, ChevronRightIcon, InstagramIcon, FacebookIcon } from "@/lib/icons"
+import { ChevronDownIcon, ChevronRightIcon, InstagramIcon, TwitterIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/reusable"
 
@@ -55,7 +55,7 @@ export default function HelpSidebar({
                         <button
                             onClick={() => toggleCategory(category.id)}
                             className={cn(
-                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-black text-brand-dark dark:text-dark-heading transition-all group cursor-pointer uppercase tracking-tight",
+                                "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-bold text-brand-dark dark:text-dark-heading transition-all group cursor-pointer",
                                 "hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                             )}
                         >
@@ -123,21 +123,18 @@ export default function HelpSidebar({
                     <Button
                         variant="outline"
                         className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
-                        onClick={() => window.open("https://instagram.com", "_blank")}
+                        onClick={() => window.open("https://instagram.com/usedudit", "_blank")}
                     >
                         <InstagramIcon size={18} />
                     </Button>
                     <Button
                         variant="outline"
                         className="rounded-full w-10 h-10 p-0 border-gray-200 dark:border-dark-border text-gray-500 dark:text-dark-body hover:text-brand-green dark:hover:text-brand-green hover:border-brand-green dark:hover:border-brand-green transition-all"
-                        onClick={() => window.open("https://facebook.com", "_blank")}
+                        onClick={() => window.open("https://twitter.com/usedudit", "_blank")}
                     >
-                        <FacebookIcon size={18} />
+                        <TwitterIcon size={18} />
                     </Button>
                 </div>
-                <p className="text-[10px] text-center text-gray-400 dark:text-dark-body mt-3 font-medium uppercase tracking-widest">
-                    Versão 2.4.0
-                </p>
             </div>
         </aside>
     )

@@ -88,8 +88,8 @@ const PaymentMethodGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
-                            {getBrandsLabel(method) || getPaymentTypeLabel(method)}
+                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mt-1">
+                            ID: {method.id.slice(0, 5).toUpperCase()}
                         </div>
                     </div>
                 </div>
@@ -103,9 +103,9 @@ const PaymentMethodGridCard = React.memo(
                             </span>
                         </div>
                         <div className="flex flex-col gap-0.5 items-end">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Taxas</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Conta Financeira</span>
                             <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                {getFeeLabel(method)}
+                                {method.finance_account_name || "-"}
                             </span>
                         </div>
                     </div>
@@ -113,10 +113,15 @@ const PaymentMethodGridCard = React.memo(
                     <div className="flex items-end justify-between mt-3">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2">
                                 <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90">
                                     {getPaymentTypeLabel(method)}
                                 </Badge>
+                                {method.is_online_default && (
+                                    <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
+                                        Padrão
+                                    </Badge>
+                                )}
                             </div>
                         </div>
 

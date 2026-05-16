@@ -24,9 +24,11 @@ export default async function FinancialOverviewRoute() {
 
   return (
     <>
-      <ERPPageHeader title="Visão Geral" />
-      <FadeIn className="p-4">
-        <FinancialOverviewPage data={result.data} />
+      <ERPPageHeader title="Resumo Financeiro" />
+      <FadeIn className="min-h-svh bg-white p-4 dark:bg-dark-background md:p-6">
+        <div className="mx-auto w-full max-w-[1600px] space-y-6">
+            <FinancialOverviewPage data={result.data} />
+        </div>
       </FadeIn>
     </>
   )

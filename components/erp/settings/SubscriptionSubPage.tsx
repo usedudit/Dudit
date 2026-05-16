@@ -128,7 +128,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
                 }`}
         >
             {popular && (
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-brand-green text-white text-xs font-bold py-1.5 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap shadow-sm">
                     Mais popular
                 </div>
             )}
@@ -151,7 +151,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
 
                 <Button
                     variant={popular ? "default" : "outline"}
-                    className={`w-full h-12 rounded-xl text-base font-bold transition-all duration-300 ${popular ? "bg-brand-green text-white hover:bg-brand-green/90 border-0" : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface/50"}`}
+                    className="w-full h-12"
                     onClick={onAction}
                     disabled={isLoading || isCurrent}
                 >
@@ -547,10 +547,9 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                         <BillingToggle value={billingCycle} onChange={setBillingCycle} />
 
                         {/* Plans Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-12 items-stretch">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12 items-stretch">
                             {loading ? (
                                 <>
-                                    <PlanCardSkeleton />
                                     <PlanCardSkeleton />
                                     <PlanCardSkeleton />
                                     <PlanCardSkeleton />
