@@ -87,14 +87,14 @@ export default function HelpSidebar({
                                                         className={cn(
                                                             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all group relative cursor-pointer",
                                                             isActive
-                                                                ? "bg-brand-green/10 text-brand-green font-bold"
+                                                                ? "bg-brand-green/10 text-brand-green font-semibold"
                                                                 : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                                                         )}
                                                     >
                                                         {isActive && (
                                                             <motion.div
                                                                 layoutId="active-indicator"
-                                                                className="absolute left-0 w-1 h-5 bg-brand-green rounded-r-full"
+                                                                className="bg-brand-green w-1 rounded-full self-stretch shrink-0 min-h-5"
                                                             />
                                                         )}
                                                         <span className="flex-1 truncate">{article.title}</span>

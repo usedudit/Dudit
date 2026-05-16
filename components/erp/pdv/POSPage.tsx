@@ -711,6 +711,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         paymentBreakdown?: PaymentBreakdownEntry[]
         paymentStatus?: "paid" | "partially_paid" | "unpaid"
         paidAmount?: number
+        isPendingDelivery?: boolean
     }) => {
         if (cart.length === 0) {
             return { error: "Adicione itens para finalizar." }
@@ -741,6 +742,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 paidAmount: Number(paymentData.paidAmount || 0),
                 paymentMethod: paymentData.paymentMethod || "pendente",
                 paymentBreakdown,
+                isPendingDelivery: paymentData.isPendingDelivery,
             })
 
             if (!result.success) {

@@ -67,6 +67,7 @@ type FinalizePreSaleInput = {
     paidAmount: number
     paymentMethod?: string | null
     paymentBreakdown?: FinalizePaymentEntry[]
+    isPendingDelivery?: boolean
 }
 
 type PosPaymentResolveResult =
@@ -216,6 +217,7 @@ async function syncPosSaleToOrders(params: {
     financeAccountId?: string | null
     defaultPaymentMethod: string
     actorUserId: string
+    isPendingDelivery?: boolean
 }): Promise<string | null> {
     const admin = createAdminClient()
     const { data: existingOrder } = await admin
@@ -284,7 +286,10 @@ async function syncPosSaleToOrders(params: {
     const paymentMethodDiscountAmount = safeMoney(Math.max(0, baseBeforePaymentMethod - finalTotal))
     const paymentMethodExtraAmount = safeMoney(Math.max(0, finalTotal - baseBeforePaymentMethod))
     const deliveryType = shippingFee > 0 ? "delivery" : "pickup"
-    const deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
+    let deliveryStatus = shippingFee > 0 ? "preparing" : "delivered"
+    if (params.isPendingDelivery) {
+        deliveryStatus = deliveryType === "pickup" ? "pickup_available" : "preparing"
+    }
     const paymentSituation = sale.payment_status === "paid"
         ? "paid"
         : sale.payment_status === "partially_paid"
@@ -710,9 +715,14 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         .maybeSingle()
 
     const hasShipping = Number(finalizedPreSale?.shipping_fee || 0) > 0
+    let finalDeliveryStatus = hasShipping ? "preparing" : "delivered"
+    if (input.isPendingDelivery) {
+        finalDeliveryStatus = hasShipping ? "preparing" : "pickup_available"
+    }
+
     await supabase
         .from("sales")
-        .update({ delivery_status: hasShipping ? "preparing" : "delivered" })
+        .update({ delivery_status: finalDeliveryStatus })
         .eq("id", saleId)
         .eq("partner_id", input.partnerId)
 
@@ -777,6 +787,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         financeAccountId: input.financeAccountId || null,
         defaultPaymentMethod: input.paymentMethod || "PDV",
         actorUserId: user.id,
+        isPendingDelivery: input.isPendingDelivery,
     })
 
     // Invalidate caches (non-blocking - sale is already safely committed)

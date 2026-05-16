@@ -823,9 +823,17 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         paymentMethod?: string
         paymentBreakdown?: PaymentBreakdownEntry[]
         deliveryStatus?: string
+        isPendingDelivery?: boolean
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
-        const finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
+        let finalDeliveryStatus = deliveryStatus;
+        if (paymentOverrides?.isPendingDelivery) {
+            finalDeliveryStatus = deliveryMethod === "pickup" ? "pickup_available" : "not_sent";
+        } else if (paymentOverrides?.deliveryStatus) {
+            finalDeliveryStatus = paymentOverrides.deliveryStatus;
+        } else {
+            finalDeliveryStatus = deliveryMethod === "pickup" ? "delivered" : deliveryStatus;
+        }
 
         return {
             partnerId,
@@ -910,6 +918,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         paymentMethod?: string
         paymentBreakdown?: PaymentBreakdownEntry[]
         deliveryStatus?: string
+        isPendingDelivery?: boolean
     }) => {
         setIsSaving(true)
         try {
@@ -971,6 +980,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             paymentMethod: paymentData.paymentMethod,
             paymentBreakdown: paymentData.paymentBreakdown,
             paidAmount: paymentData.paidAmount,
+            isPendingDelivery: paymentData.isPendingDelivery,
         })
     }
 

@@ -15,6 +15,7 @@ import {
     PlusIcon,
     PrinterIcon,
     FileIcon,
+    TagIcon,
     CheckCircleIcon,
     ChevronRightIcon,
     CancelCircleIcon,
@@ -216,8 +217,17 @@ const normalizeMethodType = (value?: string | null) => {
     const raw = String(value || "").toLowerCase().trim();
     if (raw === "cash" || raw === "dinheiro") return "cash";
     if (raw === "pix") return "pix";
-    if (["credit_card", "debit_card", "card", "cartao", "cartão", "credito", "debito"].includes(raw)) return "card";
+    if (["credit_card", "credito", "cartao_credito", "cartão de crédito"].includes(raw)) return "credit_card";
+    if (["debit_card", "debito", "cartao_debito", "cartão de débito"].includes(raw)) return "debit_card";
+    if (["bank_transfer", "transferencia_bancaria", "transferencia", "ted", "doc", "transferência", "transferência bancária"].includes(raw)) return "bank_transfer";
+    if (["card", "cartao", "cartão", "credit", "debit"].includes(raw)) return "credit_card";
     return "other";
+};
+
+const getTargetViewForMethodType = (type: string) => {
+    if (type === "cash") return "money";
+    if (type === "pix") return "pix";
+    return "card"; // credit_card, debit_card, bank_transfer, other
 };
 
 /** Props alinhadas entre PDV (`POSPage`) e venda manual (`CreateOrder`) - manter os mesmos significados. */
@@ -362,6 +372,12 @@ const PaymentModal = ({
         () => (availableMethods || []).filter((method) => method?.is_active !== false),
         [availableMethods],
     );
+
+    const availableMethodTypes = useMemo(() => {
+        const types = new Set(activeMethods.map((m) => normalizeMethodType(m.type)));
+        types.add("cash"); // Always allow cash
+        return types;
+    }, [activeMethods]);
 
     useEffect(() => {
         if (!isOpen || !partnerId) return;
@@ -785,30 +801,36 @@ const PaymentModal = ({
             setSelectedMethodId(method.id);
             setInstallments(String(newPayments[editingPaymentIndex]?.installmentNumber || 1));
             const normalizedType = normalizeMethodType(method.type);
-            if (normalizedType === 'cash') setView('money');
-            else if (normalizedType === 'pix') setView('pix');
-            else setView('card');
+            setView(getTargetViewForMethodType(normalizedType));
         }
     };
 
-    const openMethodTypeSelection = (methodType: "cash" | "pix" | "card") => {
+    const openMethodTypeSelection = (methodType: string) => {
         resetSelectedMethodPricing({ clearType: false });
         const methodsOfType = activeMethods.filter((method) => normalizeMethodType(method.type) === methodType);
-        if (methodsOfType.length === 0) {
+
+        if (methodsOfType.length === 0 && methodType !== "cash") {
             toast({
                 title: "Sem métodos ativos",
-                description: `Nenhum método ${methodType === "cash" ? "de dinheiro" : methodType === "pix" ? "de PIX" : "de cartão"} ativo encontrado.`,
+                description: `Nenhum método deste tipo ativo encontrado.`,
                 variant: "destructive",
             });
             return;
         }
+
         if (methodsOfType.length === 1) {
             const only = methodsOfType[0];
             setSelectedMethodId(only.id);
             setPaymentCalculation(null);
-            setView(methodType === "cash" ? "money" : methodType === "pix" ? "pix" : "card");
+            setView(getTargetViewForMethodType(methodType));
             return;
         }
+
+        if (methodsOfType.length === 0 && methodType === "cash") {
+            setView("money");
+            return;
+        }
+
         setSelectedMethodType(methodType);
         setView("method_type_select");
     };
@@ -980,8 +1002,9 @@ const PaymentModal = ({
         const resolvedType = normalizeMethodType(activeMethods.find((m) => m.id === paymentMethodId)?.type || method);
         if (resolvedType === 'cash') return MoneyIcon;
         if (resolvedType === 'pix') return QRCodeIcon;
-        if (resolvedType === 'card') return CreditCardIcon;
-        return PlusIcon;
+        if (['credit_card', 'debit_card'].includes(resolvedType)) return CreditCardIcon;
+        if (resolvedType === 'bank_transfer') return FileIcon;
+        return TagIcon;
     }
 
     return (
@@ -1102,24 +1125,54 @@ const PaymentModal = ({
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
-                                                <PaymentMethodCard
-                                                    icon={MoneyIcon}
-                                                    label="Dinheiro"
-                                                    disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
-                                                    onClick={() => openMethodTypeSelection("cash")}
-                                                />
-                                                <PaymentMethodCard
-                                                    icon={QRCodeIcon}
-                                                    label="Pix"
-                                                    disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
-                                                    onClick={() => openMethodTypeSelection("pix")}
-                                                />
-                                                <PaymentMethodCard
-                                                    icon={CreditCardIcon}
-                                                    label="Cartão"
-                                                    disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão'}
-                                                    onClick={() => openMethodTypeSelection("card")}
-                                                />
+                                                {availableMethodTypes.has("cash") && (
+                                                    <PaymentMethodCard
+                                                        icon={MoneyIcon}
+                                                        label="Dinheiro"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Dinheiro'}
+                                                        onClick={() => openMethodTypeSelection("cash")}
+                                                    />
+                                                )}
+                                                {availableMethodTypes.has("pix") && (
+                                                    <PaymentMethodCard
+                                                        icon={QRCodeIcon}
+                                                        label="Pix"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Pix'}
+                                                        onClick={() => openMethodTypeSelection("pix")}
+                                                    />
+                                                )}
+                                                {availableMethodTypes.has("credit_card") && (
+                                                    <PaymentMethodCard
+                                                        icon={CreditCardIcon}
+                                                        label="Cartão de Crédito"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Crédito'}
+                                                        onClick={() => openMethodTypeSelection("credit_card")}
+                                                    />
+                                                )}
+                                                {availableMethodTypes.has("debit_card") && (
+                                                    <PaymentMethodCard
+                                                        icon={CreditCardIcon}
+                                                        label="Cartão de Débito"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Cartão de Débito'}
+                                                        onClick={() => openMethodTypeSelection("debit_card")}
+                                                    />
+                                                )}
+                                                {availableMethodTypes.has("bank_transfer") && (
+                                                    <PaymentMethodCard
+                                                        icon={FileIcon}
+                                                        label="Transferência"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Transferência'}
+                                                        onClick={() => openMethodTypeSelection("bank_transfer")}
+                                                    />
+                                                )}
+                                                {availableMethodTypes.has("other") && (
+                                                    <PaymentMethodCard
+                                                        icon={TagIcon}
+                                                        label="Outros"
+                                                        disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin' && normalizePaymentMethodLabel(originalPaymentMethod) !== 'Outros'}
+                                                        onClick={() => openMethodTypeSelection("other")}
+                                                    />
+                                                )}
                                                 <PaymentMethodCard
                                                     icon={SplitIcon}
                                                     label="Dividir"
@@ -1345,9 +1398,11 @@ const PaymentModal = ({
                                                         ? MoneyIcon
                                                         : normalizedType === "pix"
                                                             ? QRCodeIcon
-                                                            : normalizedType === "card"
-                                                                ? CreditCardIcon
-                                                                : MoreHorizontalIcon;
+                                                            : normalizedType === "bank_transfer"
+                                                                ? FileIcon
+                                                                : ["credit_card", "debit_card"].includes(normalizedType)
+                                                                    ? CreditCardIcon
+                                                                    : TagIcon;
                                                     return (
                                                         <PaymentMethodCard
                                                             key={`split-${method.id}`}
@@ -1373,8 +1428,12 @@ const PaymentModal = ({
                                                             ? MoneyIcon
                                                             : normalizedType === "pix"
                                                                 ? QRCodeIcon
-                                                                : CreditCardIcon;
-                                                        const targetView = normalizedType === "cash" ? "money" : normalizedType === "pix" ? "pix" : "card";
+                                                                : normalizedType === "bank_transfer"
+                                                                    ? FileIcon
+                                                                    : ["credit_card", "debit_card"].includes(normalizedType)
+                                                                        ? CreditCardIcon
+                                                                        : TagIcon;
+                                                        const targetView = getTargetViewForMethodType(normalizedType);
                                                         return (
                                                             <PaymentMethodCard
                                                                 key={`single-${method.id}`}
@@ -1621,7 +1680,6 @@ const PaymentModal = ({
                         </>
                     )}
                 </AnimatePresence>
-
             </motion.div>
         </div>
     );

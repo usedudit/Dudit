@@ -490,10 +490,10 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                 <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                                     <div className="flex justify-between items-start">
                                         <div className="flex flex-col min-w-0 pr-1">
-                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate">
                                                 {method.name || "Sem nome"}
                                             </h3>
-                                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mt-0.5">
+                                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase mt-0.5">
                                                 ID: {method.id.slice(0, 5).toUpperCase()}
                                             </span>
                                         </div>
@@ -510,7 +510,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                     </div>
                                     <div className="flex justify-between items-center mt-2">
                                         <div className="flex items-center gap-2">
-                                            <Badge variant="gray" icon={null} className="text-[10px] h-5 px-2 uppercase tracking-wider">
+                                            <Badge variant="gray" icon={null} className="text-[10px] h-5 px-2 uppercase">
                                                 {getPaymentTypeLabel(method)}
                                             </Badge>
                                             {method.discount_percent ? (

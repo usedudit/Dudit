@@ -73,19 +73,17 @@ function MiniToggle<T extends string>({
 
 function CashCard({ value }: { value: number }) {
     return (
-        <div className="relative flex flex-col h-[280px] rounded-[16px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-            <div className="p-4 h-[160px]">
-                <div className="relative w-full h-full bg-gradient-to-br from-[#0066FF] to-[#0052CC] rounded-[12px] overflow-hidden">
-                    <div className="absolute inset-0 bg-white/5" />
-                    <div className="absolute top-4 left-4">
-                         <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                             <BankIcon className="w-5 h-5 text-white" />
-                         </div>
-                    </div>
+        <div className="relative flex flex-col h-full rounded-[16px] border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+            <div className="relative w-full h-[140px] shrink-0 bg-gradient-to-br from-[#0066FF] to-[#0052CC]">
+                <div className="absolute inset-0 bg-white/5" />
+                <div className="absolute top-6 left-6">
+                     <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                         <BankIcon className="w-5 h-5 text-white" />
+                     </div>
                 </div>
             </div>
             
-            <div className="px-6 py-4 flex flex-col justify-end flex-1">
+            <div className="px-6 py-5 flex flex-col justify-end flex-1">
                 <p className="text-[14px] font-medium text-[#A1A1AA] mb-1">Em caixa</p>
                 <div className="flex items-center justify-between">
                     <p className="text-[28px] font-medium text-brand-dark dark:text-dark-heading">
@@ -103,7 +101,7 @@ function CashCard({ value }: { value: number }) {
 
 function SummaryMetricCard({ title, value, tone, icon: Icon }: { title: string; value: number; tone: "green" | "red"; icon: any }) {
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] p-5 flex flex-col h-[132px] justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] p-5 flex flex-col flex-1 justify-between min-h-[132px]">
             <div className="flex items-center justify-between">
                 <span className="text-[15px] font-medium text-[#A1A1AA]">{title}</span>
                 <div className={cn("w-6 h-6 rounded flex items-center justify-center", tone === "green" ? "bg-[#22C55E] text-white" : "bg-[#EF4444] text-white")}>
@@ -125,7 +123,7 @@ function ProjectionCard({ data }: { data: FinancialOverviewData["projection"] })
     const current = range === "sevenDays" ? data.sevenDays : data.thirtyDays
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] p-6 flex flex-col justify-between h-[280px]">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] p-6 flex flex-col justify-between h-full min-h-[280px]">
             <div>
                 <div className="flex items-center justify-between mb-8">
                     <h2 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading">Projeção de receita</h2>
@@ -149,7 +147,7 @@ function ProjectionCard({ data }: { data: FinancialOverviewData["projection"] })
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <p className="text-[14px] font-medium text-[#A1A1AA]">Despesas previstas</p>
-                        <p className="text-[20px] font-semibold text-[#A1A1AA] dark:text-dark-body">
+                        <p className="text-[20px] font-semibold text-brand-dark dark:text-dark-heading">
                             <span className="text-[#A1A1AA] text-[16px] font-medium mr-1">R$</span>
                             {current.outflow.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </p>
@@ -182,7 +180,7 @@ function RevenueEvolution({ data }: { data: FinancialOverviewData["revenueEvolut
     const chartData = data[period]
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] flex flex-col h-[400px] relative">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] flex flex-col h-full min-h-[380px] relative">
             <div className="px-6 pt-6 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <h2 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading">Evolução da Receita</h2>
                 <div className="flex items-center gap-4 text-[13px] font-medium text-[#A1A1AA]">
@@ -248,7 +246,7 @@ function RevenueDistribution({ data }: { data: FinancialOverviewData["revenueDis
     const total = data.reduce((acc, item) => acc + item.value, 0)
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] flex flex-col h-[400px]">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[16px] flex flex-col h-full min-h-[380px]">
             <div className="px-6 py-5 border-b border-[#F4F4F5] dark:border-dark-border/50">
                 <h2 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading mb-5">Distribuição da Receita</h2>
                 <div className="flex items-end justify-between">
@@ -270,7 +268,7 @@ function RevenueDistribution({ data }: { data: FinancialOverviewData["revenueDis
                     />
                 </div>
             </div>
-            <div className="p-6 space-y-4 overflow-auto">
+            <div className="p-6 space-y-6 overflow-auto">
                 {data.length > 0 ? data.map((item) => (
                     <div key={item.label} className="grid grid-cols-[100px_1fr_40px_100px] items-center gap-4 text-[14px]">
                         <span className="font-medium text-brand-dark dark:text-dark-heading truncate">{item.label}</span>
@@ -290,10 +288,10 @@ export default function FinancialOverviewPage({ data }: { data: FinancialOvervie
     return (
         <div className="w-full flex flex-col gap-6">
             {/* Top Grid: Cash, Metrics, Projection */}
-            <div className="grid grid-cols-1 lg:grid-cols-[280px_320px_1fr] gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.5fr] gap-6">
                 <CashCard value={data.totals.cash} />
 
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 h-full">
                     <SummaryMetricCard
                         title="A receber"
                         value={data.totals.receivable}

@@ -88,7 +88,7 @@ const PaymentMethodGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase tracking-wider mt-1">
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1 flex items-center">
                             ID: {method.id.slice(0, 5).toUpperCase()}
                         </div>
                     </div>

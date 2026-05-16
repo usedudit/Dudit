@@ -86,12 +86,12 @@ export default function HelpTOC({ content }: { content: string }) {
                                 className={cn(
                                     "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition-all cursor-pointer text-left group relative",
                                     isActive
-                                        ? "bg-brand-green/10 text-brand-green font-bold"
+                                        ? "bg-brand-green/10 text-brand-green font-semibold"
                                         : "text-brand-inactive-text dark:text-dark-body hover:bg-brand-gray dark:hover:bg-dark-border/40 hover:text-brand-dark dark:hover:text-dark-heading"
                                 )}
                             >
                                 {isActive && (
-                                    <div className="absolute left-0 w-1 h-3 bg-brand-green rounded-r-full" />
+                                    <div className="bg-brand-green w-1 rounded-full self-stretch shrink-0 min-h-5" />
                                 )}
                                 <span className="truncate">{item.text}</span>
                             </button>
