@@ -15,7 +15,6 @@ import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useProductMetadata } from "@/lib/product-metadata-context"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
 import { mapProductToFormData } from "@/lib/utils/product-mappers"
-import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
@@ -98,7 +97,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const isEditing = useMemo(() => ["add", "edit", "duplicate"].includes(internalMode), [internalMode])
 
     const { error: notifyError, success: notifySuccess, info: notifyInfo, warning: notifyWarning } = useNotification()
-    const { success: notifySuccess, error: notifyError } = useNotification()
     const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()

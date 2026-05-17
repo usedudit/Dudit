@@ -456,7 +456,7 @@ export function PaymentWrapper({
                         >
                             {/* Header igual ao step pix */}
                             <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
-                                <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pagamento" className="w-8 h-8 object-contain" />
+                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-8 h-8 object-contain" />
                             </div>
 
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
@@ -575,12 +575,13 @@ export function PaymentWrapper({
 
                                 <div className="flex flex-col gap-4">
                                     <Separator />
-                                    <button
+                                    <Button
+                                        variant="link"
                                         onClick={handleClose}
-                                        className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors"
+                                        className="w-full"
                                     >
                                         Voltar
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </motion.div>

@@ -17,10 +17,10 @@ import { formatCurrency, formatFullDate } from "@/lib/utils";
 
 const getStatusConfig = (status: string) => {
     switch (status) {
-        case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200' };
-        case 'pending': return { label: 'Pendente', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200' };
-        case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200' };
-        default: return { label: status, color: 'text-gray-700', bg: 'bg-gray-100', icon: AlertCircleIcon, border: 'border-gray-200' };
+        case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
+        case 'pending': return { label: 'Pendente', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
+        case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200', dotBg: 'bg-red-500' };
+        default: return { label: status, color: 'text-gray-700', bg: 'bg-gray-100', icon: AlertCircleIcon, border: 'border-gray-200', dotBg: 'bg-gray-500' };
     }
 };
 
@@ -71,6 +71,16 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
         updateDetailsUrl(null);
     };
 
+    const handleCardClick = (e: React.MouseEvent, id: string, orderNumber: string) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('a') || target.closest('button')) {
+            return;
+        }
+        if (window.innerWidth < 768) {
+            handleOpenDetails(id, orderNumber);
+        }
+    };
+
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     return (
@@ -105,9 +115,14 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                     const storeImage = order.partners?.store_image_url
                                         ? getR2ImageUrl(order.partners.store_image_url)
                                         : "https://img.dudit.com.br/static/Placeholder.png";
+                                    const hasReviewAction = (order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0]) || reviewedOrderIds.has(order.id);
 
                                     return (
-                                        <div key={order.id} className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors">
+                                        <div 
+                                            key={order.id} 
+                                            onClick={(e) => handleCardClick(e, order.id, order.order_number)}
+                                            className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors cursor-pointer md:cursor-default"
+                                        >
                                             {order.situation === "pending" && (
                                                 <OrderStatusSyncOnLoad
                                                     orderId={order.id}
@@ -130,6 +145,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                         {/* Date Top */}
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                                             {formatFullDate(order.created_at)}
+                                                            <span className={`w-2.5 h-2.5 rounded-full ${statusConfig.dotBg} md:hidden`} title={statusConfig.label} />
                                                         </h3>
                                                         {/* Order ID & Store Name Bottom */}
                                                         <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5">
@@ -141,9 +157,9 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 </div>
 
                                                 {/* Separator mobile */}
-                                                <div className="h-px bg-brand-border/60 dark:bg-dark-border/60 w-full md:hidden" />
+                                                <div className="hidden h-px bg-brand-border/60 dark:bg-dark-border/60 w-full md:hidden" />
 
-                                                <div className="flex items-center justify-center md:justify-end gap-3 md:gap-6 w-full md:w-auto">
+                                                <div className="hidden md:flex items-center justify-center md:justify-end gap-3 md:gap-6 w-full md:w-auto">
                                                     <div className="flex flex-col items-end">
                                                         <span className="text-xs font-medium text-brand-inactive-text md:block hidden">Total</span>
                                                         {formatCurrency(order.total_amount)}
@@ -201,7 +217,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 </div>
 
                                                 {/* Actions Footer */}
-                                                <div className="flex flex-wrap justify-end items-center gap-3 mt-8 pt-6 border-t border-brand-border dark:border-dark-border">
+                                                <div className={`flex-wrap justify-end items-center gap-3 mt-8 pt-6 border-t border-brand-border dark:border-dark-border ${hasReviewAction ? 'flex' : 'hidden md:flex'}`}>
 
                                                     {order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0] && (
                                                         <ReviewButton
@@ -221,7 +237,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                     )}
 
                                                     {/* Action Buttons Container */}
-                                                    <div className="flex flex-row items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0 justify-end flex-wrap">
+                                                    <div className="hidden md:flex flex-row items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0 justify-end flex-wrap">
                                                         <Button
                                                             onClick={() => handleOpenDetails(order.id, order.order_number)}
                                                             variant="outline"

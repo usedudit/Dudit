@@ -19,11 +19,12 @@ import {
 } from "@/lib/icons"
 
 interface AccordionProps {
-  title: string
+  title: React.ReactNode
   children: React.ReactNode
   defaultOpen?: boolean
   triggerClass?: string
   titleClass?: string
+  onToggle?: (isOpen: boolean) => boolean | void
 }
 
 export const Accordion: React.FC<AccordionProps> = ({
@@ -31,7 +32,8 @@ export const Accordion: React.FC<AccordionProps> = ({
   children,
   defaultOpen = false,
   triggerClass,
-  titleClass
+  titleClass,
+  onToggle
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -43,7 +45,13 @@ export const Accordion: React.FC<AccordionProps> = ({
     <div className={`last:border-0 pb-2 ${!triggerClass ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          if (onToggle) {
+            const result = onToggle(!isOpen)
+            if (result === false) return
+          }
+          setIsOpen(!isOpen)
+        }}
         className={buttonStyles}
       >
         <span className={titleClass || ""}>{title}</span>

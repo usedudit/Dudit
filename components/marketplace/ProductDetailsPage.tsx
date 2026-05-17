@@ -75,16 +75,16 @@ function ActionButtons({ isFavorite, onFavorite, onShareClick, className = "" }:
             <Button
                 variant="filled"
                 onClick={(e) => { e.stopPropagation(); onFavorite(); }}
-                className="w-10 h-10 flex items-center justify-center"
+                className="w-9 h-9 flex items-center justify-center"
             >
-                <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
+                <HeartIcon className={`w-4 h-4 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
             </Button>
             <Button
                 variant="filled"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
-                className="w-10 h-10 flex items-center justify-center"
+                className="w-9 h-9 flex items-center justify-center"
             >
-                <ShareIcon className="w-5 h-5 text-brand-green" />
+                <ShareIcon className="w-4 h-4 text-brand-green" />
             </Button>
         </div>
     )
@@ -829,59 +829,92 @@ export function ProductDetailsPageClient({
                 className="min-h-screen bg-white lg:pt-[50px] font-sans flex flex-col"
             >
 
-                <AnimatePresence>
-                    {isMounted && isLightboxOpen && createPortal(
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.98 }}
-                            transition={{ duration: 0.25, ease: "easeOut" }}
-                            className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
-                        >
-                            {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
-                            <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
-                                <button onClick={() => setIsLightboxOpen(false)}
-                                    className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                                    <XIcon size={20} />
-                                </button>
-                                <span className="text-white text-sm font-semibold">
-                                    {lightboxActiveImg + 1}/{productImages.length}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                                        <HeartIcon size={20} />
+                {isMounted && createPortal(
+                    <AnimatePresence>
+                        {isLightboxOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
+                                className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm"
+                            >
+                                {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
+                                <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
+                                    <button onClick={() => setIsLightboxOpen(false)}
+                                        className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                        <XIcon size={20} />
                                     </button>
-                                </div>
-                            </div>
-
-                            {/* ── Desktop layout ── */}
-                            <div className="hidden lg:flex flex-1 min-h-0 relative">
-                                {/* Close button */}
-                                <button onClick={() => setIsLightboxOpen(false)}
-                                    className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
-                                    <XIcon size={22} />
-                                </button>
-
-                                {/* Thumbnails column */}
-                                <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
-                                    {productImages.map((img: string, i: number) => (
-                                        <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
-                                            className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
-                        ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
-                                            <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
-                                        </div>
-                                    ))}
+                                    <span className="text-white text-sm font-semibold">
+                                        {lightboxActiveImg + 1}/{productImages.length}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                            <HeartIcon size={20} />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Main image */}
-                                <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
+                                {/* ── Desktop layout ── */}
+                                <div className="hidden lg:flex flex-1 min-h-0 relative">
+                                    {/* Close button */}
+                                    <button onClick={() => setIsLightboxOpen(false)}
+                                        className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                        <XIcon size={22} />
+                                    </button>
+
+                                    {/* Thumbnails column */}
+                                    <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
+                                        {productImages.map((img: string, i: number) => (
+                                            <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
+                                                className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
+                            ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
+                                                <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Main image */}
+                                    <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
+                                        <AnimatePresence mode="wait" custom={slideDirection}
+                                            onExitComplete={() => { lightboxJustOpened.current = false }}>
+                                            <motion.img
+                                                key={lightboxActiveImg}
+                                                src={productImages[lightboxActiveImg]}
+                                                className="max-w-full max-h-full object-contain"
+                                                alt={`Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                                                custom={slideDirection}
+                                                variants={lightboxJustOpened.current ? {} : slideVariants}
+                                                initial={lightboxJustOpened.current ? false : "enter"}
+                                                animate="center"
+                                                exit={lightboxJustOpened.current ? undefined : "exit"}
+                                                transition={{ duration: 0.2 }}
+                                            />
+                                        </AnimatePresence>
+                                        {productImages.length > 1 && (
+                                            <>
+                                                <Button variant="filled" onClick={() => lightboxNav(-1)}
+                                                    className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
+                                                    <ChevronLeftIcon size={26} />
+                                                </Button>
+                                                <Button variant="filled" onClick={() => lightboxNav(1)}
+                                                    className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
+                                                    <ChevronRightIcon size={26} />
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ── Mobile image area ── */}
+                                <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
                                     <AnimatePresence mode="wait" custom={slideDirection}
                                         onExitComplete={() => { lightboxJustOpened.current = false }}>
                                         <motion.img
                                             key={lightboxActiveImg}
                                             src={productImages[lightboxActiveImg]}
-                                            className="max-w-full max-h-full object-contain"
-                                            alt={`Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                                            className="max-w-full max-h-full object-contain px-4"
+                                            alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
                                             custom={slideDirection}
                                             variants={lightboxJustOpened.current ? {} : slideVariants}
                                             initial={lightboxJustOpened.current ? false : "enter"}
@@ -890,49 +923,18 @@ export function ProductDetailsPageClient({
                                             transition={{ duration: 0.2 }}
                                         />
                                     </AnimatePresence>
-                                    {productImages.length > 1 && (
-                                        <>
-                                            <Button variant="filled" onClick={() => lightboxNav(-1)}
-                                                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
-                                                <ChevronLeftIcon size={26} />
-                                            </Button>
-                                            <Button variant="filled" onClick={() => lightboxNav(1)}
-                                                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
-                                                <ChevronRightIcon size={26} />
-                                            </Button>
-                                        </>
+
+                                    {variantLabel && (
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
+                                            {variantLabel}
+                                        </div>
                                     )}
                                 </div>
-                            </div>
-
-                            {/* ── Mobile image area ── */}
-                            <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
-                                <AnimatePresence mode="wait" custom={slideDirection}
-                                    onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                    <motion.img
-                                        key={lightboxActiveImg}
-                                        src={productImages[lightboxActiveImg]}
-                                        className="max-w-full max-h-full object-contain px-4"
-                                        alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                        custom={slideDirection}
-                                        variants={lightboxJustOpened.current ? {} : slideVariants}
-                                        initial={lightboxJustOpened.current ? false : "enter"}
-                                        animate="center"
-                                        exit={lightboxJustOpened.current ? undefined : "exit"}
-                                        transition={{ duration: 0.2 }}
-                                    />
-                                </AnimatePresence>
-
-                                {variantLabel && (
-                                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-4 py-2 rounded-full whitespace-nowrap">
-                                        {variantLabel}
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>,
-                        document.body
-                    )}
-                </AnimatePresence>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>,
+                    document.body
+                )}
 
                 <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     {/* Breadcrumb */}
@@ -1006,25 +1008,7 @@ export function ProductDetailsPageClient({
                                                     onClick={() => openLightbox(activeImgIndex)} />
                                             </AnimatePresence>
 
-                                            <ActionButtons
-                                                isFavorite={isFavorite}
-                                                onFavorite={() => setIsFavorite(!isFavorite)}
-                                                onShareClick={() => setShowShareModal(true)}
-                                                className="absolute top-4 right-4 z-20 lg:hidden"
-                                            />
-
-                                            {productImages.length > 1 && (
-                                                <>
-                                                    <button onClick={goToPrev}
-                                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md z-10">
-                                                        <ChevronLeftIcon size={18} className="text-brand-dark" />
-                                                    </button>
-                                                    <button onClick={goToNext}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md z-10">
-                                                        <ChevronRightIcon size={18} className="text-brand-dark" />
-                                                    </button>
-                                                </>
-                                            )}
+                                            {/* ActionButtons and Chevron navigation arrows hidden on mobile/tablet product image card as they are already displayed in the top header */}
 
                                         </div>
                                     </div>

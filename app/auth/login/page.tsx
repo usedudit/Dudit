@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useLayoutEffect, Suspense } from "react"
+import { useState, useEffect, useLayoutEffect, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { motion, AnimatePresence } from "framer-motion"
@@ -66,12 +66,20 @@ function AuthContent() {
     }
   }, [verifiedParam, rawModeParam, router])
 
+  const lastCheckedUserId = useRef<string | null>(null)
+
   // Sessão logada + ?mode=partner: com ERP -> /erp/switch; sem ERP -> fica no wizard
   useEffect(() => {
     if (!user || !isPartnerMode) {
       setCanShowPartnerWizardWhenLoggedIn(null)
+      lastCheckedUserId.current = null
       return
     }
+
+    if (lastCheckedUserId.current === user.id) {
+      return
+    }
+
     let gone = false
     setCanShowPartnerWizardWhenLoggedIn(null)
     getUserHasAnyPartnerAccess()
@@ -81,10 +89,14 @@ function AuthContent() {
           router.replace("/erp/switch")
           return
         }
+        lastCheckedUserId.current = user.id
         setCanShowPartnerWizardWhenLoggedIn(true)
       })
       .catch(() => {
-        if (!gone) setCanShowPartnerWizardWhenLoggedIn(true)
+        if (!gone) {
+          lastCheckedUserId.current = user.id
+          setCanShowPartnerWizardWhenLoggedIn(true)
+        }
       })
     return () => {
       gone = true

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, InfoCard, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection } from "@/components/reusable"
+import { Button, Input, FormDropdown, InfoCard, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, TrashIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -12,8 +12,10 @@ import {
     upsertDeliveryFeeRuleAction,
     upsertPartnerDeliveryConfigAction,
 } from "@/app/actions/shared/delivery"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: string; onBack: () => void }) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [planSlug, setPlanSlug] = useState("free")
@@ -165,106 +167,137 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             </FormSection>
 
                             {/* Distância */}
-                            <FormSection hasSeparator title="Distância e Frete">
-                                <div className="space-y-6">
-                                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega baseados na distância da loja.</p>
-                                    {!advancedEnabled && (
-                                        <div className="p-4 rounded-xl bg-brand-primary/5 border border-brand-primary/20">
-                                            <p className="text-sm font-bold text-brand-primary flex items-center gap-2">Recurso disponível no plano Escalar</p>
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <Accordion 
+                                    title={
+                                        <span className="flex items-center gap-2">
+                                            Distância e Frete
+                                            {!advancedEnabled && (
+                                                <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                            )}
+                                        </span>
+                                    } 
+                                    defaultOpen={false} 
+                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                    onToggle={(isOpen) => {
+                                        if (isOpen && !advancedEnabled) {
+                                            openPlanUpgrade("escalar")
+                                            return false
+                                        }
+                                    }}
+                                >
+                                    <div className="space-y-6 pb-4">
+                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega baseados na distância da loja.</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <Input
+                                                disabled={!advancedEnabled}
+                                                label="KM incluído"
+                                                value={settings.includedKm}
+                                                onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
+                                                suffix="km"
+                                            />
+                                            <MoneyInput
+                                                disabled={!advancedEnabled}
+                                                label="Preço por KM extra"
+                                                value={settings.extraKmPrice}
+                                                onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
+                                            />
+                                            <Input
+                                                disabled={!advancedEnabled}
+                                                label="Distância máxima"
+                                                value={settings.maxDeliveryKm}
+                                                onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
+                                                suffix="km"
+                                            />
                                         </div>
-                                    )}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <Input
-                                            disabled={!advancedEnabled}
-                                            label="KM incluído"
-                                            value={settings.includedKm}
-                                            onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
-                                            suffix="km"
-                                        />
-                                        <MoneyInput
-                                            disabled={!advancedEnabled}
-                                            label="Preço por KM extra"
-                                            value={settings.extraKmPrice}
-                                            onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
-                                        />
-                                        <Input
-                                            disabled={!advancedEnabled}
-                                            label="Distância máxima"
-                                            value={settings.maxDeliveryKm}
-                                            onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
-                                            suffix="km"
-                                        />
                                     </div>
-                                </div>
-                            </FormSection>
+                                </Accordion>
+                            </div>
 
                             {/* Regras por horário */}
-                            <FormSection hasSeparator title="Regras por Horário">
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={!advancedEnabled}
-                                            onClick={() => setIsRuleModalOpen(true)}
-                                            leftIcon={<PlusIcon className="w-4 h-4" />}
-                                        >
-                                            Adicionar regra
-                                        </Button>
-                                    </div>
+                            <div className="mt-8">
+                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                <Accordion 
+                                    title={
+                                        <span className="flex items-center gap-2">
+                                            Regras por Horário
+                                            {!advancedEnabled && (
+                                                <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                            )}
+                                        </span>
+                                    } 
+                                    defaultOpen={false} 
+                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                    onToggle={(isOpen) => {
+                                        if (isOpen && !advancedEnabled) {
+                                            openPlanUpgrade("escalar")
+                                            return false
+                                        }
+                                    }}
+                                >
+                                    <div className="space-y-6 pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={!advancedEnabled}
+                                                onClick={() => setIsRuleModalOpen(true)}
+                                                leftIcon={<PlusIcon className="w-4 h-4" />}
+                                            >
+                                                Adicionar regra
+                                            </Button>
+                                        </div>
 
-                                    {!advancedEnabled ? (
-                                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-8 flex items-center justify-center min-h-[140px]">
-                                            <p className="text-sm font-bold text-brand-primary">Recurso disponível no plano Escalar</p>
-                                        </div>
-                                    ) : rules.length === 0 ? (
-                                        <IconPlaceholder
-                                            icon={ClockIcon}
-                                            title="Nenhuma regra cadastrada"
-                                            subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
-                                        />
-                                    ) : (
-                                        <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left border-separate border-spacing-0">
-                                                    <thead>
-                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Início</th>
-                                                            <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Fim</th>
-                                                            <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Tipo</th>
-                                                            <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Valor</th>
-                                                            <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-center w-20">Ações</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {rules.map((rule) => (
-                                                            <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
-                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
-                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                    {rule.type === "fixed" ? "Fixo" : "Multiplicador"}
-                                                                </td>
-                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}
-                                                                </td>
-                                                                <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
-                                                                    <button
-                                                                        onClick={async () => { await deleteDeliveryFeeRuleAction(partnerId, rule.id); await reload() }}
-                                                                        className="p-2 text-brand-inactive-text hover:text-brand-red transition-colors"
-                                                                    >
-                                                                        <TrashIcon className="w-4 h-4" />
-                                                                    </button>
-                                                                </td>
+                                        {rules.length === 0 ? (
+                                            <IconPlaceholder
+                                                icon={ClockIcon}
+                                                title="Nenhuma regra cadastrada"
+                                                subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
+                                            />
+                                        ) : (
+                                            <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left border-separate border-spacing-0">
+                                                        <thead>
+                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Início</th>
+                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Fim</th>
+                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Tipo</th>
+                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Valor</th>
+                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-center w-20">Ações</th>
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                        </thead>
+                                                        <tbody>
+                                                            {rules.map((rule) => (
+                                                                <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
+                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
+                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                        {rule.type === "fixed" ? "Fixo" : "Multiplicador"}
+                                                                    </td>
+                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}
+                                                                    </td>
+                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
+                                                                        <button
+                                                                            onClick={async () => { await deleteDeliveryFeeRuleAction(partnerId, rule.id); await reload() }}
+                                                                            className="p-2 text-brand-inactive-text hover:text-brand-red transition-colors"
+                                                                        >
+                                                                            <TrashIcon className="w-4 h-4" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </FormSection>
+                                        )}
+                                    </div>
+                                </Accordion>
+                            </div>
                         </div>
 
                         {/* Sidebar Info (Optional) */}

@@ -580,7 +580,7 @@ export default function ProductsPage({
                 if (uploadData.success && uploadData.key) {
                     uploadedImageUrl = uploadData.key
                 } else {
-                    toast({ title: "Erro", description: "Falha no upload da imagem", variant: "destructive" })
+                    notifyError("Erro", "Falha no upload da imagem")
                     return
                 }
             }
@@ -626,17 +626,17 @@ export default function ProductsPage({
                     afterMutation()
                     const updatesMap = new Map(updates.map(u => [u.id, u]))
                     setProducts(p => p.map(prod => updatesMap.has(prod.id) ? { ...prod, ...updatesMap.get(prod.id) } : prod))
-                    toast({ title: "Sucesso", description: "Alterações aplicadas com sucesso" })
+                    notifySuccess("Sucesso", "Alterações aplicadas com sucesso")
                     setBulkEditModal({ isOpen: false })
                     setSelection(p => ({ ...p, ids: new Set() }))
                 } else {
-                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                    notifyError("Erro", result.error || "Falha ao aplicar alterações")
                 }
             }
 
         } catch (error) {
             console.error(error)
-            toast({ title: "Erro", description: "Ocorreu um erro ao processar a solicitação", variant: "destructive" })
+            notifyError("Erro", "Ocorreu um erro ao processar a solicitação")
         } finally {
             setActionModal({ open: false, text: "" })
         }

@@ -205,7 +205,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         >
             <div className="w-full">
                 {/* Header */}
-                <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
+                <div className="mb-8 hidden lg:flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                     <div className="hidden md:flex">
                         <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                             <XIcon className="w-5 h-5" />
@@ -227,13 +227,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-emerald-900/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <div className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                        Status do Pedido #{orderNumber}
+                                        Detalhes do Pedido #{orderNumber}
                                     </div>
                                 </div>
-                                <span className={`text-sm font-bold ${statusConfig.color}`}>{statusConfig.label}</span>
+                                {/* <span className={`text-sm font-bold ${statusConfig.color}`}>{statusConfig.label}</span> */}
                             </div>
                             <div className="p-6">
-                                <div className={`${statusConfig.color} font-bold text-sm mb-1`}>{statusConfig.statusText}</div>
+                                {/* <div className={`${statusConfig.color} font-bold text-sm mb-1`}>{statusConfig.statusText}</div> */}
                                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                                     Realizado em {dateStrFull}
                                     {isDelivery && <span className="italic font-black text-brand-green flex items-center"><TruckIcon size={18} className="fill-current mr-0.5" /> DUDIT</span>}
@@ -266,7 +266,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <span className="font-normal text-brand-inactive-text">• {paymentMethodName}</span>
                                                     </div>
                                             }
-                                            description={statusConfig.statusText}
+                                            // description={statusConfig.statusText}
                                             onClick={handlePixClick}
                                         />
                                     </div>

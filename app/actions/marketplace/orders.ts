@@ -288,6 +288,8 @@ export async function createOrderAction(data: {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
     partner_id: data.partnerId,
+    product_id: data.itemType === "product" ? data.itemId : null,
+    service_id: data.itemType === "service" ? data.itemId : null,
     total_amount: paymentAwareTotal,
     shipping_cost: deliveryFee,
     delivery_fee: deliveryFee,

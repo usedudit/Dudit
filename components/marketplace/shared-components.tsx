@@ -8,6 +8,7 @@ import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/uti
 import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { Badge } from "@/components/reusable"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -309,7 +310,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
 
     return (
         <div
-            className="w-[160px] md:w-[196px] relative group/card h-full shrink-0"
+            className="w-[150px] md:w-[196px] relative group/card h-full shrink-0"
         >
             <Link
                 href={getProductUrl(product, product.partners)}
@@ -329,20 +330,27 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                 </div>
 
                 <div className="px-1">
-                    <h3 className="text-[13px] md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-1">
+                    <h3 className="text-sm md:text-[15px] font-normal text-brand-dark line-clamp-2 min-h-[2.5em] mb-1">
                         {product.name}
                     </h3>
 
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex flex-col">
                             {product.originalPrice && (
-                                <span className="text-[10px] text-gray-400 line-through">
+                                <span className="text-xs text-brand-inactive-text line-through">
                                     {formatCurrency(product.originalPrice)}
                                 </span>
                             )}
-                            <span className="text-base font-bold text-brand-dark leading-tight">
-                                {formatCurrency(product.price)}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-base font-bold text-brand-dark leading-tight">
+                                    {formatCurrency(product.price)}
+                                </span>
+                                {product.originalPrice && product.originalPrice > product.price && (
+                                    <Badge variant="orange" icon={null} className="px-1.5 py-0.5 text-[10px] md:text-[11px] font-bold">
+                                        -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
 
                         {(product.rating ?? 0) > 0 && (
@@ -397,7 +405,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         <section className="mx-auto mb-12 md:mb-16 max-w-[1300px] overflow-hidden">
             <div className="flex items-end justify-between px-4 lg:px-0 mb-6 md:mb-8">
                 <div>
-                    <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-1">{title}</h2>
+                    <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
                     {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}
                 </div>
                 <Link

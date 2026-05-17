@@ -450,7 +450,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: 
     return (
         <section id={sectionId} data-category-section={sectionId} className="scroll-mt-[150px] mb-10 lg:mb-12">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[20px] lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
+                <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
                 <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
             </div>
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">
@@ -470,7 +470,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     return (
         <section id="coupons" className="mb-10 lg:mb-12 scroll-mt-[150px]">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[20px] lg:text-[22px] font-semibold text-brand-dark">Cupons do vendedor</h2>
+                <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">Cupons do vendedor</h2>
                 <CarouselNav targetRef={ref} />
             </div>
             <div ref={ref} className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
@@ -690,7 +690,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                 </div>
             </div>
 
-            <div ref={topRef}>
+            <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
                 <div className="w-full h-[180px] lg:h-[220px] lg:rounded-2xl lg:mb-4 overflow-hidden relative">
                     <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                 </div>
@@ -735,24 +735,50 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                 </div>
             </div>
 
-            <div className={`lg:hidden fixed top-[64px] left-0 right-0 z-[45] bg-white border-b border-brand-border shadow-sm transition-all duration-200 ${isStickyVisible && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-                <div className="flex items-center gap-1 px-3 mt-3">
-                    <button onClick={() => setIsContextModalOpen(true)} className="w-7 h-7 shrink-0 flex items-center justify-center text-brand-dark my-2">
-                        {activeContext === "Produtos" ? <Package size={19} /> : <HeartIcon size={19} />}
+            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark border-b border-white/10 shadow-md transition-all duration-200 ${isStickyVisible && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+                <div className="flex items-center gap-2 px-3 h-full">
+                    <button
+                        onClick={() => setIsContextModalOpen(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center text-white/80 hover:text-white bg-white/5 active:bg-white/10 rounded-lg transition-colors"
+                        title="Selecionar tipo"
+                    >
+                        {activeContext === "Produtos" ? <Package size={17} /> : <HeartIcon size={17} />}
                     </button>
-                    {canScrollTabsLeft && <button onClick={() => tabsScrollRef.current?.scrollBy({ left: -160, behavior: "smooth" })} className="w-8 h-9 shrink-0 flex items-center justify-center text-brand-dark"><ChevronLeftIcon size={18} /></button>}
-                    <div ref={tabsScrollRef} className="flex-1 overflow-x-auto hide-scrollbar">
-                        <Tabs value={activeTag} onValueChange={selectTab}>
-                            <TabsList className="border-0 pb-0 pt-0 gap-5 bg-transparent">
+
+                    {canScrollTabsLeft && (
+                        <button
+                            onClick={() => tabsScrollRef.current?.scrollBy({ left: -160, behavior: "smooth" })}
+                            className="w-6 h-full shrink-0 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                        >
+                            <ChevronLeftIcon size={16} />
+                        </button>
+                    )}
+
+                    <div ref={tabsScrollRef} className="flex-1 h-full overflow-x-auto hide-scrollbar">
+                        <Tabs value={activeTag} onValueChange={selectTab} className="h-full">
+                            <TabsList className="border-0 p-0 h-full gap-5 bg-transparent flex items-center">
                                 {allTabs.map(tab => (
-                                    <TabsTrigger id={`vendor-tab-${tab.id}`} key={tab.id} value={tab.id} className="pb-1 whitespace-nowrap text-brand-inactive-text data-[state=active]:text-brand-green data-[state=active]:font-bold bg-transparent data-[state=active]:bg-transparent">
+                                    <TabsTrigger
+                                        id={`vendor-tab-${tab.id}`}
+                                        key={tab.id}
+                                        value={tab.id}
+                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/60 data-[state=active]:text-brand-green data-[state=active]:font-bold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
+                                    >
                                         {tab.label}
                                     </TabsTrigger>
                                 ))}
                             </TabsList>
                         </Tabs>
                     </div>
-                    {canScrollTabsRight && <button onClick={() => tabsScrollRef.current?.scrollBy({ left: 160, behavior: "smooth" })} className="w-8 h-9 shrink-0 flex items-center justify-center text-brand-dark"><ChevronRightIcon size={18} /></button>}
+
+                    {canScrollTabsRight && (
+                        <button
+                            onClick={() => tabsScrollRef.current?.scrollBy({ left: 160, behavior: "smooth" })}
+                            className="w-6 h-full shrink-0 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                        >
+                            <ChevronRightIcon size={16} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -800,8 +826,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
                             {categoryView ? (
-                                <section data-category-section={categoryView} className="scroll-mt-[150px]">
-                                    <div className="flex items-center gap-2 mb-6">
+                                <section data-category-section={categoryView} className="scroll-mt-[150px] pt-4 lg:pt-0">
+                                    <div className="hidden lg:flex items-center gap-2 mb-6">
                                         <button onClick={() => openCategory(null)} className="w-9 h-9 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
                                             <ArrowLeftIcon size={18} />
                                         </button>

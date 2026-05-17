@@ -13,7 +13,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function MyOrdersPage() {
+export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string }> }) {
+  const resolvedParams = await searchParams
   const user = await requireUser()
   const adminClient = await createAdminClient()
   const orderSelect = `
@@ -84,9 +85,12 @@ export default async function MyOrdersPage() {
 
   const cartCount = sessionData?.cartCount || 0
 
+  const isDetails = resolvedParams?.tab === 'details'
+  const headerTitle = isDetails ? "Detalhes do pedido" : "Meus pedidos"
+
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-      <MarketplaceHeader currentView="account-info" userProfile={userProfile} cartCount={cartCount} />
+      <MarketplaceHeader simpleTitle={headerTitle} userProfile={userProfile} cartCount={cartCount} />
 
       <MyOrdersListClient
         orders={orders}
