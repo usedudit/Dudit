@@ -59,12 +59,15 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
             if (result.success) {
                 toast.success("Produto atualizado com sucesso!")
                 setMode("details")
+                return { success: true }
             } else {
                 toast.error(result.error || "Erro ao atualizar produto")
+                return { success: false, error: result.error }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating product:", error)
             toast.error("Erro ao atualizar produto")
+            return { success: false, error: error.message }
         } finally {
             setIsSaving(false)
         }

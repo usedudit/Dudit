@@ -81,7 +81,7 @@ interface AddProductPageProps {
     partnerId?: string
     storeId?: string
     isLoadingDetails?: boolean
-    onSave?: (data: any, isDraft?: boolean) => Promise<void>
+    onSave?: (data: any, isDraft?: boolean) => Promise<{ success: boolean; error?: string } | void>
     onDuplicate?: (product: Product) => void
     onDelete?: () => void
 }
@@ -567,10 +567,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
             if (d.marketplace_category_id) payload.marketplace_category_id = d.marketplace_category_id
 
             if (onSave) {
-                await onSave({
+                const saveRes = await onSave({
                     ...payload,
                     pending_variants: productData.pending_variants || [],
                 })
+                
+                if (saveRes && saveRes.success === false) {
+                    setIsSavingProduct(false)
+                    isSubmittingRef.current = false
+                    return
+                }
+
                 setPendingImages([])
                 isSubmittingRef.current = false
                 return

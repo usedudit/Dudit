@@ -481,18 +481,20 @@ export default function ProductsPage({
                 }
 
                 closeEntity()
-                return
+                return { success: true }
             } else {
                 const errorMsg = res.error || "Erro ao salvar produto"
                 if (isPlanLimitReachedError(errorMsg)) {
                     const target = getNextPlanTarget(planSlug)
                     if (target) openPlanUpgrade(target)
-                    return
+                    return { success: false, error: errorMsg }
                 }
                 toast({ title: "Erro", description: errorMsg, variant: "destructive" })
+                return { success: false, error: errorMsg }
             }
-        } catch {
-            toast({ title: "Erro", variant: "destructive" })
+        } catch (e: any) {
+            toast({ title: "Erro", description: "Erro interno", variant: "destructive" })
+            return { success: false, error: "Erro interno" }
         } finally {
             setIsSaving(false)
         }

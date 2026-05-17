@@ -580,12 +580,6 @@ const PaymentModal = ({
         };
     }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
 
-    useEffect(() => {
-        if (editingPaymentIndex !== null) return;
-        if ((view !== 'card' && view !== 'pix') || !paymentCalculation?.success) return;
-        const nextAmount = Number(paymentCalculation.finalAmount || chargeTarget || 0);
-        setPaymentBaseAmount((current) => (Math.abs(Number(current || 0) - nextAmount) < 0.01 ? current : nextAmount));
-    }, [view, editingPaymentIndex, paymentCalculation, chargeTarget]);
 
     const handleQuickDenomination = (val: number) => {
         setCashCalculatorInput(val > 0 ? String(Math.round(val * 100)) : "");
