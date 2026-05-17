@@ -21,11 +21,11 @@ export function KPICard({ title, value, trend, className }: KPICardProps) {
     const trendLabel = trendParts.slice(1).join(" ")
 
     return (
-        <div className={cn("relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl shadow-sm shadow-brand-dark/5", className)}>
+        <div className={cn("relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl", className)}>
             {/* Top Row: Icon + Title -> Badge */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-green/10 text-brand-green shrink-0">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand-green/10 text-brand-green shrink-0">
                         <MoneyIcon className="w-5 h-5" />
                     </div>
                     <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
@@ -34,12 +34,12 @@ export function KPICard({ title, value, trend, className }: KPICardProps) {
                 </div>
                 {trendValue && (
                     <Badge 
-                        variant="outline" 
+                        variant="secondary" 
                         className={cn(
-                            "border-0 shrink-0 font-bold",
-                            trendPositive ? "bg-[#e5f7e6] text-[#2ebd3a] dark:bg-brand-green/20 dark:text-brand-green" 
-                            : trendNegative ? "bg-red-100 text-red-600 dark:bg-brand-red/20 dark:text-brand-red" 
-                            : "bg-gray-100 text-gray-600 dark:bg-dark-border dark:text-dark-body"
+                            "shrink-0 font-bold",
+                            trendPositive ? "bg-brand-green/20 text-brand-green hover:bg-brand-green/30" 
+                            : trendNegative ? "bg-brand-red/20 text-brand-red hover:bg-brand-red/30" 
+                            : ""
                         )}
                     >
                         {TrendIcon && <TrendIcon className="w-3 h-3 mr-1 stroke-[3]" />}

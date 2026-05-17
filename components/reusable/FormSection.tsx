@@ -1,14 +1,26 @@
 import type React from "react"
 
 interface FormSectionProps {
-  title: string
-  children: React.ReactNode
-  className?: string
+    title: string
+    children: React.ReactNode
+    className?: string
+    hasSeparator?: boolean
 }
 
-export const FormSection: React.FC<FormSectionProps> = ({ title, children, className = "" }) => (
-  <div className={className}>
-    <h2 className="text-lg font-semibold text-brand-dark dark:text-dark-heading mb-4">{title}</h2>
-    <div className="space-y-5">{children}</div>
-  </div>
+export const FormSection: React.FC<FormSectionProps> = ({
+    title,
+    children,
+    className = "",
+    hasSeparator = false,
+}) => (
+    <>
+        {hasSeparator && (
+            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full" />
+        )}
+        <div className={`${hasSeparator ? "mt-8" : ""} ${className}`.trim()}>
+            <h2 className="text-lg font-semibold text-brand-dark dark:text-dark-heading mb-5">{title}</h2>
+            <div className="space-y-5">{children}</div>
+        </div>
+    </>
 )
+

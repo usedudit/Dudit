@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
-import { useToast } from "@/components/ui/use-toast"
+import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -97,7 +97,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const isEditing = useMemo(() => ["add", "edit", "duplicate"].includes(internalMode), [internalMode])
 
-    const { toast } = useToast()
+    const { error: notifyError, success: notifySuccess, info: notifyInfo, warning: notifyWarning } = useNotification()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
@@ -335,7 +335,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const handleSuggestNcm = useCallback(async () => {
         const productName = productData.name?.trim()
-        if (!productName) return toast({ title: "Atenção", description: "Digite o nome do produto primeiro" })
+        if (!productName) return notifyWarning("Atenção", "Digite o nome do produto primeiro")
         if (lastNcmSearchRef.current === productName && ncmSuggestions.length > 0) { setShowNcmModal(true); return }
         setIsLoadingNcmSuggestion(true)
         try {
@@ -346,9 +346,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setNcmSuggestions(data.suggestions)
             lastNcmSearchRef.current = productName
             setShowNcmModal(true)
-        } catch { toast({ title: "Erro", description: "Erro ao conectar com o servidor.", variant: "destructive" }) }
+        } catch { notifyError("Erro", "Erro ao conectar com o servidor.") }
         finally { setIsLoadingNcmSuggestion(false) }
-    }, [productData.name, toast, ncmSuggestions.length])
+    }, [productData.name, notifyError, ncmSuggestions.length])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -404,11 +404,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
         if (!initialProduct?.id && !productId) return
         try {
             const result = await deleteProductAction(initialProduct?.id || productId!)
-            if (result.success) { toast({ title: "Sucesso", description: "Produto excluído" }); setTimeout(() => onBack(), 300) }
-            else toast({ title: "Erro", description: result.error, variant: "destructive" })
-        } catch { toast({ title: "Erro", variant: "destructive" }) }
+            if (result.success) { notifySuccess("Sucesso", "Produto excluído"); setTimeout(() => onBack(), 300) }
+            else notifyError("Erro", result.error)
+        } catch { notifyError("Erro", "Ocorreu um erro") }
         finally { setShowDeleteModal(false) }
-    }, [initialProduct, productId, onBack, toast])
+    }, [initialProduct, productId, onBack, notifyError, notifySuccess])
 
     const handleSaveProduct = useCallback(async () => {
         if (isSubmittingRef.current) return
@@ -638,13 +638,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
         setOriginalNameForDuplicate(productData.name)
         setProductData({ ...productData, id: "", productId: "", sku: "", name: `${productData.name} (Cópia)`, images: [...(productData.images || [])] })
         setInternalMode("duplicate"); setMode("add")
-        toast({ title: "Duplicando produto", description: "Edite e salve o novo produto." })
-    }, [productData, setMode, toast])
+        notifyInfo("Duplicando produto", "Edite e salve o novo produto.")
+    }, [productData, setMode, notifyInfo])
 
     const handleShareProduct = useCallback(() => {
         navigator.clipboard.writeText(`${window.location.origin}/produto/${productData.sku || initialProduct?.sku || ""}`)
-        toast({ title: "Link copiado!" })
-    }, [productData.sku, initialProduct?.sku, toast])
+        notifySuccess("Link copiado!")
+    }, [productData.sku, initialProduct?.sku, notifySuccess])
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     XIcon,
     ChevronLeftIcon,
@@ -8,11 +8,9 @@ import {
     CopyIcon,
     ColumnsIcon as SplitIcon,
     ChevronUpIcon,
-    MoreHorizontalIcon,
     ClockIcon,
     TruckIcon,
     ChevronDownIcon,
-    PlusIcon,
     PrinterIcon,
     FileIcon,
     TagIcon,
@@ -334,6 +332,9 @@ const PaymentModal = ({
         paymentMethodDiscountAmount: number
         interestAmount: number
         feeAmount: number
+        appliedDiscountPercent?: number
+        appliedFeePercent?: number
+        appliedInterestPercent?: number
         receiptCart: any[]
     } | null>(null)
 
@@ -681,12 +682,18 @@ const PaymentModal = ({
                 paymentMethodDiscountAmount: Number(paymentCalculation.paymentMethodDiscountAmount || 0),
                 interestAmount: Number(paymentCalculation.interestAmount || 0),
                 feeAmount: Number(paymentCalculation.feeAmount || 0),
+                appliedDiscountPercent: Number(paymentCalculation.appliedDiscountPercent || 0),
+                appliedFeePercent: Number(paymentCalculation.appliedFeePercent || 0),
+                appliedInterestPercent: Number(paymentCalculation.appliedInterestPercent || 0),
             };
         }
         return {
             paymentMethodDiscountAmount: 0,
             interestAmount: 0,
             feeAmount: 0,
+            appliedDiscountPercent: 0,
+            appliedFeePercent: 0,
+            appliedInterestPercent: 0,
         };
     }, [view, splitPreview, paymentCalculation]);
 
@@ -704,13 +711,16 @@ const PaymentModal = ({
                 paymentMethodDiscountAmount: successSnapshot.paymentMethodDiscountAmount,
                 interestAmount: successSnapshot.interestAmount,
                 feeAmount: successSnapshot.feeAmount,
+                appliedDiscountPercent: successSnapshot.appliedDiscountPercent,
+                appliedFeePercent: successSnapshot.appliedFeePercent,
+                appliedInterestPercent: successSnapshot.appliedInterestPercent,
             }
             : currentPricingTotals;
 
         return [
-            source.paymentMethodDiscountAmount > 0 ? { label: 'Desc. meio pagamento', amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
-            source.interestAmount > 0 ? { label: 'Juros', amount: source.interestAmount, prefix: '+', tone: 'neutral' } : null,
-            source.feeAmount > 0 ? { label: 'Taxas', amount: source.feeAmount, tone: 'neutral' } : null,
+            source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
+            source.interestAmount > 0 ? { label: `Juros${source.appliedInterestPercent ? ` (${source.appliedInterestPercent}%)` : ''}`, amount: source.interestAmount, prefix: '+', tone: 'neutral' } : null,
+            source.feeAmount > 0 ? { label: `Taxas${source.appliedFeePercent ? ` (${source.appliedFeePercent}%)` : ''}`, amount: source.feeAmount, tone: 'neutral' } : null,
         ].filter(Boolean);
     }, [paymentStatus, successSnapshot, currentPricingTotals]);
 
@@ -901,6 +911,9 @@ const PaymentModal = ({
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
             feeAmount: Number(currentPricingTotals.feeAmount || 0),
+            appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
+            appliedFeePercent: currentPricingTotals.appliedFeePercent,
+            appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
             receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
         })
         setPaymentStatus('processing');
@@ -1221,7 +1234,7 @@ const PaymentModal = ({
                                                     />
                                                     <div className="flex justify-center mt-2">
                                                         <MoneyInput
-                                                            value={paymentBaseAmount}
+                                                            value={legFinalCharged ?? paymentBaseAmount}
                                                             onChange={handleMoneyInputSync}
                                                             className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading border-none bg-transparent h-auto py-0 focus:ring-0 focus:border-none shadow-none"
                                                             prefix=""

@@ -6,7 +6,7 @@ import AddProductPage from "./AddProductPage"
 import type { Product } from "@/lib/types/product"
 import { updateProductAction, deleteProductAction, checkProductInOrdersAction } from "@/app/actions/erp/products"
 import { UNITS } from "@/lib/constants/product-constants"
-import { toast } from "sonner"
+import { useNotification } from "@/hooks/use-notification"
 import AlertModal from "@/components/reusable/AlertModal"
 import { TrashIcon } from "@/lib/icons"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -38,6 +38,7 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
     const [unidadesMedida] = useState(() => UNITS.map((unit) => ({ codigo: unit, descricao: unit })))
+    const { success: notifySuccess, error: notifyError } = useNotification()
 
     const handleBack = () => {
         router.push("/erp/products")
@@ -57,16 +58,16 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
             })
 
             if (result.success) {
-                toast.success("Produto atualizado com sucesso!")
+                notifySuccess("Produto atualizado", "Produto atualizado com sucesso!")
                 setMode("details")
                 return { success: true }
             } else {
-                toast.error(result.error || "Erro ao atualizar produto")
+                notifyError("Erro", result.error || "Erro ao atualizar produto")
                 return { success: false, error: result.error }
             }
         } catch (error: any) {
             console.error("Error updating product:", error)
-            toast.error("Erro ao atualizar produto")
+            notifyError("Erro", "Erro ao atualizar produto")
             return { success: false, error: error.message }
         } finally {
             setIsSaving(false)
@@ -86,14 +87,14 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
         try {
             const result = await deleteProductAction(product.id)
             if (result.success) {
-                toast.success("Produto excluído com sucesso!")
+                notifySuccess("Sucesso", "Produto excluído com sucesso!")
                 router.push("/erp/products")
             } else {
-                toast.error(result.error || "Erro ao excluir produto")
+                notifyError("Erro", result.error || "Erro ao excluir produto")
             }
         } catch (error) {
             console.error("Error deleting product:", error)
-            toast.error("Erro ao excluir produto")
+            notifyError("Erro", "Erro ao excluir produto")
         } finally {
             setIsDeleting(false)
             setShowDeleteModal(false)
@@ -149,3 +150,4 @@ export function EditProductWrapper({ product, suppliers, partnerId, onDuplicate 
         </>
     )
 }
+

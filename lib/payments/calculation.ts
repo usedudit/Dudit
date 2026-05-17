@@ -23,6 +23,9 @@ export type PaymentCalculationResult = {
   amountBeforeFee: number
   installmentNumber: number
   installmentAmounts: number[]
+  appliedDiscountPercent: number
+  appliedFeePercent: number
+  appliedInterestPercent: number
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
@@ -88,5 +91,8 @@ export function calculatePaymentAmounts(input: PaymentCalculationInput): Payment
     amountBeforeFee,
     installmentNumber: clampedInstallments,
     installmentAmounts: distributeInstallments(finalAmount, clampedInstallments),
+    appliedDiscountPercent: paymentMethodDiscountPercent,
+    appliedFeePercent: feePercent,
+    appliedInterestPercent: totalInterestPercent,
   }
 }

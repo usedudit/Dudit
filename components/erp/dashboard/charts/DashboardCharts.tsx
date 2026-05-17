@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import type { ChartPoint } from "@/lib/data/dashboard"
+import { cn } from "@/lib/utils"
 
 const config = {
   value: { label: "Este Período", color: "var(--brand-green)" },
@@ -77,11 +78,11 @@ export function DashboardBarChart({ data }: { data: ChartPoint[] }) {
   )
 }
 
-export function DashboardPieChart({ data, totalValue, totalLabel }: { data: ChartPoint[], totalValue?: string, totalLabel?: string }) {
+export function DashboardPieChart({ data, totalValue, totalLabel, half }: { data: ChartPoint[], totalValue?: string, totalLabel?: string, half?: boolean }) {
   return (
-    <div className="h-[230px] w-full relative flex items-center justify-center">
+    <div className={cn("w-full relative flex items-center justify-center", half ? "h-[140px]" : "h-[230px]")}>
       {totalValue && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
+        <div className={cn("absolute flex flex-col items-center justify-center pointer-events-none mt-1", half ? "bottom-0" : "inset-0")}>
           <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">{totalLabel || "Total"}</span>
           <span className="text-[17px] font-bold text-brand-dark dark:text-dark-heading tracking-tight">{totalValue}</span>
         </div>
@@ -97,7 +98,9 @@ export function DashboardPieChart({ data, totalValue, totalLabel }: { data: Char
             outerRadius={90}
             paddingAngle={2}
             cx="50%"
-            cy="50%"
+            cy={half ? "100%" : "50%"}
+            startAngle={half ? 180 : 90}
+            endAngle={half ? 0 : -270}
           >
             {data.map((_, index) => <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
           </Pie>

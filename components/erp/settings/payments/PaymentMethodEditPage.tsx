@@ -343,7 +343,6 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                 value={formData.type}
                                                 setValue={(val) => {
                                                     const updates: any = { type: val }
-                                                    if (val === "cash") updates.is_active = true
                                                     if (val === "credit_card") updates.supports_installments = true
                                                     else {
                                                         updates.supports_installments = false
@@ -363,7 +362,6 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                     { value: "debit_card", label: "Débito" },
                                                     { value: "pix", label: "Pix" },
                                                     { value: "bank_transfer", label: "Transferência Bancária" },
-                                                    { value: "cash", label: "Dinheiro" },
                                                 ]}
                                             />
 
@@ -382,9 +380,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                 </FormSection>
 
                                 {isCard && (
-                                    <FormSection className="mt-8" title="Configurações do Cartão">
-                                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-
+                                    <FormSection hasSeparator title="Configurações do Cartão">
                                         <div className="grid grid-cols-1 gap-6">
                                             {isCredit && (
                                                 <div className="space-y-6">
@@ -404,8 +400,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                             options={[
                                                                 { value: "single", label: "Pagamento Único" },
                                                                 { value: "installments", label: "Permitir Parcelamento" },
-                                                            ]}
-                                                        />
+                                                            ]} />
 
                                                         {formData.supports_installments && (
                                                             <FormDropdown
@@ -415,13 +410,13 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                                 setValue={(val) => {
                                                                     const n = Number(val)
                                                                     setFormData(prev => {
-                                                                        const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n);
+                                                                        const newFees = [...prev.installment_fees].filter(f => f.installmentNumber <= n)
                                                                         for (let i = 1; i <= n; i++) {
                                                                             if (!newFees.find(f => f.installmentNumber === i)) {
                                                                                 newFees.push({ installmentNumber: i, feePercent: 0 })
                                                                             }
                                                                         }
-                                                                        newFees.sort((a, b) => a.installmentNumber - b.installmentNumber);
+                                                                        newFees.sort((a, b) => a.installmentNumber - b.installmentNumber)
                                                                         return { ...prev, max_installments: n, installment_fees: newFees }
                                                                     })
                                                                 }}
@@ -435,8 +430,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                                     { value: "12", label: "12x" },
                                                                     { value: "18", label: "18x" },
                                                                     { value: "24", label: "24x" },
-                                                                ]}
-                                                            />
+                                                                ]} />
                                                         )}
                                                     </div>
 
@@ -452,7 +446,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                             </div>
 
                                                             {formData.installment_fees.length === 0 || !formData.installment_fees.some(f => f.feePercent > 0) ? (
-                                                                <div className="bg-brand-gray/20 dark:bg-dark-surface/50 rounded-2xl border border-dashed border-brand-border dark:border-dark-border p-8 flex flex-col items-center text-center">
+                                                                <div className="flex flex-col items-center text-center">
                                                                     <IconPlaceholder
                                                                         icon={InfoIcon}
                                                                         containerSize="w-16 h-16"
@@ -463,27 +457,23 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                                             text: "Configurar Taxas",
                                                                             action: () => setIsInstallmentModalOpen(true),
                                                                             variant: "outline"
-                                                                        }}
-                                                                    />
+                                                                        }} />
                                                                 </div>
                                                             ) : (
-                                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface">
-                                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                                        <thead>
-                                                                            <tr className="bg-brand-gray/50 dark:bg-dark-border/10">
-                                                                                <th className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">Parcela</th>
-                                                                                <th className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-right">Juros (%)</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {formData.installment_fees.map((fee, idx) => (
-                                                                                <tr key={fee.installmentNumber} className="border-b border-brand-border/50 dark:border-dark-border/30 last:border-0 hover:bg-brand-gray/20 transition-colors">
-                                                                                    <td className="py-3 px-6 text-[13px] font-bold text-brand-dark dark:text-dark-heading">{fee.installmentNumber}x</td>
-                                                                                    <td className="py-3 px-6 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body text-right">{fee.feePercent}%</td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
+                                                                <div className="flex overflow-x-auto no-scrollbar gap-3 pb-2 -mx-1 px-1">
+                                                                    {formData.installment_fees.map((fee) => (
+                                                                        <div
+                                                                            key={fee.installmentNumber}
+                                                                            className="flex-shrink-0 bg-brand-gray/30 dark:bg-dark-surface/50 border border-brand-border dark:border-dark-border rounded-2xl p-3 w-[120px] flex flex-col items-center justify-center gap-3 transition-all hover:border-brand-green/50"
+                                                                        >
+                                                                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{fee.installmentNumber}x</span>
+                                                                            <div className={`flex items-center justify-center px-2 py-1.5 rounded-full border w-full ${fee.feePercent > 0 ? 'bg-brand-green/10 border-brand-green/20 dark:bg-brand-green/5 dark:border-brand-green/10' : 'bg-white dark:bg-dark-background border-brand-border/50 dark:border-dark-border/50'}`}>
+                                                                                <span className={`text-[11px] font-bold whitespace-nowrap ${fee.feePercent > 0 ? 'text-brand-green' : 'text-brand-inactive-text'}`}>
+                                                                                    {fee.feePercent > 0 ? `${fee.feePercent}% juros` : 'Sem juros'}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -507,8 +497,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                                                     : [...current, brand.id]
                                                                 setFormData({ ...formData, card_brand: next.join(",") || null })
                                                             }}
-                                                            className="px-4 py-3"
-                                                        />
+                                                            className="px-4 py-3" />
                                                     ))}
                                                 </div>
                                             </div>
@@ -691,7 +680,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                 const installment = i + 1;
                                 const fee = formData.installment_fees.find(f => f.installmentNumber === installment)?.feePercent || 0;
                                 return (
-                                    <div key={installment} className="flex items-center gap-4 p-3 border border-brand-border dark:border-dark-border rounded-xl">
+                                    <div key={installment} className="flex items-center justify-between gap-4">
                                         <div className="w-16 font-bold text-brand-dark dark:text-dark-heading">{installment}x</div>
                                         <div className="flex-1">
                                             <Input

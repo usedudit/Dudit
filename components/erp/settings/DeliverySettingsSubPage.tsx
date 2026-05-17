@@ -136,7 +136,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             {/* Geral */}
                             <FormSection title="Configurações Gerais">
                                 <div className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 rounded-xl bg-brand-gray/10 dark:bg-dark-background/40 border border-brand-border dark:border-dark-border transition-colors">
+                                    <div className="flex items-center justify-between">
                                         <div className="flex flex-col gap-1">
                                             <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Entrega ativa</span>
                                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes selecionem entrega no checkout</span>
@@ -148,7 +148,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                         />
                                     </div>
 
-                                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border">
+                                    <div className="flex items-center justify-between">
                                         <div className="flex flex-col gap-1 flex-1">
                                             <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Taxa base</span>
                                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor fixo cobrado por cada entrega</span>
@@ -165,7 +165,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             </FormSection>
 
                             {/* Distância */}
-                            <FormSection title="Distância e Frete">
+                            <FormSection hasSeparator title="Distância e Frete">
                                 <div className="space-y-6">
                                     <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega baseados na distância da loja.</p>
                                     {!advancedEnabled && (
@@ -199,7 +199,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             </FormSection>
 
                             {/* Regras por horário */}
-                            <FormSection title="Regras por Horário">
+                            <FormSection hasSeparator title="Regras por Horário">
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>

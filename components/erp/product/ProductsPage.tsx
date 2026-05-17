@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useNotification } from "@/hooks/use-notification"
 import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 import { generateSKUBase } from "@/lib/utils/code-generators"
@@ -185,7 +185,7 @@ export default function ProductsPage({
     suppliers,
 }: { products: Product[]; initialNextCursor: ERPProductListCursor | null; initialHasMore: boolean; partnerId: string; suppliers: any[] }) {
     const router = useRouter()
-    const { toast } = useToast()
+    const { error: notifyError, success: notifySuccess } = useNotification()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const { planSlug } = usePermissions()
@@ -457,11 +457,11 @@ export default function ProductsPage({
                         deletedImages: [],
                     })
                     if (!variantsResult.success) {
-                        toast({ title: "Produto criado com ressalvas", description: "O produto foi salvo, mas houve erro ao salvar as variantes.", variant: "destructive" })
+                        notifyError("Produto criado com ressalvas", "O produto foi salvo, mas houve erro ao salvar as variantes.")
                     }
                 }
 
-                toast({ title: "Sucesso" })
+                notifySuccess("Sucesso")
 
                 // Invalidate caches
                 if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
@@ -489,11 +489,11 @@ export default function ProductsPage({
                     if (target) openPlanUpgrade(target)
                     return { success: false, error: errorMsg }
                 }
-                toast({ title: "Erro", description: errorMsg, variant: "destructive" })
+                notifyError("Erro", errorMsg)
                 return { success: false, error: errorMsg }
             }
         } catch (e: any) {
-            toast({ title: "Erro", description: "Erro interno", variant: "destructive" })
+            notifyError("Erro", "Erro interno")
             return { success: false, error: "Erro interno" }
         } finally {
             setIsSaving(false)
@@ -509,10 +509,10 @@ export default function ProductsPage({
             if (result.success) {
                 afterMutation(deleteId)
                 setProducts((p) => p.filter((prod) => prod.id !== deleteId))
-                toast({ title: "Excluído" })
+                notifySuccess("Excluído")
             } else {
                 const isPermission = result.error?.includes("permissão")
-                toast({ title: isPermission ? "Sem permissão" : "Erro", description: result.error || "Erro ao excluir produto", variant: "destructive" })
+                notifyError(isPermission ? "Sem permissão" : "Erro", result.error || "Erro ao excluir produto")
             }
             setConfirmations((p) => ({ ...p, delete: false }))
         }
@@ -526,12 +526,12 @@ export default function ProductsPage({
             setActionModal({ open: false, text: "" })
             if (result.error) {
                 const isPermission = result.error?.includes("permissão")
-                toast({ title: isPermission ? "Sem permissão" : "Erro", description: result.error, variant: "destructive" })
+                notifyError(isPermission ? "Sem permissão" : "Erro", result.error)
             } else {
                 afterMutation()
                 const idSet = new Set(ids)
                 setProducts((p) => p.filter((prod) => !idSet.has(prod.id)))
-                toast({ title: "Excluído" })
+                notifySuccess("Excluído")
             }
             setConfirmations((p) => ({ ...p, bulkDelete: false }))
         } else {
@@ -543,7 +543,7 @@ export default function ProductsPage({
             const idSet = new Set(ids)
             setProducts((p) => p.map((prod) => idSet.has(prod.id) ? { ...prod, is_active: allInactive } : prod))
             setConfirmations((p) => ({ ...p, bulkInactive: false }))
-            toast({ title: "Atualizado" })
+            notifySuccess("Atualizado")
         }
         setSelection((p) => ({ ...p, ids: new Set() }))
     }
@@ -562,10 +562,10 @@ export default function ProductsPage({
                     afterMutation()
                     setProducts(p => p.filter(prod => !selection.ids.has(prod.id)))
                     setSelection(p => ({ ...p, ids: new Set() }))
-                    toast({ title: "Sucesso", description: `${ids.length} produtos excluídos` })
+                    notifySuccess("Sucesso", `${ids.length} produtos excluídos`)
                     setBulkEditModal({ isOpen: false })
                 } else {
-                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                    notifyError("Erro", result.error)
                 }
                 return
             }
