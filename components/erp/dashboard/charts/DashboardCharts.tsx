@@ -77,9 +77,15 @@ export function DashboardBarChart({ data }: { data: ChartPoint[] }) {
   )
 }
 
-export function DashboardPieChart({ data }: { data: ChartPoint[] }) {
+export function DashboardPieChart({ data, totalValue, totalLabel }: { data: ChartPoint[], totalValue?: string, totalLabel?: string }) {
   return (
-    <div className="h-[230px] w-full">
+    <div className="h-[230px] w-full relative flex items-center justify-center">
+      {totalValue && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
+          <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">{totalLabel || "Total"}</span>
+          <span className="text-[17px] font-bold text-brand-dark dark:text-dark-heading tracking-tight">{totalValue}</span>
+        </div>
+      )}
       <ChartContainer config={config} className="h-full w-full">
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent hideLabel />} />

@@ -16,31 +16,36 @@ export async function RevenueChartWidget({ partnerId }: { partnerId: string }) {
             className="xl:col-span-2"
             action={<PeriodSelector />}
         >
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-6">
                 {/* Value & Legend Row */}
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                    <div className="flex items-baseline gap-2.5">
-                        <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
-                            {brl(total)}
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                            Total Balance
                         </span>
-                        {trend && (
-                            <span className={cn(
-                                "text-[15px] font-bold",
-                                trendPositive ? "text-brand-green" : "text-brand-red"
-                            )}>
-                                {trend} <span className="text-brand-inactive-text font-medium text-[13px]">vs mês passado</span>
+                        <div className="flex items-baseline gap-2.5">
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                {brl(total)}
                             </span>
-                        )}
+                            {trend && (
+                                <span className={cn(
+                                    "text-[15px] font-bold",
+                                    trendPositive ? "text-brand-green" : "text-brand-red"
+                                )}>
+                                    {trend} <span className="text-brand-inactive-text font-medium text-[13px]">vs mês passado</span>
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Legend */}
-                    <div className="flex items-center gap-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                        <div className="flex items-center gap-2">
-                            <div className="h-2.5 w-2.5 rounded-full bg-brand-dark" />
+                    <div className="flex items-center gap-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading pb-1">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-3 w-3 rounded-[3px] bg-brand-dark" />
                             <span>Este Mês</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="h-2.5 w-2.5 rounded-full border-2 border-gray-300" />
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-3 w-3 rounded-[3px] bg-[#dcfce7] dark:bg-[#15803d]" />
                             <span>Mês Passado</span>
                         </div>
                     </div>

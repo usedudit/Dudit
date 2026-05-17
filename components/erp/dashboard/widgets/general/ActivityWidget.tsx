@@ -33,10 +33,20 @@ const toneBgClasses: Record<ActivityItem["tone"], string> = {
 export async function ActivityWidget({ partnerId }: { partnerId: string }) {
     const { activity } = await getGeneralActivity(partnerId)
 
-    if (activity.length === 0) return null
+    if (activity.length === 0) {
+        return (
+            <DashboardSectionCard title="Histórico de ações" className="h-full">
+                <div className="flex flex-col items-center justify-center h-[200px] text-center px-4">
+                    <span className="text-[14px] font-medium text-brand-inactive-text dark:text-dark-body">
+                        Nenhuma atividade recente.
+                    </span>
+                </div>
+            </DashboardSectionCard>
+        )
+    }
 
     return (
-        <DashboardSectionCard title="Atividade recente" className="h-full">
+        <DashboardSectionCard title="Histórico de ações" className="h-full">
             <div className="space-y-0 -mx-6 -mb-6">
                 {activity.map((item, i) => {
                     const Icon = iconMap[item.icon] || FileIcon
