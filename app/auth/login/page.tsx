@@ -119,53 +119,7 @@ function AuthContent() {
     return <div className="min-h-screen bg-[#022C2B]" />
   }
 
-  // Layout específico do Modo Parceiro (VISUAL ORIGINAL MANTIDO)
-  const PartnerLayout = () => (
-    <div className="flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
-      <div className="absolute inset-0 opacity-5 pointer-events-none" />
 
-      {/* Esquerda: Formulário / Wizard */}
-      <div className="w-full lg:w-[45%] xl:w-[40%] bg-white rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative">
-        <div className="flex justify-between items-center mb-4 px-2 shrink-0">
-          <Link href="/" prefetch={false}>
-            <img
-              src="https://img.dudit.com.br/static/Logo.png"
-              alt="Dudit"
-              width={90}
-              height={28}
-              className="h-7 w-auto hover:opacity-80 transition-opacity"
-            />
-          </Link>
-          <button
-            onClick={() => setPageMode("auth")}
-            className="text-xs font-semibold text-gray-900 hover:text-brand-green transition-colors"
-          >
-            Já tem conta? Entrar
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col justify-center overflow-y-auto scrollbar-hide px-2">
-          <div className="w-full max-w-md mx-auto">
-            <PartnerWizard
-              onBack={() => setPageMode("auth")}
-              isUserLoggedIn={!!user}
-            />
-          </div>
-        </div>
-
-        {/* Footer Mobile */}
-        <div className="lg:hidden mt-8 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} Dudit Inc.{" "}
-          <Link href="/institucional/termos" prefetch={false} className="hover:underline ml-2">Termos</Link>{" "}
-          &bull;{" "}
-          <Link href="/institucional/privacidade" prefetch={false} className="hover:underline">Privacidade</Link>
-        </div>
-      </div>
-
-      {/* Direita: Visuais Decorativos (Carregado dinamicamente) */}
-      <PartnerVisuals />
-    </div>
-  )
 
   const emailParam = searchParams.get("email") || ""
 
@@ -195,7 +149,50 @@ function AuthContent() {
           transition={{ duration: 0.4, ease: "easeInOut" }}
           className="w-full h-full"
         >
-          <PartnerLayout />
+          <div className="flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative">
+            <div className="absolute inset-0 opacity-5 pointer-events-none" />
+
+            {/* Esquerda: Formulário / Wizard */}
+            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative">
+              <div className="flex justify-between items-center mb-4 px-2 shrink-0">
+                <Link href="/" prefetch={false}>
+                  <img
+                    src="https://img.dudit.com.br/static/Logo.png"
+                    alt="Dudit"
+                    width={90}
+                    height={28}
+                    className="h-7 w-auto hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+                <button
+                  onClick={() => setPageMode("auth")}
+                  className="text-xs font-semibold text-gray-900 hover:text-brand-green transition-colors"
+                >
+                  Já tem conta? Entrar
+                </button>
+              </div>
+
+              <div className="flex-1 flex flex-col justify-center overflow-y-auto scrollbar-hide px-2">
+                <div className="w-full max-w-md mx-auto">
+                  <PartnerWizard
+                    onBack={() => setPageMode("auth")}
+                    isUserLoggedIn={!!user}
+                  />
+                </div>
+              </div>
+
+              {/* Footer Mobile */}
+              <div className="lg:hidden mt-8 text-center text-xs text-gray-400">
+                © {new Date().getFullYear()} Dudit Inc.{" "}
+                <Link href="/institucional/termos" prefetch={false} className="hover:underline ml-2">Termos</Link>{" "}
+                &bull;{" "}
+                <Link href="/institucional/privacidade" prefetch={false} className="hover:underline">Privacidade</Link>
+              </div>
+            </div>
+
+            {/* Direita: Visuais Decorativos (Carregado dinamicamente) */}
+            <PartnerVisuals />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

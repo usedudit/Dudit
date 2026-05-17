@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { ArrowDownIcon, ArrowUpIcon, MoneyIcon } from "@/lib/icons"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/reusable/Badge"
 
 interface KPICardProps {
     title: string
@@ -34,15 +34,10 @@ export function KPICard({ title, value, trend, className }: KPICardProps) {
                 </div>
                 {trendValue && (
                     <Badge 
-                        variant="secondary" 
-                        className={cn(
-                            "shrink-0 font-bold",
-                            trendPositive ? "bg-brand-green/20 text-brand-green hover:bg-brand-green/30" 
-                            : trendNegative ? "bg-brand-red/20 text-brand-red hover:bg-brand-red/30" 
-                            : ""
-                        )}
+                        variant={trendPositive ? "green" : trendNegative ? "red" : "gray"}
+                        className="shrink-0"
+                        icon={TrendIcon ? <TrendIcon className="stroke-[3]" /> : null}
                     >
-                        {TrendIcon && <TrendIcon className="w-3 h-3 mr-1 stroke-[3]" />}
                         {trendValue.replace('+', '').replace('-', '')}
                     </Badge>
                 )}

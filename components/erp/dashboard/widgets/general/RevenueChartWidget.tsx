@@ -21,7 +21,7 @@ export async function RevenueChartWidget({ partnerId }: { partnerId: string }) {
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                     <div className="flex flex-col gap-1.5">
                         <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                            Total Balance
+                            Receita Total
                         </span>
                         <div className="flex items-baseline gap-2.5">
                             <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
@@ -41,12 +41,12 @@ export async function RevenueChartWidget({ partnerId }: { partnerId: string }) {
                     {/* Legend */}
                     <div className="flex items-center gap-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading pb-1">
                         <div className="flex items-center gap-2.5">
-                            <div className="h-3 w-3 rounded-[3px] bg-brand-dark" />
-                            <span>Este Mês</span>
+                            <div className="h-3 w-3 rounded-full bg-brand-green" />
+                            <span>Este Período</span>
                         </div>
                         <div className="flex items-center gap-2.5">
-                            <div className="h-3 w-3 rounded-[3px] bg-[#dcfce7] dark:bg-[#15803d]" />
-                            <span>Mês Passado</span>
+                            <div className="h-3 w-3 rounded-full bg-[#D1D5DB] dark:bg-dark-border" />
+                            <span>Período Anterior</span>
                         </div>
                     </div>
                 </div>

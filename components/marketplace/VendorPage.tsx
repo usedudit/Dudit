@@ -736,10 +736,10 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
             </div>
 
             <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark border-b border-white/10 shadow-md transition-all duration-200 ${isStickyVisible && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-                <div className="flex items-center gap-2 px-3 h-full">
+                <div className="flex items-center gap-4 px-3 h-full">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
-                        className="w-8 h-8 shrink-0 flex items-center justify-center text-white/80 hover:text-white bg-white/5 active:bg-white/10 rounded-lg transition-colors"
+                        className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
                         title="Selecionar tipo"
                     >
                         {activeContext === "Produtos" ? <Package size={17} /> : <HeartIcon size={17} />}
@@ -762,7 +762,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                         id={`vendor-tab-${tab.id}`}
                                         key={tab.id}
                                         value={tab.id}
-                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/60 data-[state=active]:text-brand-green data-[state=active]:font-bold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
+                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/80 data-[state=active]:text-brand-green data-[state=active]:font-semibold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
                                     >
                                         {tab.label}
                                     </TabsTrigger>

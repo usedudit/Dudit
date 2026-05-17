@@ -17,9 +17,9 @@ export async function RevenueOriginWidget({ partnerId }: { partnerId: string }) 
             action={<PeriodSelector />}
             className="flex flex-col h-full"
         >
-            <div className="flex flex-col items-center gap-6 py-2">
+            <div className="flex flex-col items-center gap-0 py-2">
                 {/* Half Donut Chart */}
-                <div className="w-full max-w-[280px]">
+                <div className="w-full max-w-[260px] mx-auto -mb-4">
                     <DashboardPieChart 
                         data={origins} 
                         totalValue={brl(totalValue)} 
@@ -29,16 +29,16 @@ export async function RevenueOriginWidget({ partnerId }: { partnerId: string }) 
                 </div>
 
                 {/* Vertical Legends List */}
-                <div className="flex flex-col gap-4 w-full pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                <div className="flex flex-col gap-3 w-full pt-6 border-t border-brand-border/40 dark:border-dark-border/40">
                     {origins.map((o, index) => (
                         <div key={o.label} className="flex items-center justify-between gap-4 w-full">
-                            <div className="flex items-center gap-3.5">
-                                {/* Vertical colored rounded bar */}
+                            <div className="flex items-center gap-2.5">
+                                {/* Color indicator */}
                                 <div
-                                    className="h-6 w-2.5 rounded-full shrink-0"
+                                    className="h-3 w-3 rounded-full shrink-0"
                                     style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                                 />
-                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                                <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
                                     {o.label}
                                 </span>
                             </div>
