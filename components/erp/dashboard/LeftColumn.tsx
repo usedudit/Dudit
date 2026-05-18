@@ -14,7 +14,7 @@ import {
   TruckIcon,
   AlertCircleIcon
 } from "@/lib/icons";
-import { brl } from "@/lib/data/dashboard";
+import { formatCurrency as brl } from "@/lib/utils";
 
 export function SummaryCards({ metrics }: { metrics: any[] }) {
   const icons = [MoneyIcon, SalesIcon, TagIcon, Users];

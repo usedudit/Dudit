@@ -3,7 +3,7 @@
 import React from "react";
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
 import { ChevronDownIcon as ChevronDown } from "@/lib/icons";
-import { brl } from "@/lib/data/dashboard";
+import { formatCurrency as brl } from "@/lib/utils";
 
 const ORIGIN_COLORS = [
   'var(--color-brand-dark)',
