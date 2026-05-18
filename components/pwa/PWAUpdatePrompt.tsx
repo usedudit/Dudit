@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback } from "react"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 
 /**
  * Registra o service worker e mostra toast quando nova versão está disponível.
@@ -35,21 +35,14 @@ export function PWAUpdatePrompt() {
       if (hasShownToastRef.current) return
       hasShownToastRef.current = true
 
-      toast("Nova versão disponível", {
-        description: "Atualize para obter melhorias e correções.",
-        duration: Infinity,
-        id: "pwa-update", // ID fixo impede duplicatas mesmo se chamado 2x
-        action: {
-          label: "Atualizar",
-          onClick: () => {
-            newWorker.postMessage({ type: "SKIP_WAITING" })
-          },
-        },
-        onDismiss: () => {
-          // Permite re-mostrar se usuário fechou e há nova versão futura
-          hasShownToastRef.current = false
-        },
-      })
+      toast.success(
+        "Atualização Disponível",
+        "Uma nova versão foi instalada. Atualizando a página em instantes para aplicar as novidades..."
+      )
+
+      setTimeout(() => {
+        newWorker.postMessage({ type: "SKIP_WAITING" })
+      }, 3000)
     },
     []
   )

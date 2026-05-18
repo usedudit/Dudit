@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition, useEffect } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 import Image from "next/image"
 import {
     InfoIcon, AlertTriangleIcon, CheckCircleIcon, CancelCircleIcon,

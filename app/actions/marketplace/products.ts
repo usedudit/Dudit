@@ -105,16 +105,41 @@ async function _getProductVariants(productId: string) {
 // --- REVIEWS (DIRECT - NO CACHE) ---
 async function _getProductReviews(productId: string) {
   const supabase = getAdminClient()
-  const { data } = await supabase
+  const { data: reviewsData, error } = await supabase
     .from("reviews")
-    .select(`
-      id, rating, comment, created_at, user_id, product_id,
-      profiles(full_name, profile_image_url)
-    `)
+    .select("id, rating, comment, created_at, user_id, product_id")
     .eq("product_id", productId)
     .order("created_at", { ascending: false })
     .limit(20)
-  return data || []
+
+  if (error || !reviewsData) {
+    console.error("[Reviews] Fetch error:", error?.message)
+    return []
+  }
+
+  const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
+  let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+
+  if (userIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name, profile_image_url")
+      .in("user_id", userIds)
+
+    if (profilesData) {
+      profilesData.forEach((p: any) => {
+        profilesMap[p.user_id] = {
+          full_name: p.full_name,
+          profile_image_url: p.profile_image_url
+        }
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => ({
+    ...r,
+    profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+  }))
 }
 
 // React cache() wrappers - deduplicate within SSR request
@@ -165,16 +190,41 @@ export const getCachedReviews = async (productId: string) => {
   const fn = unstable_cache(
     async () => {
       const supabase = getAdminClient()
-      const { data } = await supabase
+      const { data: reviewsData, error } = await supabase
         .from("reviews")
-        .select(`
-          id, rating, comment, created_at, user_id, product_id,
-          profiles(full_name, profile_image_url)
-        `)
+        .select("id, rating, comment, created_at, user_id, product_id")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
         .limit(20)
-      return data || []
+
+      if (error || !reviewsData) {
+        console.error("[Reviews] Fetch error:", error?.message)
+        return []
+      }
+
+      const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
+      let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("user_profiles")
+          .select("user_id, full_name, profile_image_url")
+          .in("user_id", userIds)
+
+        if (profilesData) {
+          profilesData.forEach((p: any) => {
+            profilesMap[p.user_id] = {
+              full_name: p.full_name,
+              profile_image_url: p.profile_image_url
+            }
+          })
+        }
+      }
+
+      return reviewsData.map((r: any) => ({
+        ...r,
+        profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+      }))
     },
     [`marketplace-reviews-${productId}`],
     { tags: ["marketplace-reviews", `product-${productId}`] }

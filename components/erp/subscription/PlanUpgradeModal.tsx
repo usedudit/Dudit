@@ -6,7 +6,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { Button, ThreeDotsLoader } from "@/components/reusable"
 import { XIcon } from "@/lib/icons"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 import { formatCurrency } from "@/lib/utils"
 import {
   listPlansAction,

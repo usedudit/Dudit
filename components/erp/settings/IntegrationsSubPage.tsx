@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 
 // ─── Integration Card (same style as IntegrationsPage.tsx) ───────────────────
 

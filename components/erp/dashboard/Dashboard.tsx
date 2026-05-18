@@ -36,7 +36,7 @@ export async function Dashboard({ partnerId, sells }: DashboardProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full max-w-[1440px] mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         {/* Row 1 */}
         <div className="lg:col-span-6 flex flex-col gap-6">
           <SummaryCards metrics={metricsData.metrics} />

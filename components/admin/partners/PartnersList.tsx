@@ -22,7 +22,7 @@ import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityPage } from "@/hooks/use-entity-page"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 
 
 // ─── Duration selector ──────────────────────────────────────────────────────

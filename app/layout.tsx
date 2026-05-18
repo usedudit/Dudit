@@ -4,8 +4,6 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
-import { Toaster as SonnerToaster } from "sonner"
-import { Toaster as ShadcnToaster } from "@/components/ui/toaster"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 
 const inter = Inter({
@@ -166,8 +164,6 @@ export default async function RootLayout({
                         </NotificationProvider>
                     </QueryProvider>
                 </SupabaseProvider>
-                <SonnerToaster position="bottom-right" richColors />
-                <ShadcnToaster />
                 <PWAUpdatePrompt />
             </body>
         </html>

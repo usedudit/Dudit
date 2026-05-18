@@ -8,7 +8,7 @@ import { PlusIcon, EditIcon, TrashIcon } from "@/lib/icons"
 import { PaymentMethodDialog } from "./payment-method-dialog"
 import { deletePaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import AlertModal from "../reusable/AlertModal"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 import { formatPercent } from "@/lib/utils"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 

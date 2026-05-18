@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Badge, Spinner } from '@/components/reusable';
@@ -409,7 +410,7 @@ export const AppointmentSheet = ({
             // Validation for range picker
             if (needsRangePicker) {
                 if (new Date(`${startDateRange}T${startTimeRange}`) >= new Date(`${endDateRange}T${endTimeRange}`)) {
-                    alert("A data de término deve ser após a data de início.");
+                    toast.warning("Intervalo inválido", "A data de término deve ser após a data de início.");
                     return;
                 }
             }

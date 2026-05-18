@@ -346,31 +346,81 @@ export async function canUserReviewProduct(productId: string): Promise<boolean> 
 export async function getProductReviews(productId: string) {
   const supabase = await getSupabaseServerClient()
 
-  const { data: reviews } = await supabase
+  const { data: reviewsData, error } = await supabase
     .from("reviews")
-    .select(`
-      *,
-      profiles:user_id(full_name, profile_image_url)
-    `)
+    .select("*")
     .eq("product_id", productId)
     .order("created_at", { ascending: false })
 
-  return reviews || []
+  if (error || !reviewsData) {
+    console.error("[Reviews] Fetch error:", error?.message)
+    return []
+  }
+
+  const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
+  let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+
+  if (userIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name, profile_image_url")
+      .in("user_id", userIds)
+
+    if (profilesData) {
+      profilesData.forEach((p: any) => {
+        profilesMap[p.user_id] = {
+          full_name: p.full_name,
+          profile_image_url: p.profile_image_url
+        }
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => ({
+    ...r,
+    profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+  }))
 }
 
 export async function getPartnerReviews(partnerId: string) {
   const supabase = await getSupabaseServerClient()
 
-  const { data: reviews } = await supabase
+  const { data: reviewsData, error } = await supabase
     .from("reviews")
     .select(`
       *,
-      profiles:user_id(full_name, profile_image_url),
       products(name, images),
       services(name, images)
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
 
-  return reviews || []
+  if (error || !reviewsData) {
+    console.error("[Reviews] Fetch error:", error?.message)
+    return []
+  }
+
+  const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
+  let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+
+  if (userIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name, profile_image_url")
+      .in("user_id", userIds)
+
+    if (profilesData) {
+      profilesData.forEach((p: any) => {
+        profilesMap[p.user_id] = {
+          full_name: p.full_name,
+          profile_image_url: p.profile_image_url
+        }
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => ({
+    ...r,
+    profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+  }))
 }

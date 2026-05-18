@@ -17,7 +17,7 @@ import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 
 // ─── Duration selector ──────────────────────────────────────────────────────
 

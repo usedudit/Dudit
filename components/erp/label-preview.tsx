@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { toast } from "@/hooks/use-notification"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import JsBarcode from "jsbarcode"
@@ -78,7 +79,7 @@ export function LabelPreview({ products, layout, onClose }: LabelPreviewProps) {
 
   const handleDownloadPDF = () => {
     // Usar library como html2pdf para download
-    alert("Recurso de download PDF em desenvolvimento. Use Ctrl+P para imprimir e salvar como PDF.")
+    toast.info("Download de PDF", "Recurso de download PDF em desenvolvimento. Use Ctrl+P para imprimir e salvar como PDF.")
   }
 
   return (

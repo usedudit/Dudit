@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-notification"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -70,7 +71,7 @@ export function SupplierForm({ partnerId, supplier }: SupplierFormProps) {
       })
 
     if (result.error) {
-      alert("Erro: " + result.error)
+      toast.error("Erro ao salvar fornecedor", result.error)
       setIsLoading(false)
     } else {
       router.push("/erp/suppliers")

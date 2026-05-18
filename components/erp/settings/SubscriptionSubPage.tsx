@@ -25,7 +25,7 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 import {
     listPlansAction,
     getSubscriptionStatusAction,

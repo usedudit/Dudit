@@ -23,7 +23,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { toast } from "sonner"
+import { toast } from "@/hooks/use-notification"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 

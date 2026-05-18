@@ -510,6 +510,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     const [isStickyVisible, setIsStickyVisible] = useState(false)
     const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
     const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
+    const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
     const tabsScrollRef = useRef<HTMLDivElement>(null)
     const topRef = useRef<HTMLDivElement>(null)
     const { user } = useSupabase()
@@ -626,6 +627,21 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         window.history.pushState({}, "", query ? `${pathname}?${query}` : pathname)
     }, [pathname])
     const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })
+
+    useEffect(() => {
+        if (!categoryView && pendingScrollId) {
+            if (pendingScrollId === "todos") {
+                scrollToProducts()
+            } else {
+                const el = document.getElementById(pendingScrollId)
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+            }
+            setPendingScrollId(null)
+        }
+    }, [categoryView, pendingScrollId])
+
     const openCategory = (tag: string | null) => {
         setActiveSection("products")
         setCategoryView(tag)
@@ -636,13 +652,22 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
         setTimeout(scrollToProducts, 0)
     }
     const selectTab = (tag: string) => {
-        if (tag === "todos") openCategory(null)
-        else if (tag === "featured") {
+        setActiveSection("products")
+        if (categoryView) {
             setCategoryView(null)
             updateCategoryUrl(null)
-            setActiveTag("featured")
-            document.getElementById("featured")?.scrollIntoView({ behavior: "smooth", block: "start" })
-        } else openCategory(tag)
+            setPendingScrollId(tag)
+        } else {
+            if (tag === "todos") {
+                scrollToProducts()
+            } else {
+                const el = document.getElementById(tag)
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+            }
+        }
+        setActiveTag(tag)
     }
 
     const categoryItems = categoryView
@@ -808,12 +833,12 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                     {activeTag === "featured" && activeSection === "products" && <Check size={16} />}
                                 </button>
                             )}
-                            <button onClick={() => openCategory(null)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                            <button onClick={() => selectTab("todos")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "todos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
                                 <span>Todos</span>
                                 {activeTag === "todos" && activeSection === "products" && <Check size={16} />}
                             </button>
                             {groupedItems.map(group => (
-                                <button key={group.id} onClick={() => openCategory(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                <button key={group.id} onClick={() => selectTab(group.id)} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === group.id && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
                                     <span className="capitalize">{group.name}</span>
                                     {activeTag === group.id && activeSection === "products" && <Check size={16} />}
                                 </button>
