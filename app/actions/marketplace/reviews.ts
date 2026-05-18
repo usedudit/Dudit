@@ -33,7 +33,7 @@ async function checkFraudulentReview(
       .select("id, order_items!inner(product_id)")
       .eq("buyer_id", userId)
       .eq("partner_id", partnerId)
-      .eq("situation", "paid")
+      .in("situation", ["paid", "shipped", "delivered"])
       .eq("order_items.product_id", productId)
 
     if (error) {
@@ -188,31 +188,7 @@ export async function createReviewAction(data: {
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
   }
 
-  // SELF-HEALING: If the order's product_id or service_id is NULL in the DB,
-  // we populate it now. This is necessary because older database schemas/triggers
-  // check orders.product_id directly, but the app inserts products into order_items.
-  try {
-    const { createAdminClient } = await import("@/lib/supabase/server")
-    const adminClient = createAdminClient()
-    const { data: orderDetails } = await adminClient
-      .from("orders")
-      .select("product_id, service_id")
-      .eq("id", data.orderId)
-      .maybeSingle()
 
-    if (orderDetails && !orderDetails.product_id && !orderDetails.service_id) {
-      console.log(`[REVIEW SELF-HEALING] Updating order ${data.orderId} with product_id: ${data.productId}, service_id: ${data.serviceId}`)
-      await adminClient
-        .from("orders")
-        .update({
-          product_id: data.productId,
-          service_id: data.serviceId
-        })
-        .eq("id", data.orderId)
-    }
-  } catch (err: any) {
-    console.error(`[REVIEW SELF-HEALING] Error patching order: ${err.message}`)
-  }
 
   const { error } = await supabase.from("reviews").insert({
     order_id: data.orderId,
