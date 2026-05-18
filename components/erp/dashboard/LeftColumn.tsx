@@ -15,6 +15,7 @@ import {
   AlertCircleIcon
 } from "@/lib/icons";
 import { formatCurrency as brl } from "@/lib/utils";
+import { Dropdown, DropdownItem, Button, IconPlaceholder } from "@/components/reusable";
 
 export function SummaryCards({ metrics }: { metrics: any[] }) {
   const icons = [MoneyIcon, SalesIcon, TagIcon, Users];
@@ -24,50 +25,51 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
     const isPositive = !trendStr.trim().startsWith("-");
     const percentMatch = trendStr.match(/([0-9.,]+)%/);
     const percentValue = percentMatch ? percentMatch[1] : "0";
-    const changeMatch = trendStr.match(/^[+-]?[0-9.,]+%/);
-    const change = changeMatch ? changeMatch[0] : "0%";
-
+    
     return {
       percent: `${isPositive ? "↑" : "↓"} ${percentValue} %`,
       isPositive,
-      change
+      change: `${percentValue}%`
     };
   };
 
-  if (!metrics || metrics.length === 0) {
-    return null;
-  }
+  const formattedMetrics = (metrics || []).map((m, idx) => {
+    const trend = parseTrend(m.trend);
+    return {
+      title: m.title,
+      value: m.value,
+      trendText: trend.percent,
+      isPositive: trend.isPositive,
+      change: trend.change,
+      icon: icons[idx % icons.length]
+    };
+  });
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6 w-full h-full">
-      {metrics.slice(0, 4).map((metric, i) => {
-        const CardIcon = icons[i % icons.length];
-        const { percent, isPositive, change } = parseTrend(metric.trend);
-
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {formattedMetrics.map((card, idx) => {
+        const Icon = card.icon;
         return (
-          <div key={i} className="bg-white rounded-[24px] p-6 border border-brand-border flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-brand-green-light flex items-center justify-center text-brand-dark">
-                  <CardIcon size={18} className="text-brand-dark" />
-                </div>
-                <span className="text-[14px] font-bold text-brand-dark">{metric.title}</span>
+          <div key={idx} className="bg-white rounded-[24px] p-6 border border-brand-border flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <span className="text-[13px] font-semibold text-brand-inactive-text block mb-1">{card.title}</span>
+                <span className="text-[28px] font-extrabold text-brand-dark tracking-tight leading-none">
+                  {card.value}
+                </span>
               </div>
-              <span
-                className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
-                  }`}
-              >
-                <span>{percent.split(" ")[0]}</span>
-                <span>{percent.split(" ")[1]}</span>
-                <span>{percent.split(" ")[2]}</span>
-              </span>
+              <div className="w-12 h-12 rounded-full bg-brand-green-light flex items-center justify-center text-brand-dark">
+                <Icon size={24} className="text-brand-dark" />
+              </div>
             </div>
-
-            <div className="flex items-baseline space-x-2 mt-2">
-              <h2 className="text-[32px] font-extrabold text-brand-dark tracking-tight leading-none">{metric.value}</h2>
-              <span className="text-[12px] font-semibold text-brand-inactive-text">
-                <span className="text-brand-dark">{change}</span> vs mês passado
+            
+            <div className="flex items-center space-x-2">
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-[6px] ${
+                card.isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
+              }`}>
+                {card.trendText}
               </span>
+              <span className="text-[12px] font-semibold text-brand-inactive-text">vs mês passado</span>
             </div>
           </div>
         );
@@ -75,6 +77,36 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
     </div>
   );
 }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white rounded-xl border border-brand-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
+        <p className="text-[13px] font-extrabold text-brand-dark">{label}</p>
+        <div className="flex flex-col gap-1.5">
+          {payload.map((entry: any, index: number) => {
+            const color = entry.stroke || entry.fill || entry.color || "var(--color-brand-green)";
+            const name = entry.name === "income" ? "Este Período" : entry.name === "expense" ? "Período Anterior" : entry.name;
+            return (
+              <div key={index} className="flex items-center justify-between gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-current shrink-0" style={{ color }} />
+                  <span className="text-[12px] font-semibold text-brand-inactive-text">
+                    {name}
+                  </span>
+                </div>
+                <span className="text-[12px] font-bold text-brand-dark">
+                  {typeof entry.value === "number" ? brl(entry.value) : entry.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], totalRevenue: number }) {
   const chartData = (revenueData || []).map(p => ({
@@ -87,10 +119,18 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
     <div className="bg-white rounded-[24px] p-6 border border-brand-border flex-1">
       <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
         <h3 className="text-xl font-bold text-brand-dark">Receita Total</h3>
-        <button className="flex items-center space-x-2 text-[13px] font-bold text-brand-dark border border-brand-border rounded-full px-4 py-2 hover:bg-brand-green-light transition-colors">
-          <span>Últimos 30 Dias</span>
-          <ChevronDownIcon size={16} className="text-brand-inactive-text" />
-        </button>
+        <Dropdown
+          fullWidth={false}
+          align="right"
+          width="w-44"
+          trigger={
+            <button className="flex items-center text-[13px] font-bold text-brand-dark border border-brand-border rounded-full px-4 py-2 hover:bg-brand-green-light transition-colors">
+              <span>Últimos 30 Dias</span>
+            </button>
+          }
+        >
+          <DropdownItem>Últimos 30 Dias</DropdownItem>
+        </Dropdown>
       </div>
 
       <div className="flex flex-wrap items-end justify-between mb-8 gap-4">
@@ -139,7 +179,7 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
               dx={-10}
             />
             <Tooltip
-              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', padding: '12px 16px', fontWeight: 'bold' }}
+              content={<CustomTooltip />}
               cursor={{ stroke: 'var(--color-brand-border)', strokeWidth: 2, strokeDasharray: '4 4' }}
             />
             <Area
@@ -176,13 +216,15 @@ const iconMap: Record<string, any> = {
 export function NeedsAttention({ alerts }: { alerts: any[] }) {
   if (!alerts || alerts.length === 0) {
     return (
-      <div className="bg-white rounded-[24px] p-6 border border-brand-border flex-1">
+      <div className="bg-white rounded-[24px] p-6 border border-brand-border flex-1 flex flex-col justify-center min-h-[340px]">
         <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
           <h3 className="text-xl font-bold text-brand-dark">Precisa de Atenção</h3>
         </div>
-        <div className="py-8 text-center text-brand-inactive-text font-medium text-[15px]">
-          Tudo em dia! Nenhum alerta no momento.
-        </div>
+        <IconPlaceholder
+          title="Sem Alertas"
+          subtitle="Tudo em dia! Nenhum alerta no momento."
+          className="flex-1 py-4"
+        />
       </div>
     );
   }
@@ -231,9 +273,9 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                     </span>
                   </td>
                   <td className="text-right w-[100px]">
-                    <button className="text-[12px] font-bold text-brand-dark bg-brand-green-light border border-brand-border px-4 py-2 rounded-lg hover:bg-brand-green-secondary transition-colors whitespace-nowrap">
+                    <Button variant="outline" size="sm" className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto">
                       Resolver
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );

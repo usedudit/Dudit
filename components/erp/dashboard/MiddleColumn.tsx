@@ -1,64 +1,41 @@
 "use client";
 
 import React from "react";
-import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
-import { ChevronDownIcon as ChevronDown } from "@/lib/icons";
 import { formatCurrency as brl } from "@/lib/utils";
-
-const ORIGIN_COLORS = [
-  'var(--color-brand-dark)',
-  'var(--color-brand-green)',
-  'var(--color-brand-border)',
-  '#93c5fd', // blue
-  '#fbcfe8', // pink
-];
+import { Dropdown, DropdownItem } from "@/components/reusable";
+import { DashboardPieChart, CHART_COLORS } from "./charts/DashboardCharts";
 
 export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData: any[], revenueChartTrend: string }) {
   const totalRevenue = (originData || []).reduce((acc, o) => acc + Number(o.value), 0);
-
-  const chartData = (originData || []).map((origin, index) => {
-    const percent = totalRevenue > 0 ? Math.round((Number(origin.value) / totalRevenue) * 100) : 0;
-    return {
-      name: origin.label,
-      value: percent,
-      fill: ORIGIN_COLORS[index % ORIGIN_COLORS.length],
-    };
-  });
-
   const trendPositive = !revenueChartTrend?.startsWith("-");
 
   return (
     <div className="bg-white rounded-[24px] p-6 border border-brand-border flex flex-col h-full">
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-xl font-bold text-brand-dark">Origem da Receita</h3>
-        <button className="flex items-center space-x-1 text-[13px] font-bold text-brand-dark hover:text-brand-inactive-text">
-          <span>Últimos 30 Dias</span>
-          <ChevronDown size={16} className="text-brand-inactive-text" />
-        </button>
+        <Dropdown
+          fullWidth={false}
+          align="right"
+          width="w-44"
+          trigger={
+            <button className="flex items-center text-[13px] font-bold text-brand-dark hover:text-brand-inactive-text">
+              <span>Últimos 30 Dias</span>
+            </button>
+          }
+        >
+          <DropdownItem>Últimos 30 Dias</DropdownItem>
+        </Dropdown>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 flex-1">
-        {/* Radial Chart */}
-        <div className="h-[220px] w-full sm:w-[220px] shrink-0 relative mb-6 sm:mb-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadialBarChart
-              cx="50%"
-              cy="50%"
-              innerRadius="40%"
-              outerRadius="100%"
-              barSize={14}
-              data={chartData}
-              startAngle={90}
-              endAngle={-270}
-            >
-              <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-              <RadialBar
-                background={{ fill: 'var(--color-brand-green-light)' }}
-                dataKey="value"
-                cornerRadius={10}
-              />
-            </RadialBarChart>
-          </ResponsiveContainer>
+        {/* Half Donut Chart */}
+        <div className="w-full max-w-[260px] mx-auto -mb-4 shrink-0 flex items-center justify-center">
+          <DashboardPieChart 
+            data={(originData || []).map(o => ({ label: o.label, value: Number(o.value) }))} 
+            totalValue={brl(totalRevenue)} 
+            totalLabel="Receita Total"
+            half
+          />
         </div>
 
         <div className="flex flex-col flex-1 w-full justify-center">
@@ -80,7 +57,7 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
           <div className="space-y-4">
             {(originData || []).map((item, index) => {
               const percent = totalRevenue > 0 ? Math.round((Number(item.value) / totalRevenue) * 100) : 0;
-              const color = ORIGIN_COLORS[index % ORIGIN_COLORS.length];
+              const color = CHART_COLORS[index % CHART_COLORS.length];
 
               return (
                 <div key={item.label} className="flex items-center justify-between">

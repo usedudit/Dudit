@@ -78,8 +78,8 @@ export default async function ERPDashboardPage({
   return (
     <>
       <ERPPageHeader title={activeStore?.storeName ?? "Dashboard"} />
-      <FadeIn className="min-h-svh bg-white p-4 dark:bg-dark-background md:p-6">
-        <div className="mx-auto w-full max-w-[1600px] space-y-6">
+      <FadeIn className="p-4">
+        <div className="w-full space-y-6">
           <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
               <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
