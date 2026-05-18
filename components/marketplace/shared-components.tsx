@@ -346,7 +346,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                                     {formatCurrency(product.price)}
                                 </span>
                                 {product.originalPrice && product.originalPrice > product.price && (
-                                    <Badge variant="orange" icon={null} className="px-1.5 py-0.5 text-[10px] md:text-[11px] font-bold">
+                                    <Badge variant="orange" icon={null} className="whitespace-nowrap scale-90 shrink-0">
                                         -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
                                     </Badge>
                                 )}

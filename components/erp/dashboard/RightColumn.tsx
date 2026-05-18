@@ -22,7 +22,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
-        <p className="text-[13px] font-extrabold text-brand-dark dark:text-dark-heading">{label}</p>
+        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{label}</p>
         <div className="flex flex-col gap-1.5">
           {payload.map((entry: any, index: number) => {
             const color = entry.fill || "var(--color-brand-dark)";
@@ -108,6 +108,7 @@ const activityIconMap: Record<string, any> = {
   calendar: CalendarIcon,
   wrench: Settings2Icon,
   user: UserIcon,
+  wrenchIcon: Settings2Icon,
   truck: TruckIcon,
   file: FileIcon,
   tag: TagIcon,

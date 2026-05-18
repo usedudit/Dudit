@@ -25,51 +25,51 @@ export function SummaryCards({ metrics }: { metrics: any[] }) {
     const isPositive = !trendStr.trim().startsWith("-");
     const percentMatch = trendStr.match(/([0-9.,]+)%/);
     const percentValue = percentMatch ? percentMatch[1] : "0";
-    
+    const changeMatch = trendStr.match(/^[+-]?[0-9.,]+%/);
+    const change = changeMatch ? changeMatch[0] : "0%";
+
     return {
       percent: `${isPositive ? "↑" : "↓"} ${percentValue} %`,
       isPositive,
-      change: `${percentValue}%`
+      change
     };
   };
 
-  const formattedMetrics = (metrics || []).map((m, idx) => {
-    const trend = parseTrend(m.trend);
-    return {
-      title: m.title,
-      value: m.value,
-      trendText: trend.percent,
-      isPositive: trend.isPositive,
-      change: trend.change,
-      icon: icons[idx % icons.length]
-    };
-  });
+  if (!metrics || metrics.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-      {formattedMetrics.map((card, idx) => {
-        const Icon = card.icon;
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full h-full">
+      {metrics.slice(0, 4).map((metric, i) => {
+        const CardIcon = icons[i % icons.length];
+        const { percent, isPositive, change } = parseTrend(metric.trend);
+
         return (
-          <div key={idx} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body block mb-1">{card.title}</span>
-                <span className="text-[28px] font-extrabold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                  {card.value}
-                </span>
+          <div key={i} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
+                  <CardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                </div>
+                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{metric.title}</span>
               </div>
-              <div className="w-12 h-12 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
-                <Icon size={24} className="text-brand-dark dark:text-dark-heading" />
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-[6px] ${
-                card.isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
-              }`}>
-                {card.trendText}
+              <span
+                className={`text-[12px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 ${
+                  isPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
+                }`}
+              >
+                <span>{percent.split(" ")[0]}</span>
+                <span>{percent.split(" ")[1]}</span>
+                <span>{percent.split(" ")[2]}</span>
               </span>
-              <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">vs mês passado</span>
+            </div>
+
+            <div className="flex items-baseline space-x-2 mt-2">
+              <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{metric.value}</h2>
+              <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs mês passado
+              </span>
             </div>
           </div>
         );
@@ -82,7 +82,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
-        <p className="text-[13px] font-extrabold text-brand-dark dark:text-dark-heading">{label}</p>
+        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{label}</p>
         <div className="flex flex-col gap-1.5">
           {payload.map((entry: any, index: number) => {
             const color = entry.stroke || entry.fill || entry.color || "var(--color-brand-green)";
@@ -138,7 +138,7 @@ export function Cashflow({ revenueData, totalRevenue }: { revenueData: any[], to
       <div className="flex flex-wrap items-end justify-between mb-8 gap-4">
         <div>
           <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Total Acumulado</span>
-          <div className="text-[32px] font-extrabold text-brand-dark dark:text-dark-heading tracking-tight leading-none mt-1">
+          <div className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mt-1">
             {brl(totalRevenue)}
           </div>
         </div>
@@ -243,7 +243,7 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
             {alerts.map((item) => {
               const Icon = iconMap[item.icon] || AlertCircleIcon;
 
-              let description = "Ação recomendada para manter suas operações organizadas.";
+              let description = "Ação recomendada para manter suas operations organizadas.";
               if (item.id === "due-accounts") {
                 description = "Verifique o contas a pagar e receber para evitar juros ou atrasos.";
               } else if (item.id === "pending-orders") {
@@ -270,7 +270,7 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                     </div>
                   </td>
                   <td className="text-right pr-6">
-                    <span className="text-[15px] font-extrabold text-brand-dark dark:text-dark-heading">
+                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
                       {item.count} pendente{item.count > 1 ? "s" : ""}
                     </span>
                   </td>

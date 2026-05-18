@@ -44,7 +44,7 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
           <div className="mb-6">
             <div className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mb-1">Total de Vendas</div>
             <div className="flex items-baseline space-x-3">
-              <span className="text-[32px] font-extrabold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{brl(totalRevenue)}</span>
+              <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{brl(totalRevenue)}</span>
               {revenueChartTrend && (
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-[6px] flex items-center space-x-1 ${trendPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
                   }`}>
@@ -69,7 +69,7 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
                       <div className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">{brl(item.value)}</div>
                     </div>
                   </div>
-                  <div className="text-[13px] font-extrabold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-3.5 py-1.5 rounded-lg border border-brand-border dark:border-dark-border">
+                  <div className="text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-3.5 py-1.5 rounded-lg border border-brand-border dark:border-dark-border">
                     {percent}%
                   </div>
                 </div>

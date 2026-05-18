@@ -1,6 +1,6 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis, Tooltip } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import type { ChartPoint } from "@/lib/data/dashboard"
 import { cn } from "@/lib/utils"
@@ -15,6 +15,30 @@ export const CHART_COLORS = ["#059669", "#003D32", "#0FA96B", "#bcf49d", "#fff08
 function formatCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0)
 }
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const entry = payload[0];
+    const color = entry.payload.fill || entry.color || "var(--color-brand-green)";
+    return (
+      <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
+        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{entry.name}</p>
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-current shrink-0" style={{ color }} />
+            <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+              Vendas
+            </span>
+          </div>
+          <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(entry.value))}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function DashboardLineChart({ data }: { data: any[] }) {
   return (
@@ -80,7 +104,7 @@ export function DashboardBarChart({ data }: { data: ChartPoint[] }) {
 
 export function DashboardPieChart({ data, totalValue, totalLabel, half }: { data: ChartPoint[], totalValue?: string, totalLabel?: string, half?: boolean }) {
   return (
-    <div className={cn("w-full relative flex items-center justify-center", half ? "h-[140px]" : "h-[230px]")}>
+    <div className={cn("w-full relative flex items-center justify-center", half ? "h-[140px]" : "h-[180px]")}>
       {totalValue && (
         <div className={cn("absolute flex flex-col items-center justify-center pointer-events-none mt-1", half ? "bottom-0" : "inset-0")}>
           <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">{totalLabel || "Total"}</span>
@@ -89,13 +113,13 @@ export function DashboardPieChart({ data, totalValue, totalLabel, half }: { data
       )}
       <ChartContainer config={config} className="h-full w-full">
         <PieChart>
-          <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+          <Tooltip content={<CustomPieTooltip />} />
           <Pie
             data={data}
             dataKey="value"
             nameKey="label"
-            innerRadius={65}
-            outerRadius={90}
+            innerRadius={50}
+            outerRadius={70}
             paddingAngle={2}
             cx="50%"
             cy={half ? "100%" : "50%"}

@@ -1,5 +1,5 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
-import FinancialOverviewPage from "@/components/erp/financial-overview/FinancialOverviewPage"
+import { FinancialSummary } from "@/components/erp/financial-overview/FinancialSummary"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
@@ -25,11 +25,12 @@ export default async function FinancialOverviewRoute() {
   return (
     <>
       <ERPPageHeader title="Resumo Financeiro" />
-      <FadeIn className="min-h-svh bg-white p-4 dark:bg-dark-background md:p-6">
-        <div className="mx-auto w-full max-w-[1600px] space-y-6">
-            <FinancialOverviewPage data={result.data} />
+      <FadeIn className="p-4">
+        <div className="w-full space-y-6 pt-4 px-4 md:px-8">
+          <FinancialSummary data={result.data} />
         </div>
       </FadeIn>
     </>
   )
 }
+

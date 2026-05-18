@@ -67,7 +67,9 @@ export type FinancialOverviewData = {
     dueKind: "overdue" | "today" | "soon"
     daysUntilDue: number
   }>
+  cashflow: Record<FinancialOverviewPeriod, Array<{ label: string; entrada: number; saida: number }>>
 }
+
 
 const num = (value: unknown): number => {
   if (value === null || value === undefined || value === "") return 0
@@ -188,6 +190,36 @@ function buildRevenueEvolution(transactions: DbTransaction[], paidByTransaction:
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-12)
       .map(([, value]) => ({ ...value, gross: money(value.gross), net: money(value.net) }))
+  }
+
+  return {
+    daily: build("daily"),
+    weekly: build("weekly"),
+    monthly: build("monthly"),
+  }
+}
+
+function buildCashflow(transactions: DbTransaction[]) {
+  const paidTxs = transactions.filter((tx) => isPaidStatus(tx.status))
+  const build = (period: FinancialOverviewPeriod) => {
+    const buckets = new Map<string, { label: string; entrada: number; saida: number }>()
+    for (const tx of paidTxs) {
+      const ymd = txDate(tx)
+      const key = period === "daily" ? ymd : period === "weekly" ? weekLabel(ymd) : ymd.slice(0, 7)
+      const label = period === "daily" ? formatAxisDate(ymd) : period === "weekly" ? `Sem. ${weekLabel(ymd)}` : monthLabel(ymd)
+      const current = buckets.get(key) || { label, entrada: 0, saida: 0 }
+      const amount = Math.abs(num(tx.amount))
+      if (txDirection(tx) === "in") {
+        current.entrada += amount
+      } else {
+        current.saida += amount
+      }
+      buckets.set(key, current)
+    }
+    return Array.from(buckets.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([, value]) => ({ ...value, entrada: money(value.entrada), saida: money(value.saida) }))
   }
 
   return {
@@ -337,6 +369,7 @@ export const getFinancialOverviewData = cache(async (partnerId: string): Promise
         revenueDistribution,
         latestMovements,
         dueAccounts,
+        cashflow: buildCashflow(transactions),
       },
     }
   } catch (error: any) {
