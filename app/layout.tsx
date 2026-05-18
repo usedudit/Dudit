@@ -6,6 +6,7 @@ import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { Toaster as SonnerToaster } from "sonner"
 import { Toaster as ShadcnToaster } from "@/components/ui/toaster"
+import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 
 const inter = Inter({
     subsets: ["latin"],
@@ -44,8 +45,17 @@ export const metadata: Metadata = {
         type: "website",
     },
     icons: {
-        icon: "https://img.dudit.com.br/static/Icon.png",
-        apple: "https://img.dudit.com.br/static/Icon.png",
+        icon: [
+            { url: '/favicon.ico', sizes: '32x32' },
+            { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+            { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+        ],
+        apple: '/icons/apple-touch-icon.png',
+    },
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'default',
+        title: 'Dudit',
     },
     metadataBase: new URL("https://dudit.com.br"),
 }
@@ -73,7 +83,9 @@ export default async function RootLayout({
                 />
                 <meta name="theme-color" content="#059669" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="default" />
                 <meta name="mobile-web-app-capable" content="yes" />
+                <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
@@ -156,6 +168,7 @@ export default async function RootLayout({
                 </SupabaseProvider>
                 <SonnerToaster position="bottom-right" richColors />
                 <ShadcnToaster />
+                <PWAUpdatePrompt />
             </body>
         </html>
     )

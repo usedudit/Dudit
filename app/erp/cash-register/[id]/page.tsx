@@ -7,14 +7,15 @@ import CashSessionDetailPage from "@/components/erp/cash-register/CashSessionDet
 
 export const dynamic = "force-dynamic"
 
-export default async function CashSessionDetailsServer({ params }: { params: { id: string } }) {
+export default async function CashSessionDetailsServer({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 
   const partnerId = context.partnerId
   const [detailsResult] = await Promise.all([
-    getCashSessionDetailsAction(partnerId, params.id),
+    getCashSessionDetailsAction(partnerId, id),
   ])
 
   if (!detailsResult.success) return <AccessDenied />

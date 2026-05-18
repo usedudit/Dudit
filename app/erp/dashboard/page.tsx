@@ -52,7 +52,7 @@ async function ActiveDashboardTab({ tab, partnerId, sells, mode }: { tab: Dashbo
 export default async function ERPDashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tab?: string }> | { tab?: string }
+  searchParams?: Promise<{ tab?: string }>
 }) {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />

@@ -825,7 +825,7 @@ const UseCases = () => {
 }
 
 
-export const HomePage = () => {
+const HomePage = () => {
    const [activePage, setActivePage] = useState('home');
    const router = useRouter();
 

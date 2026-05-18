@@ -9,10 +9,11 @@ import { formatCurrency } from "@/lib/utils"
 export default async function PaymentSuccessPage({
   searchParams,
 }: {
-  searchParams: { order_id?: string; payment_id?: string }
+  searchParams: Promise<{ order_id?: string; payment_id?: string }>
 }) {
-  const orderId = searchParams.order_id
-  const paymentId = searchParams.payment_id
+  const params = await searchParams
+  const orderId = params.order_id
+  const paymentId = params.payment_id
 
   if (!orderId) {
     redirect("/")

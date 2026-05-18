@@ -1,3 +1,24 @@
+import withSerwistInit from "@serwist/next"
+
+import { spawnSync } from "node:child_process"
+
+const gitHash = spawnSync("git", ["rev-parse", "HEAD"], {
+  encoding: "utf-8",
+}).stdout?.trim()
+
+const revision =
+  gitHash ||
+  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  "offline-v1"
+
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  additionalPrecacheEntries: [{ url: "/~offline", revision }],
+  disable: process.env.NODE_ENV === "development",
+  register: false,
+})
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
@@ -120,4 +141,4 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withSerwist(nextConfig)

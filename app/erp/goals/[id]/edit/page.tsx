@@ -8,7 +8,8 @@ import GoalFormPage from "@/components/erp/goals/GoalFormPage"
 
 export const dynamic = "force-dynamic"
 
-export default async function EditGoalPage({ params }: { params: { id: string } }) {
+export default async function EditGoalPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
   const partnerId = context.partnerId
@@ -16,7 +17,7 @@ export default async function EditGoalPage({ params }: { params: { id: string } 
   const [{ allowed }, options, goalRes] = await Promise.all([
     checkPartnerPermission(partnerId, "goals", "edit"),
     getGoalFormOptionsAction(partnerId),
-    getSalesGoalByIdAction(partnerId, params.id),
+    getSalesGoalByIdAction(partnerId, id),
   ])
   if (!allowed || !options.success || !goalRes.success) return <AccessDenied />
 

@@ -9,9 +9,10 @@ import { formatCurrency } from "@/lib/utils"
 export default async function PaymentFailurePage({
   searchParams,
 }: {
-  searchParams: { order_id?: string }
+  searchParams: Promise<{ order_id?: string }>
 }) {
-  const orderId = searchParams.order_id
+  const params = await searchParams
+  const orderId = params.order_id
 
   if (!orderId) {
     redirect("/")
