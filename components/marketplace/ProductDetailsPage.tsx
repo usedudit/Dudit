@@ -184,10 +184,17 @@ export function ProductDetailsPageClient({
                     return getProductImageUrl(v.image_url || opts?.image)
                 })
                 .filter((img): img is string => !!img && img.length > 5)
-            images = variantImages.length ? Array.from(new Set(variantImages)) : [PLACEHOLDER]
+            if (variantImages.length) images = Array.from(new Set(variantImages))
         }
-        return images.length ? images : [PLACEHOLDER]
-    }, [product.images, variants])
+        if (images.length) return images
+        if (product.video_type && product.video_url) return []
+        const videoThumb = product.video_thumbnail
+        if (videoThumb && String(videoThumb).trim()) {
+            const url = String(videoThumb)
+            return [url.startsWith("http") ? url : getProductImageUrl(url)]
+        }
+        return [PLACEHOLDER]
+    }, [product.images, product.video_thumbnail, product.video_type, product.video_url, variants])
 
     const galleryItems = useMemo(() => {
         const videoType = product.video_type

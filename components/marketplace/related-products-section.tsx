@@ -1,5 +1,6 @@
 import { getCachedRelatedProducts } from "@/app/actions/marketplace/products"
 import { ProductCarousel } from "./shared-components"
+import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 
 interface RelatedProductsSectionProps {
     partnerId: string
@@ -26,8 +27,7 @@ export async function RelatedProductsSection({ partnerId, currentProductId }: Re
 
     // Mapeamento idêntico ao marketplace-home-client para garantir
     const displayProducts = partnerProducts.map((product: any) => {
-        const hasOwnImages = product.images && product.images.length > 0
-        const images = hasOwnImages ? product.images : (product.fallback_variant_image ? [product.fallback_variant_image] : product.images)
+        const images = getProductDisplayImages(product)
         const basePrice = Number(product.promotional_price || product.price)
         const price = (!product.promotional_price && product.fallback_variant_price) ? Number(product.fallback_variant_price) : basePrice
 

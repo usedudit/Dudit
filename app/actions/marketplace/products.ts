@@ -255,7 +255,7 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
       const { data } = await supabase
         .from("products")
         .select(`
-          id, name, price, promotional_price, images, rating,
+          id, name, price, promotional_price, images, video_thumbnail, rating,
           category_id, category:product_categories!category_id(name),
           partners(id, store_name, store_image_url, addresses(city, state)),
           product_variants(variant_options, price_adjustment, is_active)

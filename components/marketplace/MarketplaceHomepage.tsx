@@ -9,6 +9,7 @@ import {
   CategoryList,
   InfoSection
 } from "./shared-components"
+import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 
 interface MarketplaceHomeProps {
   products: any[]
@@ -34,8 +35,7 @@ export default function MarketplaceHome({ products = [], vitrines = [], user, us
 
   // useMemo: Prevent re-computation when activeTrend changes (products don't change)
   const displayProducts = useMemo(() => products.map((product) => {
-    const hasOwnImages = product.images && product.images.length > 0
-    const images = hasOwnImages ? product.images : (product.fallback_variant_image ? [product.fallback_variant_image] : product.images)
+    const images = getProductDisplayImages(product)
     const basePrice = Number(product.promotional_price || product.price)
     const price = (!product.promotional_price && product.fallback_variant_price) ? Number(product.fallback_variant_price) : basePrice
 

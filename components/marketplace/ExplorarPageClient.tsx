@@ -14,6 +14,7 @@ import { ChevronLeft } from "lucide-react"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -103,8 +104,7 @@ export function ExplorarPageClient({ initialResults = [], query = '', type = 'tu
                     itemType,
                 }
             }
-            const hasOwnImages = item.images && item.images.length > 0
-            const images = hasOwnImages ? item.images : (item.fallback_variant_image ? [item.fallback_variant_image] : item.images)
+            const images = getProductDisplayImages(item)
             const basePrice = Number(item.promotional_price || item.price)
             const price = (!item.promotional_price && item.fallback_variant_price) ? Number(item.fallback_variant_price) : basePrice
             return {

@@ -17,6 +17,7 @@ import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
 import { Button, DefaultModal, Input } from "@/components/reusable"
 import { ItemCard } from "./shared-components"
+import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
 
 interface VendorPageClientProps {
@@ -56,7 +57,7 @@ const normalizeItemForCard = (item: any, partner: any) => {
         ...item,
         price,
         originalPrice: item.promotional_price ? item.price : undefined,
-        images: item.images?.length ? item.images : item.fallback_variant_image ? [item.fallback_variant_image] : item.images,
+        images: getProductDisplayImages(item),
         partners: {
             store_name: partner.storeName,
             store_avatar: partner.storeImageUrl,

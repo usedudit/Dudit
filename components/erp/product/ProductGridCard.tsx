@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getStockStatus, formatCurrency } from "./product-utils"
 import type { Product } from "@/lib/types/product"
 
@@ -46,8 +46,7 @@ const ProductGridCard = React.memo(
             : 0
         const hasVariations = variationsCount > 0
 
-        const hasImage = product.images && product.images.length > 0 && product.images[0] && product.images[0].trim() !== ''
-        const imageUrl = hasImage && product.images ? getR2ImageUrl(product.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
+        const imageUrl = getPrimaryProductDisplayImage(product)
 
         return (
             <motion.div

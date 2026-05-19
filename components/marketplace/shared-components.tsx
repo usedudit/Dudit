@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
@@ -302,7 +303,7 @@ interface ItemCardProps {
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true }) => {
-    const imageUrl = getProductImageUrl(product.images)
+    const imageUrl = getPrimaryProductDisplayImage(product)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null

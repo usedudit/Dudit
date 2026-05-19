@@ -1,15 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
 import { TrashIcon, UploadIcon } from "@/lib/icons"
 import {
   bytesToBase64,
   compressVideoIfNeeded,
-  generateVideoThumbnail,
-  validateVideoFile,
+  prepareVideoClientPreview,
 } from "@/lib/video/client"
 import type { VideoMetadata, VideoType } from "@/lib/video/shared"
 
@@ -29,6 +28,13 @@ const EMPTY_VIDEO: VideoMetadata = {
   video_provider_id: null,
 }
 
+type LocalPreviewState = {
+  sessionId: number
+  previewUrl: string
+  thumbnailDataUrl: string | null
+  duration: number | null
+}
+
 function putWithProgress(
   url: string,
   file: File,
@@ -36,17 +42,6 @@ function putWithProgress(
   onProgress: (progress: number) => void,
 ) {
   return new Promise<void>((resolve, reject) => {
-    const fileName = file.name
-    const actualContentType = file.type
-
-    console.log("[R2UploadDebug] before PUT", {
-      fileName,
-      fileType: actualContentType,
-      signedExpectedContentType: signedContentType,
-      actualContentType,
-      uploadUrl: url.split("?")[0],
-    })
-
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
     xhr.setRequestHeader("Content-Type", signedContentType)
@@ -54,11 +49,6 @@ function putWithProgress(
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
     }
     xhr.onload = () => {
-      console.log("[R2UploadDebug] after PUT", {
-        fileName,
-        status: xhr.status,
-        statusText: xhr.statusText,
-      })
       if (xhr.status >= 200 && xhr.status < 300) resolve()
       else reject(new Error(`Upload interrompido (${xhr.status})`))
     }
@@ -68,40 +58,144 @@ function putWithProgress(
   })
 }
 
-function getPreviewUrl(video: VideoMetadata) {
+function getEmbedPreviewUrl(video: VideoMetadata) {
   if (video.video_type === "youtube" && video.video_provider_id) {
     return `https://www.youtube.com/embed/${video.video_provider_id}`
   }
   if (video.video_type === "vimeo" && video.video_provider_id) {
     return `https://player.vimeo.com/video/${video.video_provider_id}`
   }
-  return video.video_url || ""
+  return null
 }
 
 export default function ProductVideoSection({ itemType, itemId, video, onChange, isEditing }: ProductVideoSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const currentFileRef = useRef<File | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+  const uploadSessionRef = useRef(0)
+
   const [source, setSource] = useState<VideoType>((video.video_type || "upload") as VideoType)
   const [urlValue, setUrlValue] = useState(video.video_type === "youtube" || video.video_type === "vimeo" ? video.video_url || "" : "")
   const [error, setError] = useState("")
   const [progress, setProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [localPreview, setLocalPreview] = useState<LocalPreviewState | null>(null)
+
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+  }, [])
+
+  const clearLocalPreviewState = useCallback(() => {
+    revokeObjectUrl()
+    setLocalPreview(null)
+    currentFileRef.current = null
+  }, [revokeObjectUrl])
+
+  const handleRemoveVideo = useCallback(() => {
+    uploadSessionRef.current += 1
+    clearLocalPreviewState()
+    setError("")
+    setProgress(0)
+    setUrlValue("")
+    if (inputRef.current) inputRef.current.value = ""
+    onChange(EMPTY_VIDEO)
+    console.log("[VideoDebug]", {
+      hasVideo: false,
+      duration: null,
+      thumbnailCreated: false,
+      previewUrl: null,
+    })
+  }, [clearLocalPreviewState, onChange])
+
+  useEffect(() => () => revokeObjectUrl(), [revokeObjectUrl])
+
+  useEffect(() => {
+    if (video.video_type === "upload" && video.video_url && localPreview) {
+      clearLocalPreviewState()
+    }
+  }, [video.video_url, video.video_type, localPreview, clearLocalPreviewState])
 
   const hasVideo = !!video.video_type && !!video.video_url
-  const previewUrl = useMemo(() => getPreviewUrl(video), [video])
+  const embedUrl = useMemo(() => getEmbedPreviewUrl(video), [video])
+
+  const uploadPlayback = useMemo(() => {
+    if (localPreview) {
+      return {
+        src: localPreview.previewUrl,
+        poster: localPreview.thumbnailDataUrl || video.video_thumbnail || undefined,
+        duration: localPreview.duration ?? video.video_duration,
+        sessionKey: `local-${localPreview.sessionId}`,
+      }
+    }
+    if (video.video_type === "upload" && video.video_url) {
+      return {
+        src: video.video_url,
+        poster: video.video_thumbnail || undefined,
+        duration: video.video_duration,
+        sessionKey: `saved-${video.video_url}`,
+      }
+    }
+    return null
+  }, [video, localPreview])
 
   const handleUpload = async (file: File | undefined) => {
-    if (!file) return
+    if (!file || isUploading) return
+
+    const sessionId = ++uploadSessionRef.current
+    currentFileRef.current = file
+    clearLocalPreviewState()
     setError("")
     setProgress(1)
     setIsUploading(true)
 
     try {
-      const validation = await validateVideoFile(file)
-      const uploadFile = await compressVideoIfNeeded(file, validation.duration, (p) => setProgress(Math.min(30, p)))
-      const secondValidation = await validateVideoFile(uploadFile)
-      const thumbnail = await generateVideoThumbnail(uploadFile)
+      const initial = await prepareVideoClientPreview(file)
+      if (uploadSessionRef.current !== sessionId || currentFileRef.current !== file) return
 
-      const presignContentType = secondValidation.resolvedMime || uploadFile.type
+      objectUrlRef.current = initial.previewObjectUrl
+      setLocalPreview({
+        sessionId,
+        previewUrl: initial.previewObjectUrl,
+        thumbnailDataUrl: initial.thumbnailDataUrl,
+        duration: initial.duration,
+      })
+
+      const uploadFile = await compressVideoIfNeeded(file, initial.duration, (p) => setProgress(Math.min(25, p)))
+      if (uploadSessionRef.current !== sessionId || currentFileRef.current !== file) return
+
+      let duration = initial.duration
+      let thumbnailFile = initial.thumbnailFile
+      let resolvedMime = initial.resolvedMime
+      let firstBytes = initial.firstBytes
+      let previewObjectUrl = initial.previewObjectUrl
+
+      if (uploadFile !== file) {
+        revokeObjectUrl()
+        const compressedMeta = await prepareVideoClientPreview(uploadFile)
+        if (uploadSessionRef.current !== sessionId || currentFileRef.current !== file) {
+          URL.revokeObjectURL(compressedMeta.previewObjectUrl)
+          return
+        }
+        duration = compressedMeta.duration
+        thumbnailFile = compressedMeta.thumbnailFile
+        resolvedMime = compressedMeta.resolvedMime
+        firstBytes = compressedMeta.firstBytes
+        previewObjectUrl = compressedMeta.previewObjectUrl
+        objectUrlRef.current = previewObjectUrl
+        setLocalPreview({
+          sessionId,
+          previewUrl: previewObjectUrl,
+          thumbnailDataUrl: compressedMeta.thumbnailDataUrl,
+          duration,
+        })
+      }
+
+      if (!thumbnailFile) {
+        throw new Error("Não foi possível gerar a miniatura do vídeo. Tente outro arquivo.")
+      }
 
       const res = await fetch("/api/r2/video-upload", {
         method: "POST",
@@ -110,39 +204,56 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
           itemType,
           itemId,
           filename: uploadFile.name,
-          contentType: presignContentType,
+          contentType: resolvedMime,
           fileSize: uploadFile.size,
-          duration: secondValidation.duration,
-          firstBytesBase64: bytesToBase64(secondValidation.firstBytes),
+          duration,
+          firstBytesBase64: bytesToBase64(firstBytes),
         }),
       })
       const signed = await res.json()
       if (!res.ok) throw new Error(signed.error || "Erro ao preparar upload")
+      if (uploadSessionRef.current !== sessionId || currentFileRef.current !== file) return
 
       const thumbnailContentType = signed.thumbnail?.contentType || signed.signedThumbnailContentType || "image/jpeg"
-      const videoContentType = signed.video?.contentType || signed.signedVideoContentType || presignContentType
+      const videoContentType = signed.video?.contentType || signed.signedVideoContentType || resolvedMime
 
-      await putWithProgress(signed.thumbnail.uploadUrl, thumbnail, thumbnailContentType, (p) => setProgress(30 + Math.round(p * 0.2)))
+      await putWithProgress(signed.thumbnail.uploadUrl, thumbnailFile, thumbnailContentType, (p) => setProgress(30 + Math.round(p * 0.2)))
       await putWithProgress(signed.video.uploadUrl, uploadFile, videoContentType, (p) => setProgress(50 + Math.round(p * 0.5)))
 
+      if (uploadSessionRef.current !== sessionId || currentFileRef.current !== file) return
+
+      clearLocalPreviewState()
       onChange({
         video_type: "upload",
         video_url: signed.video.publicUrl,
         video_thumbnail: signed.thumbnail.publicUrl,
-        video_duration: Math.round(secondValidation.duration),
+        video_duration: Math.round(duration),
         video_provider_id: null,
       })
+
+      console.log("[VideoDebug]", {
+        hasVideo: true,
+        duration: Math.round(duration),
+        thumbnailCreated: true,
+        previewUrl: signed.video.publicUrl,
+      })
+
       setProgress(100)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao enviar vídeo")
+      if (uploadSessionRef.current === sessionId) {
+        setError(err instanceof Error ? err.message : "Erro ao enviar vídeo")
+      }
     } finally {
-      setIsUploading(false)
-      if (inputRef.current) inputRef.current.value = ""
+      if (uploadSessionRef.current === sessionId) {
+        setIsUploading(false)
+        if (inputRef.current) inputRef.current.value = ""
+      }
     }
   }
 
   const handleUrlPreview = async () => {
     setError("")
+    clearLocalPreviewState()
     try {
       if (source !== "youtube" && source !== "vimeo") return
 
@@ -161,30 +272,47 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
         video_duration: data.video_duration,
         video_provider_id: data.video_provider_id,
       })
+
+      console.log("[VideoDebug]", {
+        hasVideo: true,
+        duration: data.video_duration,
+        thumbnailCreated: !!data.video_thumbnail,
+        previewUrl: data.video_url,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "URL inválida")
     }
   }
 
+  const showPreviewPanel = !!uploadPlayback || !!embedUrl
+
   return (
     <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">
       <div className="flex items-center justify-between gap-4 mb-4">
         <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">Vídeo opcional</h3>
-        {hasVideo && isEditing && (
-          <button type="button" onClick={() => onChange(EMPTY_VIDEO)} className="text-sm text-brand-red-dark hover:underline inline-flex items-center gap-1">
+        {(hasVideo || localPreview) && isEditing && (
+          <button type="button" onClick={handleRemoveVideo} className="text-sm text-brand-red-dark hover:underline inline-flex items-center gap-1">
             <TrashIcon className="w-4 h-4" />
             Remover vídeo
           </button>
         )}
       </div>
 
-      {hasVideo && (
+      {showPreviewPanel && (
         <div className="mb-4 w-full max-w-[520px] aspect-video overflow-hidden rounded-lg border border-brand-border dark:border-dark-border bg-black">
-          {video.video_type === "upload" ? (
-            <video src={previewUrl} poster={video.video_thumbnail || undefined} controls preload="metadata" playsInline className="w-full h-full object-contain" />
-          ) : (
-            <iframe src={previewUrl} title="Preview do vídeo" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className="w-full h-full" />
-          )}
+          {uploadPlayback ? (
+            <video
+              key={uploadPlayback.sessionKey}
+              src={uploadPlayback.src}
+              poster={uploadPlayback.poster}
+              controls
+              preload="metadata"
+              playsInline
+              className="w-full h-full object-contain bg-black"
+            />
+          ) : embedUrl ? (
+            <iframe src={embedUrl} title="Preview do vídeo" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className="w-full h-full" />
+          ) : null}
         </div>
       )}
 
@@ -211,13 +339,27 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
                 <UploadIcon className="w-5 h-5" />
                 <span className="text-sm font-medium">{isUploading ? "Enviando vídeo..." : "Selecionar MP4, WebM ou MOV"}</span>
               </div>
-              <input ref={inputRef} type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" disabled={isUploading} onChange={(e) => handleUpload(e.target.files?.[0])} />
+              <input
+                ref={inputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                className="hidden"
+                disabled={isUploading}
+                onChange={(e) => {
+                  const selected = e.target.files?.[0]
+                  if (selected) void handleUpload(selected)
+                }}
+              />
             </label>
           ) : (
             <div className="flex flex-col sm:flex-row gap-3">
               <Input label={source === "youtube" ? "URL do YouTube" : "URL do Vimeo"} value={urlValue} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUrlValue(e.target.value)} placeholder={source === "youtube" ? "https://youtube.com/watch?v=..." : "https://vimeo.com/..."} />
               <Button type="button" onClick={handleUrlPreview} className="sm:self-end">Pré-visualizar</Button>
             </div>
+          )}
+
+          {uploadPlayback?.duration != null && uploadPlayback.duration > 0 && (
+            <p className="text-sm text-brand-inactive-text">Duração: {Math.round(uploadPlayback.duration)}s</p>
           )}
 
           {progress > 0 && isUploading && <Progress value={progress} className="h-2" />}

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getStockStatus, formatCurrency } from "./product-utils"
 import type { Product } from "@/lib/types/product"
 
@@ -57,7 +57,7 @@ const ProductListItem = React.memo(
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
                                 <img
-                                    src={getR2ImageUrl(product.images?.[0], "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                    src={getPrimaryProductDisplayImage(product)}
                                     alt=""
                                     className="w-full h-full object-cover rounded-full"
                                     loading="lazy"

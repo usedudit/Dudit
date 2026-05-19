@@ -13,6 +13,9 @@ const VIDEO_MAGIC_BYTES: Record<string, (bytes: Uint8Array) => boolean> = {
   "video/webm": (bytes) => bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3,
 }
 
+const METADATA_TIMEOUT_MS = 15000
+const SEEK_TIMEOUT_MS = 10000
+
 export async function readFirstBytes(file: File, length = 32) {
   return new Uint8Array(await file.slice(0, length).arrayBuffer())
 }
@@ -31,7 +34,7 @@ function validateVideoExtension(file: File) {
   }
 }
 
-function resolveVideoMimeType(file: File) {
+export function resolveVideoMimeType(file: File) {
   if (ALLOWED_VIDEO_MIME_TYPES.includes(file.type as any)) return file.type
   const dot = file.name.lastIndexOf(".")
   const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ""
@@ -47,84 +50,128 @@ function validateVideoMagicBytes(file: File, bytes: Uint8Array) {
   if (!checker || !checker(bytes)) throw new Error("Arquivo de vídeo inválido")
 }
 
-export async function getVideoDuration(file: File) {
-  const url = URL.createObjectURL(file)
-  try {
-    const video = document.createElement("video")
-    video.preload = "metadata"
-    video.muted = true
-    video.playsInline = true
-    video.src = url
+async function waitForVideoMetadata(video: HTMLVideoElement) {
+  await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Tempo esgotado ao ler metadados do vídeo")), METADATA_TIMEOUT_MS)
+    video.onloadedmetadata = () => {
+      window.clearTimeout(timeout)
+      resolve()
+    }
+    video.onerror = () => {
+      window.clearTimeout(timeout)
+      reject(new Error("Vídeo corrompido ou inválido. Se o arquivo for válido, recarregue a página e tente novamente."))
+    }
+  })
+}
 
-    await new Promise<void>((resolve, reject) => {
-      const timeout = window.setTimeout(() => reject(new Error("Tempo esgotado ao ler metadados do vídeo")), 15000)
-      video.onloadedmetadata = () => {
-        window.clearTimeout(timeout)
-        resolve()
-      }
-      video.onerror = () => {
-        window.clearTimeout(timeout)
-        const mediaError = video.error?.code
-        console.warn("[VideoDebug] getVideoDuration failed", {
-          name: file.name,
-          mime: file.type,
-          resolvedMime: resolveVideoMimeType(file),
-          size: file.size,
-          mediaError,
-        })
-        reject(new Error("Vídeo corrompido ou inválido. Se o arquivo for válido, recarregue a página e tente novamente."))
-      }
-    })
+async function waitForVideoSeek(video: HTMLVideoElement) {
+  await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Não foi possível gerar a miniatura do vídeo")), SEEK_TIMEOUT_MS)
+    video.onseeked = () => {
+      window.clearTimeout(timeout)
+      resolve()
+    }
+    video.onerror = () => {
+      window.clearTimeout(timeout)
+      reject(new Error("Não foi possível gerar a miniatura do vídeo"))
+    }
+  })
+}
 
-    console.info("[VideoDebug] getVideoDuration ok", {
-      name: file.name,
-      mime: file.type,
-      resolvedMime: resolveVideoMimeType(file),
-      size: file.size,
-      duration: video.duration,
-    })
+/** Loads metadata from file — caller must revoke objectUrl when done. */
+export async function loadVideoMetadataFromFile(file: File) {
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement("video")
+  video.preload = "metadata"
+  video.muted = true
+  video.playsInline = true
+  video.src = objectUrl
 
-    return video.duration
-  } finally {
-    URL.revokeObjectURL(url)
+  await waitForVideoMetadata(video)
+
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    URL.revokeObjectURL(objectUrl)
+    throw new Error("Não foi possível ler a duração do vídeo")
+  }
+
+  return { video, objectUrl, duration: video.duration }
+}
+
+async function captureThumbnailFromVideo(video: HTMLVideoElement) {
+  const seekTime = Math.min(1, Math.max(0, video.duration > 0 ? (video.duration > 1 ? 1 : video.duration / 2) : 0))
+  video.currentTime = seekTime
+  await waitForVideoSeek(video)
+
+  const canvas = document.createElement("canvas")
+  canvas.width = video.videoWidth || 1280
+  canvas.height = video.videoHeight || 720
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Não foi possível gerar a miniatura do vídeo")
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.82)
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Não foi possível gerar a miniatura do vídeo"))), "image/jpeg", 0.82)
+  })
+
+  return {
+    dataUrl,
+    file: new File([blob], "video-thumbnail.jpg", { type: "image/jpeg" }),
   }
 }
 
+export async function getVideoDuration(file: File) {
+  const { objectUrl, duration } = await loadVideoMetadataFromFile(file)
+  URL.revokeObjectURL(objectUrl)
+  console.info("[VideoDebug] getVideoDuration ok", { name: file.name, duration })
+  return duration
+}
+
 export async function generateVideoThumbnail(file: File) {
-  const url = URL.createObjectURL(file)
+  const { video, objectUrl } = await loadVideoMetadataFromFile(file)
   try {
-    const video = document.createElement("video")
-    video.preload = "metadata"
-    video.muted = true
-    video.playsInline = true
-    video.src = url
-
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve()
-      video.onerror = () => reject(new Error("Não foi possível gerar a miniatura do vídeo"))
-    })
-
-    video.currentTime = Math.min(1, Math.max(0, video.duration / 2))
-    await new Promise<void>((resolve, reject) => {
-      video.onseeked = () => resolve()
-      video.onerror = () => reject(new Error("Não foi possível gerar a miniatura do vídeo"))
-    })
-
-    const canvas = document.createElement("canvas")
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
-    const ctx = canvas.getContext("2d")
-    if (!ctx) throw new Error("Não foi possível gerar a miniatura do vídeo")
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    return await new Promise<File>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) reject(new Error("Não foi possível gerar a miniatura do vídeo"))
-        else resolve(new File([blob], "video-thumbnail.jpg", { type: "image/jpeg" }))
-      }, "image/jpeg", 0.82)
-    })
+    const { file: thumbFile } = await captureThumbnailFromVideo(video)
+    return thumbFile
   } finally {
-    URL.revokeObjectURL(url)
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+/** Single metadata pass: duration + optional thumbnail (does not revoke objectUrl). */
+export async function prepareVideoClientPreview(file: File) {
+  const resolvedMime = resolveVideoMimeType(file)
+  const firstBytes = await readFirstBytes(file)
+  validateVideoExtension(file)
+  if (!ALLOWED_VIDEO_MIME_TYPES.includes(resolvedMime as any)) throw new Error("Formato não suportado")
+  validateVideoMagicBytes(file, firstBytes)
+
+  const { video, objectUrl, duration } = await loadVideoMetadataFromFile(file)
+  assertVideoDuration(duration)
+
+  let thumbnailFile: File | null = null
+  let thumbnailDataUrl: string | null = null
+  try {
+    const captured = await captureThumbnailFromVideo(video)
+    thumbnailFile = captured.file
+    thumbnailDataUrl = captured.dataUrl
+  } catch (err) {
+    console.warn("[VideoDebug] thumbnail generation failed", err)
+  }
+
+  console.log("[VideoDebug]", {
+    hasVideo: true,
+    duration,
+    thumbnailCreated: !!thumbnailDataUrl,
+    previewUrl: objectUrl,
+  })
+
+  return {
+    duration,
+    firstBytes,
+    resolvedMime,
+    previewObjectUrl: objectUrl,
+    thumbnailFile,
+    thumbnailDataUrl,
   }
 }
 

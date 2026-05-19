@@ -72,7 +72,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("products")
           .select(`
-            id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active, show_in_marketplace,
+            id, name, price, promotional_price, images, video_thumbnail, rating, category, created_at, updated_at, is_active, show_in_marketplace,
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
           `)

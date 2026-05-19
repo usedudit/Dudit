@@ -275,7 +275,7 @@ async function _searchMarketplaceInternal(
             if (produtosIds.length > 0) {
                 promises.push(
                     supabase.from("products").select(`
-                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
