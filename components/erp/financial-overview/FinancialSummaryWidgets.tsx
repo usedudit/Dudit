@@ -3,7 +3,8 @@
 import React from "react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
-    LineChart, Line, ResponsiveContainer, Tooltip, PieChart, Pie, Cell
+    LineChart, Line, ResponsiveContainer, Tooltip, PieChart, Pie, Cell,
+    RadialBarChart, RadialBar
 } from "recharts";
 import {
     BankIcon,
@@ -80,10 +81,12 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
     const total = currentProjection.inflow + currentProjection.outflow;
     const inflowPercent = total > 0 ? Math.round((currentProjection.inflow / total) * 100) : 0;
     const outflowPercent = total > 0 ? Math.round((currentProjection.outflow / total) * 100) : 0;
+    const netPercent = Math.abs(inflowPercent - outflowPercent);
 
-    const chartData = [
-        { name: "Entradas", value: currentProjection.inflow || 0.0001, fill: "var(--brand-green)" },
-        { name: "Despesas", value: currentProjection.outflow || 0.0001, fill: "#cc4745" }
+    const radialData = [
+        { name: "Saldo Líquido", value: netPercent || 0.0001, fill: netVal >= 0 ? "var(--brand-green)" : "#cc4745" },
+        { name: "Despesas", value: outflowPercent || 0.0001, fill: "#cc4745" },
+        { name: "Entradas", value: inflowPercent || 0.0001, fill: "#064e3b" },
     ];
 
     return (
@@ -110,38 +113,46 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
                 </div>
             </div>
 
-            {/* A receber e Despesas */}
+            {/* A receber e Despesas (Standard dashboard layout matching LeftColumn.tsx) */}
             <div className="flex flex-col gap-4 lg:gap-6 lg:col-span-3">
                 <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">A receber</span>
-                        <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green shrink-0 ml-2">
-                            <span className="text-[12px] font-bold">↑</span>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-green">
+                                <MoneyIcon size={18} className="text-brand-green" />
+                            </div>
+                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">A receber</span>
                         </div>
                     </div>
-                    <div className="text-[24px] font-bold text-brand-dark dark:text-dark-heading">
-                        <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mr-1">R$</span>
-                        {data.totals.receivable.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                    <div className="flex items-baseline space-x-2 mt-2">
+                        <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            {brl(data.totals.receivable)}
+                        </h2>
                     </div>
                 </div>
 
                 <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">Despesas</span>
-                        <div className="w-8 h-8 rounded-full bg-[#fce6e5] dark:bg-dark-border/40 flex items-center justify-center text-[#cc4745] shrink-0 ml-2">
-                            <span className="text-[12px] font-bold">↓</span>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-[#fce6e5] dark:bg-dark-border/40 flex items-center justify-center text-[#cc4745]">
+                                <CreditCardIcon size={18} className="text-[#cc4745]" />
+                            </div>
+                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">Despesas</span>
                         </div>
                     </div>
-                    <div className="text-[24px] font-bold text-brand-dark dark:text-dark-heading">
-                        <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mr-1">R$</span>
-                        {data.totals.payable.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                    <div className="flex items-baseline space-x-2 mt-2">
+                        <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                            {brl(data.totals.payable)}
+                        </h2>
                     </div>
                 </div>
             </div>
 
-            {/* Projeção de receita */}
+            {/* Projeção de receita (Premium RadialBarChart layout matching the requested concentric rings style) */}
             <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col lg:col-span-6 h-full">
-                <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+                <div className="flex items-center justify-between mb-4 w-full">
                     <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Projeção de receita</h3>
                     <Dropdown
                         trigger={
@@ -157,7 +168,7 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center flex-1">
-                    {/* Donut Chart with Net Value in center */}
+                    {/* Radial Bar Chart with Net Value in center */}
                     <div className="relative w-full h-[180px] flex items-center justify-center">
                         {/* Center value overlay */}
                         <div className="absolute flex flex-col items-center justify-center pointer-events-none mt-1 inset-0">
@@ -168,37 +179,34 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
                         </div>
 
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={chartData}
+                            <RadialBarChart
+                                cx="50%"
+                                cy="50%"
+                                innerRadius="35%"
+                                outerRadius="100%"
+                                barSize={8}
+                                data={radialData}
+                                startAngle={90}
+                                endAngle={-270}
+                            >
+                                <RadialBar
+                                    background={{ fill: "currentColor", className: "text-brand-green-light/10 dark:text-dark-border/10" }}
                                     dataKey="value"
-                                    nameKey="name"
-                                    innerRadius={55}
-                                    outerRadius={75}
-                                    paddingAngle={2}
-                                    cx="50%"
-                                    cy="50%"
-                                    startAngle={90}
-                                    endAngle={-270}
-                                >
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={index} fill={entry.fill} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
+                                    cornerRadius={10}
+                                />
+                            </RadialBarChart>
                         </ResponsiveContainer>
                     </div>
 
-                    {/* Legend breakdown on the right */}
+                    {/* Legend breakdown on the right with inline dots */}
                     <div className="flex flex-col gap-4 justify-center pr-2">
                         {/* Entradas */}
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded bg-brand-green shrink-0" />
-                                <div>
-                                    <p className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">Entradas</p>
-                                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">{brl(currentProjection.inflow)}</p>
-                                </div>
+                                <div className="w-3.5 h-3.5 rounded bg-[#064e3b] shrink-0" />
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading leading-none">
+                                    Entradas <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {brl(currentProjection.inflow)}
+                                </span>
                             </div>
                             <div className="bg-[#f4f4f5] dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-3 py-1.5 rounded-lg text-[13px] font-bold">
                                 {inflowPercent}%
@@ -208,14 +216,26 @@ export function TopWidgets({ data }: { data: FinancialOverviewData }) {
                         {/* Despesas */}
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded bg-[#cc4745] shrink-0" />
-                                <div>
-                                    <p className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">Despesas</p>
-                                    <p className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">{brl(currentProjection.outflow)}</p>
-                                </div>
+                                <div className="w-3.5 h-3.5 rounded bg-[#cc4745] shrink-0" />
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading leading-none">
+                                    Despesas <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {brl(currentProjection.outflow)}
+                                </span>
                             </div>
                             <div className="bg-[#f4f4f5] dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-3 py-1.5 rounded-lg text-[13px] font-bold">
                                 {outflowPercent}%
+                            </div>
+                        </div>
+
+                        {/* Saldo Líquido */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={cn("w-3.5 h-3.5 rounded shrink-0", netVal >= 0 ? "bg-brand-green" : "bg-[#cc4745]")} />
+                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading leading-none">
+                                    Saldo Líq. <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {brl(Math.abs(netVal))}
+                                </span>
+                            </div>
+                            <div className="bg-[#f4f4f5] dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading px-3 py-1.5 rounded-lg text-[13px] font-bold">
+                                {netPercent}%
                             </div>
                         </div>
                     </div>

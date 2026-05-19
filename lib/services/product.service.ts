@@ -12,6 +12,10 @@ export class ProductService {
       .from("products")
       .select(`
         *,
+        category:product_categories!category_id(name),
+        subcategory:product_categories!subcategory_id(name),
+        brand:brands!brand_id(name),
+        location:storage_locations!location_id(name),
         variants:product_variants(*),
         product_fiscal_profiles(*),
         product_logistics(*)
@@ -25,28 +29,43 @@ export class ProductService {
     }
 
     if (data) {
-      const fiscal = Array.isArray(data.product_fiscal_profiles) ? data.product_fiscal_profiles[0] : data.product_fiscal_profiles
-      const logistics = Array.isArray(data.product_logistics) ? data.product_logistics[0] : data.product_logistics
+      const mapped = {
+        ...data,
+        category: (data.category as any)?.name || null,
+        subcategory: (data.subcategory as any)?.name || null,
+        brand: (data.brand as any)?.name || null,
+        location: (data.location as any)?.name || null,
+      }
+
+      const fiscal = Array.isArray(mapped.product_fiscal_profiles) ? mapped.product_fiscal_profiles[0] : mapped.product_fiscal_profiles
+      const logistics = Array.isArray(mapped.product_logistics) ? mapped.product_logistics[0] : mapped.product_logistics
 
       if (fiscal) {
-        Object.assign(data, fiscal)
+        Object.assign(mapped, fiscal)
       }
       if (logistics) {
-        Object.assign(data, logistics)
+        Object.assign(mapped, logistics)
       }
 
-      delete data.product_fiscal_profiles
-      delete data.product_logistics
+      delete mapped.product_fiscal_profiles
+      delete mapped.product_logistics
+      return mapped
     }
 
-    return data
+    return null
   }
 
   async findByPartnerId(partnerId: string): Promise<Product[]> {
     const supabase = await this.getSupabase()
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        category:product_categories!category_id(name),
+        subcategory:product_categories!subcategory_id(name),
+        brand:brands!brand_id(name),
+        location:storage_locations!location_id(name)
+      `)
       .eq("partner_id", partnerId)
       .order("created_at", { ascending: false })
 
@@ -55,7 +74,13 @@ export class ProductService {
       return []
     }
 
-    return data || []
+    return (data || []).map((p: any) => ({
+      ...p,
+      category: p.category?.name || null,
+      subcategory: p.subcategory?.name || null,
+      brand: p.brand?.name || null,
+      location: p.location?.name || null,
+    }))
   }
 
   async create(input: ProductInput): Promise<{ success: boolean; product?: Product; error?: string }> {
@@ -140,7 +165,13 @@ export class ProductService {
     const supabase = await this.getSupabase()
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        category:product_categories!category_id(name),
+        subcategory:product_categories!subcategory_id(name),
+        brand:brands!brand_id(name),
+        location:storage_locations!location_id(name)
+      `)
       .eq("partner_id", partnerId)
       .ilike("name", `%${searchTerm}%`)
       .order("created_at", { ascending: false })
@@ -150,7 +181,13 @@ export class ProductService {
       return []
     }
 
-    return data || []
+    return (data || []).map((p: any) => ({
+      ...p,
+      category: p.category?.name || null,
+      subcategory: p.subcategory?.name || null,
+      brand: p.brand?.name || null,
+      location: p.location?.name || null,
+    }))
   }
 }
 

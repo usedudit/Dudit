@@ -568,7 +568,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                     </div>
                 </div>
 
-                {isOpen && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3"><Button variant="outline" className="flex-1" onClick={() => setMovModal("withdrawal")}>Sangria</Button><Button variant="outline" className="flex-1" onClick={() => setMovModal("deposit")}>Reforço</Button><Button className="flex-1" onClick={openCloseModal} isLoading={isPreparingClose}>Fechar</Button></div>}
+                {isOpen && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3"><Button variant="outline" className="flex-1" onClick={() => setMovModal("withdrawal")}>Sangria</Button><Button variant="outline" className="flex-1" onClick={() => setMovModal("deposit")}>Reforço</Button><Button className="flex-1" onClick={openCloseModal} isLoading={isPreparingClose}>Fechar</Button></div>}
 
                 <DefaultModal isOpen={closeOpen} onClose={closeCloseModal} title="Fechar caixa">
                     <div className="space-y-4">

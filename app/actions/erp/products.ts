@@ -737,6 +737,41 @@ export async function createProductVariantsBatchAction(data: {
         return errorResponse("Limite máximo de 50 variantes por vez excedido.")
     }
 
+    // Validar limite máximo de 30 valores únicos por tipo de variante e limite de 30 caracteres
+    if (data.variants && Array.isArray(data.variants)) {
+        const uniqueValuesPerType: Record<string, Set<string>> = {}
+
+        for (const v of data.variants) {
+            if (!v.variantType || !v.variantValue) continue
+            const types = v.variantType.split(" / ").map((t: string) => t.trim())
+            const values = v.variantValue.split(" / ").map((val: string) => val.trim())
+
+            for (let idx = 0; idx < types.length; idx++) {
+                const type = types[idx]
+                const val = values[idx]
+                if (!type || !val) continue
+
+                if (type.length > 30) {
+                    return errorResponse(`O tipo de variante "${type}" excede o limite máximo de 30 caracteres.`)
+                }
+                if (val.length > 30) {
+                    return errorResponse(`O valor de variação "${val}" excede o limite máximo de 30 caracteres.`)
+                }
+
+                if (!uniqueValuesPerType[type]) {
+                    uniqueValuesPerType[type] = new Set()
+                }
+                uniqueValuesPerType[type].add(val)
+            }
+        }
+
+        for (const [type, uniqueSet] of Object.entries(uniqueValuesPerType)) {
+            if (uniqueSet.size > 30) {
+                return errorResponse(`O tipo de variante "${type}" excede o limite máximo de 30 valores permitidos (possui ${uniqueSet.size}).`)
+            }
+        }
+    }
+
     try {
         const csrf = await validateCSRF(data as Record<string, unknown>)
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
@@ -1253,11 +1288,15 @@ export const getCachedProducts = async (partnerId: string) => {
             const supabase = getAdminClient()
             const { data, error } = await supabase
                 .from("products")
-                .select("id, name, category, brand, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status")
+                .select("id, name, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
                 .eq("partner_id", partnerId)
                 .order("created_at", { ascending: false })
             if (error) throw error
-            return data || []
+            return (data || []).map((p: any) => ({
+                ...p,
+                category: p.category?.name || null,
+                brand: p.brand?.name || null
+            }))
         },
         [TAGS.products(partnerId)],
         { tags: [TAGS.products(partnerId)] }
@@ -1270,10 +1309,19 @@ export const getCachedProductById = async (productId: string) => {
             const supabase = getAdminClient()
             const { data: product, error } = await supabase
                 .from("products")
-                .select("*, variants:product_variants(*)")
+                .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
                 .eq("id", productId)
                 .single()
             if (error) throw error
+            if (product) {
+                return {
+                    ...product,
+                    category: product.category?.name || null,
+                    subcategory: product.subcategory?.name || null,
+                    brand: product.brand?.name || null,
+                    location: product.location?.name || null
+                }
+            }
             return product
         },
         [`product-details-${productId}`],
@@ -1405,7 +1453,7 @@ export async function getERPProductsPageAction(
 
         let q = supabase
             .from("products")
-            .select("id, name, category, brand, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status")
+            .select("id, name, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
 
         if (cursor) {
@@ -1419,7 +1467,11 @@ export async function getERPProductsPageAction(
 
         if (error) throw error
 
-        const rows = data || []
+        const rows = (data || []).map((p: any) => ({
+            ...p,
+            category: p.category?.name || null,
+            brand: p.brand?.name || null
+        }))
         const hasMore = rows.length > limit
         const items = hasMore ? rows.slice(0, limit) : rows
         const last = items[items.length - 1]

@@ -64,10 +64,9 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
                 <div key={item.label} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-[14px] h-[14px] rounded-[4px] shrink-0" style={{ backgroundColor: color }} />
-                    <div>
-                      <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading leading-tight">{item.label}</div>
-                      <div className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">{brl(item.value)}</div>
-                    </div>
+                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading leading-none">
+                      {item.label} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {brl(item.value)}
+                    </span>
                   </div>
                   <div className="text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-3.5 py-1.5 rounded-lg border border-brand-border dark:border-dark-border">
                     {percent}%

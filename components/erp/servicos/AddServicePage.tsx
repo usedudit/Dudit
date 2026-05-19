@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, ActionsDropdown } from "@/components/reusable"
-import { ChevronLeftIcon, EditIcon, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import { useToast } from "@/components/ui/use-toast"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useStore } from "@/lib/store-context"
@@ -555,6 +555,55 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                 )}
                             </AnimatePresence>
                         </div>
+                    </div>
+
+                    {/* Mobile Bottom Action Bar */}
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                        {isEditing ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                    disabled={isSavingService || isLoadingDetails}
+                                    className="flex-1"
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={handleSaveService}
+                                    disabled={isSavingService || isLoadingDetails}
+                                    className="flex-1"
+                                >
+                                    <SaveIcon className="w-4 h-4 mr-2" />
+                                    {isSavingService ? "Salvando..." : "Salvar"}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <ActionsDropdown
+                                    onDuplicate={handleDuplicateService}
+                                    onDelete={() => setShowDeleteModal(true)}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            disabled={isLoadingDetails}
+                                        >
+                                            <ThreeDotsIcon className="w-4 h-4 mr-2" />
+                                            Opções
+                                        </Button>
+                                    }
+                                />
+                                <Button
+                                    onClick={enterEditMode}
+                                    className="flex-1 whitespace-nowrap"
+                                    disabled={isLoadingDetails}
+                                >
+                                    <EditIcon className="w-4 h-4 mr-2" />
+                                    Editar serviço
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </Tabs>
             </div>

@@ -11,6 +11,8 @@ interface TagsInputProps {
   disabled?: boolean
   className?: string
   label?: string
+  error?: boolean
+  errorMessage?: string
 }
 
 export function TagsInput({
@@ -20,14 +22,30 @@ export function TagsInput({
   disabled = false,
   className,
   label,
+  error: externalError = false,
+  errorMessage: externalErrorMessage,
 }: TagsInputProps) {
   const [inputValue, setInputValue] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  const isInputTooLong = inputValue.length > 30
+  const hasTooLongTag = tags.some(tag => tag.length > 30)
+  
+  const hasError = externalError || isInputTooLong || hasTooLongTag
+  const displayErrorMessage = isInputTooLong 
+    ? "O valor digitado não pode ter mais de 30 caracteres."
+    : hasTooLongTag
+      ? "Um ou mais valores excedem o limite de 30 caracteres."
+      : externalErrorMessage
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && inputValue.trim()) {
       e.preventDefault()
       const newTag = inputValue.trim()
+      if (newTag.length > 30) {
+        // Block adding tags > 30 chars
+        return
+      }
       if (!tags.includes(newTag)) {
         onChange([...tags, newTag])
       }
@@ -42,11 +60,12 @@ export function TagsInput({
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-1 flex-1 w-full", className)}>
       {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
       <div
         className={cn(
-          "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus:border-brand-green dark:focus:border-brand-green focus:outline-none transition-all border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface",
+          "flex flex-wrap gap-2 h-[42px] px-3 py-2 rounded-lg border focus-within:border-brand-green dark:focus-within:border-brand-green focus-within:outline-none transition-all bg-white dark:bg-dark-surface",
+          hasError ? "border-brand-red" : "border-brand-border dark:border-dark-border",
           disabled && "opacity-50 cursor-not-allowed bg-brand-gray dark:bg-dark-border/20",
         )}
         onClick={() => !disabled && inputRef.current?.focus()}
@@ -54,7 +73,12 @@ export function TagsInput({
         {tags.map((tag, index) => (
           <div
             key={index}
-            className="flex items-center gap-1 bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading px-2 py-1 rounded-md text-sm font-medium animate-fadeIn"
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium animate-fadeIn",
+              tag.length > 30 
+                ? "bg-red-100 dark:bg-red-900/30 text-brand-red" 
+                : "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+            )}
           >
             <span>{tag}</span>
             {!disabled && (
@@ -86,6 +110,9 @@ export function TagsInput({
           )}
         />
       </div>
+      {hasError && displayErrorMessage && (
+        <p className="text-xs text-brand-red mt-1">{displayErrorMessage}</p>
+      )}
     </div>
   )
 }

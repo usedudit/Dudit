@@ -256,24 +256,24 @@ export const IntegrationsSubPage = ({
                 >
                     <div className="flex flex-col">
                         {/* Header with Icons */}
-                <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
-                    <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
-                        <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
-                    </div>
+                        <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
+                                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
+                            </div>
 
-                    <div className="flex flex-col items-center gap-1">
-                        <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
-                            <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                            <div className="flex flex-col items-center gap-1">
+                                <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                                    <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                                </div>
+                            </div>
+
+                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-full h-full object-contain" />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
-                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-full h-full object-contain" />
-                    </div>
-                </div>
-
-                <div className="px-2 text-center md:text-left">
-                    <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-6 leading-relaxed">
+                        <div className="px-2 text-center md:text-left">
+                            <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-6 leading-relaxed">
                                 Venda de forma profissional aceitando as principais formas de pagamento do mercado com integração automática.
                             </p>
 
@@ -473,7 +473,7 @@ export const IntegrationsSubPage = ({
                 </DefaultModal>
 
                 {/* Mobile Bottom Action Bar */}
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                     <Button
                         variant="outline"
                         onClick={handleBack}

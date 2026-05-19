@@ -505,7 +505,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                     </div>
                 </div>
 
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-gray-200 dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                     <ActionsDropdown
                         onPrint={() => window.print()}
                         onShare={() => { }}

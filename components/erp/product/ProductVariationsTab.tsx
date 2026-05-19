@@ -29,12 +29,12 @@ import {
     TrashIcon,
     ThreeDotsIcon,
     Settings2Icon,
-    EditIcon,
     CheckCircleIcon,
     BlockedIcon,
     SearchIcon,
     FilterIcon,
-    MoneyIcon
+    MoneyIcon,
+    InfoIcon
 } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
@@ -343,7 +343,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
         } finally {
             setIsLoading(false)
         }
-    }, [productData?.id, productData?.pending_variants])
+    }, [productData?.id, productData?.pending_variants?.length])
 
     // CARREGA VARIANTES TODA VEZ QUE O COMPONENTE MONTA OU PRODUCT_ID MUDA
     useEffect(() => {
@@ -669,7 +669,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
     const renderListBadge = (key: string, label: string) => {
         const items = filters[key] as string[]
         if (!items || items.length === 0) return null
-        return <FilterChip key={key} label={label} icon={<CheckCircleIcon size={12} />} value={items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`} tooltip={`${label}: ${items.join(", ")}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: [] }))} />
+        return <FilterChip key={key} label={label} icon={<InfoIcon size={12} />} value={items.length <= 3 ? items.join(", ") : `${items.slice(0, 3).join(", ")}...`} tooltip={`${label}: ${items.join(", ")}`} onRemove={() => setFilters((p: any) => ({ ...p, [key]: [] }))} />
     }
 
     // --- Render ---
@@ -720,7 +720,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                         <div className="flex-1 min-w-0">
                             <Input
                                 name="searchVar"
-                                placeholder="Buscar..."
+                                placeholder="Buscar variação..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="h-[42px] w-full"
@@ -755,7 +755,19 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                     {/* Filter Controls (Desktop/Tablets) */}
                     <div className={`hidden md:flex flex-col gap-4 mb-4 w-full ${!isEditing ? "opacity-60 pointer-events-none" : ""}`}>
                         <div className="flex items-center gap-2 w-full">
-                            <Input name="searchVar" placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-[42px] flex-1" variant="full-rounded" label="" />
+                            <Input
+                                name="searchVar"
+                                placeholder="Buscar..."
+                                value={search} onChange={(e) => setSearch(e.target.value)}
+                                className="h-[42px] flex-1"
+                                variant="full-rounded"
+                                prefix={
+                                    <SearchIcon
+                                        size={18}
+                                        className="text-brand-inactive-text shrink-0"
+                                    />
+                                }
+                                label="" />
                             <Button variant="outline" onClick={() => setIsFilterOpen(true)} leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}>
                                 Filtros
                             </Button>
@@ -935,7 +947,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                 onApply={handleBulkEditApply}
             />
 
-            <AlertModal isOpen={modalState.delete} onClose={() => setModalState(p => ({ ...p, delete: false }))} onConfirm={handleDelete} title="Excluir variante?" message={`Tem certeza que deseja excluir ${selectedIds.size} produtos? Esta ação não pode ser desfeita.`} confirmText="Excluir" variant="danger" icon={<TrashIcon />} />
+            <AlertModal isOpen={modalState.delete} onClose={() => setModalState(p => ({ ...p, delete: false }))} onConfirm={handleDelete} title="Excluir variante?" message={`Tem certeza que deseja excluir a variante "${itemToDelete?.name || ''}"? Esta ação não pode ser desfeita.`} confirmText="Excluir" variant="danger" icon={<TrashIcon />} />
             <AlertModal isOpen={modalState.bulkDelete} onClose={() => setModalState(p => ({ ...p, bulkDelete: false }))} onConfirm={() => handleBulkEditApply({ type: 'delete' })} title="Excluir variantes" description="Ação irreversível." confirmText="Excluir Seleção" variant="danger" />
             <AlertModal isOpen={modalState.bulkStatus} onClose={() => setModalState(p => ({ ...p, bulkStatus: false }))} onConfirm={() => handleBulkEditApply({ type: 'visibility', visibilityMode: variations.filter(v => selectedIds.has(v.id)).every(v => !v.status) ? 'publish' : 'hide' })} title="Atualizar Status" message={`Tem certeza que deseja alterar o status de ${selectedIds.size} variante(s)?`} confirmText="Confirmar" variant="warning" />
         </>
