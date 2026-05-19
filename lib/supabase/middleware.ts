@@ -148,10 +148,24 @@ export async function middleware(request: NextRequest) {
   // without complex per-component propagation. This is the standard
   // approach for Next.js apps in production.
 
+  const r2MediaOrigins = [process.env.NEXT_PUBLIC_R2_CDN_URL, process.env.NEXT_PUBLIC_R2_PUBLIC_DEV_URL]
+    .filter(Boolean)
+    .map((raw) => {
+      try {
+        const href = String(raw).startsWith("http") ? String(raw) : `https://${raw}`
+        return new URL(href).origin
+      } catch {
+        return null
+      }
+    })
+    .filter((origin, index, list): origin is string => !!origin && list.indexOf(origin) === index)
+    .join(" ")
+
   const cspHeader = `
     default-src 'self';
     worker-src 'self' blob:;
     child-src 'self' blob:;
+    media-src 'self' blob: ${r2MediaOrigins};
     script-src 'self' 'unsafe-inline' 'unsafe-eval'
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
@@ -197,7 +211,8 @@ export async function middleware(request: NextRequest) {
         https://stats.g.doubleclick.net 
         https://cloudflareinsights.com 
         https://*.cloudflare.com
-        https://nominatim.openstreetmap.org;
+        https://nominatim.openstreetmap.org
+        https://vimeo.com;
     frame-src 'self' 
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
@@ -205,7 +220,10 @@ export async function middleware(request: NextRequest) {
         https://checkout.mercadopago.com
         https://accounts.google.com
         https://auth.nuvemfiscal.com.br 
-        https://www.mercadolibre.com;
+        https://www.mercadolibre.com
+        https://www.youtube.com
+        https://www.youtube-nocookie.com
+        https://player.vimeo.com;
     img-src 'self' data: https: blob: 
         https://*.googleapis.com 
         https://*.gstatic.com 

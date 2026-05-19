@@ -33,6 +33,7 @@ async function _getMarketplaceProductBase(id: string) {
       location_id, location:storage_locations!location_id(name),
       images, rating, partner_id, sku, 
       condition, show_in_marketplace, technical_specs, created_at,
+      video_type, video_url, video_thumbnail, video_duration, video_provider_id,
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, 
@@ -48,7 +49,12 @@ async function _getMarketplaceProductBase(id: string) {
 
   if (error || !data) {
     if (error) console.error(`[Product] Fetch error for ${id}:`, error.message)
+    console.warn(`[MarketplaceTrace] produto:${id} ausente na query PDP`)
     return null
+  }
+
+  if (process.env.NODE_ENV !== "production" && data.video_type && data.video_url) {
+    console.info(`[MarketplaceTrace] produto:${id} PDP com vídeo type=${data.video_type} duration=${data.video_duration ?? "null"}`)
   }
 
   // Normalização básica (independente de usuário)

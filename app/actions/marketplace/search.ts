@@ -365,6 +365,9 @@ async function _searchMarketplaceInternal(
         }
 
         const cleanData = finalData.filter(Boolean)
+        if (process.env.NODE_ENV !== "production" && cleanData.length < filteredIds.length) {
+          console.warn(`[MarketplaceTrace] API/search: ${filteredIds.length - cleanData.length} ids sem objeto (${type}, query="${query}")`)
+        }
         const tFinal = performance.now()
 
         const totalRequested = filteredIds.length

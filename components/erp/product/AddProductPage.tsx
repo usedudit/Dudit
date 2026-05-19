@@ -523,7 +523,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 isActive: d.is_active,
                 isOnPromotion: !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
-                showInMarketplace: !!d.show_in_marketplace, // Ensure boolean
+                showInMarketplace: d.show_in_marketplace !== false,
                 requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
                 primaryImageIndex: 0,

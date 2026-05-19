@@ -56,6 +56,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         images: productImages,
         productType: product.product_type === "digital" ? "Digital" : "Fí­sico",
         is_active: product.is_active,
+        show_in_marketplace: product.show_in_marketplace !== false,
         minStock: product.min_stock || 0,
         stock_quantity: product.stock_quantity || 0,
         rating: product.rating || 0,

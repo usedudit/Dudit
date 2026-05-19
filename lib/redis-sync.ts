@@ -87,9 +87,11 @@ export async function syncToExploreRedis({
         // Verifica se o produto pode ser público no marketplace
         const isPublic = dbData.is_active && dbData.show_in_marketplace !== false
         if (!isPublic) {
-          console.log(`[RedisSync] Produto ${id} inativo ou oculto. Removendo do Redis.`)
+          console.log(`[MarketplaceTrace] produto:${id} removido do Redis — is_active=${dbData.is_active} show_in_marketplace=${dbData.show_in_marketplace}`)
           return await removeFromExploreRedis(id, type)
         }
+
+        console.log(`[MarketplaceTrace] produto:${id} sincronizado no Redis (db ok, query ok)`)
 
         // Normalização básica idêntica ao que o marketplace espera
         const rawPartner = Array.isArray(dbData.partners) ? dbData.partners[0] : dbData.partners

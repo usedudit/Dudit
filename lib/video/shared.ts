@@ -68,7 +68,7 @@ export function parseVimeoUrl(input: string): { id: string; url: string } | null
   }
 }
 
-export async function getVimeoThumbnail(videoUrl: string): Promise<string | null> {
+export async function getVimeoOembed(videoUrl: string): Promise<{ thumbnail_url?: string; duration?: number } | null> {
   try {
     const res = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoUrl)}`, {
       headers: { Accept: "application/json" },
@@ -76,10 +76,39 @@ export async function getVimeoThumbnail(videoUrl: string): Promise<string | null
     })
     if (!res.ok) return null
     const data = await res.json()
-    return typeof data.thumbnail_url === "string" ? data.thumbnail_url : null
+    return {
+      thumbnail_url: typeof data.thumbnail_url === "string" ? data.thumbnail_url : undefined,
+      duration: typeof data.duration === "number" ? data.duration : undefined,
+    }
   } catch {
     return null
   }
+}
+
+export async function getVimeoThumbnail(videoUrl: string): Promise<string | null> {
+  const data = await getVimeoOembed(videoUrl)
+  return data?.thumbnail_url || null
+}
+
+export async function getYouTubeDurationSeconds(videoId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Dudit/1.0)",
+        "Accept-Language": "en",
+      },
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    const lengthMatch = html.match(/"lengthSeconds":"(\d+)"/)
+    if (lengthMatch) return Number(lengthMatch[1])
+    const msMatch = html.match(/"approxDurationMs":"(\d+)"/)
+    if (msMatch) return Math.round(Number(msMatch[1]) / 1000)
+  } catch {
+    return null
+  }
+  return null
 }
 
 export async function normalizeVideoMetadata(input: Partial<VideoMetadata>): Promise<VideoMetadata> {
@@ -88,11 +117,16 @@ export async function normalizeVideoMetadata(input: Partial<VideoMetadata>): Pro
   if (input.video_type === "youtube") {
     const parsed = input.video_url ? parseYouTubeUrl(input.video_url) : null
     if (!parsed) throw new Error("URL do YouTube inválida")
+    const durationSeconds = await getYouTubeDurationSeconds(parsed.id)
+    if (durationSeconds === null) {
+      throw new Error("Não foi possível obter a duração do vídeo do YouTube. Verifique se o link está público.")
+    }
+    assertVideoDuration(durationSeconds)
     return {
       video_type: "youtube",
       video_url: parsed.url,
       video_thumbnail: parsed.thumbnail,
-      video_duration: null,
+      video_duration: Math.round(durationSeconds),
       video_provider_id: parsed.id,
     }
   }
@@ -100,11 +134,17 @@ export async function normalizeVideoMetadata(input: Partial<VideoMetadata>): Pro
   if (input.video_type === "vimeo") {
     const parsed = input.video_url ? parseVimeoUrl(input.video_url) : null
     if (!parsed) throw new Error("URL do Vimeo inválida")
+    const oembed = await getVimeoOembed(parsed.url)
+    const durationSeconds = oembed?.duration
+    if (durationSeconds === undefined || durationSeconds === null) {
+      throw new Error("Não foi possível obter a duração do vídeo do Vimeo. Verifique se o link está público.")
+    }
+    assertVideoDuration(durationSeconds)
     return {
       video_type: "vimeo",
       video_url: parsed.url,
-      video_thumbnail: await getVimeoThumbnail(parsed.url),
-      video_duration: null,
+      video_thumbnail: oembed?.thumbnail_url || null,
+      video_duration: Math.round(durationSeconds),
       video_provider_id: parsed.id,
     }
   }

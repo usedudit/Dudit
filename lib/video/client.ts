@@ -31,8 +31,19 @@ function validateVideoExtension(file: File) {
   }
 }
 
+function resolveVideoMimeType(file: File) {
+  if (ALLOWED_VIDEO_MIME_TYPES.includes(file.type as any)) return file.type
+  const dot = file.name.lastIndexOf(".")
+  const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : ""
+  if (ext === ".mp4") return "video/mp4"
+  if (ext === ".webm") return "video/webm"
+  if (ext === ".mov") return "video/quicktime"
+  return file.type
+}
+
 function validateVideoMagicBytes(file: File, bytes: Uint8Array) {
-  const checker = VIDEO_MAGIC_BYTES[file.type]
+  const mimeType = resolveVideoMimeType(file)
+  const checker = VIDEO_MAGIC_BYTES[mimeType]
   if (!checker || !checker(bytes)) throw new Error("Arquivo de vídeo inválido")
 }
 
@@ -42,11 +53,35 @@ export async function getVideoDuration(file: File) {
     const video = document.createElement("video")
     video.preload = "metadata"
     video.muted = true
+    video.playsInline = true
     video.src = url
 
     await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve()
-      video.onerror = () => reject(new Error("Vídeo corrompido ou inválido"))
+      const timeout = window.setTimeout(() => reject(new Error("Tempo esgotado ao ler metadados do vídeo")), 15000)
+      video.onloadedmetadata = () => {
+        window.clearTimeout(timeout)
+        resolve()
+      }
+      video.onerror = () => {
+        window.clearTimeout(timeout)
+        const mediaError = video.error?.code
+        console.warn("[VideoDebug] getVideoDuration failed", {
+          name: file.name,
+          mime: file.type,
+          resolvedMime: resolveVideoMimeType(file),
+          size: file.size,
+          mediaError,
+        })
+        reject(new Error("Vídeo corrompido ou inválido. Se o arquivo for válido, recarregue a página e tente novamente."))
+      }
+    })
+
+    console.info("[VideoDebug] getVideoDuration ok", {
+      name: file.name,
+      mime: file.type,
+      resolvedMime: resolveVideoMimeType(file),
+      size: file.size,
+      duration: video.duration,
     })
 
     return video.duration
@@ -95,13 +130,21 @@ export async function generateVideoThumbnail(file: File) {
 
 export async function validateVideoFile(file: File) {
   if (!file || file.size <= 0) throw new Error("Arquivo vazio não é permitido")
-  if (!ALLOWED_VIDEO_MIME_TYPES.includes(file.type as any)) throw new Error("Formato não suportado")
+  const resolvedMime = resolveVideoMimeType(file)
+  if (!ALLOWED_VIDEO_MIME_TYPES.includes(resolvedMime as any)) throw new Error("Formato não suportado")
   validateVideoExtension(file)
   const firstBytes = await readFirstBytes(file)
   validateVideoMagicBytes(file, firstBytes)
   const duration = await getVideoDuration(file)
   assertVideoDuration(duration)
-  return { duration, firstBytes }
+  console.info("[VideoDebug] validateVideoFile ok", {
+    name: file.name,
+    mime: file.type,
+    resolvedMime,
+    size: file.size,
+    duration,
+  })
+  return { duration, firstBytes, resolvedMime }
 }
 
 export async function compressVideoIfNeeded(file: File, duration: number, onProgress?: (progress: number) => void) {

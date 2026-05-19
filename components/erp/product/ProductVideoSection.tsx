@@ -11,7 +11,7 @@ import {
   generateVideoThumbnail,
   validateVideoFile,
 } from "@/lib/video/client"
-import { getVimeoThumbnail, parseVimeoUrl, parseYouTubeUrl, type VideoMetadata, type VideoType } from "@/lib/video/shared"
+import type { VideoMetadata, VideoType } from "@/lib/video/shared"
 
 interface ProductVideoSectionProps {
   itemType: "product" | "service"
@@ -115,30 +115,23 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
   const handleUrlPreview = async () => {
     setError("")
     try {
-      if (source === "youtube") {
-        const parsed = parseYouTubeUrl(urlValue)
-        if (!parsed) throw new Error("URL do YouTube inválida")
-        onChange({
-          video_type: "youtube",
-          video_url: parsed.url,
-          video_thumbnail: parsed.thumbnail,
-          video_duration: null,
-          video_provider_id: parsed.id,
-        })
-        return
-      }
+      if (source !== "youtube" && source !== "vimeo") return
 
-      if (source === "vimeo") {
-        const parsed = parseVimeoUrl(urlValue)
-        if (!parsed) throw new Error("URL do Vimeo inválida")
-        onChange({
-          video_type: "vimeo",
-          video_url: parsed.url,
-          video_thumbnail: await getVimeoThumbnail(parsed.url),
-          video_duration: null,
-          video_provider_id: parsed.id,
-        })
-      }
+      const res = await fetch("/api/video/metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source, url: urlValue }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "URL inválida")
+
+      onChange({
+        video_type: data.video_type,
+        video_url: data.video_url,
+        video_thumbnail: data.video_thumbnail,
+        video_duration: data.video_duration,
+        video_provider_id: data.video_provider_id,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "URL inválida")
     }
