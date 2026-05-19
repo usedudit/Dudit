@@ -105,9 +105,9 @@ const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
 const RatingInline = ({ rating, reviewsCount }: { rating: number; reviewsCount: number }) => (
     <div className="flex items-center gap-1.5 text-[12px] lg:text-[13px] text-brand-dark">
         <StarIcon size={14} className="text-brand-green fill-brand-green" />
-        {reviewsCount > 0 && rating > 0 ? (
+        {reviewsCount > 0 ? (
             <>
-                <span className="font-semibold">{formatNumber(rating, 1, 1)}</span>
+                <span className="font-semibold">{formatNumber(rating || 0, 1, 1)}</span>
                 <span className="text-brand-inactive-text">({reviewsCount} avaliações)</span>
             </>
         ) : (
@@ -119,7 +119,7 @@ const RatingInline = ({ rating, reviewsCount }: { rating: number; reviewsCount: 
 const StoreStats = ({ rating, sales, createdAt, reviewsCount }: any) => (
     <div className="flex items-center justify-between mb-8">
         <StatItem
-            value={reviewsCount > 0 && rating > 0 ? formatNumber(rating, 1, 1) : "Sem avaliações"}
+            value={reviewsCount > 0 ? formatNumber(rating || 0, 1, 1) : "Sem avaliações"}
             label="Avaliacao"
             icon={<StarIcon size={14} className="text-brand-green fill-brand-green" />}
         />
@@ -492,6 +492,16 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
 }
 
 export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
+    const calculatedReviewsCount = reviews?.length || 0
+    const calculatedAverageRating = useMemo(() => {
+        if (calculatedReviewsCount === 0) return 0
+        const sum = reviews.reduce((acc: number, r: any) => acc + (r.rating || 0), 0)
+        return sum / calculatedReviewsCount
+    }, [reviews, calculatedReviewsCount])
+
+    const displayRating = calculatedReviewsCount > 0 ? calculatedAverageRating : (partner.rating || 0)
+    const displayReviewsCount = calculatedReviewsCount > 0 ? calculatedReviewsCount : (stats.reviewsCount || 0)
+
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info">("products")
@@ -706,7 +716,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text">
                             <span>{partner.city}, {partner.state}</span>
                             {partner.distance_km_formatted && <span>{partner.distance_km_formatted}</span>}
-                            <RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} />
+                            <RatingInline rating={displayRating} reviewsCount={displayReviewsCount} />
                         </div>
                     </div>
                     <div className="ml-auto w-[420px]">
@@ -732,7 +742,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                     </button>
                                 </div>
                                 <p className="text-[13px] lg:text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
-                                <div className="mt-1.5"><RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} /></div>
+                                <div className="mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
 
@@ -884,13 +894,13 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         {activeSection === "info" && (
                             <div>
                                 <h2 className="text-[24px] font-normal text-brand-dark mb-6">Informações de {partner.storeName}</h2>
-                                <InfoTab partner={partner} stats={stats} />
+                                <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />
                             </div>
                         )}
                         {activeSection === "reviews" && (
                             <div>
                                 <h2 className="text-[24px] font-normal text-brand-dark mb-6">Avaliações</h2>
-                                <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
+                                <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
                             </div>
                         )}
                     </div>
@@ -936,7 +946,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         <p className="text-[13px] text-brand-inactive-text font-medium">{partner.city}, {partner.state}</p>
                     </div>
                     <div className="mt-4 mb-2 flex justify-center">
-                        <StoreStats rating={partner.rating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={stats.reviewsCount} />
+                        <StoreStats rating={displayRating} sales={stats.salesCount} createdAt={partner.createdAt} reviewsCount={displayReviewsCount} />
                     </div>
                     <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
@@ -948,8 +958,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                     </div>
                     <div className="px-2 pb-6">
                         {mobileModalTab === "reviews"
-                            ? <ReviewsTab partner={partner} stats={stats} ratingDistribution={ratingDistribution} reviews={reviews} />
-                            : <InfoTab partner={partner} stats={stats} />}
+                            ? <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
+                            : <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />}
                     </div>
                 </div>
             </BottomSheet>

@@ -98,7 +98,14 @@ async function _getPartnerProducts(partnerId: string) {
 
   let query = supabase
     .from("products")
-    .select("*, product_variants(variant_options, price_adjustment, is_active)")
+    .select(`
+      *,
+      category:product_categories!category_id(name),
+      subcategory:product_categories!subcategory_id(name),
+      brand:brands!brand_id(name),
+      location:storage_locations!location_id(name),
+      product_variants(variant_options, price_adjustment, is_active)
+    `)
     .eq("partner_id", partnerId)
 
   // If NOT owner, apply visibility filters
@@ -127,7 +134,15 @@ async function _getPartnerProducts(partnerId: string) {
     }
 
     const { product_variants, ...rest } = item
-    return { ...rest, fallback_variant_image, fallback_variant_price }
+    return {
+      ...rest,
+      category: item.category?.name || null,
+      subcategory: item.subcategory?.name || null,
+      brand: item.brand?.name || null,
+      location: item.location?.name || null,
+      fallback_variant_image,
+      fallback_variant_price
+    }
   })
 
   return safeData
@@ -167,14 +182,14 @@ async function _getPartnerReviews(partnerId: string) {
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, profile_image_url")
+      .select("user_id, full_name")
       .in("user_id", userIds)
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
         profilesMap[p.user_id] = {
           full_name: p.full_name,
-          profile_image_url: p.profile_image_url
+          profile_image_url: null
         }
       })
     }
@@ -292,7 +307,14 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
       const supabase = getAdminClient()
       const { data } = await supabase
         .from("products")
-        .select("*, product_variants(variant_options, price_adjustment, is_active)")
+        .select(`
+          *,
+          category:product_categories!category_id(name),
+          subcategory:product_categories!subcategory_id(name),
+          brand:brands!brand_id(name),
+          location:storage_locations!location_id(name),
+          product_variants(variant_options, price_adjustment, is_active)
+        `)
         .eq("partner_id", partnerId)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
@@ -313,7 +335,15 @@ export const getCachedPartnerProducts = async (partnerId: string) => {
         }
 
         const { product_variants, ...rest } = item
-        return { ...rest, fallback_variant_image, fallback_variant_price }
+        return {
+          ...rest,
+          category: item.category?.name || null,
+          subcategory: item.subcategory?.name || null,
+          brand: item.brand?.name || null,
+          location: item.location?.name || null,
+          fallback_variant_image,
+          fallback_variant_price
+        }
       })
 
       return safeData
@@ -387,14 +417,14 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from("user_profiles")
-          .select("user_id, full_name, profile_image_url")
+          .select("user_id, full_name")
           .in("user_id", userIds)
 
         if (profilesData) {
           profilesData.forEach((p: any) => {
             profilesMap[p.user_id] = {
               full_name: p.full_name,
-              profile_image_url: p.profile_image_url
+              profile_image_url: null
             }
           })
         }

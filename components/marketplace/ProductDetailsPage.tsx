@@ -189,6 +189,25 @@ export function ProductDetailsPageClient({
         return images.length ? images : [PLACEHOLDER]
     }, [product.images, variants])
 
+    const galleryItems = useMemo(() => {
+        const videoType = product.video_type
+        const hasVideo = videoType && product.video_url
+        const videoItems = hasVideo ? [{
+            type: "video" as const,
+            src: String(product.video_url),
+            poster: product.video_thumbnail || undefined,
+            provider: videoType,
+            providerId: product.video_provider_id || undefined,
+        }] : []
+
+        return [
+            ...videoItems,
+            ...productImages.map((src: string) => ({ type: "image" as const, src })),
+        ]
+    }, [product.video_type, product.video_url, product.video_thumbnail, product.video_provider_id, productImages])
+
+    const videoOffset = galleryItems[0]?.type === "video" ? 1 : 0
+
     const processedVariants = useMemo(() => variants.map((v) => {
         const opts = typeof v.variant_options === "string" ? JSON.parse(v.variant_options) : v.variant_options
         const rawImg = v.image_url || opts?.image
@@ -283,9 +302,9 @@ export function ProductDetailsPageClient({
             const first = processedVariants.find((v) => (v.stock_available ?? v.stock_quantity ?? 0) > 0) || processedVariants[0]
             setSelectedAttributes(first.attributes)
             setSelectedVariant(first)
-            if (first.imageIndex !== -1) setActiveImgIndex(first.imageIndex)
+            if (first.imageIndex !== -1) setActiveImgIndex(first.imageIndex + videoOffset)
         }
-    }, [processedVariants, selectedVariant])
+    }, [processedVariants, selectedVariant, videoOffset])
 
     const handleAttributeSelect = useCallback((key: string, value: string) => {
         const newAttrs = { ...selectedAttributes, [key]: value }
@@ -296,9 +315,9 @@ export function ProductDetailsPageClient({
             setSelectedAttributes(match.attributes)
             setSelectedVariant(match)
             setQuantity(1)
-            if (match.imageIndex !== -1) setActiveImgIndex(match.imageIndex)
+            if (match.imageIndex !== -1) setActiveImgIndex(match.imageIndex + videoOffset)
         }
-    }, [selectedAttributes, processedVariants])
+    }, [selectedAttributes, processedVariants, videoOffset])
 
     const goToImage = useCallback((index: number) => {
         setSlideDirection(index > activeImgIndex ? 1 : -1)
@@ -307,19 +326,19 @@ export function ProductDetailsPageClient({
 
     const goToPrev = useCallback(() => {
         setSlideDirection(-1)
-        setActiveImgIndex((p: number) => (p - 1 + productImages.length) % productImages.length)
-    }, [productImages.length])
+        setActiveImgIndex((p: number) => (p - 1 + galleryItems.length) % galleryItems.length)
+    }, [galleryItems.length])
 
     const goToNext = useCallback(() => {
         setSlideDirection(1)
-        setActiveImgIndex((p: number) => (p + 1) % productImages.length)
-    }, [productImages.length])
+        setActiveImgIndex((p: number) => (p + 1) % galleryItems.length)
+    }, [galleryItems.length])
 
     const lightboxNav = useCallback((dir: 1 | -1) => {
         lightboxJustOpened.current = false
         setSlideDirection(dir)
-        setLightboxActiveImg((p: number) => (p + dir + productImages.length) % productImages.length)
-    }, [productImages.length])
+        setLightboxActiveImg((p: number) => (p + dir + galleryItems.length) % galleryItems.length)
+    }, [galleryItems.length])
 
     const openLightbox = useCallback((index: number) => {
         lightboxJustOpened.current = true
@@ -367,7 +386,7 @@ export function ProductDetailsPageClient({
                 name: `${product.name} ${selectedVariant?.variant_name || ""}`,
                 price: pricing.current,
                 quantity,
-                image: productImages[activeImgIndex],
+                image: productImages[Math.max(0, activeImgIndex - videoOffset)] || productImages[0],
                 variant: selectedVariant?.variant_name,
                 availabilityValue: Number(product.availability_value || 0),
                 availabilityUnit: product.availability_unit || "Minutos",
@@ -390,7 +409,7 @@ export function ProductDetailsPageClient({
 
         sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
         router.push("/checkout")
-    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex])
+    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset])
 
 
     const shareMessage = useMemo(() => {
@@ -400,6 +419,19 @@ export function ProductDetailsPageClient({
     }, [product.name, pricing]);
 
     // ─── Sub-sections ────────────────────────────────────────────────────────────
+
+    const renderGalleryItem = (item: (typeof galleryItems)[number], className: string, alt: string) => {
+        if (item.type === "video") {
+            if (item.provider === "youtube" && item.providerId) {
+                return <iframe key={item.src} src={`https://www.youtube.com/embed/${item.providerId}`} title={alt} loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className={className} />
+            }
+            if (item.provider === "vimeo" && item.providerId) {
+                return <iframe key={item.src} src={`https://player.vimeo.com/video/${item.providerId}`} title={alt} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen className={className} />
+            }
+            return <video key={item.src} src={item.src} poster={item.poster} controls preload="metadata" playsInline className={className} />
+        }
+        return <motion.img key={item.src} src={item.src} className={className} alt={alt} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} />
+    }
 
     const VariantsSection = useMemo(() => (
         <div className="space-y-6 mb-8">
@@ -846,7 +878,7 @@ export function ProductDetailsPageClient({
                                         <XIcon size={20} />
                                     </button>
                                     <span className="text-white text-sm font-semibold">
-                                        {lightboxActiveImg + 1}/{productImages.length}
+                                        {lightboxActiveImg + 1}/{galleryItems.length}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
@@ -865,11 +897,11 @@ export function ProductDetailsPageClient({
 
                                     {/* Thumbnails column */}
                                     <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
-                                        {productImages.map((img: string, i: number) => (
+                                        {galleryItems.map((item, i: number) => (
                                             <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
                                                 className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
                             ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
-                                                <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
+                                                <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`} />
                                             </div>
                                         ))}
                                     </div>
@@ -878,20 +910,9 @@ export function ProductDetailsPageClient({
                                     <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
                                         <AnimatePresence mode="wait" custom={slideDirection}
                                             onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                            <motion.img
-                                                key={lightboxActiveImg}
-                                                src={productImages[lightboxActiveImg]}
-                                                className="max-w-full max-h-full object-contain"
-                                                alt={`Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                                custom={slideDirection}
-                                                variants={lightboxJustOpened.current ? {} : slideVariants}
-                                                initial={lightboxJustOpened.current ? false : "enter"}
-                                                animate="center"
-                                                exit={lightboxJustOpened.current ? undefined : "exit"}
-                                                transition={{ duration: 0.2 }}
-                                            />
+                                            {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain", `Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                         </AnimatePresence>
-                                        {productImages.length > 1 && (
+                                        {galleryItems.length > 1 && (
                                             <>
                                                 <Button variant="filled" onClick={() => lightboxNav(-1)}
                                                     className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
@@ -910,18 +931,7 @@ export function ProductDetailsPageClient({
                                 <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
                                     <AnimatePresence mode="wait" custom={slideDirection}
                                         onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                        <motion.img
-                                            key={lightboxActiveImg}
-                                            src={productImages[lightboxActiveImg]}
-                                            className="max-w-full max-h-full object-contain px-4"
-                                            alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                            custom={slideDirection}
-                                            variants={lightboxJustOpened.current ? {} : slideVariants}
-                                            initial={lightboxJustOpened.current ? false : "enter"}
-                                            animate="center"
-                                            exit={lightboxJustOpened.current ? undefined : "exit"}
-                                            transition={{ duration: 0.2 }}
-                                        />
+                                        {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain px-4", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                     </AnimatePresence>
 
                                     {variantLabel && (
@@ -953,11 +963,11 @@ export function ProductDetailsPageClient({
                             <div className="flex gap-3 mb-6">
                                 {/* Desktop thumbnails */}
                                 <div className="hidden lg:flex flex-col gap-2 w-[70px] shrink-0">
-                                    {productImages.map((img: string, i: number) => (
+                                    {galleryItems.map((item, i: number) => (
                                         <div key={i} onClick={() => goToImage(i)}
                                             className={`w-full aspect-square rounded-md border cursor-pointer overflow-hidden transition-all
                         ${activeImgIndex === i ? "border-brand-green ring-1 ring-brand-green" : "border-brand-border hover:border-brand-border"}`}>
-                                            <img src={img} className="w-full h-full object-cover" alt={`Foto de ${product.name} em ${partner.city}`} />
+                                            <img src={item.type === "video" ? (item.poster || PLACEHOLDER) : item.src} className="w-full h-full object-cover" alt={`Foto de ${product.name} em ${partner.city}`} />
                                         </div>
                                     ))}
                                 </div>
@@ -965,7 +975,7 @@ export function ProductDetailsPageClient({
                                 <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
                                     {/* Desktop Prev Button */}
                                     <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {productImages.length > 1 && (
+                                        {galleryItems.length > 1 && (
                                             <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
                                                 <ChevronLeftIcon size={20} className="text-brand-dark" />
                                             </button>
@@ -986,13 +996,15 @@ export function ProductDetailsPageClient({
                                                 onMouseLeave={() => zoomScale.set(1)}
                                                 onClick={() => openLightbox(activeImgIndex)}>
                                                 <AnimatePresence mode="popLayout" custom={slideDirection}>
-                                                    <motion.img key={activeImgIndex} src={productImages[activeImgIndex]}
-                                                        className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                                        custom={slideDirection} variants={slideVariants}
-                                                        initial="enter" animate="center" exit="exit"
-                                                        transition={{ duration: 0.2 }}
-                                                        onClick={() => openLightbox(activeImgIndex)}
-                                                        style={{ transformOrigin, scale: smoothScale }} />
+                                                    {galleryItems[activeImgIndex]?.type === "image" ? (
+                                                        <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
+                                                            className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                                                            custom={slideDirection} variants={slideVariants}
+                                                            initial="enter" animate="center" exit="exit"
+                                                            transition={{ duration: 0.2 }}
+                                                            onClick={() => openLightbox(activeImgIndex)}
+                                                            style={{ transformOrigin, scale: smoothScale }} />
+                                                    ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${product.name}`)}
                                                 </AnimatePresence>
                                             </div>
                                         </div>
@@ -1000,12 +1012,7 @@ export function ProductDetailsPageClient({
                                         {/* Mobile main image */}
                                         <div className="lg:hidden relative bg-white rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
                                             <AnimatePresence mode="wait" custom={slideDirection}>
-                                                <motion.img key={activeImgIndex} src={productImages[activeImgIndex]}
-                                                    className="absolute inset-0 w-full h-full object-contain" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                                    custom={slideDirection} variants={slideVariants}
-                                                    initial="enter" animate="center" exit="exit"
-                                                    transition={{ duration: 0.2 }}
-                                                    onClick={() => openLightbox(activeImgIndex)} />
+                                                {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                             </AnimatePresence>
 
                                             {/* ActionButtons and Chevron navigation arrows hidden on mobile/tablet product image card as they are already displayed in the top header */}
@@ -1024,7 +1031,7 @@ export function ProductDetailsPageClient({
                                         </button>
 
                                         <div className="flex-1 flex items-center">
-                                            {productImages.length > 1 && (
+                                            {galleryItems.length > 1 && (
                                                 <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
                                                     <ChevronRightIcon size={20} className="text-brand-dark" />
                                                 </button>

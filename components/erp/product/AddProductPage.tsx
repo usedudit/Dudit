@@ -51,7 +51,7 @@ const getEmptyProduct = () => ({
     id: "", name: "", category: "", category_id: "", productId: "", sku: "", description: "", subcategory: "", subcategory_id: "", brand: "", brand_id: "", gtin: "",
     price: 0, costPrice: 0, stock: 0, minStock: 0, maxStock: 0, promotional_price: null, promotionTypeId: null,
     condicao: "Novo", unidade: "UN", localizacao: "", location_id: "", productType: "Físico",
-    images: [], primary_image_index: 0, video_url: "",
+    images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
     is_active: true, show_in_marketplace: true, allow_sell_without_stock: false, is_highlighted: false, show_price_in_store: true,
     marketplace_category_id: null, availability_value: 0, availability_unit: "Dias",
     warranty_value: 0, warranty_period: "Meses",
@@ -118,16 +118,16 @@ const AddProductPage: FC<AddProductPageProps> = ({
     }, [])
 
     const initialProductState = useMemo(() => {
-        const base = getEmptyProduct()
+        const base = { ...getEmptyProduct(), id: crypto.randomUUID() }
         // @ts-ignore
         const mapped = mapProductToFormData(initialProduct || initialData)
         if (!mapped) return base
         if (internalMode === "duplicate") {
-            return { ...base, ...mapped, id: "", productId: "", sku: "", name: `${mapped.name} (Cópia)`, images: mapped.images || [] }
+            return { ...base, ...mapped, id: crypto.randomUUID(), productId: "", sku: "", name: `${mapped.name} (Cópia)`, images: mapped.images || [] }
         }
         // @ts-ignore
         const realImages = (mapped.images || []).filter((img: string | File) => typeof img === "string" && !img.startsWith("data:"))
-        return { ...base, ...mapped, images: realImages.length > 0 ? realImages : base.images }
+        return { ...base, ...mapped, id: mapped.id || base.id, images: realImages.length > 0 ? realImages : base.images }
     }, [initialProduct, initialData, internalMode])
 
     const quickAdjustedInitial = useMemo(() => {
@@ -494,6 +494,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
             const warranty = d.warranty_value > 0 ? `${d.warranty_value} ${d.warranty_period}` : undefined
 
             const payload: any = {
+                id: d.id || undefined,
                 partnerId,
                 storeId,
                 csrf_token: csrfToken,
@@ -553,7 +554,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 preparationDays: Number(d.preparation_days) || 0,
                 allow_sell_without_stock: d.allow_sell_without_stock || false,
                 featured: d.is_highlighted,
-                videoUrl: d.video_url,
+                videoType: d.video_type || null,
+                videoUrl: d.video_url || null,
+                videoThumbnail: d.video_thumbnail || null,
+                videoDuration: d.video_duration || null,
+                videoProviderId: d.video_provider_id || null,
                 technicalSpecs: d.attributes,
                 warranty,
                 availability_value: Number(d.availability_value) || 0,
@@ -634,7 +639,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const handleDuplicateProduct = useCallback(() => {
         setOriginalNameForDuplicate(productData.name)
-        setProductData({ ...productData, id: "", productId: "", sku: "", name: `${productData.name} (Cópia)`, images: [...(productData.images || [])] })
+        setProductData({ ...productData, id: crypto.randomUUID(), productId: "", sku: "", name: `${productData.name} (Cópia)`, images: [...(productData.images || [])] })
         setInternalMode("duplicate"); setMode("add")
         notifyInfo("Duplicando produto", "Edite e salve o novo produto.")
     }, [productData, setMode, notifyInfo])
@@ -781,6 +786,15 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
                                             isQuickMode={isQuick}
+                                            itemId={productData.id}
+                                            video={{
+                                                video_type: productData.video_type || null,
+                                                video_url: productData.video_url || null,
+                                                video_thumbnail: productData.video_thumbnail || null,
+                                                video_duration: productData.video_duration || null,
+                                                video_provider_id: productData.video_provider_id || null,
+                                            }}
+                                            onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />

@@ -39,7 +39,7 @@ const getEmptyService = () => ({
     id: "", name: "", category: "", category_id: "", sku: "", description: "", subcategory: "", subcategory_id: "",
     price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
-    images: [], primary_image_index: 0, video_url: "",
+    images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
     is_active: true, show_in_marketplace: true, highlight_service: false,
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
@@ -90,14 +90,14 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     }, [])
 
     const initialServiceState = useMemo(() => {
-        const base = getEmptyService()
+        const base = { ...getEmptyService(), id: crypto.randomUUID() }
         const mapped = initialService || initialData
         if (!mapped) return base
         if (internalMode === "duplicate") {
-            return { ...base, ...mapped, id: "", sku: "", name: `${mapped.name} (Cópia)`, images: mapped.images || [] }
+            return { ...base, ...mapped, id: crypto.randomUUID(), sku: "", name: `${mapped.name} (Cópia)`, images: mapped.images || [] }
         }
         const realImages = (mapped.images || []).filter((img: string | File) => typeof img === "string" && !img.startsWith("data:"))
-        return { ...base, ...mapped, images: realImages.length > 0 ? realImages : base.images }
+        return { ...base, ...mapped, id: mapped.id || base.id, images: realImages.length > 0 ? realImages : base.images }
     }, [initialService, initialData, internalMode])
 
     const [serviceData, setServiceData] = useState<any>(initialServiceState)
@@ -361,6 +361,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
             }
 
             const payload: any = {
+                id: serviceData.id || undefined,
                 partnerId, storeId, csrf_token: csrfToken,
                 name: serviceData.name, description: serviceData.description,
                 sku: serviceData.sku, category_id: serviceData.category_id,
@@ -376,7 +377,11 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 highlight_service: !!serviceData.highlight_service,
                 tags: serviceData.tags || [],
                 notes: serviceData.notes,
-                video_url: serviceData.video_url,
+                video_type: serviceData.video_type || null,
+                video_url: serviceData.video_url || null,
+                video_thumbnail: serviceData.video_thumbnail || null,
+                video_duration: serviceData.video_duration || null,
+                video_provider_id: serviceData.video_provider_id || null,
                 warranty: serviceData.warranty,
                 technical_details: serviceData.technical_details,
                 resources: serviceData.resources || [],
@@ -412,7 +417,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
     const handleDuplicateService = useCallback(() => {
         setOriginalNameForDuplicate(serviceData.name)
-        setServiceData({ ...serviceData, id: "", sku: "", name: `${serviceData.name} (Cópia)`, images: [...(serviceData.images || [])] })
+        setServiceData({ ...serviceData, id: crypto.randomUUID(), sku: "", name: `${serviceData.name} (Cópia)`, images: [...(serviceData.images || [])] })
         setInternalMode("duplicate"); setMode("add")
         toast({ title: "Duplicando serviço", description: "Edite e salve o novo serviço." })
     }, [serviceData, setMode, toast])
@@ -524,6 +529,15 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages}
                                             isQuickMode={isQuick}
+                                            itemId={serviceData.id}
+                                            video={{
+                                                video_type: serviceData.video_type || null,
+                                                video_url: serviceData.video_url || null,
+                                                video_thumbnail: serviceData.video_thumbnail || null,
+                                                video_duration: serviceData.video_duration || null,
+                                                video_provider_id: serviceData.video_provider_id || null,
+                                            }}
+                                            onVideoChange={(video) => setServiceData((prev: any) => ({ ...prev, ...video }))}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />

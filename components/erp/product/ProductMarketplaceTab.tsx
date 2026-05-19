@@ -88,14 +88,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
               onChange={(val) => manualChange("description", val)}
               disabled={!isEditing}
             />
-            <Input
-              label="Vídeo do Produto"
-              name="video_url"
-              value={productData?.video_url || ""}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              placeholder="Cole o link do vídeo (YouTube, Vimeo...)"
-            />
           </div>
         </div>
 

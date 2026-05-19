@@ -6,6 +6,7 @@ import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard } from "
 import { formatCurrency } from "@/lib/utils";
 import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
+import ProductVideoSection from "./ProductVideoSection"
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
@@ -79,10 +80,13 @@ interface ProductGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
     isQuickMode?: boolean
+    itemId: string
+    video: any
+    onVideoChange: (video: any) => void
 }
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, itemId, video, onVideoChange
 }) => {
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
     const { salesPrice, profit, margin } = useMemo(() => {
@@ -121,6 +125,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                 <div className="mb-10">
                     <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
+                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
                 </div>
 
                 <div className="space-y-6">

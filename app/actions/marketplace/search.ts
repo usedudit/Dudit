@@ -275,7 +275,8 @@ async function _searchMarketplaceInternal(
             if (produtosIds.length > 0) {
                 promises.push(
                     supabase.from("products").select(`
-                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
+                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                        category_id, category:product_categories!category_id(name), created_at,
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
@@ -338,7 +339,13 @@ async function _searchMarketplaceInternal(
                 if (item.product_variants !== undefined) {
                     const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
                     const { product_variants, ...rest } = item
-                    return { ...rest, itemType: 'produto', partners: partner, ...variantFallback }
+                    return {
+                        ...rest,
+                        category: item.category?.name || null,
+                        itemType: 'produto',
+                        partners: partner,
+                        ...variantFallback
+                    }
                 }
 
                 return { ...item, itemType: 'servico', partners: partner }
@@ -440,13 +447,14 @@ async function searchMarketplacePostgresFTS(
 
         if (type === 'tudo' || type === 'produtos') {
             let req = supabase.from("products").select(`
-                id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
+                id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                category_id, category:product_categories!category_id(name), created_at,
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
             `).eq("is_active", true).eq("show_in_marketplace", true)
             let reqJoined = req
             if (qRaw) {
-                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%,category.ilike.%${qRaw}%`
+                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%`
                 reqJoined = reqJoined.or(orFilter)
             }
             if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
@@ -462,7 +470,13 @@ async function searchMarketplacePostgresFTS(
                     } : null
                     const variantFallback = extractFirstVariantFallback((item as any).product_variants, Number(item.price))
                     const { product_variants, ...rest } = item
-                    return { ...rest, itemType: 'produto', partners: partner, ...variantFallback }
+                    return {
+                        ...rest,
+                        category: item.category?.name || null,
+                        itemType: 'produto',
+                        partners: partner,
+                        ...variantFallback
+                    }
                 }))
             }
         }

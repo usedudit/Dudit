@@ -17,6 +17,8 @@
     "@aws-sdk/client-s3": "^3.605.0",
     "@aws-sdk/s3-request-presigner": "^3.605.0",
     "@emotion/is-prop-valid": "1.4.0",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@hookform/resolvers": "5.2.2",
     "@hugeicons/core-free-icons": "3.1.1",
     "@hugeicons/react": "1.1.4",

@@ -14,8 +14,38 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
+import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 
 const getBrasiliaTime = () => new Date(new Date().getTime() - 3 * 60 * 60 * 1000).toISOString()
+
+const assertUploadVideoOwnership = async (video: any, userId: string, itemId: string) => {
+    if (video.video_type !== "upload") return
+    const getKey = (url: string) => {
+        try {
+            return url.startsWith("http") ? new URL(url).pathname.replace(/^\/+/, "") : url
+        } catch {
+            throw new Error("URL de vídeo inválida")
+        }
+    }
+    const expectedPrefix = `users/${userId}/services/${itemId}`
+    const videoKey = getKey(video.video_url || "")
+    const thumbnailKey = getKey(video.video_thumbnail || "")
+    if (!videoKey.startsWith(`${expectedPrefix}.`) || thumbnailKey !== `${expectedPrefix}-thumbnail.jpg`) {
+        throw new Error("URL de vídeo não pertence a este serviço")
+    }
+    const { getFileMetadataFromR2 } = await import("@/lib/r2/server")
+    const [videoObject, thumbnailObject] = await Promise.all([
+        getFileMetadataFromR2(videoKey),
+        getFileMetadataFromR2(thumbnailKey),
+    ])
+    if (!ALLOWED_VIDEO_MIME_TYPES.includes(videoObject.contentType as any) || videoObject.contentLength > MAX_VIDEO_FILE_SIZE) {
+        throw new Error("Vídeo excede limite")
+    }
+    if (thumbnailObject.contentType !== "image/jpeg" || thumbnailObject.contentLength > MAX_FILE_SIZE) {
+        throw new Error("Miniatura do vídeo inválida")
+    }
+}
 
 export type ERPServiceListCursor = { createdAt: string; id: string }
 
@@ -122,7 +152,18 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         const businessInfo = normalizeBusinessInfo(ctx?.businessInfo)
         const isQuick = businessInfo.mode === "quick"
 
+        const videoMetadata = await normalizeVideoMetadata({
+            video_type: data.video_type || data.videoType || (data.video_url || data.videoUrl ? "youtube" : null),
+            video_url: data.video_url || data.videoUrl || null,
+            video_thumbnail: data.video_thumbnail || data.videoThumbnail || null,
+            video_duration: data.video_duration || data.videoDuration || null,
+            video_provider_id: data.video_provider_id || data.videoProviderId || null,
+        })
+        if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do serviço é obrigatório para upload de vídeo")
+        if (data.id) await assertUploadVideoOwnership(videoMetadata, user.id, data.id)
+
         const serviceData: any = {
+            ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
             store_id: finalStoreId,
             name: data.name,
@@ -146,7 +187,11 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,
             tags: data.tags || [],
             notes: data.notes || null,
-            video_url: data.video_url || data.videoUrl || null,
+            video_type: videoMetadata.video_type,
+            video_url: videoMetadata.video_url,
+            video_thumbnail: videoMetadata.video_thumbnail,
+            video_duration: videoMetadata.video_duration,
+            video_provider_id: videoMetadata.video_provider_id,
             warranty: data.warranty || null,
             technical_details: data.technical_details || data.technicalDetails || null,
             resources: data.resources || [],
@@ -197,7 +242,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (!serviceId) return errorResponse("ID do serviço não fornecido")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePartnerAccessWithPermission(existing.partner_id, "services", "edit", user)
@@ -233,8 +278,36 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.highlightService !== undefined) payload.highlight_service = data.highlightService
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.notes !== undefined) payload.notes = data.notes
-        if (data.video_url !== undefined) payload.video_url = data.video_url
-        if (data.videoUrl !== undefined) payload.video_url = data.videoUrl
+        if (
+            data.video_type !== undefined ||
+            data.videoType !== undefined ||
+            data.video_url !== undefined ||
+            data.videoUrl !== undefined ||
+            data.video_thumbnail !== undefined ||
+            data.videoThumbnail !== undefined ||
+            data.video_duration !== undefined ||
+            data.videoDuration !== undefined ||
+            data.video_provider_id !== undefined ||
+            data.videoProviderId !== undefined
+        ) {
+            const videoMetadata = (data.video_type || data.videoType)
+                ? await normalizeVideoMetadata({
+                    video_type: data.video_type || data.videoType,
+                    video_url: data.video_url || data.videoUrl || null,
+                    video_thumbnail: data.video_thumbnail || data.videoThumbnail || null,
+                    video_duration: data.video_duration || data.videoDuration || null,
+                    video_provider_id: data.video_provider_id || data.videoProviderId || null,
+                })
+                : EMPTY_VIDEO_METADATA
+            if (videoMetadata.video_type === "upload") {
+                await assertUploadVideoOwnership(videoMetadata, user.id, serviceId)
+            }
+            payload.video_type = videoMetadata.video_type
+            payload.video_url = videoMetadata.video_url
+            payload.video_thumbnail = videoMetadata.video_thumbnail
+            payload.video_duration = videoMetadata.video_duration
+            payload.video_provider_id = videoMetadata.video_provider_id
+        }
         if (data.warranty !== undefined) payload.warranty = data.warranty
         if (data.technical_details !== undefined) payload.technical_details = data.technical_details
         if (data.technicalDetails !== undefined) payload.technical_details = data.technicalDetails
@@ -250,6 +323,20 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)
 
+        if (
+            existing.video_type === "upload" &&
+            payload.video_url !== undefined &&
+            existing.video_url &&
+            existing.video_url !== payload.video_url
+        ) {
+            const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server")
+            const cleanup = [existing.video_url, existing.video_thumbnail].filter(Boolean).map(async (url: string) => {
+                const key = url.startsWith("http") ? extractKeyFromR2Url(url) : url
+                if (key) await deleteFileFromR2(key)
+            })
+            Promise.all(cleanup).catch(console.error)
+        }
+
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {
@@ -264,7 +351,7 @@ export async function deleteServiceAction(serviceId: string): Promise<ActionResp
         if (!user) return errorResponse("Não autenticado")
 
         const admin = getAdminClient()
-        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id").eq("id", serviceId).single()
+        const { data: existing, error: fetchError } = await admin.from("services").select("partner_id, video_type, video_url, video_thumbnail").eq("id", serviceId).single()
         if (fetchError || !existing) return errorResponse("Serviço não encontrado")
 
         await requirePartnerAccessWithPermission(existing.partner_id, "services", "delete", user)
@@ -273,6 +360,15 @@ export async function deleteServiceAction(serviceId: string): Promise<ActionResp
         const { error } = await supabase.from("services").delete().eq("id", serviceId)
 
         if (error) return errorResponse(error.message)
+
+        if (existing.video_type === "upload") {
+            const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server")
+            const cleanup = [existing.video_url, existing.video_thumbnail].filter(Boolean).map(async (url: string) => {
+                const key = url.startsWith("http") ? extractKeyFromR2Url(url) : url
+                if (key) await deleteFileFromR2(key)
+            })
+            Promise.all(cleanup).catch(console.error)
+        }
 
         revalidatePath("/erp/servicos")
         return successResponse({ deleted: true })

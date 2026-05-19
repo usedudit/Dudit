@@ -4,6 +4,7 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { getR2ServerConfig, getR2PublicUrl } from "./r2-server-config"
@@ -30,7 +31,11 @@ export interface UploadConfig {
   /** User ID from requireUser() - REQUIRED for multi-tenant isolation */
   userId: string
   prefix?: string
+  key?: string
   expiresIn?: number
+  allowedMimeTypes?: readonly string[]
+  allowedExtensions?: readonly string[]
+  mimeToExt?: Record<string, string>
 }
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
@@ -72,7 +77,12 @@ function sanitizeFileName(name: string): string {
  * Validate file extension against allowlist and dangerous blocklist.
  * Returns the safe extension (without dot) or throws.
  */
-function validateAndGetExtension(fileName: string, mimeType: string): string {
+function validateAndGetExtension(
+  fileName: string,
+  mimeType: string,
+  allowedExtensions: readonly string[] = ALLOWED_EXTENSIONS,
+  mimeToExt: Record<string, string> = MIME_TO_EXT
+): string {
   const sanitized = sanitizeFileName(fileName)
   const dotIndex = sanitized.lastIndexOf(".")
   const extension = dotIndex >= 0 ? sanitized.substring(dotIndex).toLowerCase() : ""
@@ -83,14 +93,14 @@ function validateAndGetExtension(fileName: string, mimeType: string): string {
   }
 
   // Verify extension is in allowlist
-  if (!ALLOWED_EXTENSIONS.includes(extension as any)) {
+  if (!allowedExtensions.includes(extension)) {
     throw new Error(
-      `Extensão não permitida: ${extension}. Permitidas: ${ALLOWED_EXTENSIONS.join(", ")}`
+      `Extensão não permitida: ${extension}. Permitidas: ${allowedExtensions.join(", ")}`
     )
   }
 
   // Cross-validate: extension must match MIME type
-  const expectedExt = MIME_TO_EXT[mimeType]
+  const expectedExt = mimeToExt[mimeType]
   if (!expectedExt) {
     throw new Error(`Tipo MIME não permitido: ${mimeType}`)
   }
@@ -117,7 +127,11 @@ export async function generateSignedUploadUrl(
     fileType,
     userId,
     prefix = R2_PREFIXES.products,
+    key: requestedKey,
     expiresIn: requestedExpiry,
+    allowedMimeTypes = ALLOWED_MIME_TYPES,
+    allowedExtensions = ALLOWED_EXTENSIONS,
+    mimeToExt = MIME_TO_EXT,
   } = config
 
   // 1. Validate user ID (multi-tenant isolation)
@@ -126,7 +140,7 @@ export async function generateSignedUploadUrl(
   }
 
   // 2. Validate MIME type against strict allowlist
-  if (!ALLOWED_MIME_TYPES.includes(fileType as any)) {
+  if (!allowedMimeTypes.includes(fileType)) {
     throw new Error("Tipo de arquivo não permitido")
   }
 
@@ -135,7 +149,7 @@ export async function generateSignedUploadUrl(
   }
 
   // 3. Validate and get safe extension (cross-validates MIME ↔ extension)
-  const safeExt = validateAndGetExtension(fileName, fileType)
+  const safeExt = validateAndGetExtension(fileName, fileType, allowedExtensions, mimeToExt)
 
   // 4. Cap expiry to maximum allowed
   const expiresIn = Math.min(
@@ -143,8 +157,11 @@ export async function generateSignedUploadUrl(
     MAX_PRESIGNED_URL_EXPIRY
   )
 
-  // 5. Generate user-scoped key: users/{userId}/{prefix}{timestamp}-{uuid}.{ext}
-  const key = `users/${userId}/${prefix}${Date.now()}-${crypto.randomUUID()}.${safeExt}`
+  // 5. Generate user-scoped key. Routes may pass a deterministic key after validating ownership.
+  const key = requestedKey || `users/${userId}/${prefix}${Date.now()}-${crypto.randomUUID()}.${safeExt}`
+  if (!validateKeyOwnership(key, userId) || key.includes("..") || key.startsWith("/")) {
+    throw new Error("Chave de upload inválida")
+  }
 
   const serverConfig = getR2ServerConfig()
   const client = createR2Client()
@@ -191,6 +208,29 @@ export async function deleteFileFromR2(key: string) {
         Key: key,
       })
     )
+  } finally {
+    client.destroy()
+  }
+}
+
+export async function getFileMetadataFromR2(key: string) {
+  if (!key || key.includes("..") || key.startsWith("/")) {
+    throw new Error("Chave de arquivo invÃ¡lida")
+  }
+
+  const serverConfig = getR2ServerConfig()
+  const client = createR2Client()
+  try {
+    const result = await client.send(
+      new HeadObjectCommand({
+        Bucket: serverConfig.bucketName,
+        Key: key,
+      })
+    )
+    return {
+      contentType: result.ContentType || null,
+      contentLength: result.ContentLength || 0,
+    }
   } finally {
     client.destroy()
   }

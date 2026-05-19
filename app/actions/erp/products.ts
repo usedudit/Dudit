@@ -22,6 +22,8 @@ import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { checkLimit, canUseFeature, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
+import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE } from "@/lib/r2/config"
 
 const _deleteFromR2 = async (url: string) => {
     if (!url || !url.trim()) return;
@@ -33,6 +35,34 @@ const _deleteFromR2 = async (url: string) => {
         console.error("Failed to delete image: ", url, e);
     }
 };
+
+const assertUploadVideoOwnership = async (video: any, userId: string, folder: "products" | "services", itemId: string) => {
+    if (video.video_type !== "upload") return
+    const getKey = (url: string) => {
+        try {
+            return url.startsWith("http") ? new URL(url).pathname.replace(/^\/+/, "") : url
+        } catch {
+            throw new Error("URL de vídeo inválida")
+        }
+    }
+    const expectedPrefix = `users/${userId}/${folder}/${itemId}`
+    const videoKey = getKey(video.video_url || "")
+    const thumbnailKey = getKey(video.video_thumbnail || "")
+    if (!videoKey.startsWith(`${expectedPrefix}.`) || thumbnailKey !== `${expectedPrefix}-thumbnail.jpg`) {
+        throw new Error("URL de vídeo não pertence a este item")
+    }
+    const { getFileMetadataFromR2 } = await import("@/lib/r2/server")
+    const [videoObject, thumbnailObject] = await Promise.all([
+        getFileMetadataFromR2(videoKey),
+        getFileMetadataFromR2(thumbnailKey),
+    ])
+    if (!ALLOWED_VIDEO_MIME_TYPES.includes(videoObject.contentType as any) || videoObject.contentLength > MAX_VIDEO_FILE_SIZE) {
+        throw new Error("Vídeo excede limite")
+    }
+    if (thumbnailObject.contentType !== "image/jpeg" || thumbnailObject.contentLength > MAX_FILE_SIZE) {
+        throw new Error("Miniatura do vídeo inválida")
+    }
+}
 
 // ============================================================================
 // HELPERS & SEGURANÃ‡A
@@ -124,7 +154,7 @@ export async function deleteProductAction(productId: string) {
     const actionStart = performance.now()
     await requireRateLimit(RateLimitCategory.PRODUCT_DELETE)
     try {
-        const product = await fetchProductAndVerifyOwnership(productId, "delete")
+        const product = await fetchProductAndVerifyOwnership(productId, "delete", "id, partner_id, images, sku, name, video_type, video_url, video_thumbnail")
 
         const admin = getAdminClient()
 
@@ -156,6 +186,12 @@ export async function deleteProductAction(productId: string) {
             Promise.all(imagesToDelete.map(img => _deleteFromR2(img))).catch(console.error)
             decrement_usage_counter(product.partner_id, "images_count", imagesToDelete.length).catch(console.error)
         }
+        if (product.video_type === "upload") {
+            Promise.all([
+                product.video_url ? _deleteFromR2(product.video_url) : Promise.resolve(),
+                product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
+            ]).catch(console.error)
+        }
 
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(productId, product.partner_id, 'delete')
@@ -171,6 +207,7 @@ export async function deleteProductAction(productId: string) {
 // ============================================================================
 
 export async function createProductComprehensiveAction(data: {
+    id?: string
     partnerId: string
     storeId: string
     name: string
@@ -234,6 +271,10 @@ export async function createProductComprehensiveAction(data: {
     availability_unit?: string
     warranty?: string | null
     videoUrl?: string | null
+    videoType?: VideoType | null
+    videoThumbnail?: string | null
+    videoDuration?: number | null
+    videoProviderId?: string | null
     technicalSpecs?: any
     deliveryFormat?: string | null
     showInMarketplace?: boolean
@@ -304,7 +345,18 @@ export async function createProductComprehensiveAction(data: {
         // SKU: função pura (zero queries), unicidade garantida pelo banco
         const sku = data.sku?.trim() || generateSKUBase(data.name)
 
+        const videoMetadata = await normalizeVideoMetadata({
+            video_type: data.videoType || (data.videoUrl ? "youtube" : null),
+            video_url: data.videoUrl || null,
+            video_thumbnail: data.videoThumbnail || null,
+            video_duration: data.videoDuration || null,
+            video_provider_id: data.videoProviderId || null,
+        })
+        if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do produto é obrigatório para upload de vídeo")
+        if (data.id) await assertUploadVideoOwnership(videoMetadata, _user.id, "products", data.id)
+
         const productData = {
+            id: data.id || undefined,
             partner_id: finalPartnerId,
             store_id: finalStoreId,
             name: data.name,
@@ -337,7 +389,7 @@ export async function createProductComprehensiveAction(data: {
             availability_value: data.availability_value || 0,
             availability_unit: data.availability_unit || "Dias",
             warranty: data.warranty || null,
-            video_url: data.videoUrl || null,
+            video_url: videoMetadata.video_url,
             technical_specs: data.technicalSpecs || {},
             delivery_format: data.deliveryFormat || null,
             show_in_marketplace: data.showInMarketplace !== false,
@@ -417,6 +469,16 @@ export async function createProductComprehensiveAction(data: {
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
+        const videoUpdate = {
+            video_type: videoMetadata.video_type,
+            video_url: videoMetadata.video_url,
+            video_thumbnail: videoMetadata.video_thumbnail,
+            video_duration: videoMetadata.video_duration,
+            video_provider_id: videoMetadata.video_provider_id,
+        }
+        const { error: videoUpdateError } = await getAdminClient().from("products").update(videoUpdate).eq("id", insertedProduct.id)
+        if (videoUpdateError) return errorResponse(videoUpdateError.message, videoUpdateError)
+
         // Criar moderation job (cron processa)
         const admin = getAdminClient()
         Promise.resolve(
@@ -479,7 +541,11 @@ interface UpdateProductData {
     isOnPromotion?: boolean
     deliveryFormat?: string
     tags?: string[]
-    videoUrl?: string
+    videoUrl?: string | null
+    videoType?: VideoType | null
+    videoThumbnail?: string | null
+    videoDuration?: number | null
+    videoProviderId?: string | null
     technicalSpecs?: any
     minStock?: number
     maxStock?: number
@@ -519,7 +585,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // 2. CSRF + ownership em paralelo (independentes)
         const [csrf, product] = await Promise.all([
             validateCSRF(data as Record<string, unknown>),
-            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status"),
+            fetchProductAndVerifyOwnership(productId, "edit", "id, partner_id, images, sku, name, description, moderation_status, video_type, video_url, video_thumbnail"),
         ])
         if (!csrf.valid) return errorResponse(csrf.error || "CSRF inválido")
 
@@ -602,7 +668,33 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.categoryId !== undefined) payload.category_id = data.categoryId
         if (data.brandId !== undefined) payload.brand_id = data.brandId
         if (data.locationId !== undefined) payload.location_id = data.locationId
-        if (data.videoUrl !== undefined) payload.video_url = data.videoUrl
+        if (
+            data.videoType !== undefined ||
+            data.videoUrl !== undefined ||
+            data.videoThumbnail !== undefined ||
+            data.videoDuration !== undefined ||
+            data.videoProviderId !== undefined
+        ) {
+            const videoMetadata = data.videoType
+                ? await normalizeVideoMetadata({
+                    video_type: data.videoType,
+                    video_url: data.videoUrl || null,
+                    video_thumbnail: data.videoThumbnail || null,
+                    video_duration: data.videoDuration || null,
+                    video_provider_id: data.videoProviderId || null,
+                })
+                : EMPTY_VIDEO_METADATA
+            if (videoMetadata.video_type === "upload") {
+                const currentUser = await verifyAuth()
+                await assertUploadVideoOwnership(videoMetadata, currentUser.id, "products", productId)
+            }
+
+            payload.video_type = videoMetadata.video_type
+            payload.video_url = videoMetadata.video_url
+            payload.video_thumbnail = videoMetadata.video_thumbnail
+            payload.video_duration = videoMetadata.video_duration
+            payload.video_provider_id = videoMetadata.video_provider_id
+        }
         if (data.technicalSpecs !== undefined) payload.technical_specs = data.technicalSpecs
         if (data.featured !== undefined) payload.is_featured = data.featured
         if (data.deliveryFormat !== undefined) payload.delivery_format = data.deliveryFormat
@@ -631,7 +723,11 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         // FIX: A função RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
         const adminUpdate = getAdminClient()
-        await adminUpdate.from('products').update({ moderation_status: payload.moderation_status }).eq('id', productId)
+        const directProductPatch: any = { moderation_status: payload.moderation_status }
+        ;["video_type", "video_url", "video_thumbnail", "video_duration", "video_provider_id"].forEach((field) => {
+            if (payload[field] !== undefined) directProductPatch[field] = payload[field]
+        })
+        await adminUpdate.from('products').update(directProductPatch).eq('id', productId)
 
         // Criar moderation job se necessário (cron processa) - reuses same admin client
         if (needsTextRemoderation) {
@@ -660,6 +756,18 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             }
         } else if (payload.images && payload.images.length > 0) {
             increment_usage_counter(product.partner_id, "images_count", payload.images.length).catch(console.error)
+        }
+
+        if (
+            product.video_type === "upload" &&
+            payload.video_url !== undefined &&
+            product.video_url &&
+            product.video_url !== payload.video_url
+        ) {
+            Promise.all([
+                _deleteFromR2(product.video_url),
+                product.video_thumbnail ? _deleteFromR2(product.video_thumbnail) : Promise.resolve(),
+            ]).catch(console.error)
         }
 
         // Synchronous revalidation and Redis sync to prevent stale data

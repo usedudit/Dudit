@@ -57,7 +57,8 @@ export async function GET(request: Request) {
             if (produtosIds.length > 0) {
                 promises.push(
                     supabase.from("products").select(`
-              id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating, category, created_at,
+              id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+              category_id, category:product_categories!category_id(name), created_at,
                         partners(id, store_name, store_image_url, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `).in("id", produtosIds)
@@ -107,26 +108,33 @@ export async function GET(request: Request) {
                     }
                 }
                 
-                const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-                const partner = rawPartner ? {
-                    ...rawPartner,
-                    store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                    city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
-                } : null
-
-                if (item.product_variants !== undefined) { // É Produto
-                    const variants = item.product_variants
-                    const withImage = variants?.find((v: any) => v.is_active && v.variant_options?.image)
-                    const first = variants?.find((v: any) => v.is_active) || variants?.[0]
-                    const image = withImage?.variant_options?.image || null
-                    const priceAdj = first?.price_adjustment
-                    const fallbackPrice = priceAdj && priceAdj > 0 ? priceAdj : null
-                    const { product_variants, ...rest } = item
-                    return { ...rest, itemType: 'produto', partners: partner, fallback_variant_image: image, fallback_variant_price: fallbackPrice }
-                }
-
-                // É Serviço
-                return { ...item, itemType: 'servico', partners: partner }
+                 const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+                 const partner = rawPartner ? {
+                     ...rawPartner,
+                     store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                     city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
+                 } : null
+ 
+                 if (item.product_variants !== undefined) { // É Produto
+                     const variants = item.product_variants
+                     const withImage = variants?.find((v: any) => v.is_active && v.variant_options?.image)
+                     const first = variants?.find((v: any) => v.is_active) || variants?.[0]
+                     const image = withImage?.variant_options?.image || null
+                     const priceAdj = first?.price_adjustment
+                     const fallbackPrice = priceAdj && priceAdj > 0 ? priceAdj : null
+                     const { product_variants, ...rest } = item
+                     return {
+                         ...rest,
+                         category: item.category?.name || null,
+                         itemType: 'produto',
+                         partners: partner,
+                         fallback_variant_image: image,
+                         fallback_variant_price: fallbackPrice
+                     }
+                 }
+ 
+                 // É Serviço
+                 return { ...item, itemType: 'servico', partners: partner }
             }
 
             // Mapear os missingIndices preenchendo o array cachedObjects e salvando assincronamente no Redis

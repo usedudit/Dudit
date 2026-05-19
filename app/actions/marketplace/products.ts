@@ -27,8 +27,12 @@ async function _getMarketplaceProductBase(id: string) {
     .select(`
       id, name, description, price, promotional_price, stock_quantity, stock_available, availability_value, availability_unit,
       is_active, moderation_status,
-      category, images, rating, partner_id, sku, 
-      condition, brand, show_in_marketplace, technical_specs, created_at,
+      category_id, category:product_categories!category_id(name),
+      subcategory_id, subcategory:product_categories!subcategory_id(name),
+      brand_id, brand:brands!brand_id(name),
+      location_id, location:storage_locations!location_id(name),
+      images, rating, partner_id, sku, 
+      condition, show_in_marketplace, technical_specs, created_at,
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
         id, store_name, store_description, rating, user_id, 
@@ -49,6 +53,11 @@ async function _getMarketplaceProductBase(id: string) {
 
   // Normalização básica (independente de usuário)
   if (data) {
+    data.category = (data.category as any)?.name || null
+    data.subcategory = (data.subcategory as any)?.name || null
+    data.brand = (data.brand as any)?.name || null
+    data.location = (data.location as any)?.name || null
+
     let p: any = data.partners
     if (Array.isArray(p)) p = p[0]
 
@@ -123,14 +132,14 @@ async function _getProductReviews(productId: string) {
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, profile_image_url")
+      .select("user_id, full_name")
       .in("user_id", userIds)
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
         profilesMap[p.user_id] = {
           full_name: p.full_name,
-          profile_image_url: p.profile_image_url
+          profile_image_url: null
         }
       })
     }
@@ -208,14 +217,14 @@ export const getCachedReviews = async (productId: string) => {
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from("user_profiles")
-          .select("user_id, full_name, profile_image_url")
+          .select("user_id, full_name")
           .in("user_id", userIds)
 
         if (profilesData) {
           profilesData.forEach((p: any) => {
             profilesMap[p.user_id] = {
               full_name: p.full_name,
-              profile_image_url: p.profile_image_url
+              profile_image_url: null
             }
           })
         }
@@ -240,7 +249,8 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
       const { data } = await supabase
         .from("products")
         .select(`
-          id, name, price, promotional_price, images, rating, category,
+          id, name, price, promotional_price, images, rating,
+          category_id, category:product_categories!category_id(name),
           partners(id, store_name, store_image_url, addresses(city, state)),
           product_variants(variant_options, price_adjustment, is_active)
         `)
@@ -271,7 +281,13 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
         const fallbackPrice = item.product_variants?.[0]?.price_adjustment || null
 
         const { product_variants, ...rest } = item as any
-        return { ...rest, partners: partner, fallback_variant_image: fallbackUrl, fallback_variant_price: fallbackPrice }
+        return {
+          ...rest,
+          category: item.category?.name || null,
+          partners: partner,
+          fallback_variant_image: fallbackUrl,
+          fallback_variant_price: fallbackPrice
+        }
       })
 
       return safeData

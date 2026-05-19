@@ -15,6 +15,11 @@ export interface Product {
   sku: string | null
   rating: number
   images: string[] | null
+  video_type?: "upload" | "youtube" | "vimeo" | null
+  video_url?: string | null
+  video_thumbnail?: string | null
+  video_duration?: number | null
+  video_provider_id?: string | null
   created_at: string
   partner_id: string
   brand: string | null

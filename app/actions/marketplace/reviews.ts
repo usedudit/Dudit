@@ -131,24 +131,38 @@ async function updateProductRating(supabase: any, productId: string) {
   await supabase.from("products").update({ rating: averageRating }).eq("id", productId)
 }
 
-async function updatePartnerRating(supabase: any, partnerId: string) {
-  // Get all products from this partner
-  const { data: products } = await supabase.from("products").select("id").eq("partner_id", partnerId)
-
-  if (!products || products.length === 0) {
-    return
-  }
-
-  const productIds = products.map((p: any) => p.id)
-
-  // Get all reviews for all products of this partner
+async function updateServiceRating(supabase: any, serviceId: string) {
   const { data: reviews } = await supabase
     .from("reviews")
     .select("rating")
-    .in("product_id", productIds)
+    .eq("service_id", serviceId)
     .not("rating", "is", null)
 
   if (!reviews || reviews.length === 0) {
+    return
+  }
+
+  const averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length
+
+  await supabase.from("services").update({ rating: averageRating }).eq("id", serviceId)
+}
+
+async function updatePartnerRating(supabase: any, partnerId: string) {
+  // Get all reviews directly for this partner (both product and service reviews)
+  const { data: reviews, error } = await supabase
+    .from("reviews")
+    .select("rating")
+    .eq("partner_id", partnerId)
+    .not("rating", "is", null)
+
+  if (error) {
+    console.error(`[Reviews] Error fetching ratings for partner ${partnerId}:`, error.message)
+    return
+  }
+
+  if (!reviews || reviews.length === 0) {
+    // If no reviews, set partner rating to 0
+    await supabase.from("partners").update({ rating: 0 }).eq("id", partnerId)
     return
   }
 
@@ -207,11 +221,27 @@ export async function createReviewAction(data: {
   if (data.productId) {
     await updateProductRating(supabase, data.productId)
   }
+  if (data.serviceId) {
+    await updateServiceRating(supabase, data.serviceId)
+  }
   await updatePartnerRating(supabase, data.partnerId)
+
+  // Invalidate partner cache tags to ensure seller page shows real-time stats
+  try {
+    const { revalidatePartnerProfile } = await import("@/lib/utils/revalidation")
+    await revalidatePartnerProfile(data.partnerId)
+    const { revalidateTag } = await import("next/cache")
+    revalidateTag("partner-reviews", "max")
+    revalidateTag(`partner-${data.partnerId}`, "max")
+  } catch (revalError) {
+    console.error("[Reviews] Failed to revalidate partner details:", revalError)
+  }
 
   revalidatePath("/pedidos")
   revalidatePath("/marketplace")
-  revalidatePath(`/marketplace/products/${data.productId}`)
+  if (data.productId) {
+    revalidatePath(`/marketplace/products/${data.productId}`)
+  }
 
   return { success: true }
 }
@@ -237,7 +267,7 @@ export async function updateReviewAction(reviewId: string, data: {
   // Verify user owns this review
   const { data: review } = await supabase
     .from("reviews")
-    .select("user_id")
+    .select("user_id, partner_id, product_id, service_id")
     .eq("id", reviewId)
     .single()
 
@@ -258,9 +288,30 @@ export async function updateReviewAction(reviewId: string, data: {
     return { error: error.message }
   }
 
-  // Trigger will automatically update partner and product ratings
-  revalidatePath("/marketplace")
+  if (review.product_id) {
+    await updateProductRating(supabase, review.product_id)
+  }
+  if (review.service_id) {
+    await updateServiceRating(supabase, review.service_id)
+  }
+  await updatePartnerRating(supabase, review.partner_id)
 
+  // Invalidate cache tags
+  try {
+    const { revalidatePartnerProfile } = await import("@/lib/utils/revalidation")
+    await revalidatePartnerProfile(review.partner_id)
+    const { revalidateTag } = await import("next/cache")
+    revalidateTag("partner-reviews", "max")
+    revalidateTag(`partner-${review.partner_id}`, "max")
+  } catch (revalError) {
+    console.error("[Reviews] Failed to revalidate partner details:", revalError)
+  }
+
+  revalidatePath("/marketplace")
+  revalidatePath("/pedidos")
+  if (review.product_id) {
+    revalidatePath(`/marketplace/products/${review.product_id}`)
+  }
 
   return { success: true }
 }
@@ -281,7 +332,7 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
   // Verify user owns this review
   const { data: review } = await supabase
     .from("reviews")
-    .select("user_id, product_id")
+    .select("user_id, partner_id, product_id, service_id")
     .eq("id", reviewId)
     .single()
 
@@ -298,12 +349,30 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
     return { error: error.message }
   }
 
-  // Trigger will automatically update partner and product ratings
+  if (review.product_id) {
+    await updateProductRating(supabase, review.product_id)
+  }
+  if (review.service_id) {
+    await updateServiceRating(supabase, review.service_id)
+  }
+  await updatePartnerRating(supabase, review.partner_id)
+
+  // Invalidate cache tags
+  try {
+    const { revalidatePartnerProfile } = await import("@/lib/utils/revalidation")
+    await revalidatePartnerProfile(review.partner_id)
+    const { revalidateTag } = await import("next/cache")
+    revalidateTag("partner-reviews", "max")
+    revalidateTag(`partner-${review.partner_id}`, "max")
+  } catch (revalError) {
+    console.error("[Reviews] Failed to revalidate partner details:", revalError)
+  }
+
   revalidatePath("/marketplace")
+  revalidatePath("/pedidos")
   if (review.product_id) {
     revalidatePath(`/marketplace/products/${review.product_id}`)
   }
-
 
   return { success: true }
 }
@@ -363,14 +432,14 @@ export async function getProductReviews(productId: string) {
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, profile_image_url")
+      .select("user_id, full_name")
       .in("user_id", userIds)
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
         profilesMap[p.user_id] = {
           full_name: p.full_name,
-          profile_image_url: p.profile_image_url
+          profile_image_url: null
         }
       })
     }
@@ -406,14 +475,14 @@ export async function getPartnerReviews(partnerId: string) {
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("user_profiles")
-      .select("user_id, full_name, profile_image_url")
+      .select("user_id, full_name")
       .in("user_id", userIds)
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
         profilesMap[p.user_id] = {
           full_name: p.full_name,
-          profile_image_url: p.profile_image_url
+          profile_image_url: null
         }
       })
     }

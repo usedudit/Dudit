@@ -38,5 +38,10 @@ export function mapProductToFormData(initialProduct: Product | null | undefined)
     subcategory_id: initialProduct.subcategory_id,
     brand_id: initialProduct.brand_id,
     location_id: initialProduct.location_id,
+    video_type: (initialProduct as any).video_type || null,
+    video_url: (initialProduct as any).video_url || "",
+    video_thumbnail: (initialProduct as any).video_thumbnail || null,
+    video_duration: (initialProduct as any).video_duration || null,
+    video_provider_id: (initialProduct as any).video_provider_id || null,
   }
 }

@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput } from "@/components/reusable"
-import { PlusIcon, XIcon, StoreIcon, LinkIcon, ArrowUpDownIcon, TrashIcon } from "@/lib/icons"
+import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon } from "@/lib/icons"
 
 interface ServiceMarketplaceTabProps {
     serviceData: any
@@ -62,15 +62,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             value={serviceData?.description || ""}
                             onChange={(val) => manualChange("description", val)}
                             disabled={!isEditing}
-                        />
-                        <Input
-                            label="Vídeo do Serviço"
-                            name="video_url"
-                            value={serviceData?.video_url || ""}
-                            onChange={handleInputChange}
-                            disabled={!isEditing}
-                            placeholder="Cole o link do vídeo (YouTube, Vimeo...)"
-                            suffix={<LinkIcon className="w-5 h-5 text-brand-inactive-text" />}
                         />
                     </div>
                 </div>
