@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { formatCurrency as brl } from "@/lib/utils";
 import { Dropdown, DropdownItem } from "@/components/reusable";
 import { DashboardPieChart, CHART_COLORS } from "./charts/DashboardCharts";
@@ -32,9 +31,9 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
       <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 flex-1">
         {/* Full Donut Chart */}
         <div className="w-full max-w-[260px] mx-auto shrink-0 flex items-center justify-center">
-          <DashboardPieChart 
-            data={(originData || []).map(o => ({ label: o.label, value: Number(o.value) }))} 
-            totalValue={brl(totalRevenue)} 
+          <DashboardPieChart
+            data={(originData || []).map(o => ({ label: o.label, value: Number(o.value) }))}
+            totalValue={brl(totalRevenue)}
             totalLabel="Receita Total"
           />
         </div>
@@ -55,7 +54,7 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
           </div>
 
           {/* Legend / List */}
-          <div className="space-y-4">
+          <div className="space-y-1">
             {(originData || []).map((item, index) => {
               const percent = totalRevenue > 0 ? Math.round((Number(item.value) / totalRevenue) * 100) : 0;
               const color = CHART_COLORS[index % CHART_COLORS.length];
@@ -68,7 +67,7 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
                       {item.label} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {brl(item.value)}
                     </span>
                   </div>
-                  <div className="text-[13px] font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-3.5 py-1.5 rounded-lg border border-brand-border dark:border-dark-border">
+                  <div className="text-xs font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-2 py-1 rounded-full border border-brand-border dark:border-dark-border">
                     {percent}%
                   </div>
                 </div>

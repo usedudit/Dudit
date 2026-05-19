@@ -519,7 +519,7 @@ export default function QuotesPage({
                                     </Button>
 
                                     <Button leftIcon={<PlusIcon size={18} />} onClick={handleAddQuote}>
-                                        Novo Orçamento
+                                        Novo orçamento
                                     </Button>
                                 </div>
                             </div>

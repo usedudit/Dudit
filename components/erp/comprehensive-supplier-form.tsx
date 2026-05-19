@@ -330,7 +330,6 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="zipCode">CEP</Label>
                 <CepInput
                   id="zipCode"
                   name="zipCode"
@@ -350,19 +349,21 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 grid gap-2">
-                  <Label htmlFor="street">Rua</Label>
                   <Input
                     id="street"
                     name="street"
+                    label="Rua/Avenida"
+                    placeholder="Rua, Avenida, etc."
                     value={formData.street}
                     onChange={(e) => setFormData({ ...formData, street: e.target.value })}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="number">Número</Label>
                   <Input
                     id="number"
                     name="number"
+                    label="Número"
+                    placeholder="123"
                     value={formData.number}
                     onChange={(e) => setFormData({ ...formData, number: e.target.value })}
                   />
@@ -370,21 +371,22 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="complement">Complemento</Label>
                 <Input
                   id="complement"
                   name="complement"
+                  label="Complemento"
+                  placeholder="Apto, Bloco, etc."
                   value={formData.complement}
                   onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
-                  placeholder="Apartamento, sala, etc"
                 />
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="neighborhood">Bairro</Label>
                 <Input
                   id="neighborhood"
                   name="neighborhood"
+                  label="Bairro"
+                  placeholder="Nome do bairro"
                   value={formData.neighborhood}
                   onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
                 />
@@ -392,16 +394,16 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="city">Cidade</Label>
                   <Input
                     id="city"
                     name="city"
+                    label="Cidade"
+                    placeholder="Nome da cidade"
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="state">Estado</Label>
                   <StateComboBox
                     value={formData.state}
                     onChange={(v) => setFormData({ ...formData, state: v })}

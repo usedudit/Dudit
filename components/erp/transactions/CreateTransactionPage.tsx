@@ -1726,7 +1726,7 @@ export default function CreateTransactionPage({
                                         <h1
                                             className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-300 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}
                                         >
-                                            {isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar Transação" : "Nova Transação"}
+                                            {isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar transação" : "Nova transação"}
                                         </h1>
                                         <div
                                             className={`text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}

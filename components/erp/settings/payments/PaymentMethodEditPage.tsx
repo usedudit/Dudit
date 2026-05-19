@@ -294,7 +294,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                         <div className="hidden md:flex items-start justify-between">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                 <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                    {editingMethod ? "Editar Método de Pagamento" : "Novo Método de Pagamento"}
+                                    {editingMethod ? "Editar método de pagamento" : "Novo método de pagamento"}
                                 </h1>
                                 <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                     {editingMethod ? `Configurando ${formData.name}` : "Configure um novo meio de pagamento para sua loja."}

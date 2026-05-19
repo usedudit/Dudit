@@ -526,9 +526,9 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
             if (result.success) {
                 setVariations(p => p.filter(v => !selectedIds.has(v.id)))
                 setSelectedIds(new Set())
-                notifySuccess(`${ids.length} variantes excluídas`)
+                notifySuccess(`${ids.length} variações excluídas`)
             } else {
-                notifyError(result.error || "Erro ao excluir variantes")
+                notifyError(result.error || "Erro ao excluir variações")
             }
             return
         }
@@ -686,14 +686,14 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-12 ">
                     <Spinner size={36} color="text-brand-dark dark:text-dark-heading" />
-                    <p className="text-sm text-brand-inactive-text mt-2">Carregando variantes...</p>
+                    <p className="text-sm text-brand-inactive-text mt-2">Carregando variações...</p>
                 </div>
             ) : variations.length === 0 && !hasActiveFilters && !search ? (
                 <div className="space-y-6">
                     <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface">
                         <IconPlaceholder
                             icon={Package}
-                            title="Não há variantes"
+                            title="Não há variações"
                             subtitle="Adicione cores, tamanhos ou outros atributos."
                             itemButton={{
                                 text: "Adicionar variante",
@@ -948,7 +948,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
             />
 
             <AlertModal isOpen={modalState.delete} onClose={() => setModalState(p => ({ ...p, delete: false }))} onConfirm={handleDelete} title="Excluir variante?" message={`Tem certeza que deseja excluir a variante "${itemToDelete?.name || ''}"? Esta ação não pode ser desfeita.`} confirmText="Excluir" variant="danger" icon={<TrashIcon />} />
-            <AlertModal isOpen={modalState.bulkDelete} onClose={() => setModalState(p => ({ ...p, bulkDelete: false }))} onConfirm={() => handleBulkEditApply({ type: 'delete' })} title="Excluir variantes" description="Ação irreversível." confirmText="Excluir Seleção" variant="danger" />
+            <AlertModal isOpen={modalState.bulkDelete} onClose={() => setModalState(p => ({ ...p, bulkDelete: false }))} onConfirm={() => handleBulkEditApply({ type: 'delete' })} title="Excluir variações" description="Ação irreversível." confirmText="Excluir Seleção" variant="danger" />
             <AlertModal isOpen={modalState.bulkStatus} onClose={() => setModalState(p => ({ ...p, bulkStatus: false }))} onConfirm={() => handleBulkEditApply({ type: 'visibility', visibilityMode: variations.filter(v => selectedIds.has(v.id)).every(v => !v.status) ? 'publish' : 'hide' })} title="Atualizar Status" message={`Tem certeza que deseja alterar o status de ${selectedIds.size} variante(s)?`} confirmText="Confirmar" variant="warning" />
         </>
     )

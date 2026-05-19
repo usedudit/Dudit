@@ -296,7 +296,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     setExistingVariants(dbVariants)
                 }
             } catch (error) {
-                console.error("Erro ao carregar variantes:", error)
+                console.error("Erro ao carregar variações:", error)
             } finally {
                 setIsLoadingVariants(false)
             }
@@ -477,7 +477,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         if (nextValues.length < currentValues.length) {
             setConfirmAction({
                 title: "Remover Valor",
-                message: "Tem certeza que deseja remover este valor? Isso irá recalcular as combinações de variantes.",
+                message: "Tem certeza que deseja remover este valor? Isso irá recalcular as combinações de variações.",
                 onConfirm: () => {
                     updateVariant(variantId, "values", nextValues)
                 }
@@ -664,10 +664,10 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             if (!product?.id) {
                 if (onSavePendingVariants) {
                     onSavePendingVariants(variantsToSave)
-                    notifySuccess(`${variantsToSave.length} variantes preparadas para salvar!`)
+                    notifySuccess(`${variantsToSave.length} variações preparadas para salvar!`)
                     onClose()
                 } else {
-                    notifyError("Não foi possível preparar as variantes para salvar.")
+                    notifyError("Não foi possível preparar as variações para salvar.")
                 }
                 return
             }
@@ -680,11 +680,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             })
 
             if (result.success) {
-                notifySuccess(`${variantsToSave.length} variantes salvas com sucesso!`)
+                notifySuccess(`${variantsToSave.length} variações salvas com sucesso!`)
                 onSaveSuccess?.()
                 onClose()
             } else {
-                notifyError(result.error || "Erro ao salvar variantes")
+                notifyError(result.error || "Erro ao salvar variações")
             }
         } catch (err) {
             console.error("Error saving variants:", err)
@@ -698,7 +698,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface w-full">
             {/* HEADER */}
             <div className="flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Adicionar Variantes</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Adicionar variações</h2>
                 <Button variant="filled" onClick={onClose} className="w-[40px] h-[40px]">
                     <XIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
@@ -709,7 +709,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     <div className="flex items-center justify-center h-full min-h-96">
                         <div className="flex flex-col items-center gap-3">
                             <Spinner size={18} />
-                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Carregando variantes...</p>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Carregando variações...</p>
                         </div>
                     </div>
                 ) : (
@@ -765,11 +765,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
                                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
                                                 <div className="md:col-span-3">
-                                                    <Input 
-                                                        label="Tipo" 
-                                                        placeholder="Ex: Cor" 
-                                                        value={variant.type} 
-                                                        onChange={(e) => updateVariant(variant.id, "type", e.target.value)} 
+                                                    <Input
+                                                        label="Tipo"
+                                                        placeholder="Ex: Cor"
+                                                        value={variant.type}
+                                                        onChange={(e) => updateVariant(variant.id, "type", e.target.value)}
                                                         className="mb-0"
                                                         error={variant.type.length > 30}
                                                         errorMessage="Máximo 30 caracteres."
@@ -778,11 +778,11 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                     />
                                                 </div>
                                                 <div className="md:col-span-9">
-                                                    <TagsInput 
-                                                        label="Valores" 
-                                                        placeholder="Digite e Enter (ex: P, M, G)" 
-                                                        tags={variant.values} 
-                                                        onChange={(vals) => handleTagsChange(variant.id, variant.values, vals)} 
+                                                    <TagsInput
+                                                        label="Valores"
+                                                        placeholder="Digite e Enter (ex: P, M, G)"
+                                                        tags={variant.values}
+                                                        onChange={(vals) => handleTagsChange(variant.id, variant.values, vals)}
                                                         className="w-full"
                                                         error={variant.values.some(v => v.length > 30)}
                                                         errorMessage="Valores não podem exceder 30 caracteres."
@@ -836,14 +836,14 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
                         {/* PREVIEW DA TABELA */}
                         <div>
-                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4">Tabela de variantes</h3>
+                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading mb-4">Tabela de variações</h3>
 
                             {tableRows.length === 0 ? (
                                 <div className="border border-brand-border dark:border-dark-border rounded-xl p-12 flex flex-col items-center justify-center text-center bg-white dark:bg-dark-surface">
                                     <IconPlaceholder
                                         icon={Package}
-                                        title="Nenhuma variante"
-                                        subtitle="Adicione opções acima para gerar as variantes."
+                                        title="Nenhuma variação"
+                                        subtitle="Adicione opções acima para gerar as variações."
                                     />
                                 </div>
                             ) : (
@@ -959,7 +959,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
             <div className="p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex justify-between items-center relative z-20">
                 <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                    Saiba mais sobre <span className="text-blue-500 cursor-pointer hover:underline">Variantes</span>
+                    Saiba mais sobre <span className="text-blue-500 cursor-pointer hover:underline">Variações</span>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="outline" onClick={onClose} disabled={isSaving} className="px-6 bg-transparent">Cancelar</Button>
@@ -974,7 +974,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                 Salvando...
                             </>
                         ) : (
-                            "Salvar Variantes"
+                            "Salvar Variações"
                         )}
                     </Button>
                 </div>
@@ -998,7 +998,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 onClose={() => setImageToDelete(null)}
                 onConfirm={confirmDeleteImage}
                 title="Remover Imagem"
-                message="Tem certeza que deseja remover esta imagem? Essa ação pode afetar variantes vinculadas."
+                message="Tem certeza que deseja remover esta imagem? Essa ação pode afetar variações vinculadas."
                 confirmText="Remover"
                 variant="danger"
                 icon={<TrashIcon />}
@@ -1018,7 +1018,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 icon={<TrashIcon />}
             />
 
-            <SavingStatusModal isOpen={isSaving} text="Salvando Variantes..." />
+            <SavingStatusModal isOpen={isSaving} text="Salvando variações..." />
         </div>
     )
 

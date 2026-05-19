@@ -62,7 +62,7 @@ const TypeCard = ({ icon, label, subLabel, selected, onClick, simple = false }: 
                     <div className="w-10 h-10 rounded-full border border-brand-green flex items-center justify-center bg-brand-green/5">
                         <PlusIcon size={20} />
                     </div>
-                    <span className="text-xs font-bold">Novo Tipo</span>
+                    <span className="text-xs font-bold">Novo tipo</span>
                 </div>
             ) : (
                 <>
@@ -279,7 +279,7 @@ export const AddUnavailableSheet = ({
                                 onClick={() => { setSelectedType(t.name); setTitle(t.name); }}
                             />
                         ))}
-                        <TypeCard simple label="Novo Tipo" onClick={() => setIsNewTypeSheetOpen(true)} />
+                        <TypeCard simple label="Novo tipo" onClick={() => setIsNewTypeSheetOpen(true)} />
                     </div>
                 </div>
 
@@ -477,7 +477,7 @@ export const AddUnavailableSheet = ({
     const NewTypeSheetBody = (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface overflow-hidden">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo Tipo</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo tipo</h2>
                 <Button variant="filled" onClick={() => setIsNewTypeSheetOpen(false)} size="icon">
                     <XIcon className="h-5 w-5" />
                 </Button>

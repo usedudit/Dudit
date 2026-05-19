@@ -78,7 +78,8 @@ async function seedRedis() {
     const { data: produtos } = await supabase
         .from("products")
         .select(`
-            id, name, description, price, promotional_price, images, rating, category, created_at,
+            id, name, description, price, promotional_price, images, rating,
+            category_id, category:product_categories!category_id(name), created_at,
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
@@ -97,7 +98,8 @@ async function seedRedis() {
             const variantFallback = extractFirstVariantFallback((item as any).product_variants)
             const { product_variants, ...rest } = item
             
-            const produtoNormalizado = { ...rest, itemType: 'produto', partners: partner, ...variantFallback }
+            const categoryName = (item.category as any)?.name || null
+            const produtoNormalizado = { ...rest, category: categoryName, itemType: 'produto', partners: partner, ...variantFallback }
             const score = new Date(item.created_at).getTime()
             const globalId = `produto:${item.id}`
 

@@ -113,7 +113,7 @@ export async function examplePartnerNotification(
     to: partnerEmail,
     subject: `Novo pedido de ${buyerName}`,
     html: `
-      <h3>Novo Pedido Recebido</h3>
+      <h3>Novo pedido recebido</h3>
       <p>Você recebeu um pedido de <strong>${buyerName}</strong></p>
       <p><strong>Produto:</strong> ${productName}</p>
       <p>Acesse sua loja para mais detalhes: https://example.com/erp/orders</p>

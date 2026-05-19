@@ -817,9 +817,9 @@ async function getCachedGeneralTopCategories(partnerId: string, sells: string[])
         // Get product categories
         const productNames = [...new Set((data || []).map((i: any) => i.product_name).filter(Boolean))]
         if (productNames.length > 0) {
-          const { data: products } = await supabase.from("products").select("name, category").eq("partner_id", partnerId).in("name", productNames.slice(0, 50)).limit(50)
+          const { data: products } = await supabase.from("products").select("name, category:product_categories!category_id(name)").eq("partner_id", partnerId).in("name", productNames.slice(0, 50)).limit(50)
           const nameToCategory = new Map<string, string>()
-          for (const p of products || []) nameToCategory.set(p.name, p.category || "Sem categoria")
+          for (const p of products || []) nameToCategory.set(p.name, p.category?.name || "Sem categoria")
           for (const item of data || []) {
             const cat = nameToCategory.get(item.product_name) || "Sem categoria"
             categoryMap.set(cat, (categoryMap.get(cat) || 0) + money(item.quantity))

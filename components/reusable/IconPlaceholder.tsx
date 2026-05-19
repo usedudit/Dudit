@@ -17,7 +17,11 @@ interface IconPlaceholderProps {
   subtitleClass?: string
   itemButton?: {
     text: string
-    action: string | (() => void)
+    action?: string | (() => void)
+    type?: "file" | "button"
+    accept?: string
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+    disabled?: boolean
     variant?: "default" | "outline" | "outlinered" | "destructive" | "ghost" | "filled"
     className?: string
   }
@@ -58,7 +62,25 @@ export default function IconPlaceholder({
 
   const renderButton = () => {
     if (!itemButton) return null
-    const { text, action, variant = "default", className = "" } = itemButton
+    const { text, action, type, accept, onChange, disabled, variant = "default", className = "" } = itemButton
+
+    if (type === "file") {
+      return (
+        <Button asChild variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept={accept}
+              onChange={onChange}
+              className="hidden"
+              disabled={disabled}
+              value=""
+            />
+            {text}
+          </label>
+        </Button>
+      )
+    }
 
     if (typeof action === "string") {
       return (

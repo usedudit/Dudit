@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { TrashIcon, ChevronRightIcon } from '@/lib/icons';
 import { formatCurrency } from '@/lib/utils';
 
@@ -10,7 +9,7 @@ export const ReceiptScallopEdge = () => (
         {Array.from({ length: 12 }).map((_, i) => (
             <div
                 key={i}
-                className="w-10 h-10 bg-white dark:bg-dark-surface rounded-full shrink-0 -ml-3 first:-ml-5"
+                className="w-10 h-10 bg-brand-gray dark:bg-dark-border/50 rounded-full border border-brand-border dark:border-dark-border shrink-0 -ml-3 first:-ml-5"
                 style={{ marginTop: '-24px' }}
             ></div>
         ))}
@@ -25,26 +24,26 @@ export const Numpad = ({ onInput, onDelete, disabled }: { onInput: (key: string)
                     <button disabled={disabled}
                         key={n}
                         onClick={() => onInput(n.toString())}
-                        className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
+                        className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
                     >
                         {n}
                     </button>
                 ))}
                 <button disabled={disabled}
                     onClick={() => onInput('.')}
-                    className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border pb-3 active:scale-95 transform duration-100"
+                    className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border pb-3 active:scale-95 transform duration-100"
                 >
                     .
                 </button>
                 <button disabled={disabled}
                     onClick={() => onInput('0')}
-                    className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-[#f6f7f8] dark:bg-dark-border/30 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
+                    className="h-16 md:h-[74px] rounded-[22px] text-2xl md:text-[30px] font-bold text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/50 hover:bg-[#eef1f3] dark:hover:bg-dark-border/50 transition-colors border border-transparent hover:border-brand-border dark:hover:border-dark-border active:scale-95 transform duration-100"
                 >
                     0
                 </button>
                 <button disabled={disabled}
                     onClick={onDelete}
-                    className="h-16 md:h-[74px] rounded-[22px] flex items-center justify-center text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-transparent active:scale-95 transform duration-100"
+                    className="h-16 md:h-[74px] rounded-[22px] flex items-center justify-center text-brand-red bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-transparent active:scale-95 transform duration-100"
                 >
                     <TrashIcon size={24} />
                 </button>
@@ -58,7 +57,7 @@ export const PaymentMethodCard = ({ icon: Icon, label, onClick, disabled }: { ic
         onClick={onClick}
         className={`flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group ${disabled ? 'opacity-50 pointer-events-none bg-gray-50 dark:bg-dark-border/10' : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
     >
-        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${disabled ? 'bg-gray-200 dark:bg-dark-border/30' : 'bg-gray-100 dark:bg-dark-border/50 group-hover:bg-white dark:group-hover:bg-dark-surface'}`}>
+        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-colors ${disabled ? 'bg-gray-200 dark:bg-dark-border/50' : 'bg-gray-100 dark:bg-dark-border/50 group-hover:bg-white dark:group-hover:bg-dark-surface'}`}>
             <Icon size={20} className="text-brand-dark dark:text-dark-heading md:w-6 md:h-6" />
         </div>
         <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">{label}</span>
@@ -127,7 +126,7 @@ export const ReceiptContent = ({
     customerName,
     pricingDetails = [],
 }: any) => (
-    <div className="bg-[#F8F9FA] dark:bg-dark-surface/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
+    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
         {/* Receipt Header */}
         <div className="mb-6 flex justify-between items-center">
             <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Detalhes da Transação</h3>

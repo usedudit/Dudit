@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormDropdown, Input } from "@/components/reusable"
+import { Button, FormDropdown, IconPlaceholder, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
 import { TrashIcon, UploadIcon } from "@/lib/icons"
 import {
@@ -69,7 +69,6 @@ function getEmbedPreviewUrl(video: VideoMetadata) {
 }
 
 export default function ProductVideoSection({ itemType, itemId, video, onChange, isEditing }: ProductVideoSectionProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const currentFileRef = useRef<File | null>(null)
   const objectUrlRef = useRef<string | null>(null)
   const uploadSessionRef = useRef(0)
@@ -79,7 +78,18 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
   const [error, setError] = useState("")
   const [progress, setProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState<File | null>(null)
   const [localPreview, setLocalPreview] = useState<LocalPreviewState | null>(null)
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.log(bytes) / Math.log(k)
+    const index = Math.floor(i >= 0 ? i : 0)
+    const boundedIndex = Math.min(index, sizes.length - 1)
+    return parseFloat((bytes / Math.pow(k, boundedIndex)).toFixed(2)) + " " + sizes[boundedIndex]
+  }
 
   const revokeObjectUrl = useCallback(() => {
     if (objectUrlRef.current) {
@@ -100,7 +110,6 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     setError("")
     setProgress(0)
     setUrlValue("")
-    if (inputRef.current) inputRef.current.value = ""
     onChange(EMPTY_VIDEO)
     console.log("[VideoDebug]", {
       hasVideo: false,
@@ -149,6 +158,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     clearLocalPreviewState()
     setError("")
     setProgress(1)
+    setUploadingFile(file)
     setIsUploading(true)
 
     try {
@@ -246,7 +256,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     } finally {
       if (uploadSessionRef.current === sessionId) {
         setIsUploading(false)
-        if (inputRef.current) inputRef.current.value = ""
+        setUploadingFile(null)
       }
     }
   }
@@ -334,23 +344,53 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
           />
 
           {source === "upload" ? (
-            <label className="h-28 rounded-lg border-2 border-dashed border-brand-border dark:border-dark-border flex items-center justify-center cursor-pointer hover:border-brand-green transition-colors">
-              <div className="flex items-center gap-3 text-brand-inactive-text">
-                <UploadIcon className="w-5 h-5" />
-                <span className="text-sm font-medium">{isUploading ? "Enviando vídeo..." : "Selecionar MP4, WebM ou MOV"}</span>
+            isUploading && uploadingFile ? (
+              <div className="flex items-center gap-4 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-border/10 max-w-[520px]">
+                <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-brand-primary/10 text-brand-primary shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                      {uploadingFile.name}
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                    <span className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
+                      {formatFileSize(uploadingFile.size)}
+                    </span>
+                  </div>
+                  {progress > 0 && (
+                    <div className="flex items-center gap-3">
+                      <Progress value={progress} className="h-1.5 flex-1" />
+                      <span className="text-xs font-semibold text-brand-primary min-w-[30px] text-right">
+                        {progress}%
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                className="hidden"
-                disabled={isUploading}
-                onChange={(e) => {
-                  const selected = e.target.files?.[0]
-                  if (selected) void handleUpload(selected)
-                }}
-              />
-            </label>
+            ) : !hasVideo && !localPreview ? (
+              <div className="w-full flex-col flex items-center justify-center">
+                <IconPlaceholder
+                  icon={UploadIcon}
+                  title="Selecionar MP4, WebM ou MOV"
+                  subtitle="Arraste e solte aqui ou clique para selecionar"
+                  itemButton={{
+                    text: "Selecionar vídeo",
+                    type: "file",
+                    accept: "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov",
+                    onChange: (e) => {
+                      const selected = e.target.files?.[0]
+                      if (selected) void handleUpload(selected)
+                    },
+                    disabled: isUploading,
+                    variant: "outline",
+                  }}
+                />
+              </div>
+            ) : null
           ) : (
             <div className="flex flex-col sm:flex-row gap-3">
               <Input label={source === "youtube" ? "URL do YouTube" : "URL do Vimeo"} value={urlValue} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUrlValue(e.target.value)} placeholder={source === "youtube" ? "https://youtube.com/watch?v=..." : "https://vimeo.com/..."} />
@@ -358,11 +398,10 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
             </div>
           )}
 
-          {uploadPlayback?.duration != null && uploadPlayback.duration > 0 && (
+          {uploadPlayback?.duration != null && uploadPlayback.duration > 0 && !isUploading && (
             <p className="text-sm text-brand-inactive-text">Duração: {Math.round(uploadPlayback.duration)}s</p>
           )}
 
-          {progress > 0 && isUploading && <Progress value={progress} className="h-2" />}
           {error && <p className="text-sm text-brand-red-dark">{error}</p>}
         </div>
       )}

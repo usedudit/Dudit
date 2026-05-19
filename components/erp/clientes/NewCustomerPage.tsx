@@ -347,7 +347,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
         }
     }
 
-    const pageTitle = customerId ? "Editar Cliente" : "Novo Cliente"
+    const pageTitle = customerId ? "Editar cliente" : "Novo cliente"
     const isEditLoadingLocked = Boolean(customerId && isLoadingData)
 
     return (
@@ -652,11 +652,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 setNeighborhood(data.neighborhood)
                                                                 setCity(data.city)
                                                                 setUf(data.state || "SP")
+                                                                setNoNumber(data.number === "S/N")
                                                             }}
                                                             error={fieldErrors.has("cep")}
                                                             errorMessage={fieldErrors.has("cep") ? "CEP inválido" : undefined}
                                                         />
-                                                        <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
+                                                        <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={street} onChange={e => setStreet(e.target.value)} />
 
                                                         <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                                             <NumberInputWithCheckbox
@@ -665,6 +666,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 noNumber={noNumber}
                                                                 onNumberChange={val => setNumber(val)}
                                                                 onNoNumberChange={checked => { setNoNumber(checked); if (checked) setNumber(""); }}
+                                                                placeholder="123"
                                                             />
                                                             <Input label="Complemento" placeholder="Apto, Bloco, etc." value={complement} onChange={e => setComplement(e.target.value)} />
                                                         </div>
@@ -673,7 +675,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                         <div className="grid grid-cols-2 gap-3 items-end">
                                                             <Input label="Cidade" placeholder="Nome da cidade" value={city} onChange={e => setCity(e.target.value)} />
                                                             <StateComboBox
-                                                                label="Estado"
                                                                 value={uf}
                                                                 onChange={setUf}
                                                                 className="w-full"
@@ -696,8 +697,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de cobrança</h3>
                                                             <div className="space-y-4">
                                                                 <CepInput
-                                                                    label="CEP"
-                                                                    placeholder="00000-000"
                                                                     value={billingCep}
                                                                     onChange={(val) => {
                                                                         setBillingCep(val)
@@ -713,11 +712,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         setBillingNeighborhood(data.neighborhood)
                                                                         setBillingCity(data.city)
                                                                         setBillingUf(data.state || "SP")
+                                                                        setBillingNoNumber(data.number === "S/N")
                                                                     }}
                                                                     error={fieldErrors.has("billingCep")}
                                                                     errorMessage={fieldErrors.has("billingCep") ? "CEP inválido" : undefined}
                                                                 />
-                                                                <Input label="Logradouro" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
+                                                                <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={billingStreet} onChange={e => setBillingStreet(e.target.value)} />
                                                                 <div className="grid grid-cols-2 gap-3 flex-row items-center">
                                                                     <NumberInputWithCheckbox
                                                                         label="Número"
@@ -725,6 +725,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         noNumber={billingNoNumber}
                                                                         onNumberChange={val => setBillingNumber(val)}
                                                                         onNoNumberChange={checked => { setBillingNoNumber(checked); if (checked) setBillingNumber(""); }}
+                                                                        placeholder="123"
                                                                     />
                                                                     <Input label="Complemento" placeholder="Apto, Bloco, etc." value={billingComplement} onChange={e => setBillingComplement(e.target.value)} />
                                                                 </div>
@@ -732,7 +733,6 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 <div className="grid grid-cols-2 gap-3 items-end">
                                                                     <Input label="Cidade" placeholder="Nome da cidade" value={billingCity} onChange={e => setBillingCity(e.target.value)} />
                                                                     <StateComboBox
-                                                                        label="Estado"
                                                                         value={billingUf}
                                                                         onChange={setBillingUf}
                                                                         className="w-full"

@@ -562,9 +562,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const total = Math.max(0, subtotal + shippingNum + otherCostsNum - discountValue);
 
     const quoteCode = realQuoteNumber || existingQuote?.quote_number || "";
-    const pageTitle = mode === 'create' ? 'Novo Orçamento' :
-        mode === 'edit' ? `Editar Orçamento ${quoteCode}`.trim() :
-            mode === 'duplicate' ? `Duplicar Orçamento ${quoteCode}`.trim() :
+    const pageTitle = mode === 'create' ? 'Novo orçamento' :
+        mode === 'edit' ? `Editar orçamento ${quoteCode}`.trim() :
+            mode === 'duplicate' ? `Duplicar orçamento ${quoteCode}`.trim() :
                 `Orçamento ${quoteCode}`.trim();
 
     useEffect(() => {

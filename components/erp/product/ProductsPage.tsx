@@ -457,7 +457,7 @@ export default function ProductsPage({
                         deletedImages: [],
                     })
                     if (!variantsResult.success) {
-                        notifyError("Produto criado com ressalvas", "O produto foi salvo, mas houve erro ao salvar as variantes.")
+                        notifyError("Produto criado com ressalvas", "O produto foi salvo, mas houve erro ao salvar as variações.")
                     }
                 }
 
@@ -734,7 +734,7 @@ export default function ProductsPage({
                                         className="w-full"
                                     >
                                         <PlusIcon size={16} />
-                                        Novo Produto
+                                        Novo produto
                                     </Button>
                                 </div>
                             </div>

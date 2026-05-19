@@ -20,7 +20,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         { id: 2, name: 'Global Electronics Ltd', location: 'Shenzhen, China', logo: 'bg-blue-600 text-white' },
     ])
 
-    const addSupplier = () => setSuppliersList([...suppliersList, { id: Date.now(), name: 'Novo Fornecedor', location: 'Localização...', logo: 'bg-gray-400 text-white' }])
+    const addSupplier = () => setSuppliersList([...suppliersList, { id: Date.now(), name: 'Novo fornecedor', location: 'Localização...', logo: 'bg-gray-400 text-white' }])
     const removeSupplier = (id: number) => setSuppliersList(suppliersList.filter(s => s.id !== id))
 
     return (

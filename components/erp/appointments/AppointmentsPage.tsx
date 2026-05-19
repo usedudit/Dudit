@@ -675,7 +675,7 @@ const AppointmentsPage = ({
 
                                 <div className="flex items-center gap-3">
                                     <Button onClick={() => handleOpenCreate()} leftIcon={<PlusIcon size={18} />}>
-                                        Novo Agendamento
+                                        Novo agendamento
                                     </Button>
                                 </div>
                             </div>
@@ -840,7 +840,7 @@ const AppointmentsPage = ({
                                                                             title="Nenhum agendamento encontrado"
                                                                             subtitle=""
                                                                             itemButton={{
-                                                                                text: "Novo Agendamento",
+                                                                                text: "Novo agendamento",
                                                                                 action: () => handleOpenCreate(),
                                                                             }}
                                                                         />

@@ -100,7 +100,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Local</DialogTitle>
+            <DialogTitle>Novo local</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

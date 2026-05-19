@@ -34,6 +34,7 @@ import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard,
 import { TagIcon, MoneyIcon, FileIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
@@ -178,6 +179,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     // Financial
     const [shippingFee, setShippingFee] = useState("0")
+    const [isCustomShipping, setIsCustomShipping] = useState(false)
     const [otherCosts, setOtherCosts] = useState("0")
     const [discountValue, setDiscountValue] = useState(0)
     const [discountType, setDiscountType] = useState<'fixed' | 'percentage' | 'coupon'>('fixed')
@@ -478,6 +480,44 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }, [deliveryMethod, selectedCustomer?.id, partnerId])
 
+    useEffect(() => {
+        let active = true
+        if (deliveryMethod !== "delivery" || isCustomShipping) {
+            return
+        }
+
+        const hasStreet = !!street?.trim()
+        const hasCity = !!city?.trim()
+        const hasNeighborhood = !!neighborhood?.trim()
+        const hasUf = !!uf?.trim()
+
+        if (!hasStreet || !hasCity || !hasNeighborhood || !hasUf) {
+            setShippingFee("0")
+            return
+        }
+
+        const destinationAddress = `${street}, ${number || "S/N"} - ${neighborhood}, ${city} - ${uf}, ${cep}`
+
+        const timer = setTimeout(async () => {
+            const quote = await quoteDeliveryFeeAction({
+                partnerId,
+                destinationAddress,
+            })
+            if (!active) return
+
+            if (quote.success) {
+                setShippingFee(String(quote.fee || 0))
+            } else {
+                setShippingFee("0")
+            }
+        }, 300)
+
+        return () => {
+            active = false
+            clearTimeout(timer)
+        }
+    }, [deliveryMethod, cep, street, number, neighborhood, city, uf, partnerId, isCustomShipping])
+
     // --- Handlers ---
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -724,6 +764,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setManualItemNameErrors(new Set())
         setManualItemPriceErrors(new Set())
         setFieldErrors(new Set())
+        setCep("")
+        setStreet("")
+        setNumber("")
+        setComplement("")
+        setNeighborhood("")
+        setCity("")
+        setUf("SP")
+        setNoNumber(false)
+        setIsCustomShipping(false)
         setActiveTab("general")
     }
 
@@ -782,6 +831,30 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setValidationMessage("Selecione a conta de recebimento da venda antes de salvar.")
             setShowValidationModal(true)
             return false
+        }
+
+        if (deliveryMethod === "delivery") {
+            const hasStreet = !!street?.trim()
+            const hasCity = !!city?.trim()
+            const hasNeighborhood = !!neighborhood?.trim()
+            const hasCep = !!cep?.trim()
+            const hasState = !!uf?.trim()
+
+            if (!hasStreet || !hasCity || !hasNeighborhood || !hasCep || !hasState) {
+                setFieldErrors(prev => {
+                    const next = new Set(prev)
+                    if (!hasStreet) next.add("street")
+                    if (!hasCity) next.add("city")
+                    if (!hasNeighborhood) next.add("neighborhood")
+                    if (!hasCep) next.add("cep")
+                    if (!hasState) next.add("uf")
+                    return next
+                })
+                setActiveTab("delivery")
+                setValidationMessage("O endereço de entrega é obrigatório (CEP, Rua, Bairro, Cidade e Estado). Por favor, preencha todos os campos na aba de Entrega.")
+                setShowValidationModal(true)
+                return false
+            }
         }
 
         if (deliveryMethod === "delivery" && (!deliveryDate || !deliveryTime)) {
@@ -1075,7 +1148,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="hidden md:inline truncate">{editOrderId ? "Editar Pedido" : "Novo Pedido"}</span>
+                                        <span className="hidden md:inline truncate">{editOrderId ? "Editar pedido" : "Novo pedido"}</span>
                                     </h1>
                                     <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                         {editOrderId ? "Atualize as informações da venda" : "Preencha as informações da nova venda"}
@@ -1632,8 +1705,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         if (details.success && details.data) setShippingCustomerDetails(details.data)
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
-                    onApply={({ shippingFee: fee }: any) => {
+                    onApply={({ shippingFee: fee, isCustom }: any) => {
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
+                        setIsCustomShipping(!!isCustom)
                         setIsShippingSheetOpen(false)
                     }}
                 />

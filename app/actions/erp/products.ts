@@ -89,7 +89,7 @@ const fetchProductAndVerifyOwnership = async (productId: string, requiredAction?
         admin.from("products").select(selectColumns).eq("id", productId).single(),
         resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
     ])
-    
+
     const { data: product, error } = productRes
 
     if (error || !product) throw new Error("Produto não encontrado")
@@ -116,7 +116,7 @@ const verifyBatchOwnership = async (productIds: string[], resolvedUser?: any) =>
         admin.from("products").select("id, partner_id").in("id", sanitized),
         resolvedUser ? Promise.resolve(resolvedUser) : verifyAuth()
     ])
-    
+
     const { data } = dataRes
 
     if (!data || data.length !== sanitized.length) throw new Error("Produtos não encontrados")
@@ -724,9 +724,9 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // FIX: A função RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
         const adminUpdate = getAdminClient()
         const directProductPatch: any = { moderation_status: payload.moderation_status }
-        ;["video_type", "video_url", "video_thumbnail", "video_duration", "video_provider_id"].forEach((field) => {
-            if (payload[field] !== undefined) directProductPatch[field] = payload[field]
-        })
+            ;["video_type", "video_url", "video_thumbnail", "video_duration", "video_provider_id"].forEach((field) => {
+                if (payload[field] !== undefined) directProductPatch[field] = payload[field]
+            })
         await adminUpdate.from('products').update(directProductPatch).eq('id', productId)
 
         // Criar moderation job se necessário (cron processa) - reuses same admin client
@@ -798,7 +798,7 @@ export async function createProductVariantAction(data: {
 
         // Check subscription feature
         if (!await canUseFeature(product.partner_id, "product_variants")) {
-            return { error: "Seu plano não permite o uso de variantes. Faça upgrade para desbloquear." }
+            return { error: "Seu plano não permite o uso de variações. Faça upgrade para desbloquear." }
         }
 
         const supabase = await getSupabaseServerClient()
@@ -842,7 +842,7 @@ export async function createProductVariantsBatchAction(data: {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
     if (data.variants && data.variants.length > 50) {
-        return errorResponse("Limite máximo de 50 variantes por vez excedido.")
+        return errorResponse("Limite máximo de 50 variações por vez excedido.")
     }
 
     // Validar limite máximo de 30 valores únicos por tipo de variante e limite de 30 caracteres

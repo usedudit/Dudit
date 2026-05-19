@@ -119,7 +119,7 @@ export const Input: React.FC<FormInputProps> = ({
   return (
     <div className={cn("flex-1 w-full", className)}>
       {label && (
-        <div className="flex items-center gap-2 mb-1.5">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
           <label
             htmlFor={inputId}
             className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate"

@@ -7,7 +7,6 @@ import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
 import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon } from "@/lib/icons"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
-import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 import { RichTextEditor } from "@/components/reusable"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
@@ -53,13 +52,10 @@ interface ServiceGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
     isQuickMode?: boolean
-    itemId: string
-    video: any
-    onVideoChange: (video: any) => void
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, itemId, video, onVideoChange
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
 }) => {
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
 
@@ -99,7 +95,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 
                 <div className="mb-10">
                     <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
-                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
                 </div>
 
                 <div className="space-y-6">

@@ -310,7 +310,7 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
                                 </div>
                             ) : isProductDetail && storeSearchPlaceholder ? (
-                                <div className={`bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 transition-all duration-300 ${isScrolled ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"}`}>
+                                <div className={`bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 ${isScrolled ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
                                     <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
                                     <input
                                         type="text"

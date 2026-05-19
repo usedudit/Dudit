@@ -6,17 +6,24 @@ import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, Icon
 import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import ProductVideoSection from "./ProductVideoSection"
 
 interface ProductMarketplaceTabProps {
   productData: any
   handleInputChange: (e: any) => void
   isEditing: boolean
+  itemId: string
+  video: any
+  onVideoChange: (video: any) => void
 }
 
 export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
   productData,
   handleInputChange,
   isEditing,
+  itemId,
+  video,
+  onVideoChange,
 }) => {
   // --- Estados da Categoria Oficial ---
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -89,6 +96,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
               disabled={!isEditing}
             />
           </div>
+          <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
         </div>
 
         {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}

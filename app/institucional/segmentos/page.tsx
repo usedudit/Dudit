@@ -29,7 +29,7 @@ const segments = [
   },
   {
     title: "Lojas de Roupa",
-    description: "Controle de variantes (cor/tamanho), estoque e sua vitrine online pronta em minutos.",
+    description: "Controle de variações (cor/tamanho/etc), estoque e sua vitrine online pronta em minutos.",
     type: "fashion"
   },
   {

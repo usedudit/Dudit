@@ -386,7 +386,6 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                         {step === 4 && (
                             <div className="space-y-4">
                                 <CepInput
-                                    name="cep" label="CEP"
                                     value={partnerData.address.cep}
                                     onChange={(value: string) => patchAddress({ cep: value })}
                                     onAddressFetched={(addr) => patchAddress({
@@ -394,22 +393,24 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         neighborhood: addr.neighborhood || partnerData.address.neighborhood,
                                         city: addr.city || partnerData.address.city,
                                         state: addr.state || partnerData.address.state,
+                                        noNumber: addr.number === "S/N"
                                     })}
                                 />
-                                <Input name="street" label="Rua" value={partnerData.address.street} onChange={e => patchAddress({ street: e.target.value })} />
+                                <Input name="street" label="Rua/Avenida" placeholder="Rua, Avenida, etc." value={partnerData.address.street} onChange={e => patchAddress({ street: e.target.value })} />
                                 <div className="grid grid-cols-2 gap-3">
                                     <NumberInputWithCheckbox
                                         label="Número"
                                         number={partnerData.address.number}
                                         noNumber={partnerData.address.noNumber}
                                         onNumberChange={val => patchAddress({ number: val })}
-                                        onNoNumberChange={checked => patchAddress({ noNumber: checked, number: checked ? "" : partnerData.address.number })}
+                                        onNoNumberChange={checked => patchAddress({ noNumber: checked, number: checked ? "S/N" : "" })}
+                                        placeholder="123"
                                     />
-                                    <Input name="complement" label="Complemento" value={partnerData.address.complement} onChange={e => patchAddress({ complement: e.target.value })} />
+                                    <Input name="complement" label="Complemento" placeholder="Apto, Bloco, etc." value={partnerData.address.complement} onChange={e => patchAddress({ complement: e.target.value })} />
                                 </div>
-                                <Input name="neighborhood" label="Bairro" value={partnerData.address.neighborhood} onChange={e => patchAddress({ neighborhood: e.target.value })} />
+                                <Input name="neighborhood" label="Bairro" placeholder="Nome do bairro" value={partnerData.address.neighborhood} onChange={e => patchAddress({ neighborhood: e.target.value })} />
                                 <div className="grid grid-cols-2 gap-3 items-end">
-                                    <Input name="city" label="Cidade" value={partnerData.address.city} onChange={e => patchAddress({ city: e.target.value })} />
+                                    <Input name="city" label="Cidade" placeholder="Nome da cidade" value={partnerData.address.city} onChange={e => patchAddress({ city: e.target.value })} />
                                     <StateComboBox value={partnerData.address.state} onChange={v => patchAddress({ state: v })} className="w-full" />
                                 </div>
                             </div>

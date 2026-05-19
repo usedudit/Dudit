@@ -406,7 +406,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         <section className="mx-auto mb-12 md:mb-16 max-w-[1300px] overflow-hidden">
             <div className="flex items-end justify-between px-4 lg:px-0 mb-6 md:mb-8">
                 <div>
-                    <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
+                    <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">{title}</h2>
                     {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}
                 </div>
                 <Link

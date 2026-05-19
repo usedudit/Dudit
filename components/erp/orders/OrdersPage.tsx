@@ -681,7 +681,7 @@ export default function OrdersPage({
                                     </Button>
 
                                     <Button onClick={handleAddOrder} leftIcon={<PlusIcon size={18} />} >
-                                        Novo Pedido
+                                        Novo pedido
                                     </Button>
                                 </div>
                             </div>

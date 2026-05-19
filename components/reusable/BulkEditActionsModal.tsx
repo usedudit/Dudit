@@ -289,7 +289,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         <label className="flex items-center gap-3 p-2 cursor-pointer mt-2">
                             <Checkbox checked={priceConfig.onlyPublished} onChange={c => setPriceConfig(p => ({ ...p, onlyPublished: c }))} />
                             <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">
-                                Aplicar apenas {targetType === 'product' ? 'aos produtos publicados' : 'às variantes publicadas'}
+                                Aplicar apenas {targetType === 'product' ? 'aos produtos publicados' : 'às variações publicadas'}
                             </span>
                         </label>
                     </div>

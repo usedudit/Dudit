@@ -78,11 +78,9 @@ export const AddressTab: React.FC<AddressTabProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 flex flex-col gap-8">
                     <section>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">EndereÃ§o de Entrega</h3>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço de Entrega</h3>
                         <div className="space-y-4">
                             <CepInput
-                                label="CEP"
-                                placeholder="00000-000"
                                 value={cep}
                                 onChange={setCep}
                                 name="cep"
@@ -91,10 +89,11 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     setNeighborhood(data.neighborhood)
                                     setCity(data.city)
                                     setUf(data.state || "SP")
+                                    setNoNumber(data.number === "S/N")
                                 }}
                                 disabled={isMarketplaceOrder}
                             />
-                            <Input label="Logradouro" placeholder="Rua, Avenida, etc." disabled={isMarketplaceOrder} value={street} onChange={(e: any) => setStreet(e.target.value)} />
+                            <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." disabled={isMarketplaceOrder} value={street} onChange={(e: any) => setStreet(e.target.value)} />
 
                             <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                 <NumberInputWithCheckbox
@@ -107,6 +106,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         if (checked) setNumber("")
                                     }}
                                     disabled={isMarketplaceOrder}
+                                    placeholder="123"
                                 />
                                 <Input label="Complemento" placeholder="Apto, Bloco, etc." disabled={isMarketplaceOrder} value={complement} onChange={(e: any) => setComplement(e.target.value)} />
                             </div>
@@ -115,7 +115,6 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                             <div className="grid grid-cols-2 gap-3 items-end">
                                 <Input label="Cidade" placeholder="Nome da cidade" disabled={isMarketplaceOrder} value={city} onChange={(e: any) => setCity(e.target.value)} />
                                 <StateComboBox
-                                    label="Estado"
                                     value={uf}
                                     onChange={setUf}
                                     className="w-full"

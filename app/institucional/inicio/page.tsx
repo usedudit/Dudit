@@ -425,7 +425,7 @@ const BentoFeatures = () => {
                         {card.type === 'sales' && (
                            <div className="bg-white p-4 w-full max-w-[240px] rounded-lg border border-gray-100 text-xs">
                               <div className="flex justify-between mb-4 border-b pb-2">
-                                 <span className="text-brand-inactive-text">Novo Pedido</span>
+                                 <span className="text-brand-inactive-text">Novo pedido</span>
                                  <div className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold">PIX</div>
                               </div>
                               <div className="text-xl font-bold text-brand-dark mb-1">R$ 150,00</div>

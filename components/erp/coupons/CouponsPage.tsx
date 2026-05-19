@@ -627,7 +627,7 @@ export default function CouponsPage({
                                             Exportar
                                         </Button>
                                         <Button onClick={openCreate} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
-                                            Novo Cupom
+                                            Novo cupom
                                         </Button>
                                     </div>
                                 </div>

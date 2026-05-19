@@ -333,7 +333,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
     const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
         supabase
             .from("products")
-            .select("id, name, category, category_id, price, sku, images, is_active")
+            .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(200),
@@ -362,7 +362,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
         products: (products || []).map((p: any) => ({
             id: p.id,
             name: p.name,
-            category: p.category,
+            category: p.category?.name || null,
             categoryId: p.category_id,
             price: p.price,
             sku: p.sku,

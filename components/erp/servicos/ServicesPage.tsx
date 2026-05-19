@@ -511,7 +511,7 @@ export default function ServicesPage({
                                         className="w-full"
                                     >
                                         <PlusIcon size={16} />
-                                        Novo Serviço
+                                        Novo serviço
                                     </Button>
                                 </div>
                             </div>

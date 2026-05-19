@@ -413,7 +413,7 @@ export default function CustomersPage({
                                     </Button>
 
                                     <Button onClick={handleAddCustomer} leftIcon={<PlusIcon size={18} />}>
-                                        Novo Cliente
+                                        Novo cliente
                                     </Button>
                                 </div>
                             </div>
@@ -480,46 +480,46 @@ export default function CustomersPage({
                                                     {paginated.map((c: Customer) => {
                                                         const prefetch = getPrefetchProps(c.originalId)
                                                         return (
-                                                        <div
-                                                            key={c.originalId}
-                                                            className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                            onClick={() => handleDetailsCustomer(c)}
-                                                            onTouchStart={prefetch.onTouchStart}
-                                                        >
-                                                            <UserProfileImage
-                                                                fullName={c.name || "Cliente"}
-                                                                className="w-14 h-14 text-xl"
-                                                            />
+                                                            <div
+                                                                key={c.originalId}
+                                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
+                                                                onClick={() => handleDetailsCustomer(c)}
+                                                                onTouchStart={prefetch.onTouchStart}
+                                                            >
+                                                                <UserProfileImage
+                                                                    fullName={c.name || "Cliente"}
+                                                                    className="w-14 h-14 text-xl"
+                                                                />
 
-                                                            <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div className="flex flex-col min-w-0 pr-1">
-                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                            {c.name}
-                                                                        </h3>
-                                                                        <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                            {c.id !== '-' ? c.id : "Cliente"}
-                                                                        </span>
+                                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex flex-col min-w-0 pr-1">
+                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                {c.name}
+                                                                            </h3>
+                                                                            <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                                {c.id !== '-' ? c.id : "Cliente"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
+                                                                            {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
+                                                                        </Badge>
                                                                     </div>
-                                                                    <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
-                                                                        {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
-                                                                    </Badge>
-                                                                </div>
-                                                                <div className="flex justify-between items-center mt-1">
-                                                                    <span className="text-[14px] font-bold text-brand-primary">
-                                                                        {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
-                                                                    </span>
-                                                                    <div className="flex items-center gap-4">
-                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                            {c.orders} pedido{c.orders !== 1 && 's'}
+                                                                    <div className="flex justify-between items-center mt-1">
+                                                                        <span className="text-[14px] font-bold text-brand-primary">
+                                                                            {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
                                                                         </span>
-                                                                        <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
-                                                                            <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
+                                                                        <div className="flex items-center gap-4">
+                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                                {c.orders} pedido{c.orders !== 1 && 's'}
+                                                                            </span>
+                                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
+                                                                                <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
                                                         )
                                                     })}
                                                 </div>
@@ -528,18 +528,18 @@ export default function CustomersPage({
                                                     {paginated.map((c: Customer) => {
                                                         const prefetch = getPrefetchProps(c.originalId)
                                                         return (
-                                                        <CustomerGridCard
-                                                            key={c.originalId}
-                                                            customer={c}
-                                                            selected={selection.ids.has(c.originalId)}
-                                                            onSelect={() => handleSelectRow(c.originalId)}
-                                                            onDetails={() => handleDetailsCustomer(c)}
-                                                            onEdit={() => handleEditCustomer(c)}
-                                                            onDelete={() => handleDeleteCustomer(c)}
-                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
-                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
-                                                            onPrefetchTouchStart={prefetch.onTouchStart}
-                                                        />
+                                                            <CustomerGridCard
+                                                                key={c.originalId}
+                                                                customer={c}
+                                                                selected={selection.ids.has(c.originalId)}
+                                                                onSelect={() => handleSelectRow(c.originalId)}
+                                                                onDetails={() => handleDetailsCustomer(c)}
+                                                                onEdit={() => handleEditCustomer(c)}
+                                                                onDelete={() => handleDeleteCustomer(c)}
+                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                            />
                                                         )
                                                     })}
                                                 </div>
@@ -600,19 +600,19 @@ export default function CustomersPage({
                                                                 {paginated.map((c: Customer) => {
                                                                     const prefetch = getPrefetchProps(c.originalId)
                                                                     return (
-                                                                    <CustomerListItem
-                                                                        key={c.originalId}
-                                                                        customer={c}
-                                                                        columns={COLUMNS}
-                                                                        selected={selection.ids.has(c.originalId)}
-                                                                        onSelect={handleSelectRow}
-                                                                        onEdit={handleEditCustomer}
-                                                                        onDelete={handleDeleteCustomer}
-                                                                        onDetails={handleDetailsCustomer}
-                                                                        onPrefetchMouseEnter={prefetch.onMouseEnter}
-                                                                        onPrefetchMouseLeave={prefetch.onMouseLeave}
-                                                                        onPrefetchTouchStart={prefetch.onTouchStart}
-                                                                    />
+                                                                        <CustomerListItem
+                                                                            key={c.originalId}
+                                                                            customer={c}
+                                                                            columns={COLUMNS}
+                                                                            selected={selection.ids.has(c.originalId)}
+                                                                            onSelect={handleSelectRow}
+                                                                            onEdit={handleEditCustomer}
+                                                                            onDelete={handleDeleteCustomer}
+                                                                            onDetails={handleDetailsCustomer}
+                                                                            onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                            onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                            onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                        />
                                                                     )
                                                                 })}
                                                             </tbody>

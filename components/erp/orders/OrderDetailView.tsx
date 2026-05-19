@@ -344,45 +344,49 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         />
                                                     )}
 
-                                                    <PaymentRow label="Subtotal" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{`${itemsLabel} • ${formatCurrency(subtotalValue)}`}</span>} />
+                                                    <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>} />
 
                                                     <PaymentRow
                                                         label="Tipo de Entrega"
                                                         value={
                                                             <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereco"} •{" "}
-                                                                <span className={Number(order.shipping_cost || 0) <= 0 ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"}>
-                                                                    {Number(order.shipping_cost || 0) <= 0 ? "Grátis" : formatCurrency(order.shipping_cost || 0)}
-                                                                </span>
+                                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
                                                             </span>
                                                         }
                                                     />
 
+                                                    {Number(order.shipping_cost || 0) > 0 && (
+                                                        <PaymentRow
+                                                            label="Valor do Frete"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.shipping_cost)}</span>}
+                                                        />
+                                                    )}
+
                                                     {Number(order.additional_costs || 0) > 0 && (
-                                                        <PaymentRow label="Custos Adicionais" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
+                                                        <PaymentRow label="Outros Custos" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
                                                     )}
 
                                                     {Number(order.discount_value || 0) > 0 && (
                                                         <PaymentRow
-                                                            label="Desconto"
+                                                            label="Desconto do Pedido"
                                                             value={<span className="text-brand-red font-bold">- {formatCurrency(order.discount_value)}</span>}
                                                         />
                                                     )}
                                                     {couponDiscountAmount > 0 && (
                                                         <PaymentRow
-                                                            label="Desconto por cupom"
+                                                            label="Desconto por Cupom"
                                                             value={<span className="text-brand-red font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
                                                         />
                                                     )}
                                                     {paymentMethodDiscountAmount > 0 && (
                                                         <PaymentRow
-                                                            label="Desconto por método de pagamento"
+                                                            label="Desconto do Método"
                                                             value={<span className="text-brand-red font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                                         />
                                                     )}
                                                     {paymentMethodExtraAmount > 0 && (
                                                         <PaymentRow
-                                                            label="Acréscimo do método de pagamento"
+                                                            label="Taxa do Método"
                                                             value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
                                                         />
                                                     )}

@@ -19,8 +19,8 @@ import ServiceCategoriesPageControls from "./ServiceCategoriesPageControls"
 
 // Actions
 import {
-    createServiceCategoryAction as createCategoryAction, 
-    updateServiceCategoryAction as updateCategoryAction, 
+    createServiceCategoryAction as createCategoryAction,
+    updateServiceCategoryAction as updateCategoryAction,
     deleteServiceCategoryAction as deleteCategoryAction,
     getServiceMetadataAction as getMetadataAction
 } from "@/app/actions/erp/service-metadata"
@@ -41,7 +41,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
     const { openPlanUpgrade } = usePlanUpgrade()
     // State
     const [metadata, setMetadata] = useState(initialMetadata)
-    
+
     // Initialize activeTab from URL parameter 'tab'
     const tabFromUrl = searchParams.get("tab") as any
     const validTabs = ["categories", "subcategories"]
@@ -115,7 +115,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
     const handleTabChange = (tab: "categories" | "subcategories") => {
         setActiveTab(tab)
         setPage(1)
-        
+
         // Update URL
         const params = new URLSearchParams(searchParams.toString())
         params.set("tab", tab)
@@ -124,9 +124,9 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
 
     const getAddButtonLabel = () => {
         switch (activeTab) {
-            case "categories": return "Nova Categoria"
-            case "subcategories": return "Nova Subcategoria"
-            default: return "Novo Cadastro"
+            case "categories": return "Nova categoria"
+            case "subcategories": return "Nova subcategoria"
+            default: return "Novo cadastro"
         }
     }
 
@@ -336,7 +336,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
             <DefaultModal
                 isOpen={modal.isOpen}
                 onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
-                title={modal.mode === "add" ? "Novo Cadastro" : "Editar Cadastro"}
+                title={modal.mode === "add" ? "Novo cadastro" : "Editar cadastro"}
                 footer={
                     <div className="flex justify-end gap-3 w-full">
                         <Button variant="outline" onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}>Cancelar</Button>

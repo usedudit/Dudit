@@ -241,7 +241,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                         />
                                         <Button className='whitespace-nowrap' onClick={() => onEdit?.(customer)}>
                                             <EditIcon className="w-4 h-4 mr-2" />
-                                            Editar Cliente
+                                            Editar cliente
                                         </Button>
                                     </div>
                                 </div>

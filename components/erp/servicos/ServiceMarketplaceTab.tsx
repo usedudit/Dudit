@@ -5,15 +5,19 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput } from "@/components/reusable"
 import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon } from "@/lib/icons"
+import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 
 interface ServiceMarketplaceTabProps {
     serviceData: any
     handleInputChange: (e: any) => void
     isEditing: boolean
+    itemId: string
+    video: any
+    onVideoChange: (video: any) => void
 }
 
 export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
-    serviceData, handleInputChange, isEditing
+    serviceData, handleInputChange, isEditing, itemId, video, onVideoChange
 }) => {
     // --- Helper para simular evento nativo ---
     const manualChange = (name: string, value: any) => {
@@ -64,6 +68,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
+                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
                 </div>
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}

@@ -697,21 +697,21 @@ export function ProductDetailsPageClient({
                 {[
                     {
                         title: "Pagamento Direto ao Vendedor",
-                        sub: "A Dudit não processa pagamentos: o seu dinheiro vai direto para o vendedor.",
                         onClick: () => setShowPaymentModal(true)
                     },
                     {
                         title: "Entrega e Garantia do Vendedor",
-                        sub: "A entrega, troca e garantia são responsabilidade do vendedor. A Dudit conecta você a ele.",
                         onClick: () => setShowResponsibilityModal(true)
                     },
-                ].map(({ title, sub, onClick }) => (
-                    <button key={title} onClick={onClick} className="w-full flex items-center justify-between py-5 border-b border-brand-border hover:bg-brand-gray text-left transition-colors">
-                        <div>
-                            <p className="font-bold text-brand-dark text-sm mb-0.5">{title}</p>
-                            <p className="text-brand-inactive-text text-xs">{sub}</p>
-                        </div>
-                        <ChevronRightIcon className="text-brand-green shrink-0" size={20} />
+                ].map(({ title, onClick }) => (
+                    <button
+                        key={title}
+                        onClick={onClick}
+                        className="w-full flex items-center gap-3 py-4 px-3 border-b border-brand-border hover:bg-brand-gray text-left transition-colors"
+                    >
+                        <div className="bg-brand-green w-1 rounded-full self-stretch shrink-0 min-h-[20px]" />
+                        <span className="font-bold text-brand-dark text-sm flex-grow">{title}</span>
+                        <ChevronRightIcon className="text-brand-dark shrink-0" size={20} />
                     </button>
                 ))}
             </div>
@@ -755,8 +755,16 @@ export function ProductDetailsPageClient({
                 isOpen={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
                 maxWidth="md"
+                hideHeader={true}
             >
-                <div className="flex flex-col">
+                <div className="flex flex-col relative">
+                    <button
+                        onClick={() => setShowPaymentModal(false)}
+                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <XIcon size={16} />
+                    </button>
                     {/* Header with Dual Squares */}
                     <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden"
                         style={{ background: 'linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)' }}>
@@ -784,8 +792,16 @@ export function ProductDetailsPageClient({
                 isOpen={showResponsibilityModal}
                 onClose={() => setShowResponsibilityModal(false)}
                 maxWidth="md"
+                hideHeader={true}
             >
-                <div className="flex flex-col">
+                <div className="flex flex-col relative">
+                    <button
+                        onClick={() => setShowResponsibilityModal(false)}
+                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors"
+                        title="Fechar"
+                    >
+                        <XIcon size={16} />
+                    </button>
                     {/* Header with Dual Squares */}
                     <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
                         <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3 overflow-hidden">
@@ -1051,20 +1067,20 @@ export function ProductDetailsPageClient({
                                     </div>
 
                                     {/* Desktop Right Column (Actions + Next) */}
-                                    <div className="hidden lg:flex flex-col gap-6 shrink-0 items-center self-stretch py-2">
-                                        <button onClick={() => setIsFavorite(!isFavorite)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Favoritar">
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
+                                        <Button variant="filled" onClick={() => setIsFavorite(!isFavorite)} className="w-10 h-10 flex items-center justify-center" title="Favoritar">
                                             <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
-                                        </button>
+                                        </Button>
 
-                                        <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm" title="Compartilhar">
+                                        <Button variant="filled" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
-                                        </button>
+                                        </Button>
 
                                         <div className="flex-1 flex items-center">
                                             {galleryItems.length > 1 && (
-                                                <button onClick={goToNext} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                     <ChevronRightIcon size={20} className="text-brand-dark" />
-                                                </button>
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

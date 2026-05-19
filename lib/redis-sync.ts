@@ -67,18 +67,19 @@ export async function syncToExploreRedis({
     // para garantir que o Redis tenha todos os joins (parceiro, endereço, etc)
     if (!removeFromRedis && (Object.keys(data).length <= 1 || !data.partners)) {
       const admin = getAdminClient()
-      
+
       if (type === 'produto') {
         const { data: dbData } = await admin
           .from("products")
           .select(`
-            id, name, price, promotional_price, images, video_thumbnail, rating, category, created_at, updated_at, is_active, show_in_marketplace,
+            id, name, description, price, promotional_price, images, video_thumbnail, rating,
+            category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
           `)
           .eq("id", id)
           .single()
-        
+
         if (!dbData) {
           console.warn(`[RedisSync] Produto ${id} não encontrado no DB. Removendo do Redis.`)
           return await removeFromExploreRedis(id, type)
@@ -106,11 +107,18 @@ export async function syncToExploreRedis({
 
         const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
 
-        finalData = { ...dbData, partners: partner, ...variantFallback }
+        const categoryName = (dbData.category as any)?.name || null
+
+        finalData = {
+          ...dbData,
+          category: categoryName,
+          partners: partner,
+          ...variantFallback
+        }
         delete finalData.product_variants // Não cacheamos variantes no objeto principal
       } else if (type === 'servico') {
-         // Lógica similar para serviços
-         const { data: dbData } = await admin
+        // Lógica similar para serviços
+        const { data: dbData } = await admin
           .from("services")
           .select(`
             id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active,
@@ -118,7 +126,7 @@ export async function syncToExploreRedis({
           `)
           .eq("id", id)
           .single()
-        
+
         if (!dbData) {
           return await removeFromExploreRedis(id, type)
         }
@@ -138,7 +146,7 @@ export async function syncToExploreRedis({
         } : null
         finalData = { ...dbData, partners: partner }
       }
- else if (type === 'loja') {
+      else if (type === 'loja') {
         const { data: dbData } = await admin
           .from("partners")
           .select(`
@@ -147,14 +155,14 @@ export async function syncToExploreRedis({
           `)
           .eq("id", id)
           .single()
-        
+
         if (dbData) {
           const city = dbData.addresses?.[0]?.city || null
           const state = dbData.addresses?.[0]?.state || null
-          finalData = { 
-            id: dbData.id, 
-            name: dbData.store_name, 
-            images: [dbData.banner_url || dbData.store_image_url], 
+          finalData = {
+            id: dbData.id,
+            name: dbData.store_name,
+            images: [dbData.banner_url || dbData.store_image_url],
             partners: { ...dbData, city, state },
             created_at: dbData.created_at,
             updated_at: dbData.updated_at

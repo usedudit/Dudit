@@ -550,7 +550,7 @@ export default function FinancialCategoriesPage({
                     <div className="flex items-center gap-3">
                         <Button onClick={handleAdd} disabled={!!planGate} className="w-full">
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Novo Cadastro
+                            Novo cadastro
                         </Button>
                     </div>
                 </div>
@@ -658,7 +658,7 @@ export default function FinancialCategoriesPage({
             <DefaultModal
                 isOpen={modal.isOpen}
                 onClose={() => setModal((prev) => ({ ...prev, isOpen: false }))}
-                title={modal.mode === "add" ? "Novo Cadastro" : "Editar Cadastro"}
+                title={modal.mode === "add" ? "Novo cadastro" : "Editar cadastro"}
                 footer={
                     <div className="flex justify-end gap-3 w-full">
                         <Button variant="outline" onClick={() => setModal((prev) => ({ ...prev, isOpen: false }))}>
@@ -796,10 +796,10 @@ export default function FinancialCategoriesPage({
                                     is_default:
                                         prev.mode === "add"
                                             ? !accounts.some(
-                                                  (acc) =>
-                                                      acc.type === nextType &&
-                                                      (!acc.integration_source || acc.integration_source !== "mercadopago"),
-                                              )
+                                                (acc) =>
+                                                    acc.type === nextType &&
+                                                    (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                            )
                                             : prev.item.is_default,
                                 },
                             }))

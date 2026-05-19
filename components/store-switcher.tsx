@@ -77,7 +77,7 @@ export function StoreSwitcher() {
                     className="text-brand-primary hover:bg-brand-primary/10 flex items-center gap-2"
                 >
                     <PlusIcon className="w-4 h-4" />
-                    <span>Novo Local</span>
+                    <span>Novo local</span>
                 </DropdownItem>
             </Dropdown>
 

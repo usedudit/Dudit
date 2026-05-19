@@ -575,8 +575,6 @@ export const BusinessDataSubPage = ({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Endereço do negócio</h3>
                                                 <div className="space-y-4">
                                                     <CepInput
-                                                        label="CEP"
-                                                        placeholder="00000-000"
                                                         value={addresses.zipCode}
                                                         onChange={(val) => {
                                                             setAddresses({ ...addresses, zipCode: val })
@@ -590,6 +588,7 @@ export const BusinessDataSubPage = ({
                                                                 neighborhood: data.neighborhood || prev.neighborhood,
                                                                 city: data.city || prev.city,
                                                                 state: data.state || prev.state,
+                                                                noNumber: data.number === "S/N"
                                                             }))
                                                             setFieldErrors(prev => {
                                                                 const n = new Set(prev)
@@ -604,7 +603,7 @@ export const BusinessDataSubPage = ({
                                                         errorMessage={fieldErrors.has("zipCode") ? "CEP inválido" : ""}
                                                     />
                                                     <Input
-                                                        label="Logradouro"
+                                                        label="Rua/Avenida"
                                                         placeholder="Rua, Avenida, etc."
                                                         value={addresses.street}
                                                         onChange={e => {
@@ -622,6 +621,7 @@ export const BusinessDataSubPage = ({
                                                                 noNumber={addresses.noNumber}
                                                                 onNumberChange={val => setAddresses({ ...addresses, number: val })}
                                                                 onNoNumberChange={checked => setAddresses({ ...addresses, noNumber: checked, number: checked ? "S/N" : "" })}
+                                                                placeholder="123"
                                                             />
                                                         </div>
                                                         <div>
@@ -659,7 +659,6 @@ export const BusinessDataSubPage = ({
                                                         </div>
                                                         <div>
                                                             <StateComboBox
-                                                                label="UF"
                                                                 value={addresses.state}
                                                                 onChange={v => setAddresses({ ...addresses, state: v })}
                                                                 className="w-full"

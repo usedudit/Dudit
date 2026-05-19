@@ -7,7 +7,7 @@ import {
     MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
     TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon,
 } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown } from "@/components/reusable"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
@@ -211,7 +211,7 @@ export function CheckoutPageClient() {
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
-        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "",
+        zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
     })
 
     const [showAddressModal, setShowAddressModal] = useState(false)
@@ -383,8 +383,9 @@ export function CheckoutPageClient() {
 
     const handleSaveNewAddress = async () => {
         if (!userId) return
-        const { zipCode, street, number, neighborhood, city, state } = newAddressData
-        if (!zipCode || !street || !number || !neighborhood || !city || !state) {
+        const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+        const finalNumber = noNumber ? "S/N" : number
+        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
             setDeliveryError("Preencha todos os campos obrigatórios do endereço")
             return
         }
@@ -401,7 +402,7 @@ export function CheckoutPageClient() {
         }
         const result = await createAddressAction({
             entityId: userId, entityType: "user",
-            street, number, complement: newAddressData.complement,
+            street, number: finalNumber, complement: newAddressData.complement,
             neighborhood, city, state, zipCode,
             isDefault: userAddresses.length === 0,
             csrf_token: csrfToken,
@@ -415,7 +416,7 @@ export function CheckoutPageClient() {
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(result.address) }))
             }
             setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "" })
+            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
         }
         setIsLoading(false)
     }
@@ -839,7 +840,7 @@ export function CheckoutPageClient() {
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
-                    
+
                     setPixPaymentData({
                         orderId: result.orderId,
                         orderNumber: result.orderNumber,
@@ -885,7 +886,7 @@ export function CheckoutPageClient() {
                     })
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
-                    
+
                     setPixPaymentData({
                         orderId: result.orderId,
                         orderNumber: result.orderNumber,
@@ -1158,9 +1159,9 @@ export function CheckoutPageClient() {
                                                                     <ListItem
                                                                         icon={
                                                                             selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                                                            selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                            MoneyIcon
+                                                                                selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                                    selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                                        MoneyIcon
                                                                         }
                                                                         title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                                                                         description={selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" : selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro"}
@@ -1173,7 +1174,7 @@ export function CheckoutPageClient() {
                                                                         <div className="mt-4">
                                                                             <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
                                                                             <div className="flex flex-wrap gap-2">
-                                                                                {selectedStorefrontMethod.cardBrand.split(',').map(b => {
+                                                                                {selectedStorefrontMethod.cardBrand.split(/[;,]/).map(b => {
                                                                                     const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
                                                                                     if (!brand) return null
                                                                                     return (
@@ -1242,7 +1243,7 @@ export function CheckoutPageClient() {
                                                                 <div className="mt-4">
                                                                     <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
                                                                     <div className="flex flex-wrap gap-2">
-                                                                        {selectedStorefrontMethod.cardBrand.split(',').map(b => {
+                                                                        {selectedStorefrontMethod.cardBrand.split(/[;,]/).map(b => {
                                                                             const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
                                                                             if (!brand) return null
                                                                             return (
@@ -1550,12 +1551,11 @@ export function CheckoutPageClient() {
             <DefaultModal
                 isOpen={showAddressForm}
                 onClose={() => setShowAddressForm(false)}
-                title="Adicionar Novo Endereço"
+                title="Adicionar novo endereço"
             >
                 <div className="flex flex-col gap-4">
                     <div onBlur={handleCepBlur}>
                         <CepInput
-                            label="CEP"
                             value={newAddressData.zipCode}
                             onChange={(val) => setNewAddressData({ ...newAddressData, zipCode: val })}
                             disabled={loadingCep}
@@ -1563,19 +1563,21 @@ export function CheckoutPageClient() {
                     </div>
                     <div>
                         <Input
-                            label="Logradouro"
+                            label="Rua/Avenida"
                             value={newAddressData.street}
                             onChange={(e) => setNewAddressData({ ...newAddressData, street: e.target.value })}
-                            placeholder="Ex: Rua das Flores"
+                            placeholder="Rua, Avenida, etc."
                             disabled={loadingCep}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Input
+                            <NumberInputWithCheckbox
                                 label="Número"
-                                value={newAddressData.number}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, number: e.target.value })}
+                                number={newAddressData.number}
+                                noNumber={newAddressData.noNumber}
+                                onNumberChange={(val) => setNewAddressData({ ...newAddressData, number: val })}
+                                onNoNumberChange={(checked) => setNewAddressData({ ...newAddressData, noNumber: checked, number: checked ? "S/N" : "" })}
                                 placeholder="123"
                             />
                         </div>
@@ -1584,7 +1586,7 @@ export function CheckoutPageClient() {
                                 label="Complemento"
                                 value={newAddressData.complement}
                                 onChange={(e) => setNewAddressData({ ...newAddressData, complement: e.target.value })}
-                                placeholder="Apto, Sala..."
+                                placeholder="Apto, Bloco, etc."
                             />
                         </div>
                     </div>
@@ -1594,7 +1596,7 @@ export function CheckoutPageClient() {
                             value={newAddressData.neighborhood}
                             onChange={(e) => setNewAddressData({ ...newAddressData, neighborhood: e.target.value })}
                             disabled={loadingCep}
-                            placeholder="Bairro"
+                            placeholder="Nome do bairro"
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -1604,12 +1606,11 @@ export function CheckoutPageClient() {
                                 value={newAddressData.city}
                                 onChange={(e) => setNewAddressData({ ...newAddressData, city: e.target.value })}
                                 disabled={loadingCep}
-                                placeholder="Cidade"
+                                placeholder="Nome da cidade"
                             />
                         </div>
                         <div>
                             <StateComboBox
-                                label="Estado"
                                 value={newAddressData.state}
                                 onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
                             />
@@ -1706,9 +1707,9 @@ export function CheckoutPageClient() {
                     {storefrontMethods.map((m) => {
                         const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                             m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                            m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                            <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
-                        
+                                m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                    <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+
                         const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
 
                         return (
@@ -1747,7 +1748,7 @@ export function CheckoutPageClient() {
                                     <>
                                         <Separator className="mx-4 my-0" />
                                         <div className="px-4 py-3 flex flex-wrap gap-2">
-                                            {m.cardBrand.split(',').map(b => {
+                                            {m.cardBrand.split(/[;,]/).map(b => {
                                                 const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
                                                 if (!brand) return null
                                                 return (
@@ -1782,14 +1783,14 @@ export function CheckoutPageClient() {
                         Você gostaria de encontrar outro lugar que entregue neste endereço?
                     </p>
                     <div className="flex w-full gap-3">
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             className="flex-1"
                             onClick={() => setShowOutsideRadiusModal(false)}
                         >
                             Não
                         </Button>
-                        <Button 
+                        <Button
                             className="flex-1"
                             onClick={() => router.push("/")}
                         >

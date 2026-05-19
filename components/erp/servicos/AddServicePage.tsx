@@ -425,8 +425,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const dateCreated = serviceData.created_at ? new Date(serviceData.created_at).toLocaleDateString("pt-BR") : "N/A"
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
 
-    const pageTitle = internalMode === "add" ? "Adicionar Novo Serviço"
-        : internalMode === "duplicate" ? "Duplicar Serviço"
+    const pageTitle = internalMode === "add" ? "Adicionar novo serviço"
+        : internalMode === "duplicate" ? "Duplicar serviço"
             : serviceData.name
 
     useEffect(() => {
@@ -529,15 +529,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages}
                                             isQuickMode={isQuick}
-                                            itemId={serviceData.id}
-                                            video={{
-                                                video_type: serviceData.video_type || null,
-                                                video_url: serviceData.video_url || null,
-                                                video_thumbnail: serviceData.video_thumbnail || null,
-                                                video_duration: serviceData.video_duration || null,
-                                                video_provider_id: serviceData.video_provider_id || null,
-                                            }}
-                                            onVideoChange={(video) => setServiceData((prev: any) => ({ ...prev, ...video }))}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />
@@ -564,6 +555,15 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                         <ServiceMarketplaceTab
                                             serviceData={serviceData} handleInputChange={handleInputChange}
                                             isEditing={isEditing && !isSavingService}
+                                            itemId={serviceData.id}
+                                            video={{
+                                                video_type: serviceData.video_type || null,
+                                                video_url: serviceData.video_url || null,
+                                                video_thumbnail: serviceData.video_thumbnail || null,
+                                                video_duration: serviceData.video_duration || null,
+                                                video_provider_id: serviceData.video_provider_id || null,
+                                            }}
+                                            onVideoChange={(video) => setServiceData((prev: any) => ({ ...prev, ...video }))}
                                         />
                                     </FadeIn>
                                 )}

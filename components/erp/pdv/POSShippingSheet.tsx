@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { XIcon } from "@/lib/icons"
-import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, CepInput, CustomerCard, Checkbox, MoneyInput, Input, Tabs, TabsContent, TabsList, TabsTrigger, NumberInputWithCheckbox, StateComboBox } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -64,6 +64,8 @@ export default function POSShippingSheet({
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [shippingInput, setShippingInput] = useState(Number(currentShippingFee || 0))
   const [shippingFree, setShippingFree] = useState(currentShippingFee <= 0)
+  const [isCustomShipping, setIsCustomShipping] = useState(false)
+  const [calculatedFee, setCalculatedFee] = useState(0)
   const [isAddressSheetOpen, setIsAddressSheetOpen] = useState(false)
   const [isSavingAddress, setIsSavingAddress] = useState(false)
   const [activeTab, setActiveTab] = useState("cliente")
@@ -74,6 +76,7 @@ export default function POSShippingSheet({
   const [zipCode, setZipCode] = useState("")
   const [street, setStreet] = useState("")
   const [number, setNumber] = useState("")
+  const [noNumber, setNoNumber] = useState(false)
   const [complement, setComplement] = useState("")
   const [neighborhood, setNeighborhood] = useState("")
   const [city, setCity] = useState("")
@@ -84,13 +87,17 @@ export default function POSShippingSheet({
     setShippingInput(Number(currentShippingFee || 0))
     // Keep auto-quote enabled on open; "Sem custo" should be an explicit user choice.
     setShippingFree(false)
+    setIsCustomShipping(false)
+    setCalculatedFee(0)
   }, [isOpen, currentShippingFee])
 
   useEffect(() => {
     if (!customerDetails?.address) return
     setZipCode(customerDetails.address.zipCode || "")
     setStreet(customerDetails.address.street || "")
-    setNumber(customerDetails.address.number || "")
+    const isNoNumber = customerDetails.address.number === "S/N"
+    setNumber(isNoNumber ? "" : customerDetails.address.number || "")
+    setNoNumber(isNoNumber)
     setComplement(customerDetails.address.complement || "")
     setNeighborhood(customerDetails.address.neighborhood || "")
     setCity(customerDetails.address.city || "")
@@ -100,7 +107,7 @@ export default function POSShippingSheet({
   const isDirty =
     zipCode !== (customerDetails?.address?.zipCode || "") ||
     street !== (customerDetails?.address?.street || "") ||
-    number !== (customerDetails?.address?.number || "") ||
+    (noNumber ? "S/N" : number) !== (customerDetails?.address?.number || "") ||
     complement !== (customerDetails?.address?.complement || "") ||
     neighborhood !== (customerDetails?.address?.neighborhood || "") ||
     city !== (customerDetails?.address?.city || "") ||
@@ -124,7 +131,9 @@ export default function POSShippingSheet({
 
   const hasSelectedCustomer = !!selectedCustomerId
   const hasStreet = !!customerDetails?.address?.street?.trim()
-  const shippingFeeValue = shippingFree ? 0 : Math.max(0, Number(shippingInput || 0))
+  const shippingFeeValue = isCustomShipping
+    ? (shippingFree ? 0 : Math.max(0, Number(shippingInput || 0)))
+    : calculatedFee
 
   useEffect(() => {
     let active = true
@@ -140,7 +149,9 @@ export default function POSShippingSheet({
       if (quote.success) {
         setDistanceKm(Number(quote.distanceKm || 0))
         setBreakdown(quote.breakdown as Record<string, unknown>)
-        if (!shippingFree) setShippingInput(Number(quote.fee || 0))
+        const fee = Number(quote.fee || 0)
+        setCalculatedFee(fee)
+        if (!shippingFree) setShippingInput(fee)
       }
       setIsQuoteLoading(false)
     }, 250)
@@ -182,26 +193,6 @@ export default function POSShippingSheet({
               />
             )}
 
-            {hasSelectedCustomer && hasStreet && (
-              <div className="mt-6">
-                <div className="border-t border-brand-border dark:border-dark-border mb-6 w-full"></div>
-
-                <MoneyInput
-                  label="Envio personalizado"
-                  name="customShippingFee"
-                  value={shippingFree ? 0 : shippingInput}
-                  onChange={(value) => setShippingInput(value)}
-                  suffix={(
-                    <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading">
-                      <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
-                      Sem custo
-                    </label>
-                  )}
-                  readOnly={shippingFree}
-                />
-              </div>
-            )}
-
             {hasSelectedCustomer && !hasStreet && (
               <Button className="w-full" onClick={() => setIsAddressSheetOpen(true)}>
                 Adicionar endereço
@@ -219,6 +210,31 @@ export default function POSShippingSheet({
               </div>
               {isQuoteLoading && <p className="mt-2 text-xs text-brand-inactive-text">Recalculando valores...</p>}
             </div>
+
+            {hasSelectedCustomer && hasStreet && (
+              <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border space-y-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
+                  <Checkbox checked={isCustomShipping} onChange={() => setIsCustomShipping((prev) => !prev)} name="isCustomShipping" />
+                  Envio personalizado
+                </label>
+
+                {isCustomShipping && (
+                  <MoneyInput
+                    label="Valor do Envio"
+                    name="customShippingFee"
+                    value={shippingFree ? 0 : shippingInput}
+                    onChange={(value) => setShippingInput(value)}
+                    suffix={(
+                      <label className="flex items-center gap-1 text-xs text-brand-dark dark:text-dark-heading cursor-pointer">
+                        <Checkbox checked={shippingFree} onChange={() => setShippingFree((prev) => !prev)} name="shippingFree" />
+                        Sem custo
+                      </label>
+                    )}
+                    readOnly={shippingFree}
+                  />
+                )}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -252,18 +268,28 @@ export default function POSShippingSheet({
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
         <Input label="Cliente" name="addressCustomerName" value={customerDetails?.name || ""} readOnly />
         <div className="grid grid-cols-2 gap-3">
-          <CepInput label="CEP" value={zipCode} onChange={setZipCode} onAddressFetched={(addr) => {
+          <CepInput value={zipCode} onChange={setZipCode} onAddressFetched={(addr) => {
             setStreet(addr.street || "")
             setNeighborhood(addr.neighborhood || "")
             setCity(addr.city || "")
             setState(addr.state || "")
           }} />
-          <Input label="Endereço" name="shippingStreet" value={street} onChange={(e) => setStreet(e.target.value)} />
-          <Input label="Número" name="shippingNumber" value={number} onChange={(e) => setNumber(e.target.value)} />
-          <Input label="Complemento" name="shippingComplement" value={complement} onChange={(e) => setComplement(e.target.value)} />
-          <Input label="Bairro" name="shippingNeighborhood" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
-          <Input label="Cidade" name="shippingCity" value={city} onChange={(e) => setCity(e.target.value)} />
-          <Input label="UF" name="shippingState" value={state} onChange={(e) => setState(e.target.value)} />
+          <Input label="Rua/Avenida" name="shippingStreet" placeholder="Rua, Avenida, etc." value={street} onChange={(e) => setStreet(e.target.value)} />
+          <NumberInputWithCheckbox
+            label="Número"
+            number={number}
+            noNumber={noNumber}
+            onNumberChange={setNumber}
+            onNoNumberChange={(checked) => {
+              setNoNumber(checked)
+              setNumber(checked ? "S/N" : "")
+            }}
+            placeholder="123"
+          />
+          <Input label="Complemento" name="shippingComplement" placeholder="Apto, Bloco, etc." value={complement} onChange={(e) => setComplement(e.target.value)} />
+          <Input label="Bairro" name="shippingNeighborhood" placeholder="Nome do bairro" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+          <Input label="Cidade" name="shippingCity" placeholder="Nome da cidade" value={city} onChange={(e) => setCity(e.target.value)} />
+          <StateComboBox value={state} onChange={setState} />
         </div>
       </div>
 

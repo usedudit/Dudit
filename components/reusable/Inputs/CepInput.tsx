@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/reusable"
 import { consultarCEP } from "@/lib/nuvem-fiscal"
 import { Spinner } from "@/components/reusable/Spinner"
+import { Button } from "@/components/reusable/Button"
 
 interface CepResponse {
     logradouro?: string
@@ -18,13 +19,15 @@ interface CepResponse {
 interface CepInputProps extends Omit<React.ComponentProps<typeof Input>, "onChange" | "onBlur"> {
     value: string
     onChange: (value: string) => void
-    onAddressFetched?: (addressData: { street: string; neighborhood: string; city: string; state: string }) => void
+    onAddressFetched?: (addressData: { street: string; neighborhood: string; city: string; state: string; number: string }) => void
 }
 
 export const CepInput: React.FC<CepInputProps> = ({
     value,
     onChange,
     onAddressFetched,
+    label = "CEP",
+    placeholder = "00000-000",
     ...props
 }) => {
     const [loading, setLoading] = useState(false)
@@ -60,6 +63,7 @@ export const CepInput: React.FC<CepInputProps> = ({
                     neighborhood: data.bairro || "",
                     city: data.localidade || data.municipio || "",
                     state: data.uf || "",
+                    number: "",
                 })
             } else {
                 fetchingCepRef.current = ""
@@ -90,13 +94,24 @@ export const CepInput: React.FC<CepInputProps> = ({
     return (
         <div className="relative">
             <Input
+                label={label}
+                placeholder={placeholder}
+                labelAddon={
+                    <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => window.open("https://buscacepinter.correios.com.br/app/endereco/index.php", "_blank")}
+                        className="text-xs font-bold p-0 h-auto min-h-0 bg-transparent hover:bg-transparent text-brand-dark dark:text-dark-heading hover:text-brand-green"
+                    >
+                        Não sei meu CEP
+                    </Button>
+                }
                 {...props}
                 value={value}
                 onChange={handleChange}
                 onBlur={handleBlur}
                 disabled={loading || props.disabled}
                 maxLength={9}
-                placeholder={props.placeholder || "00000-000"}
             />
             {loading && (
                 <Spinner className="absolute right-3 top-9 w-4 h-4 text-gray-400" size={16} />

@@ -18,7 +18,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   mercado_pago_checkout: "Pagamento online (Mercado Pago)",
   system_orders: "Pedidos pelo sistema",
   system_bookings: "Agendamentos pelo sistema",
-  product_variants: "Variantes de produtos",
+  product_variants: "Variações de produtos",
   product_complements: "Complementos de produtos",
   promotions_and_coupons: "Promoções e cupons",
   local_shipping_config: "Frete local configurável",

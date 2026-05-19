@@ -753,7 +753,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             notifySuccess("Venda finalizada com sucesso.")
             setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
             clearCartAfterPaymentModalClosesRef.current = true
-            return { success: true, orderNumber: result.data?.saleId }
+            return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId }
         } finally {
             setIsFinalizing(false)
             isFinalizingRef.current = false
@@ -1083,7 +1083,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             ) : (
                 <FadeIn key="open" className="flex h-full flex-col gap-4">
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
-                        <div className="flex min-h-0 flex-col xl:col-span-8 xl:pr-6">
+                        <div className="flex min-h-0 flex-col xl:col-span-8 xl:px-6">
                             <POSHeader
                                 isMobile={isMobile}
                                 search={search}

@@ -249,7 +249,7 @@ export async function getStockMovementDetails(id: string) {
                     name,
                     sku,
                     images,
-                    category
+                    category:product_categories!category_id(name)
                 )
             `)
             .eq("movement_id", id)
@@ -298,7 +298,7 @@ export async function getStockMovementDetails(id: string) {
                 name: item.products?.name || 'Produto Excluído',
                 sku: item.products?.sku || 'N/A',
                 image: (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : null,
-                category: item.products?.category || 'Sem Categoria',
+                category: item.products?.category?.name || 'Sem Categoria',
                 previousStock: item.previous_quantity || 0,
                 currentStock: item.new_quantity || 0,
             },

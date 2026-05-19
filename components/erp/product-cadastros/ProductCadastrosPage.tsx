@@ -43,7 +43,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
     const { openPlanUpgrade } = usePlanUpgrade()
     // State
     const [metadata, setMetadata] = useState(initialMetadata)
-    
+
     // Initialize activeTab from URL parameter 'tab'
     const tabFromUrl = searchParams.get("tab") as any
     const validTabs = ["categories", "subcategories", "brands", "locations"]
@@ -119,7 +119,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
     const handleTabChange = (tab: "categories" | "subcategories" | "brands" | "locations") => {
         setActiveTab(tab)
         setPage(1)
-        
+
         // Update URL
         const params = new URLSearchParams(searchParams.toString())
         params.set("tab", tab)
@@ -128,11 +128,11 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
 
     const getAddButtonLabel = () => {
         switch (activeTab) {
-            case "categories": return "Nova Categoria"
-            case "subcategories": return "Nova Subcategoria"
-            case "brands": return "Nova Marca"
-            case "locations": return "Nova Localização"
-            default: return "Novo Cadastro"
+            case "categories": return "Nova categoria"
+            case "subcategories": return "Nova subcategoria"
+            case "brands": return "Nova marca"
+            case "locations": return "Nova localização"
+            default: return "Novo cadastro"
         }
     }
 
@@ -358,7 +358,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
             <DefaultModal
                 isOpen={modal.isOpen}
                 onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
-                title={modal.mode === "add" ? "Novo Cadastro" : "Editar Cadastro"}
+                title={modal.mode === "add" ? "Novo cadastro" : "Editar cadastro"}
                 footer={
                     <div className="flex justify-end gap-3 w-full">
                         <Button variant="outline" onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}>Cancelar</Button>

@@ -833,7 +833,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         )
     }
 
-    return { success: true as const, data: { saleId } }
+    // Fetch the human-readable sale_number (DDT-XXXXXX) to display on the frontend
+    const { data: saleRecord } = await supabase
+        .from("sales")
+        .select("sale_number")
+        .eq("id", saleId)
+        .eq("partner_id", input.partnerId)
+        .maybeSingle()
+
+    const saleNumber = saleRecord?.sale_number || null
+
+    return { success: true as const, data: { saleId, saleNumber } }
 }
 
 export async function createPOSQuickProductAction(input: {

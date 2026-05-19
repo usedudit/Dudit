@@ -55,6 +55,29 @@ const normalizePaymentMethodLabel = (value?: string | null) => {
     return String(value || '').trim();
 };
 
+const getFormattedMethodLabel = (name: string, type?: string | null) => {
+    if (!name) return "";
+    const normalizedType = normalizeMethodType(type);
+    const typeLabel =
+        normalizedType === 'cash' ? 'Dinheiro' :
+            normalizedType === 'pix' ? 'Pix' :
+                normalizedType === 'credit_card' ? 'Cartão de Crédito' :
+                    normalizedType === 'debit_card' ? 'Cartão de Débito' :
+                        normalizedType === 'bank_transfer' ? 'Transferência' : 'Outros';
+
+    const lowerName = name.toLowerCase().trim();
+    const lowerType = typeLabel.toLowerCase().trim();
+
+    if (lowerName === lowerType || (lowerName === "dinheiro" && lowerType === "dinheiro") || (lowerName === "pix" && lowerType === "pix")) {
+        return typeLabel;
+    }
+    if (lowerName.startsWith(lowerType)) {
+        return name;
+    }
+    return `${typeLabel} (${name})`;
+};
+
+
 // --- HELPER COMPONENTS ---
 
 const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number, totalNeed: number }) => {
@@ -465,12 +488,13 @@ const PaymentModal = ({
         [payments],
     );
 
-    /** Base sobre a qual incidem taxas/desconto do método (troco em dinheiro não aumenta o pedido). */
+    /** Base sobre a qual incidem taxas/desconto do método — sempre o total do pedido, NUNCA o "valor a receber" digitado pelo operador. */
     const basisForMethodCalc = useMemo(() => {
-        const raw = Math.max(0, Number(paymentBaseAmount || 0));
-        if (view === 'split' || editingPaymentIndex !== null) return raw;
-        if (view === 'money') return Math.min(raw, Math.max(0, Number(chargeTarget || 0)));
-        return raw > 0.009 ? raw : Math.max(0, Number(chargeTarget || 0));
+        if (view === 'split' || editingPaymentIndex !== null) {
+            return Math.max(0, Number(paymentBaseAmount || 0));
+        }
+        // Para pagamento único (pix, card, money): calcula sempre sobre o total do pedido
+        return Math.max(0, Number(chargeTarget || 0));
     }, [view, editingPaymentIndex, paymentBaseAmount, chargeTarget]);
 
     useEffect(() => {
@@ -571,6 +595,11 @@ const PaymentModal = ({
             if (!active) return;
             if (res?.success) {
                 setPaymentCalculation(res);
+                // Auto-fill "Valor a receber" com o valor final calculado (com desconto/taxa) — apenas uma vez
+                const calculatedFinal = Number(res.finalAmount || 0);
+                if (calculatedFinal > 0.009 && editingPaymentIndex === null) {
+                    setPaymentBaseAmount(calculatedFinal);
+                }
             } else {
                 setPaymentCalculation(null);
             }
@@ -579,6 +608,8 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
+        // basisForMethodCalc agora depende apenas de chargeTarget (não de paymentBaseAmount),
+        // então mudar o "Valor a receber" NÃO dispara recálculo.
     }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
 
 
@@ -634,20 +665,13 @@ const PaymentModal = ({
         if (editingPaymentIndex !== null) {
             return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
         }
-        if (view === 'money') {
-            if (allocationTotal + 0.01 >= chargeTarget) {
-                return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: finalDueForLeg };
-            }
-            return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
-        }
-        if (legFinalCharged != null) {
-            return { compactAlertPaid: legFinalCharged, compactAlertNeed: legFinalCharged };
-        }
-        return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
+        // Para pagamento único: compara o que o operador digitou vs o valor final a cobrar (com desconto/taxa)
+        return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: finalDueForLeg };
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
 
-    const isAllocationUnderpaid = allocationTotal < chargeTarget - 0.01;
-    const isUnderpaid = isAllocationUnderpaid;
+    // Compara o valor que o operador digitou contra o valor final a cobrar (já com desconto/taxa)
+    const isAllocationUnderpaid = paymentBaseAmount < finalDueForLeg - 0.01;
+    const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.01 : isAllocationUnderpaid;
     const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.01;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
 
@@ -736,17 +760,19 @@ const PaymentModal = ({
         }
         : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
 
+    const selectedMethodObj = selectedMethodId ? activeMethods.find((m) => m.id === selectedMethodId) : null;
     const getTitle = () => {
         const selectedTypeLabel =
             selectedMethodType === "pix" ? "Pix" :
                 selectedMethodType === "cash" ? "Dinheiro" :
                     selectedMethodType === "card" ? "Cartão" : "Método";
+        const methodSuffix = selectedMethodObj?.name ? ` ("${selectedMethodObj.name}")` : '';
         switch (view) {
             case 'methods': return 'Método de Pagamento';
             case 'method_type_select': return `Selecionar ${selectedTypeLabel}`;
-            case 'money': return 'Dinheiro';
-            case 'card': return 'Cartão';
-            case 'pix': return 'Pix';
+            case 'money': return `Dinheiro${methodSuffix}`;
+            case 'card': return `Cartão${methodSuffix}`;
+            case 'pix': return `Pix${methodSuffix}`;
             case 'split': return 'Dividir Pagamento';
             case 'split_method_select': return 'Selecionar Método';
             default: return 'Pagamento';
@@ -794,10 +820,11 @@ const PaymentModal = ({
 
     const handleMethodSelectionInSplit = (method: PartnerPaymentMethod) => {
         if (editingPaymentIndex !== null) {
+            const formattedLabel = getFormattedMethodLabel(method.name, method.type);
             const newPayments = [...payments];
             newPayments[editingPaymentIndex] = {
                 ...newPayments[editingPaymentIndex],
-                method: method.name,
+                method: formattedLabel,
                 paymentMethodId: method.id,
             };
             setPayments(newPayments);
@@ -851,14 +878,20 @@ const PaymentModal = ({
                 ? payments
                     .filter((payment) => payment.method && payment.amount > 0.009)
                     .map((payment) => ({
-                        method: normalizePaymentMethodLabel(payment.method),
+                        method: payment.method,
                         amount: Number(payment.amount || 0),
                         paymentMethodId: payment.paymentMethodId || null,
                         installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
                     }))
                 : [{
-                    method: normalizePaymentMethodLabel(activeMethods.find((method) => method.id === selectedMethodId)?.name || (view === 'money' ? 'dinheiro' : (view === 'pix' ? 'pix' : 'cartao'))),
-                    amount: Number(paymentBaseAmount || 0),
+                    method: (() => {
+                        const selectedMethodObj = activeMethods.find((method) => method.id === selectedMethodId);
+                        if (selectedMethodObj) {
+                            return getFormattedMethodLabel(selectedMethodObj.name, selectedMethodObj.type);
+                        }
+                        return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
+                    })(),
+                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -1276,7 +1309,7 @@ const PaymentModal = ({
                                                         baseAllocated={basisForMethodCalc}
                                                     />
                                                     <MoneyInput
-                                                        value={paymentBaseAmount}
+                                                        value={legFinalCharged != null ? legFinalCharged : paymentBaseAmount}
                                                         onChange={setPaymentBaseAmount}
                                                         className="font-bold text-lg"
                                                     />
@@ -1326,7 +1359,7 @@ const PaymentModal = ({
                                                         baseAllocated={basisForMethodCalc}
                                                     />
                                                     <MoneyInput
-                                                        value={paymentBaseAmount}
+                                                        value={legFinalCharged != null ? legFinalCharged : paymentBaseAmount}
                                                         onChange={setPaymentBaseAmount}
                                                         className="font-bold text-lg"
                                                     />
@@ -1357,7 +1390,7 @@ const PaymentModal = ({
                                                         {splitPreview.error}
                                                     </p>
                                                 )}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-1 gap-4">
                                                     {payments.map((p, idx) => {
                                                         const li = activeSplitLegs.findIndex((l) => l.id === p.id);
                                                         const pr = splitPreview && 'success' in splitPreview && splitPreview.success && li >= 0

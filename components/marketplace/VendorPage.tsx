@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, Package } from "@/lib/icons"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -19,6 +19,7 @@ import { Button, DefaultModal, Input } from "@/components/reusable"
 import { ItemCard } from "./shared-components"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 
 interface VendorPageClientProps {
     partner: any
@@ -99,7 +100,7 @@ const AVAILABLE_BRANDS = [
 const paymentKind = (pm: any) => `${pm.type || ""} ${pm.payment_type || ""} ${pm.name || ""}`.toLowerCase()
 const isPaymentActive = (pm: any) => pm.is_active !== false
 const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
-    .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(";"))
+    .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(/[;,]/))
     .map(brand => brand.trim().toLowerCase())
     .filter(Boolean)))
 
@@ -249,11 +250,11 @@ const CardBrands = ({ brands }: { brands: string[] }) => {
 const InfoTab = ({ partner, stats }: any) => {
     const hoursList = formatOpeningHoursList(partner.openingHours)
     const paymentMethodsArr = (partner.paymentMethods || []).filter(isPaymentActive)
-    const pixMethods = paymentMethodsArr.filter((pm: any) => paymentKind(pm).includes("pix"))
-    const cashMethods = paymentMethodsArr.filter((pm: any) => paymentKind(pm).includes("cash") || paymentKind(pm).includes("dinheiro"))
-    const transferMethods = paymentMethodsArr.filter((pm: any) => paymentKind(pm).includes("transfer"))
-    const creditMethods = paymentMethodsArr.filter((pm: any) => paymentKind(pm).includes("credit") || paymentKind(pm).includes("credito"))
-    const debitMethods = paymentMethodsArr.filter((pm: any) => paymentKind(pm).includes("debit") || paymentKind(pm).includes("debito"))
+    const pixMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "pix")
+    const cashMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "cash")
+    const transferMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "bank_transfer")
+    const creditMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "credit_card")
+    const debitMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "debit_card")
     const creditBrands = getUniqueBrands(creditMethods)
     const debitBrands = getUniqueBrands(debitMethods)
     const hasSimplePayments = pixMethods.length > 0 || cashMethods.length > 0 || transferMethods.length > 0
@@ -269,26 +270,17 @@ const InfoTab = ({ partner, stats }: any) => {
             {partner.storeDescription && (
                 <>
                     <div>
-                        <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Sobre {partner.storeName}</h3>
+                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Sobre {partner.storeName}</h3>
                         <p className="text-[15px] text-brand-inactive-text leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
                 </>
             )}
 
-            <div>
-                <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Informações</h3>
-                <div className="space-y-3 text-[14px] text-brand-inactive-text">
-                    <p>{partner.city}, {partner.state}</p>
-                    {partner.neighborhood && <p>{partner.neighborhood}</p>}
-                </div>
-            </div>
-            <div className="h-[1px] bg-brand-border w-full" />
-
             {hasPaymentSections && (
                 <>
                     <div>
-                        <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Formas de pagamento</h3>
+                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Formas de pagamento</h3>
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div className="flex flex-wrap gap-2">
@@ -318,7 +310,7 @@ const InfoTab = ({ partner, stats }: any) => {
             {hoursList.length > 0 && (
                 <>
                     <div>
-                        <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Horário de Funcionamento</h3>
+                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Horário de Funcionamento</h3>
                         <div className="space-y-3">
                             {hoursList.map((item: any) => (
                                 <div key={item.dayName} className="flex justify-between items-center text-[14px]">
@@ -333,7 +325,7 @@ const InfoTab = ({ partner, stats }: any) => {
             )}
 
             <div>
-                <h3 className="text-[18px] font-semibold text-brand-dark mb-4">Endereço</h3>
+                <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Endereço</h3>
                 <div className="flex items-start gap-3 mb-5">
                     <MapPinIcon size={20} className="text-brand-inactive-text mt-1 shrink-0" />
                     <div>
@@ -451,7 +443,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: 
     return (
         <section id={sectionId} data-category-section={sectionId} className="scroll-mt-[150px] mb-10 lg:mb-12">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">{title}</h2>
+                <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">{title}</h2>
                 <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
             </div>
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">
@@ -471,7 +463,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     return (
         <section id="coupons" className="mb-10 lg:mb-12 scroll-mt-[150px]">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl lg:text-[22px] font-semibold text-brand-dark">Cupons do vendedor</h2>
+                <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">Cupons do vendedor</h2>
                 <CarouselNav targetRef={ref} />
             </div>
             <div ref={ref} className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
@@ -778,7 +770,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
                         title="Selecionar tipo"
                     >
-                        {activeContext === "Produtos" ? <Package size={17} /> : <HeartIcon size={17} />}
+                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : <ServiceIcon size={17} />}
                     </button>
 
                     {canScrollTabsLeft && (
@@ -798,7 +790,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                         id={`vendor-tab-${tab.id}`}
                                         key={tab.id}
                                         value={tab.id}
-                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/80 data-[state=active]:text-brand-green data-[state=active]:font-semibold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
+                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/60 data-[state=active]:text-white data-[state=active]:font-semibold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
                                     >
                                         {tab.label}
                                     </TabsTrigger>

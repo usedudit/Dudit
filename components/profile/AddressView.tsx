@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, TrashIcon, CheckCircleIcon, PlusIcon, EditIcon } from "@/lib/icons"
-import { Button, Input, CepInput, StateComboBox } from "@/components/reusable"
+import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox } from "@/components/reusable"
 import { SectionCard, Feedback, PageHeader, fade, View } from "./profile-shared"
 import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
@@ -45,7 +45,7 @@ interface AddressViewProps {
 
 const emptyForm = {
   zipCode: "", street: "", number: "", complement: "",
-  neighborhood: "", city: "", state: "", addressType: "casa",
+  neighborhood: "", city: "", state: "", addressType: "casa", noNumber: false,
 }
 
 export const AddressView = ({
@@ -64,15 +64,17 @@ export const AddressView = ({
 
   const startEdit = (addr: any) => {
     clearMessages()
+    const isNoNumber = addr.number === "S/N"
     setForm({
       zipCode: addr.zip_code || "",
       street: addr.street || "",
-      number: addr.number || "",
+      number: isNoNumber ? "" : addr.number || "",
       complement: addr.complement || "",
       neighborhood: addr.neighborhood || "",
       city: addr.city || "",
       state: addr.state || "",
       addressType: addr.address_type || "casa",
+      noNumber: isNoNumber,
     })
     setEditingId(addr.id)
   }
@@ -88,8 +90,9 @@ export const AddressView = ({
   }
 
   const handleSave = async () => {
-    const { zipCode, street, number, neighborhood, city, state, addressType } = form
-    if (!zipCode || !street || !number || !neighborhood || !city || !state) {
+    const { zipCode, street, number, neighborhood, city, state, addressType, noNumber } = form
+    const finalNumber = noNumber ? "S/N" : number
+    if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
       setError("Preencha todos os campos obrigatórios")
       return
     }
@@ -104,7 +107,7 @@ export const AddressView = ({
         const result = await createAddressAction({
           entityId: userId,
           entityType: "user",
-          zipCode, street, number,
+          zipCode, street, number: finalNumber,
           complement: form.complement,
           neighborhood, city, state,
           isDefault: addresses.length === 0,
@@ -124,7 +127,7 @@ export const AddressView = ({
           addressId: editingId!,
           entityId: userId,
           entityType: "user",
-          zipCode, street, number,
+          zipCode, street, number: finalNumber,
           complement: form.complement,
           neighborhood, city, state,
           addressType,
@@ -204,7 +207,6 @@ export const AddressView = ({
         ))}
       </div>
       <CepInput
-        label="CEP"
         id="zipCode"
         name="zipCode"
         value={form.zipCode}
@@ -219,18 +221,24 @@ export const AddressView = ({
           }))
         }}
       />
-      <Input label="Rua" id="street" name="street" value={form.street}
+      <Input label="Rua/Avenida" id="street" name="street" placeholder="Rua, Avenida, etc." value={form.street}
         onChange={e => setForm(f => ({ ...f, street: e.target.value }))} />
       <div className="grid grid-cols-2 gap-4">
-        <Input label="Número" id="number" name="number" value={form.number}
-          onChange={e => setForm(f => ({ ...f, number: e.target.value }))} />
-        <Input label="Complemento" id="complement" name="complement" value={form.complement}
+        <NumberInputWithCheckbox
+          label="Número"
+          number={form.number}
+          noNumber={form.noNumber}
+          onNumberChange={val => setForm(f => ({ ...f, number: val }))}
+          onNoNumberChange={checked => setForm(f => ({ ...f, noNumber: checked, number: checked ? "S/N" : "" }))}
+          placeholder="123"
+        />
+        <Input label="Complemento" id="complement" name="complement" placeholder="Apto, Bloco, etc." value={form.complement}
           onChange={e => setForm(f => ({ ...f, complement: e.target.value }))} />
       </div>
-      <Input label="Bairro" id="neighborhood" name="neighborhood" value={form.neighborhood}
+      <Input label="Bairro" id="neighborhood" name="neighborhood" placeholder="Nome do bairro" value={form.neighborhood}
         onChange={e => setForm(f => ({ ...f, neighborhood: e.target.value }))} />
       <div className="grid grid-cols-2 gap-4">
-        <Input label="Cidade" id="city" name="city" value={form.city}
+        <Input label="Cidade" id="city" name="city" placeholder="Nome da cidade" value={form.city}
           onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
         <StateComboBox value={form.state} onChange={v => setForm(f => ({ ...f, state: v }))} className="w-full" />
       </div>

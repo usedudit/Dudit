@@ -654,8 +654,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const enterEditMode = useCallback(() => { setInternalMode("edit"); setMode("edit") }, [setMode])
 
-    const pageTitle = internalMode === "add" ? "Adicionar Novo Produto"
-        : internalMode === "duplicate" ? "Duplicar Produto"
+    const pageTitle = internalMode === "add" ? "Adicionar novo produto"
+        : internalMode === "duplicate" ? "Duplicar produto"
             : productData.name
 
     useEffect(() => {
@@ -786,15 +786,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
                                             isQuickMode={isQuick}
-                                            itemId={productData.id}
-                                            video={{
-                                                video_type: productData.video_type || null,
-                                                video_url: productData.video_url || null,
-                                                video_thumbnail: productData.video_thumbnail || null,
-                                                video_duration: productData.video_duration || null,
-                                                video_provider_id: productData.video_provider_id || null,
-                                            }}
-                                            onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                         />
@@ -832,7 +823,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 <p className="mt-4 text-[15px] text-brand-dark dark:text-dark-heading font-medium">Carregando marketplace...</p>
                                             </div>
                                         ) : (
-                                            <ProductMarketplaceTab productData={productData} handleInputChange={handleInputChange} isEditing={isEditing} />
+                                            <ProductMarketplaceTab
+                                                productData={productData} handleInputChange={handleInputChange}
+                                                isEditing={isEditing && !isSavingProduct}
+                                                itemId={productData.id}
+                                                video={{
+                                                    video_type: productData.video_type || null,
+                                                    video_url: productData.video_url || null,
+                                                    video_thumbnail: productData.video_thumbnail || null,
+                                                    video_duration: productData.video_duration || null,
+                                                    video_provider_id: productData.video_provider_id || null,
+                                                }}
+                                                onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
+                                            />
                                         )}
                                     </FadeIn>
                                 )}
