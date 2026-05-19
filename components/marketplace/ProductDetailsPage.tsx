@@ -420,15 +420,38 @@ export function ProductDetailsPageClient({
 
     // ─── Sub-sections ────────────────────────────────────────────────────────────
 
-    const renderGalleryItem = (item: (typeof galleryItems)[number], className: string, alt: string) => {
+    const renderGalleryItem = (
+        item: (typeof galleryItems)[number],
+        className: string,
+        alt: string,
+        layout: "inline" | "lightbox" = "inline",
+    ) => {
         if (item.type === "video") {
+            const shellClass =
+                layout === "lightbox"
+                    ? "w-full h-full min-h-[50vh] max-h-[85vh] max-w-[min(96vw,1100px)] flex items-center justify-center"
+                    : "absolute inset-0 w-full h-full"
+            const mediaClass = layout === "lightbox" ? "w-full h-full min-h-[50vh] max-h-[85vh] aspect-video border-0" : "absolute inset-0 w-full h-full border-0"
+
             if (item.provider === "youtube" && item.providerId) {
-                return <iframe key={item.src} src={`https://www.youtube.com/embed/${item.providerId}`} title={alt} loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className={className} />
+                return (
+                    <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                        <iframe src={`https://www.youtube.com/embed/${item.providerId}`} title={alt} loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen className={mediaClass} />
+                    </motion.div>
+                )
             }
             if (item.provider === "vimeo" && item.providerId) {
-                return <iframe key={item.src} src={`https://player.vimeo.com/video/${item.providerId}`} title={alt} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen className={className} />
+                return (
+                    <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                        <iframe src={`https://player.vimeo.com/video/${item.providerId}`} title={alt} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen className={mediaClass} />
+                    </motion.div>
+                )
             }
-            return <video key={item.src} src={item.src} poster={item.poster} controls preload="metadata" playsInline className={className} />
+            return (
+                <motion.div key={item.src} className={shellClass} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }}>
+                    <video src={item.src} poster={item.poster} controls preload="metadata" playsInline className={mediaClass} />
+                </motion.div>
+            )
         }
         return <motion.img key={item.src} src={item.src} className={className} alt={alt} custom={slideDirection} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} />
     }
@@ -910,7 +933,7 @@ export function ProductDetailsPageClient({
                                     <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
                                         <AnimatePresence mode="wait" custom={slideDirection}
                                             onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                            {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain", `Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
+                                            {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain", `Foto principal de ${product.name} à venda em ${partner.city} - ${partner.state}`, "lightbox")}
                                         </AnimatePresence>
                                         {galleryItems.length > 1 && (
                                             <>
@@ -931,7 +954,7 @@ export function ProductDetailsPageClient({
                                 <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
                                     <AnimatePresence mode="wait" custom={slideDirection}
                                         onExitComplete={() => { lightboxJustOpened.current = false }}>
-                                        {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain px-4", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
+                                        {renderGalleryItem(galleryItems[lightboxActiveImg], "max-w-full max-h-full object-contain px-4", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`, "lightbox")}
                                     </AnimatePresence>
 
                                     {variantLabel && (

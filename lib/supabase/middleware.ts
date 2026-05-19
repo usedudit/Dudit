@@ -211,6 +211,8 @@ export async function middleware(request: NextRequest) {
         https://stats.g.doubleclick.net 
         https://cloudflareinsights.com 
         https://*.cloudflare.com
+        https://*.r2.cloudflarestorage.com
+        https://img.dudit.com.br
         https://nominatim.openstreetmap.org
         https://vimeo.com;
     frame-src 'self' 

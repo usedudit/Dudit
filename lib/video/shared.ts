@@ -90,25 +90,80 @@ export async function getVimeoThumbnail(videoUrl: string): Promise<string | null
   return data?.thumbnail_url || null
 }
 
-export async function getYouTubeDurationSeconds(videoId: string): Promise<number | null> {
+async function getYouTubeDurationFromInnertube(videoId: string): Promise<number | null> {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
+      },
+      body: JSON.stringify({
+        videoId,
+        context: {
+          client: {
+            clientName: "ANDROID",
+            clientVersion: "20.10.38",
+            androidSdkVersion: 30,
+            hl: "pt",
+            gl: "BR",
+          },
+        },
+      }),
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const seconds = data?.videoDetails?.lengthSeconds
+    if (seconds !== undefined && seconds !== null && Number.isFinite(Number(seconds))) {
+      return Number(seconds)
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+async function getYouTubeDurationFromWatchPage(videoId: string): Promise<number | null> {
   try {
     const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Dudit/1.0)",
-        "Accept-Language": "en",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
       },
       cache: "no-store",
     })
     if (!res.ok) return null
     const html = await res.text()
-    const lengthMatch = html.match(/"lengthSeconds":"(\d+)"/)
+
+    const patterns = [
+      /"lengthSeconds":"(\d+)"/,
+      /"approxDurationMs":"(\d+)"/,
+      /"duration":"PT(\d+)M(\d+)S"/,
+      /"duration":"PT(\d+)S"/,
+    ]
+
+    const lengthMatch = html.match(patterns[0])
     if (lengthMatch) return Number(lengthMatch[1])
-    const msMatch = html.match(/"approxDurationMs":"(\d+)"/)
+
+    const msMatch = html.match(patterns[1])
     if (msMatch) return Math.round(Number(msMatch[1]) / 1000)
+
+    const isoMinSec = html.match(patterns[2])
+    if (isoMinSec) return Number(isoMinSec[1]) * 60 + Number(isoMinSec[2])
+
+    const isoSecOnly = html.match(patterns[3])
+    if (isoSecOnly) return Number(isoSecOnly[1])
   } catch {
     return null
   }
   return null
+}
+
+export async function getYouTubeDurationSeconds(videoId: string): Promise<number | null> {
+  const fromInnertube = await getYouTubeDurationFromInnertube(videoId)
+  if (fromInnertube !== null) return fromInnertube
+  return getYouTubeDurationFromWatchPage(videoId)
 }
 
 export async function normalizeVideoMetadata(input: Partial<VideoMetadata>): Promise<VideoMetadata> {
