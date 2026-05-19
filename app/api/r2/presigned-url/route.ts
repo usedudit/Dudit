@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
       uploadUrl: result.uploadUrl,
       key: result.key,
       publicUrl: result.publicUrl,
+      contentType: result.contentType,
     })
   } catch (error) {
     console.error("[R2 Presigned URL] Error:", error)

@@ -4,6 +4,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
+import { resolveVideoUploadContentType } from "@/lib/r2/resolve-content-type"
 import {
   ALLOWED_VIDEO_EXTENSIONS,
   ALLOWED_VIDEO_MIME_TYPES,
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     const itemType = body.itemType as ItemType
     const itemId = body.itemId
     const filename = String(body.filename || "")
-    const contentType = String(body.contentType || "")
+    const contentType = resolveVideoUploadContentType(String(body.contentType || ""), filename)
     const fileSize = Number(body.fileSize || 0)
     const duration = Number(body.duration || 0)
     const firstBytesBase64 = String(body.firstBytesBase64 || "")
@@ -85,10 +86,13 @@ export async function POST(req: NextRequest) {
     const videoKey = `users/${user.id}/${folder}/${itemId}.${ext}`
     const thumbnailKey = `users/${user.id}/${folder}/${itemId}-thumbnail.jpg`
 
+    const signedVideoContentType = contentType
+    const signedThumbnailContentType = "image/jpeg"
+
     const [video, thumbnail] = await Promise.all([
       generateSignedUploadUrl({
         fileName: `${itemId}.${ext}`,
-        fileType: contentType,
+        fileType: signedVideoContentType,
         userId: user.id,
         key: videoKey,
         allowedMimeTypes: ALLOWED_VIDEO_MIME_TYPES,
@@ -98,16 +102,25 @@ export async function POST(req: NextRequest) {
       }),
       generateSignedUploadUrl({
         fileName: `${itemId}-thumbnail.jpg`,
-        fileType: "image/jpeg",
+        fileType: signedThumbnailContentType,
         userId: user.id,
         key: thumbnailKey,
         expiresIn: 120,
       }),
     ])
 
+    console.info("[R2 Video Upload] Presigned URLs geradas", {
+      videoKey,
+      thumbnailKey,
+      signedVideoContentType,
+      signedThumbnailContentType,
+    })
+
     return NextResponse.json({
       video,
       thumbnail,
+      signedVideoContentType,
+      signedThumbnailContentType,
       maxThumbnailSize: MAX_FILE_SIZE,
     })
   } catch (error: any) {

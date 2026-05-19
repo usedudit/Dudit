@@ -252,6 +252,7 @@ async function handleUpload(request: NextRequest) {
         uploadUrl: signedUrl.uploadUrl,
         publicUrl: signedUrl.publicUrl,
         key: signedUrl.key,
+        contentType: signedUrl.contentType,
         fileName: filename,
         imageHash,
         moderation: {
@@ -267,7 +268,7 @@ async function handleUpload(request: NextRequest) {
     const uploadResponse = await fetch(signedUrl.uploadUrl, {
       method: "PUT",
       headers: {
-        "Content-Type": mimeType,
+        "Content-Type": signedUrl.contentType,
         "Content-Length": buffer.length.toString(),
       },
       body: new Uint8Array(buffer),

@@ -29,16 +29,40 @@ const EMPTY_VIDEO: VideoMetadata = {
   video_provider_id: null,
 }
 
-function putWithProgress(url: string, file: File, onProgress: (progress: number) => void) {
+function putWithProgress(
+  url: string,
+  file: File,
+  signedContentType: string,
+  onProgress: (progress: number) => void,
+) {
   return new Promise<void>((resolve, reject) => {
+    const fileName = file.name
+    const actualContentType = file.type
+
+    console.log("[R2UploadDebug] before PUT", {
+      fileName,
+      fileType: actualContentType,
+      signedExpectedContentType: signedContentType,
+      actualContentType,
+      uploadUrl: url.split("?")[0],
+    })
+
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
-    xhr.setRequestHeader("Content-Type", file.type)
+    xhr.setRequestHeader("Content-Type", signedContentType)
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
     }
-    xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Upload interrompido"))
-    xhr.onerror = () => reject(new Error("Upload interrompido"))
+    xhr.onload = () => {
+      console.log("[R2UploadDebug] after PUT", {
+        fileName,
+        status: xhr.status,
+        statusText: xhr.statusText,
+      })
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(`Upload interrompido (${xhr.status})`))
+    }
+    xhr.onerror = () => reject(new Error("Upload interrompido (rede ou CORS)"))
     xhr.onabort = () => reject(new Error("Upload interrompido"))
     xhr.send(file)
   })
@@ -77,6 +101,8 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
       const secondValidation = await validateVideoFile(uploadFile)
       const thumbnail = await generateVideoThumbnail(uploadFile)
 
+      const presignContentType = secondValidation.resolvedMime || uploadFile.type
+
       const res = await fetch("/api/r2/video-upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,7 +110,7 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
           itemType,
           itemId,
           filename: uploadFile.name,
-          contentType: uploadFile.type,
+          contentType: presignContentType,
           fileSize: uploadFile.size,
           duration: secondValidation.duration,
           firstBytesBase64: bytesToBase64(secondValidation.firstBytes),
@@ -93,8 +119,11 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
       const signed = await res.json()
       if (!res.ok) throw new Error(signed.error || "Erro ao preparar upload")
 
-      await putWithProgress(signed.thumbnail.uploadUrl, thumbnail, (p) => setProgress(30 + Math.round(p * 0.2)))
-      await putWithProgress(signed.video.uploadUrl, uploadFile, (p) => setProgress(50 + Math.round(p * 0.5)))
+      const thumbnailContentType = signed.thumbnail?.contentType || signed.signedThumbnailContentType || "image/jpeg"
+      const videoContentType = signed.video?.contentType || signed.signedVideoContentType || presignContentType
+
+      await putWithProgress(signed.thumbnail.uploadUrl, thumbnail, thumbnailContentType, (p) => setProgress(30 + Math.round(p * 0.2)))
+      await putWithProgress(signed.video.uploadUrl, uploadFile, videoContentType, (p) => setProgress(50 + Math.round(p * 0.5)))
 
       onChange({
         video_type: "upload",

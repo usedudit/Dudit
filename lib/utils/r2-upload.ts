@@ -14,7 +14,7 @@ export async function getPresignedUploadUrl(
   filename: string,
   contentType: string,
   fileSize?: number
-): Promise<{ uploadUrl: string; key: string; publicUrl: string } | null> {
+): Promise<{ uploadUrl: string; key: string; publicUrl: string; contentType: string } | null> {
   try {
     // Client-side pre-validation (defense-in-depth)
     if (!CLIENT_ALLOWED_TYPES.includes(contentType)) {
@@ -47,12 +47,14 @@ export async function getPresignedUploadUrl(
 
 export async function uploadToR2(
   file: File,
-  presignedData: { uploadUrl: string; key: string; publicUrl: string }
+  presignedData: { uploadUrl: string; key: string; publicUrl: string; contentType: string }
 ): Promise<string | null> {
   try {
+    const signedContentType = presignedData.contentType || file.type
+
     // Client-side pre-validation
-    if (!CLIENT_ALLOWED_TYPES.includes(file.type)) {
-      console.error("[R2] Tipo de arquivo não permitido:", file.type)
+    if (!CLIENT_ALLOWED_TYPES.includes(signedContentType)) {
+      console.error("[R2] Tipo de arquivo não permitido:", signedContentType)
       return null
     }
 
@@ -61,10 +63,24 @@ export async function uploadToR2(
       return null
     }
 
+    console.log("[R2UploadDebug] before PUT", {
+      fileName: file.name,
+      fileType: file.type,
+      signedExpectedContentType: signedContentType,
+      actualContentType: file.type,
+      uploadUrl: presignedData.uploadUrl.split("?")[0],
+    })
+
     const res = await fetch(presignedData.uploadUrl, {
       method: "PUT",
-      headers: { "Content-Type": file.type },
+      headers: { "Content-Type": signedContentType },
       body: file,
+    })
+
+    console.log("[R2UploadDebug] after PUT", {
+      fileName: file.name,
+      status: res.status,
+      statusText: res.statusText,
     })
 
     if (!res.ok) {

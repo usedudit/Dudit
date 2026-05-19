@@ -110,11 +110,13 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
         // 2. Fazer upload direto do arquivo ao R2 via PUT
         setProgress(10)
 
+        const signedContentType = signedUrlData.contentType || file.type
+
         const uploadResponse = await fetch(signedUrlData.uploadUrl, {
           method: 'PUT',
           body: file,
           headers: {
-            'Content-Type': file.type,
+            'Content-Type': signedContentType,
           },
         })
 

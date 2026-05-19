@@ -23,6 +23,8 @@ export interface SignedUrlResponse {
   uploadUrl: string
   publicUrl: string
   key: string
+  /** Exact Content-Type included in the AWS SigV4 signature — client PUT must use this value. */
+  contentType: string
 }
 
 export interface UploadConfig {
@@ -174,19 +176,14 @@ export async function generateSignedUploadUrl(
       // No ACL - R2 access is controlled via bucket settings and presigned URLs
     })
 
-    const uploadUrl = await getSignedUrl(client, command, {
-      expiresIn,
-      // Enforce maximum upload size at the presigned URL level
-      signableHeaders: new Set(["content-length", "content-type"]),
-    })
+    const uploadUrl = await getSignedUrl(client, command, { expiresIn })
 
-    const baseUrl = getR2PublicUrl()
+    const baseUrl = getR2PublicUrl().replace(/\/+$/, "")
     return {
       uploadUrl,
-      publicUrl: baseUrl.startsWith("http")
-        ? `${baseUrl}/${key}`
-        : `https://${baseUrl}/${key}`,
+      publicUrl: `${baseUrl}/${key}`,
       key,
+      contentType: fileType,
     }
   } finally {
     client.destroy()

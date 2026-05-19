@@ -154,7 +154,7 @@ export async function uploadImageToR2Action(
       // (domain: <accountId>.r2.cloudflarestorage.com, not user input). Also blocked in production (line 96).
       const uploadResponse = await fetch(result.uploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': mimeType },
+        headers: { 'Content-Type': result.contentType },
         body: rawBuffer,
       })
 
