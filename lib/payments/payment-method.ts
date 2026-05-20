@@ -19,3 +19,16 @@ export function toLegacyPaymentType(value: string | null | undefined): string {
   if (canonical === "bank_transfer") return "transferencia_bancaria"
   return "outros"
 }
+
+export function formatPaymentMethodLabel(value?: string | null): string {
+  const normalized = String(value || "").trim().toLowerCase()
+  if (!normalized || normalized === "pendente") return "Dinheiro"
+  if (normalized === "cash" || normalized === "dinheiro" || normalized === "money") return "Dinheiro"
+  if (normalized === "pix") return "Pix"
+  if (normalized === "credito" || normalized === "credit_card" || normalized === "cartao_credito") return "Cartão de Crédito"
+  if (normalized === "debito" || normalized === "debit_card" || normalized === "cartao_debito") return "Cartão de Débito"
+  if (normalized === "cartão" || normalized === "cartao") return "Cartão"
+  if (normalized === "bank_transfer" || normalized === "transferencia_bancaria") return "Transferência Bancária"
+  return String(value || "").trim()
+}
+

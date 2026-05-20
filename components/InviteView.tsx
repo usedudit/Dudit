@@ -169,37 +169,37 @@ export default function InviteView(props: InviteViewProps) {
                 <Building2 size={40} />
             </div>
             <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Convite para equipe</h2>
-                <p className="text-gray-500 text-sm">
-                    Você foi convidado para participar de <strong className="text-gray-800">{partnerName}</strong>.
+                <h2 className="text-2xl font-bold text-brand-dark mb-2">Convite para equipe</h2>
+                <p className="text-brand-inactive-text text-sm">
+                    Você foi convidado para participar de <strong className="text-brand-dark">{partnerName}</strong>.
                 </p>
             </div>
 
             <div className="w-full p-4 rounded-xl bg-gray-50 border border-gray-200 text-left">
-                <p className="text-xs text-gray-500 mb-1">Este convite foi enviado para:</p>
-                <p className="font-semibold text-gray-800 break-all text-sm">{inviteEmail}</p>
+                <p className="text-xs text-brand-inactive-text mb-1">Este convite foi enviado para:</p>
+                <p className="font-semibold text-brand-dark break-all text-sm">{inviteEmail}</p>
             </div>
 
             {userEmail ? (
                 <>
                     <div className="w-full p-4 rounded-xl bg-gray-50 border border-gray-200 text-left">
                         <div className="flex items-center gap-2 mb-1">
-                            <User size={16} className="text-gray-400" />
-                            <span className="text-xs text-gray-500 font-medium">Conectado como:</span>
+                            <User size={16} className="text-brand-inactive-text" />
+                            <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
                         </div>
-                        <p className="font-semibold text-gray-800 break-all text-sm">{userEmail}</p>
+                        <p className="font-semibold text-brand-dark break-all text-sm">{userEmail}</p>
                     </div>
                     <form action={onAccept} className="w-full">
-                        <button type="submit" className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-brand-green text-white font-bold text-[15px] hover:opacity-90 transition-opacity">
+                        <Button type="submit" className="w-full flex items-center justify-center gap-2 h-12">
                             <CheckCircle2 size={18} /> Confirmar Entrada
-                        </button>
+                        </Button>
                     </form>
                 </>
             ) : (
                 <form action={onLoginRedirect} className="w-full">
-                    <button type="submit" className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-brand-green text-white font-bold text-[15px] hover:opacity-90 transition-opacity">
+                    <Button type="submit" className="w-full flex items-center justify-center gap-2 h-12">
                         Fazer login para aceitar
-                    </button>
+                    </Button>
                 </form>
             )}
         </Shell>

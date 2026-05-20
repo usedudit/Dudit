@@ -246,6 +246,22 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
     if (activePartnerId) {
         const match = allAccess.find(a => a.partnerId === activePartnerId)
         if (match) {
+            // Real-time DB check: verify the user still has access (defense against stale cache)
+            // This prevents removed users from accessing the ERP during the cache TTL window
+            const admin = createAdminClient()
+            const [ownerCheck, memberCheck] = await Promise.all([
+                admin.from("partners").select("id").eq("id", activePartnerId).eq("user_id", user.id).maybeSingle(),
+                admin.from("partner_users").select("id").eq("partner_id", activePartnerId).eq("user_id", user.id).maybeSingle(),
+            ])
+
+            if (!ownerCheck.data && !memberCheck.data) {
+                // Access revoked — clear stale cookie and invalidate cached access
+                await clearActivePartner()
+                const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+                revalidateUserAccess(user.id)
+                return null
+            }
+
             return {
                 userId: match.userId,
                 partnerId: match.partnerId,

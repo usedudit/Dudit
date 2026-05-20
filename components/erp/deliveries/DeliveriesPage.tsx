@@ -138,7 +138,7 @@ export default function DeliveriesPage({
                 startedAt: raw.started_at,
                 deliveredAt: raw.delivered_at,
                 estimatedArrivalAt,
-                deliveryFee: Number(order.shipping_cost || 0),
+                deliveryFee: Number(order.delivery_fee || 0),
                 createdAtMs: new Date(raw.created_at).getTime(),
                 deliveryTimingState: isLate ? "late" : "on_time",
                 deliveryTimingLabel: estimatedArrivalAt ? (isLate ? "Atrasada" : "No prazo") : "",

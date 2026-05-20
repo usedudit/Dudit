@@ -603,7 +603,7 @@ export function ProductDetailsPageClient({
             {isProductOwner ? (
                 <InfoCard
                     message={isTeamMember
-                        ? "Você não pode comprar produtos de uma loja da qual faz parte da equipe."
+                        ? "Você não pode comprar produtos de um negócio do qual faz parte da equipe."
                         : "Você não pode comprar seus próprios produtos."}
                     color="orange"
                     className="mb-8"

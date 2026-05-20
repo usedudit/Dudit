@@ -166,6 +166,10 @@ export async function createInvitation(input: {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || ""
         const inviteUrl = `${appUrl}/invite/${rawToken}`
 
+        // 9. Invalidate invitation list cache so the new invite appears immediately
+        const { revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
+        revalidatePartnerInvitations(input.partnerId)
+
         return { success: true, inviteUrl }
     } catch (error) {
         console.error("[Invitations] createInvitation error:", error)
@@ -296,6 +300,11 @@ export async function acceptInvitation(
             },
         })
 
+        // 9. Invalidate caches so the new ERP appears immediately in the user's selector
+        const { revalidateUserAccess, revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
+        revalidateUserAccess(user.id)
+        revalidatePartnerInvitations(invitation.partner_id)
+
         return { success: true, partnerId: invitation.partner_id }
     } catch (error) {
         console.error("[Invitations] acceptInvitation error:", error)
@@ -363,6 +372,10 @@ export async function revokeInvitation(input: {
                 revokedRole: invitation.role,
             },
         })
+
+        // 6. Invalidate invitation list cache
+        const { revalidatePartnerInvitations } = await import("@/lib/utils/revalidation")
+        revalidatePartnerInvitations(input.partnerId)
 
         return { success: true }
     } catch (error) {

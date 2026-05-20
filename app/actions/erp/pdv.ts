@@ -20,6 +20,7 @@ import {
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals } from "@/lib/services/sales-goals.service"
+import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 
 type DraftItemInput = {
     productId?: string | null
@@ -340,13 +341,12 @@ async function syncPosSaleToOrders(params: {
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: draft?.coupon_id || null,
-        shipping_cost: shippingFee,
         delivery_fee: shippingFee,
         distance_km: distanceKm,
         delivery_breakdown: deliveryBreakdown,
         additional_costs: otherCosts,
         notes: sale.notes || null,
-        payment_method: inputPaymentMethodLabel(params.defaultPaymentMethod),
+        payment_method: formatPaymentMethodLabel(params.defaultPaymentMethod),
         payment_breakdown: [],
         finance_account_id: params.financeAccountId || null,
         created_by: params.actorUserId,
@@ -737,6 +737,21 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
             .eq("id", saleId)
             .eq("partner_id", input.partnerId)
     }
+
+    // Ensure the sale's final_amount, paid_amount and payment_status match the recalculated paymentAware totals
+    const updatedPaidAmount = Math.min(paymentAware.totalAmount, paidAmountForRpc)
+    const isPaid = updatedPaidAmount >= paymentAware.totalAmount - 0.01
+    const newStatus = isPaid ? "paid" : (updatedPaidAmount > 0 ? "partially_paid" : "unpaid")
+    await supabase
+        .from("sales")
+        .update({
+            final_amount: paymentAware.totalAmount,
+            paid_amount: updatedPaidAmount,
+            payment_status: newStatus,
+            status: newStatus,
+        })
+        .eq("id", saleId)
+        .eq("partner_id", input.partnerId)
 
     const sellerPartnerUserId = finalizedPreSale?.seller_id ? String(finalizedPreSale.seller_id) : null
     const { data: sellerPartnerUser } = sellerPartnerUserId

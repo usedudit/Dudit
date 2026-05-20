@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -299,10 +300,28 @@ async function processWebhookWithRetry(
 
     const previousSituation = orderData.situation
 
+    let paymentMethodName = "Desconhecido"
+    const mpPaymentMethodId = String(paymentInfo.payment_method_id || "").toLowerCase()
+    const mpPaymentTypeId = String(paymentInfo.payment_type_id || paymentInfo.payment_method?.type || "").toLowerCase()
+
+    if (mpPaymentMethodId === "pix") {
+      paymentMethodName = "Pix"
+    } else if (mpPaymentTypeId === "credit_card") {
+      paymentMethodName = "Cartão de Crédito"
+    } else if (mpPaymentTypeId === "debit_card") {
+      paymentMethodName = "Cartão de Débito"
+    } else if (mpPaymentTypeId === "ticket") {
+      paymentMethodName = "Boleto"
+    } else if (mpPaymentTypeId === "account_money") {
+      paymentMethodName = "Saldo Mercado Pago"
+    } else {
+      paymentMethodName = formatPaymentMethodLabel(paymentInfo.payment_method?.type || paymentInfo.payment_method_id)
+    }
+
     // ── Update order ──
     const updateData: any = {
       situation: orderStatus,
-      payment_method: paymentInfo.payment_method?.type || "desconhecido",
+      payment_method: paymentMethodName,
       payment_provider: "Mercado Pago",
       mp_payment_id: paymentId.toString(),
       updated_at: new Date().toISOString(),

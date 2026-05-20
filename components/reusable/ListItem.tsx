@@ -5,8 +5,8 @@ import { ChevronRightIcon } from "@/lib/icons"
 
 interface ListItemProps {
     icon?: React.ComponentType<any> | React.ReactNode
-    title: string
-    description?: string
+    title: React.ReactNode
+    description?: React.ReactNode
     onClick?: () => void
     right?: React.ReactNode
     left?: React.ReactNode

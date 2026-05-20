@@ -100,6 +100,8 @@ interface OrderGeneralTabProps {
     fieldErrors?: Set<string>
     setFieldErrors?: React.Dispatch<React.SetStateAction<Set<string>>>
     isMarketplaceOrder?: boolean
+    isMarketplaceLocked?: boolean
+    isPaidOrder?: boolean
 }
 
 export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
@@ -118,7 +120,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     salesChannelOptions, deliveryMethodOptions, deliveryStatusOptions,
     fieldErrors, setFieldErrors,
     isQuickMode = false,
-    isMarketplaceOrder = false
+    isMarketplaceOrder = false,
+    isMarketplaceLocked = false,
+    isPaidOrder = false
 }) => {
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
@@ -157,7 +161,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             Itens do Pedido
                         </h3>
 
-                        <div ref={searchRef} className={`relative mb-6 ${isMarketplaceOrder ? 'pointer-events-none opacity-60' : ''}`}>
+                        <div ref={searchRef} className={`relative mb-6 ${isMarketplaceLocked ? 'pointer-events-none opacity-60' : ''}`}>
                             <Input
                                 label=""
                                 name="productSearch"
@@ -257,7 +261,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                         <Input
                                                                             name={`item-name-${index}`}
                                                                             value={item.name}
-                                                                            disabled={isMarketplaceOrder}
+                                                                            disabled={isMarketplaceLocked}
                                                                             onChange={(e: any) => {
                                                                                 updateItemField(index, 'name', e.target.value);
                                                                                 if (nameErrors[index]) {
@@ -288,6 +292,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <MoneyInput
                                                                 name={`item-price-${index}`}
                                                                 value={item.unitPrice}
+                                                                disabled={isMarketplaceLocked}
                                                                 onChange={(val: number) => {
                                                                     updateItemPrice(index, val)
                                                                     if (priceErrors[index]) {
@@ -304,7 +309,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         <div className="flex justify-center">
                                                             <QuantitySelector
                                                                 value={item.quantity}
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceLocked}
                                                                 onChange={(val) => updateItemQty(index, val)}
                                                                 max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                                 size="md"
@@ -336,17 +341,18 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 </button>
                                                             ) : item.isManual ? (
                                                                 <button
+                                                                    disabled={isMarketplaceLocked}
                                                                     onClick={() => toggleItemEdit(index, true)}
-                                                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'hover:bg-brand-gray dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading'}`}
                                                                     title="Editar nome"
                                                                 >
                                                                     <EditIcon size={18} />
                                                                 </button>
                                                             ) : null}
                                                             <button
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceLocked}
                                                                 onClick={() => removeItem(index)}
-                                                                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${isMarketplaceOrder ? 'text-gray-300' : 'hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red'}`}
+                                                                className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red'}`}
                                                                 title="Remover item"
                                                             >
                                                                 <TrashIcon size={18} />
@@ -380,6 +386,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <Input
                                                                 name={`item-name-mobile-${index}`}
                                                                 value={item.name}
+                                                                disabled={isMarketplaceLocked}
                                                                 onChange={(e: any) => {
                                                                     updateItemField(index, 'name', e.target.value);
                                                                     if (nameErrors[index]) {
@@ -423,16 +430,17 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             </button>
                                                         ) : item.isManual ? (
                                                             <button
+                                                                disabled={isMarketplaceLocked}
                                                                 onClick={() => toggleItemEdit(index, true)}
-                                                                className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors"
+                                                                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border'}`}
                                                             >
                                                                 <EditIcon size={14} />
                                                             </button>
                                                         ) : null}
                                                         <button
-                                                            disabled={isMarketplaceOrder}
+                                                            disabled={isMarketplaceLocked}
                                                             onClick={() => removeItem(index)}
-                                                            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceOrder ? 'text-gray-300' : 'text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10'}`}
+                                                            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10'}`}
                                                         >
                                                             <TrashIcon size={14} />
                                                         </button>
@@ -442,7 +450,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <div className="flex items-center gap-4 mt-2">
                                                     <QuantitySelector
                                                         value={item.quantity}
-                                                        disabled={isMarketplaceOrder}
+                                                        disabled={isMarketplaceLocked}
                                                         onChange={(val) => updateItemQty(index, val)}
                                                         max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
                                                         size="sm"
@@ -450,7 +458,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     <div className="flex-1 max-w-[140px]">
                                                         <MoneyInput
                                                             name={`item-price-mobile-${index}`}
-                                                            disabled={isMarketplaceOrder}
+                                                            disabled={isMarketplaceLocked}
                                                             value={item.unitPrice}
                                                             onChange={(val: number) => {
                                                                 updateItemPrice(index, val)
@@ -478,7 +486,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     icon={SearchIcon}
                                     title="Nenhum produto adicionado"
                                     subtitle="Busque produtos no campo acima ou cadastre um item avulso manualmente."
-                                    itemButton={{
+                                    itemButton={isMarketplaceLocked ? undefined : {
                                         text: "Adicionar item manual",
                                         action: addBlankItem,
                                         variant: "outline",
@@ -488,7 +496,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         )}
 
                         {/* Add Item Link */}
-                        {items.length > 0 && !isMarketplaceOrder && (
+                        {items.length > 0 && !isMarketplaceLocked && (
                             <Button
                                 variant="link"
                                 onClick={addBlankItem}
@@ -514,28 +522,28 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             Pagamento
                         </h2>
 
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                             {!isQuickMode && (
                                 <>
                                     <ListItem
                                         icon={TagIcon}
                                         title="Aplicar desconto"
                                         description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                        onClick={onOpenDiscount}
-                                        className="px-4 py-3 gap-4"
+                                        onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
+                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                     />
                                     <ListItem
                                         icon={TruckIcon}
                                         title="Adicionar frete"
                                         description="Define o valor do frete do pedido"
-                                        onClick={isMarketplaceOrder ? undefined : onOpenShipping}
-                                        className={`px-4 py-3 gap-4 ${isMarketplaceOrder ? 'opacity-50 pointer-events-none' : ''}`}
+                                        onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                     />
                                 </>
                             )}
                             <MoneyInput
                                 label="Outros Custos"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked}
                                 value={parseFloat(otherCosts || "0")}
                                 onChange={(val) => setOtherCosts(val.toString())}
                             />
@@ -625,12 +633,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     customer={selectedCustomer}
                                     address={selectedCustomer.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses?.[0]}
                                     billingAddress={selectedCustomer.addresses?.find((a: any) => a.address_type === "billing")}
-                                    onRemove={isMarketplaceOrder ? undefined : () => setSelectedCustomer(null)}
+                                    onRemove={isMarketplaceLocked ? undefined : () => setSelectedCustomer(null)}
                                 />
                             ) : (
                                 <div
-                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceOrder ? 'opacity-50 pointer-events-none' : ''}`}
-                                    onClick={() => !isMarketplaceOrder && setIsCustomerSheetOpen(true)}
+                                    className={`bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-8 flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                    onClick={() => !isMarketplaceLocked && setIsCustomerSheetOpen(true)}
                                 >
                                     <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
 
@@ -638,7 +646,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         icon={UserIcon}
                                         title="Nenhum cliente selecionado"
                                         subtitle="Selecione um cliente para vincular ao pedido."
-                                        itemButton={{
+                                        itemButton={isMarketplaceLocked ? undefined : {
                                             text: "Selecionar Cliente",
                                             action: () => setIsCustomerSheetOpen(true),
                                             variant: "outline",
@@ -657,7 +665,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         <div className="space-y-4">
                             <DatePicker
                                 label="Data do Pedido"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked}
                                 value={orderDate}
                                 onChange={(date) => {
                                     if (date) {
@@ -670,7 +678,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                             <FormDropdown
                                 label="Canal de Venda"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked}
                                 value={salesChannel}
                                 setValue={(val: any) => setSalesChannel(val)}
                                 options={salesChannelOptions}
@@ -678,7 +686,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                             <FormDropdown
                                 label="Método de Entrega"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked && isPaidOrder}
                                 value={deliveryMethod}
                                 setValue={(val: any) => setDeliveryMethod(val)}
                                 options={deliveryMethodOptions}
@@ -687,6 +695,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             {!isQuickMode && (
                                 <Combobox
                                     label="Conta de recebimento"
+                                    disabled={isMarketplaceLocked && isPaidOrder}
                                     value={financeAccountId || undefined}
                                     onChange={(val) => {
                                         setFinanceAccountId(val)
@@ -699,7 +708,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         }
                                     }}
                                     options={accountOptions}
-                                    actionItem={{ label: "Criar conta", onClick: onCreateAccount }}
+                                    actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: onCreateAccount }}
                                     error={fieldErrors?.has("financeAccountId")}
                                 />
                             )}

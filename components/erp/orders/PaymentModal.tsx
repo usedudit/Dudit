@@ -891,7 +891,7 @@ const PaymentModal = ({
                         }
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
-                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : Number(paymentBaseAmount || 0),
+                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged) ? basisForMethodCalc : Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];

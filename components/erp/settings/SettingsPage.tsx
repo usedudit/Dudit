@@ -28,6 +28,7 @@ import { CommissionsSubPage } from "./CommissionsSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { useSidebar } from "@/lib/sidebar-context"
 
 interface SettingsTabsProps {
   partner: any
@@ -55,6 +56,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [activeTab, setActiveTab] = useState("empresa")
   const [mpConnected] = useState(!!partner.mp_user_id)
+  const { setHeaderOverride } = useSidebar()
 
   const PAGE_TO_SLUG: Record<string, string> = {
     "business-data": "dados-do-negocio",
@@ -114,6 +116,36 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       window.history.replaceState(null, "", url.toString())
     }
   }, [activePage, activeTab, searchParams])
+
+  React.useEffect(() => {
+    if (activePage !== "home") {
+      const titles: Record<ActivePage, string> = {
+        "business-data": "Dados do Negócio",
+        "integrations": "Integrações",
+        "team": "Equipe e Acessos",
+        "subscription": "Minha Assinatura",
+        "payment-methods": "Formas de Pagamentos",
+        "crediario": "Crediário",
+        "comissao": "Comissão",
+        "recibo": "Recibo/Devolução",
+        "vitrine": "Minha Vitrine",
+        "os": "Configuração de O.S",
+        "mensagens": "Modelos de Mensagens",
+        "delivery": "Logística e Entrega",
+        "home": "Configurações"
+      }
+      setHeaderOverride({
+        title: titles[activePage] || "Configurações",
+        onBack: () => setActivePage("home"),
+        isSubPage: true
+      })
+    } else {
+      setHeaderOverride(null)
+    }
+    return () => {
+      setHeaderOverride(null)
+    }
+  }, [activePage, setHeaderOverride])
 
   const businessInfo = normalizeBusinessInfo(partner.business_info)
 

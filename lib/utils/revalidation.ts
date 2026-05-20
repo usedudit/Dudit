@@ -218,6 +218,25 @@ export async function revalidatePartnerStatus() {
 }
 
 /**
+ * Revalida cache de acesso do usuário (lista de ERPs disponíveis).
+ * Deve ser chamada quando:
+ * - Usuário aceita convite (ganha acesso a novo ERP)
+ * - Usuário é removido de equipe (perde acesso ao ERP)
+ * - Role do usuário muda
+ */
+export async function revalidateUserAccess(userId: string) {
+  safeRevalidateTag(TAGS.userAccess(userId))
+}
+
+/**
+ * Revalida a lista de convites de um parceiro.
+ * Deve ser chamada quando convites são criados, revogados ou aceitos.
+ */
+export async function revalidatePartnerInvitations(partnerId: string) {
+  safeRevalidateTag(TAGS.partnerInvitations(partnerId))
+}
+
+/**
  * Revalida o Cache O(1) do Redis/Explore/Home no Next.js App Router
  */
 export async function revalidateExploreSearch(options?: { silent?: boolean }) {
@@ -236,4 +255,3 @@ export async function revalidateExploreSearch(options?: { silent?: boolean }) {
   safeRevalidateTag('home-products')
   safeRevalidateTag('explore-products')
 }
-

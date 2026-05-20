@@ -45,10 +45,9 @@ export default function NotFound() {
                             className="h-8 w-auto object-contain"
                         />
                     </a>
-                    <p className="text-gray-500 text-xs sm:text-sm font-medium tracking-tight">
-                        © 2026 Dudit Tecnologia Ltda. Todos os direitos reservados.
+                    <p className="text-white text-xs sm:text-sm font-medium">
+                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                     </p>
-
                 </div>
             </footer>
         </div>

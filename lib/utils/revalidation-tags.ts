@@ -33,4 +33,7 @@ export const TAGS = {
 
   // Auth / Permissions
   userAccess: (userId: string) => `user-access-${userId}`,
+
+  // Team / Invitations
+  partnerInvitations: (partnerId: string) => `partner-${partnerId}-invitations`,
 }

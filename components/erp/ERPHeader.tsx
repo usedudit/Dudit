@@ -8,7 +8,7 @@ import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon, Chev
 import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { StoreSwitcher } from "../store-switcher"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
@@ -76,6 +76,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
   const [avatarColor, setAvatarColor] = useState(userProfile?.avatarColor || getAvatarColor(userProfile?.fullName || profile?.full_name || "Usuário"))
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const { setIsMobileOpen, headerOverride } = useSidebar()
+  const searchParams = useSearchParams()
 
   // Update local state when profile data arrives
   useEffect(() => {
@@ -167,13 +168,17 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
   }
 
   const segments = pathname.split("/").filter(Boolean)
-  const isAutoInnerPage = segments.length > 2
+  const isAutoInnerPage = segments.length > 2 && !segments.includes("cadastros") && !segments.includes("cadastros-financeiro")
+
+  const hasEntityParam = searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")
+  const isSettingsSubTab = searchParams.has("tab") && !["empresa", "vendas", "adicionais"].includes(searchParams.get("tab") || "")
+  const isQueryOrTabInnerPage = hasEntityParam || isSettingsSubTab
 
   const displayTitle = headerOverride?.title || pageTitle || "Painel"
   const displayBackHref = headerOverride?.backHref || backHref
   const displayOnBack = headerOverride?.onBack || onBack
   const displayIsSubPage = headerOverride?.isSubPage || isSubPage
-  const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage)
+  const showBackButton = !!(displayBackHref || displayOnBack || displayIsSubPage || isAutoInnerPage || isQueryOrTabInnerPage)
 
   return (
     <header className="sticky top-0 bg-brand-page-bg dark:bg-dark-background z-30 border-b border-brand-border dark:border-dark-border">
@@ -184,9 +189,15 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
               <button
                 className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading md:hidden"
                 onClick={() => {
-                  if (displayOnBack) displayOnBack()
-                  else if (displayBackHref) router.push(displayBackHref)
-                  else router.back()
+                  if (displayOnBack) {
+                    displayOnBack()
+                  } else if (displayBackHref) {
+                    router.push(displayBackHref)
+                  } else if (searchParams.has("create") || searchParams.has("view") || searchParams.has("edit") || searchParams.has("duplicate")) {
+                    window.dispatchEvent(new CustomEvent('erp-sidebar-reset'))
+                  } else {
+                    router.back()
+                  }
                 }}
               >
                 <ChevronLeftIcon className="w-6 h-6" />

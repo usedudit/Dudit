@@ -402,10 +402,10 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detail.salesSummary.paymentMethodExtra)}</span>}
                                                     />
                                                 )}
-                                                {detail.salesSummary && detail.salesSummary.shippingCost > 0 && (
+                                                {detail.salesSummary && detail.salesSummary.deliveryFee > 0 && (
                                                     <PaymentRow
                                                         label="Frete/entrega"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.shippingCost)}</span>}
+                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.deliveryFee)}</span>}
                                                     />
                                                 )}
                                                 {detail.salesSummary && detail.salesSummary.additionalCosts > 0 && (

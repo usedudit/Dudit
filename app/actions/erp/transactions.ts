@@ -1956,7 +1956,7 @@ export type TransactionDetailPayload = {
         couponDiscount: number
         paymentMethodDiscount: number
         paymentMethodExtra: number
-        shippingCost: number
+        deliveryFee: number
         additionalCosts: number
     } | null
 }
@@ -2202,7 +2202,7 @@ export async function getTransactionDetailsAction(
           buyer_id,
           customer_name,
           total_amount,
-          shipping_cost,
+          delivery_fee,
           additional_costs,
           discount_value,
           discount_amount,
@@ -2249,9 +2249,9 @@ export async function getTransactionDetailsAction(
                 }, 0))
                 const manualDiscount = Math.max(0, Number((ord as any).discount_value || 0))
                 const couponDiscount = Math.max(0, Number((ord as any).discount_amount || 0))
-                const shippingCost = Math.max(0, Number((ord as any).shipping_cost || 0))
+                const deliveryFee = Math.max(0, Number((ord as any).delivery_fee || 0))
                 const additionalCosts = Math.max(0, Number((ord as any).additional_costs || 0))
-                const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + shippingCost + additionalCosts)
+                const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + deliveryFee + additionalCosts)
                 const finalTotal = Math.max(0, Number((ord as any).total_amount || 0))
                 salesSummary = {
                     subtotal,
@@ -2259,7 +2259,7 @@ export async function getTransactionDetailsAction(
                     couponDiscount,
                     paymentMethodDiscount: Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
                     paymentMethodExtra: Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
-                    shippingCost,
+                    deliveryFee,
                     additionalCosts,
                 }
             }
@@ -2350,9 +2350,9 @@ export async function getTransactionDetailsAction(
                     }, 0))
                     const manualDiscount = Math.max(0, Number((preSale as any)?.discount_amount || (sale as any).discount_amount || 0))
                     const couponDiscount = Math.max(0, Number((preSale as any)?.coupon_discount_amount || 0))
-                    const shippingCost = Math.max(0, Number((preSale as any)?.shipping_fee || 0))
+                    const deliveryFee = Math.max(0, Number((preSale as any)?.shipping_fee || 0))
                     const additionalCosts = Math.max(0, Number((preSale as any)?.other_costs || 0))
-                    const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + shippingCost + additionalCosts)
+                    const baseBeforePaymentMethod = Math.max(0, subtotal - manualDiscount - couponDiscount + deliveryFee + additionalCosts)
                     const finalTotal = Math.max(0, Number((sale as any).final_amount || 0))
                     salesSummary = {
                         subtotal,
@@ -2360,7 +2360,7 @@ export async function getTransactionDetailsAction(
                         couponDiscount,
                         paymentMethodDiscount: Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100),
                         paymentMethodExtra: Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100),
-                        shippingCost,
+                        deliveryFee,
                         additionalCosts,
                     }
                 }

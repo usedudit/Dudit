@@ -194,7 +194,6 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       id,
       order_number,
       total_amount,
-      shipping_cost,
       delivery_fee,
       distance_km,
       delivery_breakdown,
@@ -224,8 +223,8 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       status: order.situation || "pending",
       deliveryStatus: order.delivery_status || "not_sent",
       totalAmount: Number(order.total_amount || 0),
-      shippingFee: Number(order.shipping_cost || 0),
-      deliveryFee: Number(order.delivery_fee || order.shipping_cost || 0),
+      shippingFee: Number(order.delivery_fee || 0),
+      deliveryFee: Number(order.delivery_fee || 0),
       distanceKm: order.distance_km == null ? null : Number(order.distance_km),
       deliveryBreakdown: order.delivery_breakdown || null,
       orderDate: order.created_at || null,
@@ -293,7 +292,7 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
 
   const { data: selectedOrders, error: orderError } = await supabase
     .from("orders")
-    .select("id, partner_id, shipping_cost, total_amount, delivery_address, buyer_id")
+    .select("id, partner_id, delivery_fee, total_amount, delivery_address, buyer_id")
     .in("id", orderIds)
     .eq("partner_id", payload.partnerId)
     .order("created_at", { ascending: false })
@@ -446,7 +445,7 @@ export async function getERPDeliveriesPageAction(
           position,
           status,
           delivered_at,
-          orders(id, order_number, customer_name, total_amount, shipping_cost, delivery_address, buyer_id)
+          orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id)
         )
       `)
       .eq("partner_id", partnerId)
@@ -508,7 +507,7 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           order_number,
           customer_name,
           total_amount,
-          shipping_cost,
+          delivery_fee,
           delivery_address,
           buyer_id
         )
@@ -597,11 +596,11 @@ export async function updateERPDeliveryStatusAction(params: {
   if (params.status === "delivered" && currentDelivery.delivery_person_id) {
     const { data: deliveryOrders } = await supabase
       .from("delivery_orders")
-      .select("orders(delivery_fee, shipping_cost)")
+      .select("orders(delivery_fee)")
       .eq("delivery_id", params.deliveryId)
 
     const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
-      return sum + Number(row?.orders?.delivery_fee || row?.orders?.shipping_cost || 0)
+      return sum + Number(row?.orders?.delivery_fee || 0)
     }, 0)
 
     await createCommissionExpenseForEntity({

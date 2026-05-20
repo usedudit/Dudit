@@ -75,6 +75,7 @@ type ERPOrderPayload = {
         state: string
     }
     csrf_token?: string
+    manualOverrideReason?: string
 }
 
 type OrderStockItem = {
@@ -446,8 +447,8 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
         lines.push(`alterou valor de desconto: ${formatCurrency(currentOrder.discount_value || 0)} -> ${formatCurrency(payload.discountValue || 0)}`)
     }
 
-    if (Math.abs(Number(currentOrder.shipping_cost || 0) - Number(payload.shippingCost || 0)) > 0.009) {
-        lines.push(`alterou frete: ${formatCurrency(currentOrder.shipping_cost || 0)} -> ${formatCurrency(payload.shippingCost || 0)}`)
+    if (Math.abs(Number(currentOrder.delivery_fee || 0) - Number(payload.shippingCost || 0)) > 0.009) {
+        lines.push(`alterou frete: ${formatCurrency(currentOrder.delivery_fee || 0)} -> ${formatCurrency(payload.shippingCost || 0)}`)
     }
 
     if (Math.abs(Number(currentOrder.additional_costs || 0) - Number(payload.additionalCosts || 0)) > 0.009) {
@@ -1361,7 +1362,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         payment_method_discount_amount: paymentMethodDiscountAmount,
         payment_method_extra_amount: paymentMethodExtraAmount,
         coupon_id: couponIdToSave,
-        shipping_cost: serverShippingCost,
+        delivery_fee: serverShippingCost,
         additional_costs: data.additionalCosts,
         notes: data.notes || null,
         payment_method: paymentMethodSummary,
@@ -1558,7 +1559,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         }, 0))
         const manualDiscount = Math.max(0, Number((data as any).discount_value || 0))
         const couponDiscount = Math.max(0, Number((data as any).discount_amount || 0))
-        const shippingCost = Math.max(0, Number((data as any).shipping_cost || 0))
+        const shippingCost = Math.max(0, Number((data as any).delivery_fee || (data as any).shipping_cost || 0))
         const additionalCosts = Math.max(0, Number((data as any).additional_costs || 0))
         const baseBeforePaymentMethod = Math.max(0, subtotalValue - manualDiscount - couponDiscount + shippingCost + additionalCosts)
         const finalTotal = Math.max(0, Number((data as any).total_amount || 0))
@@ -1648,7 +1649,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         paid_amount: Number(sale.paid_amount || 0),
         discount_value: Math.max(0, manualDiscount),
         coupon_discount_amount: Math.max(0, couponDiscount),
-        shipping_cost: shippingCost,
+        delivery_fee: shippingCost,
         additional_costs: otherCosts,
         subtotal_value: subtotalValue,
         payment_method_discount_amount: paymentMethodDiscountAmount,
@@ -1729,7 +1730,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             total_amount,
             paid_amount,
             discount_value,
-            shipping_cost,
+            delivery_fee,
             additional_costs,
             notes,
             payment_method,
@@ -1791,7 +1792,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
 
     const changeLines = buildOrderChangeLines(currentOrder, { ...data, items: sanitizedItems })
-    if (changeLines.length === 0) {
+    if (changeLines.length === 0 && !data.manualOverrideReason) {
         return { success: true, noChanges: true }
     }
 
@@ -1887,7 +1888,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         discount_amount: couponDiscountAmount,
         payment_method_discount_amount: updatePaymentMethodDiscountAmount,
         payment_method_extra_amount: updatePaymentMethodExtraAmount,
-        shipping_cost: updateServerShipping,
+        delivery_fee: updateServerShipping,
         additional_costs: data.additionalCosts,
         notes: data.notes || null,
         payment_method: paymentMethodSummary,
@@ -2044,9 +2045,12 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         entityType: "order",
         entityId: orderId,
         actionType: "updated",
-        changeLines,
-        metadata:
-            currentOrder.situation !== paymentState.situation
+        changeLines: data.manualOverrideReason
+            ? [`Edição manual autorizada pelo Admin. Motivo: ${data.manualOverrideReason}`, ...changeLines]
+            : changeLines,
+        metadata: {
+            ...(data.manualOverrideReason ? { manualOverrideReason: data.manualOverrideReason } : {}),
+            ...(currentOrder.situation !== paymentState.situation
                 ? {
                     oldStatus: getPaymentStatusLabel(currentOrder.situation),
                     newStatus: getPaymentStatusLabel(paymentState.situation),
@@ -2058,7 +2062,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                         newStatus: getDeliveryStatusLabel(data.deliveryStatus),
                         statusScope: "delivery",
                     }
-                    : null,
+                    : {}),
+        },
         source: "manual",
     })
 

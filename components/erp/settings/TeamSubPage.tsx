@@ -144,7 +144,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
             if (result.error) {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             } else {
-                toast({ title: "Sucesso", description: "Membro removido da equipe." })
+                toast({ title: "Sucesso", description: "Membro removido da equipe.", variant: "success" })
                 fetchMembers()
             }
             setMemberToDelete(null)
@@ -157,7 +157,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
             if (result.error) {
                 toast({ title: "Erro", description: result.error, variant: "destructive" })
             } else {
-                toast({ title: "Sucesso", description: "Função atualizada com sucesso." })
+                toast({ title: "Sucesso", description: "Função atualizada com sucesso.", variant: "success" })
                 fetchMembers()
             }
         })
@@ -393,7 +393,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
                                 <TabsContent value="invites" className="mt-6">
                                     <FadeIn>
-                                        {invitations.filter(i => i.status === "PENDING").length === 0 ? (
+                                        {invitations.filter(i => !i.used_at && !i.revoked_at && new Date(i.expires_at) > new Date()).length === 0 ? (
                                             <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
                                                 <IconPlaceholder
                                                     placeholderType="image"

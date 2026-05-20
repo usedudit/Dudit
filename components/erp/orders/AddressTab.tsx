@@ -38,6 +38,8 @@ interface AddressTabProps {
     setNoNumber: (val: boolean) => void
     isMarketplaceOrder?: boolean
     originalDeliveryStatus?: string
+    isMarketplaceLocked?: boolean
+    isPaidOrder?: boolean
 }
 
 export const AddressTab: React.FC<AddressTabProps> = ({
@@ -70,6 +72,8 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     setNoNumber,
     isMarketplaceOrder = false,
     originalDeliveryStatus = 'not_sent',
+    isMarketplaceLocked = false,
+    isPaidOrder = false,
 }) => {
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryMethod === "pickup" ? "delivered" : deliveryStatus)
 
@@ -91,9 +95,9 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     setUf(data.state || "SP")
                                     setNoNumber(data.number === "S/N")
                                 }}
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked && isPaidOrder}
                             />
-                            <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." disabled={isMarketplaceOrder} value={street} onChange={(e: any) => setStreet(e.target.value)} />
+                            <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." disabled={isMarketplaceLocked && isPaidOrder} value={street} onChange={(e: any) => setStreet(e.target.value)} />
 
                             <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                 <NumberInputWithCheckbox
@@ -105,20 +109,20 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         setNoNumber(checked)
                                         if (checked) setNumber("")
                                     }}
-                                    disabled={isMarketplaceOrder}
+                                    disabled={isMarketplaceLocked && isPaidOrder}
                                     placeholder="123"
                                 />
-                                <Input label="Complemento" placeholder="Apto, Bloco, etc." disabled={isMarketplaceOrder} value={complement} onChange={(e: any) => setComplement(e.target.value)} />
+                                <Input label="Complemento" placeholder="Apto, Bloco, etc." disabled={isMarketplaceLocked && isPaidOrder} value={complement} onChange={(e: any) => setComplement(e.target.value)} />
                             </div>
-                            <Input label="Bairro" placeholder="Nome do bairro" disabled={isMarketplaceOrder} value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
+                            <Input label="Bairro" placeholder="Nome do bairro" disabled={isMarketplaceLocked && isPaidOrder} value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
 
                             <div className="grid grid-cols-2 gap-3 items-end">
-                                <Input label="Cidade" placeholder="Nome da cidade" disabled={isMarketplaceOrder} value={city} onChange={(e: any) => setCity(e.target.value)} />
+                                <Input label="Cidade" placeholder="Nome da cidade" disabled={isMarketplaceLocked && isPaidOrder} value={city} onChange={(e: any) => setCity(e.target.value)} />
                                 <StateComboBox
                                     value={uf}
                                     onChange={setUf}
                                     className="w-full"
-                                    disabled={isMarketplaceOrder}
+                                    disabled={isMarketplaceLocked && isPaidOrder}
                                 />
                             </div>
                         </div>
@@ -134,28 +138,28 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 value={selectedDeliveryPersonId || "none"}
                                 setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
                                 options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked && !isPaidOrder}
                             />
                             <FormDropdown
                                 label="Status"
                                 value={deliveryMethod === "pickup" ? "delivered" : deliveryStatus}
                                 setValue={(val: any) => setDeliveryStatus(val)}
                                 options={deliveryStatusOptions}
-                                disabled={deliveryMethod === "pickup" || (isMarketplaceOrder && originalDeliveryStatus === 'delivered')}
+                                disabled={deliveryMethod === "pickup" || (isMarketplaceLocked && (!isPaidOrder || originalDeliveryStatus === 'delivered'))}
                             />
                             <DatePicker
                                 label="Data de saída"
                                 value={deliveryDate}
                                 onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
                                 placeholder="Selecione a data"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked && !isPaidOrder}
                             />
                             <TimePicker
                                 label="Horário de saída"
                                 value={deliveryTime}
                                 onChange={setDeliveryTime}
                                 placeholder="Selecione o horário"
-                                disabled={isMarketplaceOrder}
+                                disabled={isMarketplaceLocked && !isPaidOrder}
                             />
                         </div>
 

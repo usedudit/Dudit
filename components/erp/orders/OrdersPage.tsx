@@ -181,6 +181,7 @@ export default function OrdersPage({
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
+    const [manualOverrideReason, setManualOverrideReason] = useState<string | null>(null)
 
     const isLoading = storeLoading || entityPage.isListLoading
 
@@ -191,6 +192,7 @@ export default function OrdersPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const invalidateAndRefresh = useCallback(() => {
+        setManualOverrideReason(null)
         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
@@ -598,7 +600,9 @@ export default function OrdersPage({
                             orderId={entityState.entityId}
                             partnerId={partnerId}
                             onBack={invalidateAndRefresh}
-                            onEditOrder={(order: any) => {
+                            onEditOrder={(order: any, reason?: string) => {
+                                if (reason) setManualOverrideReason(reason)
+                                else setManualOverrideReason(null)
                                 openEntity('edit', order.id)
                             }}
                             onUpdateDeliveryStatus={(order: any) => {
@@ -638,6 +642,7 @@ export default function OrdersPage({
                             partnerId={partnerId}
                             editOrderId={entityState.entityId}
                             onBack={invalidateAndRefresh}
+                            manualOverrideReason={manualOverrideReason || undefined}
                         />
                     </FadeIn>
                 ) : entityState.isOpen && entityState.action === 'create' ? (

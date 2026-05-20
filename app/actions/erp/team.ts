@@ -212,6 +212,10 @@ export async function updateTeamMemberRole(
         const { revalidatePath } = await import("next/cache")
         revalidatePath("/erp", "layout")
 
+        // Invalidate the affected user's access cache so role change reflects immediately
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        revalidateUserAccess(memberUserId)
+
         return { success: true }
     } catch (error: any) {
         return { success: false, error: error.message }
@@ -279,6 +283,11 @@ export async function removeTeamMember(memberUserId: string): Promise<{ success:
             partnerId,
             targetUserId: memberUserId,
         }))
+
+        // Invalidate the removed user's access cache so the ERP disappears from their selector
+        // and they can no longer access this ERP
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        revalidateUserAccess(memberUserId)
 
         return { success: true }
     } catch (error: any) {

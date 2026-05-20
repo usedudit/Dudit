@@ -15,7 +15,7 @@ import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
-import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
@@ -87,12 +87,27 @@ export async function createOrderAction(data: {
   let serverPrice: number
   let itemName: string = "Item"
   let preparationProducts: Array<{ availability_value?: number | null; availability_unit?: string | null }> = []
+  let parentProductId = data.itemId
+  let resolvedVariantId: string | null = null
 
   if (data.itemType === "product") {
+    const { data: variantData } = await supabase
+      .from("product_variants")
+      .select("id, product_id, price_adjustment, stock_available, variant_name")
+      .eq("id", data.itemId)
+      .maybeSingle()
+
+    let productQueryId = data.itemId
+    if (variantData) {
+      parentProductId = variantData.product_id
+      resolvedVariantId = variantData.id
+      productQueryId = variantData.product_id
+    }
+
     const { data: product, error: productError } = await supabase
       .from("products")
       .select("price, promotional_price, name, is_active, stock_available, availability_value, availability_unit")
-      .eq("id", data.itemId)
+      .eq("id", productQueryId)
       .single()
 
     if (productError || !product) {
@@ -102,17 +117,26 @@ export async function createOrderAction(data: {
       return { error: "Este produto não está mais disponível" }
     }
 
-    // Use promotional price if it exists and is lower
-    serverPrice = (product.promotional_price && product.promotional_price < product.price)
+    let basePrice = (product.promotional_price && product.promotional_price < product.price)
       ? product.promotional_price
       : product.price
-    itemName = product.name || "Produto"
+
+    if (variantData) {
+      basePrice = basePrice + Number(variantData.price_adjustment || 0)
+    }
+
+    serverPrice = basePrice
+    itemName = variantData
+      ? `${product.name} - ${variantData.variant_name}`
+      : (product.name || "Produto")
+
     preparationProducts = [{
       availability_value: Number(product.availability_value || 0),
       availability_unit: product.availability_unit || "Minutos",
     }]
 
-    if ((product.stock_available ?? 0) < data.quantity) {
+    const stockAvailable = variantData ? (variantData.stock_available ?? 0) : (product.stock_available ?? 0)
+    if (stockAvailable < data.quantity) {
       return { error: "Estoque insuficiente para este produto" }
     }
 
@@ -152,7 +176,7 @@ export async function createOrderAction(data: {
       code: data.couponCode,
       customerId: buyerId,
       subtotal: expectedTotal,
-      items: data.itemType === "product" ? [{ productId: data.itemId }] : [{ serviceId: data.itemId }],
+      items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
     })
     if (couponResult.valid) {
       couponIdToSave = couponResult.couponId || null
@@ -166,7 +190,7 @@ export async function createOrderAction(data: {
       partnerId: data.partnerId,
       customerId: buyerId,
       subtotal: expectedTotal,
-      items: data.itemType === "product" ? [{ productId: data.itemId }] : [{ serviceId: data.itemId }],
+      items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
     })
     if (autoResult.valid) {
       couponIdToSave = autoResult.couponId || null
@@ -193,7 +217,7 @@ export async function createOrderAction(data: {
   // Run through pricing engine for consistent calculation
   const pricingResult = calculateOrderPricing({
     items: [{
-      productId: data.itemType === "product" ? data.itemId : null,
+      productId: data.itemType === "product" ? parentProductId : null,
       serviceId: data.itemType === "service" ? data.itemId : null,
       unitPrice: serverPrice,
       quantity: data.quantity,
@@ -284,20 +308,26 @@ export async function createOrderAction(data: {
     deliveryTimeEstimateMinutes: 0,
   })
 
+  let paymentMethodName = data.paymentMethod
+  if (bestMethod?.name) {
+    paymentMethodName = bestMethod.name
+  } else {
+    paymentMethodName = formatPaymentMethodLabel(data.paymentMethod)
+  }
+
   const orderData: any = {
     buyer_id: buyerId,
     customer_name: buyerProfile?.full_name || null,
     partner_id: data.partnerId,
-    product_id: data.itemType === "product" ? data.itemId : null,
+    product_id: data.itemType === "product" ? parentProductId : null,
     service_id: data.itemType === "service" ? data.itemId : null,
     total_amount: paymentAwareTotal,
-    shipping_cost: deliveryFee,
     delivery_fee: deliveryFee,
     distance_km: distanceKm,
     delivery_breakdown: deliveryBreakdown,
     delivery_type: data.deliveryType,
     delivery_address: data.deliveryAddress,
-    payment_method: data.paymentMethod,
+    payment_method: paymentMethodName,
     payment_breakdown: paymentIsMp || !bestMethod?.id
       ? []
       : [{
@@ -306,7 +336,7 @@ export async function createOrderAction(data: {
         paymentMethodId: bestMethod.id,
         installmentNumber: Math.max(1, Number(data.installments || 1)),
       }],
-    payment_provider: data.paymentMethod,
+    payment_provider: paymentIsMp ? "Mercado Pago" : null,
     situation: "pending",
     notes: data.notes || null,
     coupon_id: couponIdToSave,
@@ -333,7 +363,8 @@ export async function createOrderAction(data: {
 
   await supabase.from("order_items").insert({
     order_id: order.id,
-    product_id: data.itemId,
+    product_id: data.itemType === "product" ? parentProductId : null,
+    variant_id: resolvedVariantId,
     product_name: itemName,
     product_price: serverPrice,
     quantity: data.quantity,
@@ -358,7 +389,8 @@ export async function createOrderAction(data: {
       partnerId: data.partnerId,
       orderId: order.id,
       items: [{
-        product_id: data.itemId,
+        product_id: parentProductId,
+        variant_id: resolvedVariantId,
         quantity: data.quantity,
       }],
     })
@@ -369,7 +401,7 @@ export async function createOrderAction(data: {
       return { error: reserveResult.error }
     }
 
-    await invalidateProductCache(data.itemId, data.partnerId, "update", { silent: true })
+    await invalidateProductCache(parentProductId, data.partnerId, "update", { silent: true })
   }
 
   revalidateOrdersCache()

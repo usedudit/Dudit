@@ -455,7 +455,6 @@ async function handler(request: NextRequest) {
         coupon_id: couponIdToSave,
         discount_amount: couponDiscountAmount,
         delivery_fee: deliveryFee,
-        shipping_cost: deliveryFee,
       })
       .select()
       .single()
@@ -463,6 +462,19 @@ async function handler(request: NextRequest) {
     if (orderError || !newOrder) {
       SecureLogger.error("Failed to create order", { errorCode: orderError?.code, errorMessage: orderError?.message })
       return NextResponse.json({ error: "Erro ao criar pedido" }, { status: 500 })
+    }
+
+    if (couponIdToSave) {
+      await adminClient.from("coupon_usages").upsert(
+        {
+          coupon_id: couponIdToSave,
+          customer_id: buyerId,
+          order_id: newOrder.id,
+        },
+        { onConflict: "coupon_id,order_id" }
+      ).catch((err: any) => {
+        SecureLogger.error("Failed to record coupon usage", { orderId: newOrder.id, error: err })
+      })
     }
 
     if (isDev) console.log("[v0] Order created successfully:", newOrder.id)

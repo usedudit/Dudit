@@ -12,7 +12,7 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
@@ -657,6 +657,13 @@ export async function checkoutCartAction(
     estimated_delivery_at: deliveryType === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
   } : {}
 
+  let paymentMethodName = paymentMethod
+  if (bestMethod?.name) {
+    paymentMethodName = bestMethod.name
+  } else {
+    paymentMethodName = formatPaymentMethodLabel(paymentMethod)
+  }
+
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -664,13 +671,12 @@ export async function checkoutCartAction(
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
       total_amount: paymentAwareTotal,
-      shipping_cost: deliveryFee,
       delivery_fee: deliveryFee,
       distance_km: distanceKm,
       delivery_breakdown: deliveryBreakdown,
       delivery_type: deliveryType,
       delivery_address: deliveryAddress,
-      payment_method: useMercadoPago ? "Mercado Pago" : paymentMethod,
+      payment_method: useMercadoPago ? "Mercado Pago" : paymentMethodName,
       payment_breakdown: useMercadoPago
         ? []
         : [{
@@ -679,7 +685,7 @@ export async function checkoutCartAction(
           paymentMethodId: bestMethod.id,
           installmentNumber: Math.max(1, Number(installments || 1)),
         }],
-      payment_provider: useMercadoPago ? "Mercado Pago" : paymentMethod,
+      payment_provider: useMercadoPago ? "Mercado Pago" : null,
       situation: "pending",
       notes,
       finance_account_id: financeAccountId,
