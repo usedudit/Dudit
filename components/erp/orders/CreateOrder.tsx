@@ -361,15 +361,39 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
-                setCouponId(order.coupon_id || null)
-                setCouponDiscountAmount(Number(order.discount_amount || 0))
-                setCouponPricingData(order.coupon_id ? {
-                    id: order.coupon_id,
-                    discountType: "fixed",
-                    discountValue: Number(order.discount_amount || 0),
-                    maxDiscountValue: null,
-                    freeShipping: false
-                } : null)
+                const hasCoupon = !!order.coupon_id && !!order.coupons;
+                const couponData = order.coupons;
+                setCouponId(order.coupon_id || null);
+                setCouponDiscountAmount(Number(order.discount_amount || 0));
+                if (hasCoupon) {
+                    setCouponCode(couponData.code || "");
+                    setGlobalDiscountCouponCode(couponData.code || "");
+                    setDiscountType("coupon");
+                    setCouponPricingData({
+                        id: couponData.id,
+                        discountType: couponData.discount_type as any,
+                        discountValue: Number(couponData.discount_value || 0),
+                        maxDiscountValue: couponData.max_discount_value != null ? Number(couponData.max_discount_value) : null,
+                        freeShipping: couponData.discount_type === "free_shipping" || !!couponData.free_shipping
+                    });
+                } else if (order.coupon_id) {
+                    // Fallback mock
+                    setCouponCode("");
+                    setGlobalDiscountCouponCode("");
+                    setDiscountType("coupon");
+                    setCouponPricingData({
+                        id: order.coupon_id,
+                        discountType: "fixed",
+                        discountValue: Number(order.discount_amount || 0),
+                        maxDiscountValue: null,
+                        freeShipping: false
+                    });
+                } else {
+                    setCouponCode("");
+                    setGlobalDiscountCouponCode("");
+                    setDiscountType(order.discount_type || "fixed");
+                    setCouponPricingData(null);
+                }
                 setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
 
                 if (order.order_items) {

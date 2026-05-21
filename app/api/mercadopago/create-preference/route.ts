@@ -204,7 +204,8 @@ async function handler(request: NextRequest) {
         partnerId,
         code: body.couponCode,
         customerId: user.id,
-        subtotal: totalAmount,
+        subtotal: totalAmount - deliveryFee,
+        shippingCost: deliveryFee,
         items: items.map(i => ({ productId: i.id })) // simplified
       }, adminClient)
 

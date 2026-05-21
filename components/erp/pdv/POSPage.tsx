@@ -571,6 +571,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     lineDiscountType: item.lineDiscountType ?? null,
                     lineDiscountValue: item.lineDiscountValue ?? null,
                 })),
+                couponId: appliedCouponId,
+                couponCode: appliedCouponCode,
+                couponDiscountAmount: appliedCouponDiscount,
             })
 
             if (!result.success) {
@@ -630,11 +633,20 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             }
         })
 
+        const isCoupon = !!preSale.coupon_id
+        const couponCodeVal = preSale.coupon_code || ""
+        const couponDiscountVal = Number(preSale.coupon_discount_amount || 0)
+
         setActivePreSaleId(preSale.id)
         setSelectedCustomerId(preSale.customer_id || undefined)
-        setDiscountAmount(Number(preSale.discount_amount || 0))
-        setDiscountType("fixed")
-        setDiscountCouponCode("")
+        setDiscountAmount(isCoupon ? couponDiscountVal : Number(preSale.discount_amount || 0))
+        setDiscountType(isCoupon ? "coupon" : "fixed")
+        setDiscountCouponCode(couponCodeVal)
+        setGlobalDiscountType(isCoupon ? "coupon" : "fixed")
+        setGlobalDiscountCouponCode(couponCodeVal)
+        setAppliedCouponId(preSale.coupon_id || null)
+        setAppliedCouponCode(preSale.coupon_code || null)
+        setAppliedCouponDiscount(couponDiscountVal)
         setNotes(preSale.notes || "")
         setShippingFee(Number(preSale.shipping_fee || 0))
         setDeliveryDistanceKm(Number((preSale as any).distance_km || 0) || null)
@@ -643,9 +655,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setLastSavedOrderSignature(buildOrderSignature({
             selectedCustomerId: preSale.customer_id || undefined,
             selectedSellerId,
-            discountAmount: Number(preSale.discount_amount || 0),
-            discountType: "fixed",
-            discountCouponCode: "",
+            discountAmount: isCoupon ? couponDiscountVal : Number(preSale.discount_amount || 0),
+            discountType: isCoupon ? "coupon" : "fixed",
+            discountCouponCode: couponCodeVal,
             shippingFee: Number(preSale.shipping_fee || 0),
             notes: preSale.notes || "",
             cart: items,
@@ -658,6 +670,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setDiscountAmount(0)
         setDiscountType("fixed")
         setDiscountCouponCode("")
+        setGlobalDiscountType("fixed")
+        setGlobalDiscountCouponCode("")
+        setAppliedCouponId(null)
+        setAppliedCouponCode(null)
+        setAppliedCouponDiscount(0)
         setNotes("")
         setShippingFee(0)
         setDeliveryDistanceKm(null)

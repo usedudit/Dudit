@@ -46,6 +46,7 @@ export type PricingCoupon = {
   discountValue: number | null
   maxDiscountValue: number | null
   freeShipping: boolean
+  allowCombination?: boolean
 }
 
 export type PricingInput = {
@@ -161,26 +162,32 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     const coupon = input.coupon
     appliedCouponId = coupon.id
 
-    if (coupon.discountType === "percentage" && coupon.discountValue) {
-      const pct = Math.min(100, Math.max(0, coupon.discountValue))
-      couponDiscountAmount = round2(currentTotal * (pct / 100))
-    } else if (coupon.discountType === "fixed" && coupon.discountValue) {
-      couponDiscountAmount = round2(Math.min(coupon.discountValue, currentTotal))
-    }
-    // free_shipping type: discount is 0 on items, but shipping is zeroed below
+    const hasManualDiscount = input.manualDiscount && input.manualDiscount.value > 0
+    const hasPromotionSavings = promotionSavings > 0
+    const isCombinationBlocked = coupon.allowCombination === false && (hasManualDiscount || hasPromotionSavings)
 
-    // Enforce max_discount_value cap
-    if (
-      coupon.maxDiscountValue != null &&
-      coupon.maxDiscountValue > 0 &&
-      couponDiscountAmount > coupon.maxDiscountValue
-    ) {
-      couponDiscountAmount = round2(coupon.maxDiscountValue)
-    }
+    if (!isCombinationBlocked) {
+      if (coupon.discountType === "percentage" && coupon.discountValue) {
+        const pct = Math.min(100, Math.max(0, coupon.discountValue))
+        couponDiscountAmount = round2(currentTotal * (pct / 100))
+      } else if (coupon.discountType === "fixed" && coupon.discountValue) {
+        couponDiscountAmount = round2(Math.min(coupon.discountValue, currentTotal))
+      }
+      // free_shipping type: discount is 0 on items, but shipping is zeroed below
 
-    // Free shipping
-    if (coupon.freeShipping || coupon.discountType === "free_shipping") {
-      freeShippingApplied = true
+      // Enforce max_discount_value cap
+      if (
+        coupon.maxDiscountValue != null &&
+        coupon.maxDiscountValue > 0 &&
+        couponDiscountAmount > coupon.maxDiscountValue
+      ) {
+        couponDiscountAmount = round2(coupon.maxDiscountValue)
+      }
+
+      // Free shipping
+      if (coupon.freeShipping || coupon.discountType === "free_shipping") {
+        freeShippingApplied = true
+      }
     }
   }
 

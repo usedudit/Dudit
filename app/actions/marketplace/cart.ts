@@ -525,6 +525,21 @@ export async function checkoutCartAction(
     .select("opening_hours")
     .eq("id", partnerId)
     .maybeSingle()
+  let deliveryFee = 0
+  let distanceKm: number | null = null
+  let deliveryBreakdown: Record<string, unknown> | null = null
+  if (deliveryType === "delivery") {
+    const quote = await quoteDeliveryFeeAction({
+      partnerId,
+      destinationAddress: deliveryAddress,
+      freeDeliveryCoupon: false,
+    })
+    if (!quote.success) return { error: quote.error }
+    deliveryFee = Number(quote.fee || 0)
+    distanceKm = Number(quote.distanceKm || 0)
+    deliveryBreakdown = quote.breakdown
+  }
+
   let couponIdToSave: string | null = null
   let couponDiscountAmount = 0
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
@@ -535,6 +550,7 @@ export async function checkoutCartAction(
       code: couponCode,
       customerId: user.id,
       subtotal: totalAmount,
+      shippingCost: deliveryFee,
       items: partnerItems.map((item) => ({ productId: item.productId })),
     }, adminClient)
 
@@ -548,6 +564,7 @@ export async function checkoutCartAction(
       partnerId,
       customerId: user.id,
       subtotal: totalAmount,
+      shippingCost: deliveryFee,
       items: partnerItems.map((item) => ({ productId: item.productId })),
     }, adminClient)
 
@@ -558,19 +575,18 @@ export async function checkoutCartAction(
     }
   }
 
-  let deliveryFee = 0
-  let distanceKm: number | null = null
-  let deliveryBreakdown: Record<string, unknown> | null = null
-  if (deliveryType === "delivery") {
+  // Adjust delivery fee if the chosen coupon is free shipping
+  const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
+  if (deliveryType === "delivery" && isFreeShippingCoupon) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       destinationAddress: deliveryAddress,
-      freeDeliveryCoupon: Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping"),
+      freeDeliveryCoupon: true,
     })
-    if (!quote.success) return { error: quote.error }
-    deliveryFee = Number(quote.fee || 0)
-    distanceKm = Number(quote.distanceKm || 0)
-    deliveryBreakdown = quote.breakdown
+    if (quote.success) {
+      deliveryFee = Number(quote.fee || 0)
+      deliveryBreakdown = quote.breakdown
+    }
   }
 
   const pricingResult = calculateOrderPricing({

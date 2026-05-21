@@ -202,7 +202,10 @@ async function handler(request: NextRequest) {
 
     if (isDev) console.log("[v0] All items validated. Total amount:", totalAmount)
 
-    // SEGURANÃ‡A: Validar cupom se fornecido
+    // DELIVERY FEE
+    const deliveryFee = Number(body.deliveryFee || 0)
+
+    // SEGURANÇA: Validar cupom se fornecido
     let couponIdToSave: string | null = null
     let couponDiscountAmount = 0
 
@@ -212,6 +215,7 @@ async function handler(request: NextRequest) {
         code: couponCode,
         customerId: buyerId,
         subtotal: totalAmount,
+        shippingCost: deliveryFee,
         items: validatedItems.map(i => ({ productId: i.product_id }))
       }, adminClient)
 
@@ -223,8 +227,6 @@ async function handler(request: NextRequest) {
       }
     }
 
-    // DELIVERY FEE
-    const deliveryFee = Number(body.deliveryFee || 0)
     if (deliveryFee > 0) {
       totalAmount += deliveryFee
       if (isDev) console.log("[v0] Delivery fee applied:", deliveryFee, "New total:", totalAmount)

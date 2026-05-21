@@ -4,8 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, AlertModal, SavingStatusModal } from "@/components/reusable"
-import { ArrowUpDownIcon, ExportFileIcon, PlusIcon } from "@/lib/icons"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, AlertModal, SavingStatusModal, Badge } from "@/components/reusable"
+import { ArrowUpDownIcon, ExportFileIcon, PlusIcon, TagIcon, SparklesIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -32,8 +32,12 @@ import {
     EMPTY_COUPON_RELATIONS,
     EMPTY_SCOPE_DATA,
     getCouponApplyScopeLabel,
+    getCouponCustomerScopeLabel,
     getCouponPrimaryMeta,
+    getCouponStatusLabel,
+    getCouponStatusVariant,
     getCouponUsageCount,
+    getCouponUsageSummary,
     mapCouponToForm,
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -67,7 +71,7 @@ const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center
     { id: "usage", label: "Uso", align: "left", width: "180px" },
     { id: "validity", label: "Validade", align: "left", width: "220px" },
     { id: "status", label: "Status", align: "right", width: "240px" },
-    { id: "actions", label: "Acoes", align: "right", width: "220px" },
+    { id: "actions", label: "Açoes", align: "center", width: "220px" },
 ]
 export default function CouponsPage({
     partnerId,
@@ -125,15 +129,91 @@ export default function CouponsPage({
         [coupons, selectedCouponId],
     )
 
-    const filterSections: FilterSectionConfig[] = useMemo(
-        () => [
-            { id: "discountType", title: "Tipo de desconto", type: "checkbox-list", options: ["Percentual", "Valor fixo", "Frete gratis"] },
-            { id: "applyScope", title: "Escopo do catalogo", type: "checkbox-list", options: ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos"] },
-            { id: "customerScope", title: "Clientes", type: "checkbox-list", options: ["Todos os clientes", "Clientes especificos"] },
-            { id: "automaticOnly", title: "Automacao", type: "switch", switchLabel: "Mostrar apenas cupons automaticos" },
-        ],
-        [],
-    )
+    const filterSections: FilterSectionConfig[] = useMemo(() => {
+        const availableTypes = new Set<string>()
+        const availableScopes = new Set<string>()
+        const availableCustomerScopes = new Set<string>()
+        let hasAutomatic = false
+
+        coupons.forEach((coupon) => {
+            if (coupon.discount_type === "percentage") {
+                availableTypes.add("Percentual")
+            } else if (coupon.discount_type === "fixed") {
+                availableTypes.add("Valor fixo")
+            } else if (coupon.discount_type === "free_shipping") {
+                availableTypes.add("Frete grátis")
+            }
+
+            if (coupon.apply_scope === "all") {
+                availableScopes.add("Todos os itens")
+            } else if (coupon.apply_scope === "categories") {
+                availableScopes.add("Categorias especificas")
+            } else if (coupon.apply_scope === "products") {
+                availableScopes.add("Produtos especificos")
+            } else if (coupon.apply_scope === "services") {
+                availableScopes.add("Servicos especificos")
+            }
+
+            if (coupon.customer_scope === "specific") {
+                availableCustomerScopes.add("Clientes especificos")
+            } else {
+                availableCustomerScopes.add("Todos os clientes")
+            }
+
+            if (coupon.is_automatic) {
+                hasAutomatic = true
+            }
+        })
+
+        const sections: FilterSectionConfig[] = []
+
+        const discountTypeOptions = ["Percentual", "Valor fixo", "Frete grátis"].filter((opt) =>
+            availableTypes.has(opt)
+        )
+        if (discountTypeOptions.length > 0) {
+            sections.push({
+                id: "discountType",
+                title: "Tipo de desconto",
+                type: "checkbox-list",
+                options: discountTypeOptions,
+            })
+        }
+
+        const applyScopeOptions = ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos"].filter((opt) =>
+            availableScopes.has(opt)
+        )
+        if (applyScopeOptions.length > 0) {
+            sections.push({
+                id: "applyScope",
+                title: "Escopo do catalogo",
+                type: "checkbox-list",
+                options: applyScopeOptions,
+            })
+        }
+
+        const customerScopeOptions = ["Todos os clientes", "Clientes especificos"].filter((opt) =>
+            availableCustomerScopes.has(opt)
+        )
+        if (customerScopeOptions.length > 0) {
+            sections.push({
+                id: "customerScope",
+                title: "Clientes",
+                type: "checkbox-list",
+                options: customerScopeOptions,
+            })
+        }
+
+        if (hasAutomatic) {
+            sections.push({
+                id: "automaticOnly",
+                title: "Automacao",
+                type: "switch",
+                switchLabel: "Mostrar apenas cupons automaticos",
+            })
+        }
+
+        return sections
+    }, [coupons])
 
     const resetRelations = useCallback(() => {
         setRelations(EMPTY_COUPON_RELATIONS)
@@ -506,7 +586,7 @@ export default function CouponsPage({
                 ? "Percentual"
                 : coupon.discount_type === "fixed"
                     ? "Valor fixo"
-                    : "Frete gratis"
+                    : "Frete grátis"
 
             const scopeLabel = getCouponApplyScopeLabel(coupon.apply_scope)
             const customerLabel = coupon.customer_scope === "specific" ? "Clientes especificos" : "Todos os clientes"
@@ -678,10 +758,66 @@ export default function CouponsPage({
                                             </FadeIn>
                                         ) : (
                                             <FadeIn
-                                                key={`${effectiveViewMode}-${activeTab}-${debouncedSearch}`}
+                                                key={`${isMobile ? "mobile" : effectiveViewMode}-${activeTab}-${debouncedSearch}`}
                                                 className="w-full"
                                             >
-                                                {effectiveViewMode === "grid" ? (
+                                                {isMobile ? (
+                                                    <div className="px-4 pb-6 flex flex-col border-b border-brand-border dark:border-dark-border">
+                                                        {paginatedCoupons.map((coupon) => (
+                                                            <div
+                                                                key={coupon.id}
+                                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4 animate-fade-in"
+                                                                onClick={() => openDetails(coupon)}
+                                                            >
+                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                    <TagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                                </div>
+
+                                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex flex-col min-w-0 pr-1">
+                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                {coupon.code}
+                                                                            </h3>
+                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                {getCouponPrimaryMeta(coupon)}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap justify-end gap-1.5 shrink-0">
+                                                                            {coupon.is_automatic && (
+                                                                                <Badge variant="purple" icon={<SparklesIcon />} className="text-[10px] h-5 px-1.5 whitespace-nowrap">
+                                                                                    Auto
+                                                                                </Badge>
+                                                                            )}
+                                                                            <Badge variant={getCouponStatusVariant(coupon)} className="text-[10px] h-5 px-1.5 whitespace-nowrap">
+                                                                                {getCouponStatusLabel(coupon)}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex justify-between items-center mt-1">
+                                                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                                                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                                                {getCouponApplyScopeLabel(coupon.apply_scope)}
+                                                                            </span>
+                                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                {getCouponCustomerScopeLabel(coupon.customer_scope)}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-4 shrink-0">
+                                                                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                                                                {getCouponUsageSummary(coupon)}
+                                                                            </span>
+                                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(coupon.id); }}>
+                                                                                <Checkbox checked={selection.ids.has(coupon.id)} onChange={() => handleSelectRow(coupon.id)} />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : effectiveViewMode === "grid" ? (
                                                     <div className="px-4 md:px-8 pb-6">
                                                         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                             <AnimatePresence>
@@ -804,7 +940,7 @@ export default function CouponsPage({
 
             <AlertModal
                 title="Excluir cupom"
-                description={couponToDelete ? `Tem certeza que deseja excluir o cupom ${couponToDelete.code}? Esta acao nao pode ser desfeita.` : ""}
+                description={couponToDelete ? `Tem certeza que deseja excluir o cupom ${couponToDelete.code}? Esta ação não pode ser desfeita.` : ""}
                 isOpen={!!couponToDelete}
                 onClose={() => setCouponToDelete(null)}
                 onConfirm={confirmDelete}

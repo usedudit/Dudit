@@ -74,7 +74,7 @@ const normalizeCategory = (category?: string | null) => (category || "Outros").t
 const categoryId = (category: string) => category.toLowerCase()
 
 const formatCouponValue = (coupon: any) => {
-    if (coupon.discount_type === "free_shipping") return "Frete gratis"
+    if (coupon.discount_type === "free_shipping") return "Frete grátis"
     if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}% OFF`
     return `${formatCurrency(Number(coupon.discount_value || 0))} OFF`
 }
@@ -292,13 +292,13 @@ const InfoTab = ({ partner, stats }: any) => {
                             {creditMethods.length > 0 && (
                                 <div>
                                     <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartao de credito</h4>
-                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras nao informadas.</p>}
+                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
                                 </div>
                             )}
                             {debitMethods.length > 0 && (
                                 <div>
                                     <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartao de debito</h4>
-                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras nao informadas.</p>}
+                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
                                 </div>
                             )}
                         </div>
@@ -392,7 +392,7 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
                     </div>
                 </>
             ) : (
-                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png" imageAlt="Sem avaliações" title="Ainda nao temos avaliações por aqui" subtitle="Seja o primeiro a contar para a comunidade como foi sua experiencia!" />
+                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png" imageAlt="Sem avaliações" title="Ainda não temos avaliações por aqui" subtitle="Seja o primeiro a contar para a comunidade como foi sua experiencia!" />
             )}
         </div>
     )

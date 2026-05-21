@@ -162,6 +162,21 @@ export async function createOrderAction(data: {
 
   const expectedTotal = serverPrice * data.quantity
 
+  let deliveryFee = 0
+  let distanceKm: number | null = null
+  let deliveryBreakdown: Record<string, unknown> | null = null
+  if (data.deliveryType === "delivery") {
+    const quote = await quoteDeliveryFeeAction({
+      partnerId: data.partnerId,
+      destinationAddress: data.deliveryAddress,
+      freeDeliveryCoupon: false,
+    })
+    if (!quote.success) return { error: quote.error }
+    deliveryFee = Number(quote.fee || 0)
+    distanceKm = Number(quote.distanceKm || 0)
+    deliveryBreakdown = quote.breakdown
+  }
+
   // ========================================================================
   // COUPON VALIDATION & PRICING ENGINE
   // ========================================================================
@@ -177,6 +192,7 @@ export async function createOrderAction(data: {
       code: data.couponCode,
       customerId: buyerId,
       subtotal: expectedTotal,
+      shippingCost: deliveryFee,
       items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
     }, admin)
     if (couponResult.valid) {
@@ -191,6 +207,7 @@ export async function createOrderAction(data: {
       partnerId: data.partnerId,
       customerId: buyerId,
       subtotal: expectedTotal,
+      shippingCost: deliveryFee,
       items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
     }, admin)
     if (autoResult.valid) {
@@ -200,19 +217,18 @@ export async function createOrderAction(data: {
     }
   }
 
-  let deliveryFee = 0
-  let distanceKm: number | null = null
-  let deliveryBreakdown: Record<string, unknown> | null = null
-  if (data.deliveryType === "delivery") {
+  // Adjust delivery fee if the chosen coupon is free shipping
+  const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
+  if (data.deliveryType === "delivery" && isFreeShippingCoupon) {
     const quote = await quoteDeliveryFeeAction({
       partnerId: data.partnerId,
       destinationAddress: data.deliveryAddress,
-      freeDeliveryCoupon: Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping"),
+      freeDeliveryCoupon: true,
     })
-    if (!quote.success) return { error: quote.error }
-    deliveryFee = Number(quote.fee || 0)
-    distanceKm = Number(quote.distanceKm || 0)
-    deliveryBreakdown = quote.breakdown
+    if (quote.success) {
+      deliveryFee = Number(quote.fee || 0)
+      deliveryBreakdown = quote.breakdown
+    }
   }
 
   // Run through pricing engine for consistent calculation

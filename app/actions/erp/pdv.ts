@@ -463,7 +463,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
             .order("is_default", { ascending: false }),
         supabase
             .from("pre_sales")
-            .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at")
+            .select("id, customer_id, subtotal, discount_amount, total_amount, shipping_fee, other_costs, notes, status, items, created_at, updated_at, coupon_id, coupon_code, coupon_discount_amount")
             .eq("partner_id", partnerId)
             .eq("status", "draft")
             .order("created_at", { ascending: false })

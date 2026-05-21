@@ -367,7 +367,7 @@ export default function CreateDeliveryPage({
                                                             value={selectedDeliveryPersonId || "none"}
                                                             setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
                                                             options={[
-                                                                { value: "none", label: "Sem entregador (nao atribuido)" },
+                                                                { value: "none", label: "Sem entregador (não atribuido)" },
                                                                 ...deliveryPeople.map((person) => ({
                                                                     value: person.id,
                                                                     label: person.fullName,
@@ -388,7 +388,7 @@ export default function CreateDeliveryPage({
                                                                 { value: "sent", label: "Enviado" },
                                                                 { value: "delivered", label: "Entregue" },
                                                                 { value: "pickup_available", label: "Disponivel para retirada" },
-                                                                { value: "delivery_failed", label: "Entrega nao realizada" },
+                                                                { value: "delivery_failed", label: "Entrega não realizada" },
                                                                 { value: "cancelled", label: "Cancelado" },
                                                             ]}
                                                         />
@@ -449,7 +449,7 @@ export default function CreateDeliveryPage({
                                                                                 {item.product_name || "Item"}
                                                                             </p>
                                                                             <p className="text-xs text-brand-inactive-text">
-                                                                                {item.products?.sku || "SKU nao informado"}
+                                                                                {item.products?.sku || "SKU não informado"}
                                                                             </p>
                                                                         </div>
 

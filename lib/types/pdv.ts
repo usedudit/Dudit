@@ -30,6 +30,9 @@ export type PDVPreSale = {
   items: any[]
   created_at: string
   updated_at: string
+  coupon_id?: string | null
+  coupon_code?: string | null
+  coupon_discount_amount?: number | null
 }
 
 export type PDVCustomer = {

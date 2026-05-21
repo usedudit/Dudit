@@ -1528,7 +1528,8 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         .select(`
             *,
             order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock), product_variants(id, variant_name, sku, stock_quantity, stock_available)),
-            stores(name)
+            stores(name),
+            coupons(*)
         `)
         .eq("id", orderId)
         .eq("partner_id", partnerId)

@@ -12,6 +12,7 @@ export type CouponValidationInput = {
   subtotal: number
   shippingCost?: number
   items?: Array<{ productId?: string | null; serviceId?: string | null }>
+  manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
 }
 
 export type CouponValidationResult = {
@@ -46,6 +47,7 @@ export async function validateCouponRow(
     subtotal: number
     shippingCost?: number
     items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
   }
 ): Promise<CouponValidationResult> {
   // Date validation
@@ -118,6 +120,31 @@ export async function validateCouponRow(
     return { valid: false, discountAmount: 0, errorMessage: "Valor mínimo do carrinho não atingido." }
   }
 
+  // Allow combination check (do not allow combining with products on promotion or manual discounts)
+  if (coupon.allow_combination === false) {
+    // 1. Check manual discount
+    if (input.manualDiscount && input.manualDiscount.value > 0) {
+      return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com descontos manuais." }
+    }
+
+    // 2. Check products on promotion
+    const items = input.items || []
+    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, price, promotional_price")
+        .in("id", productIds)
+
+      const hasPromo = (products || []).some(
+        (p: any) => p.promotional_price !== null && p.promotional_price > 0 && p.promotional_price < p.price
+      )
+      if (hasPromo) {
+        return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com produtos em promoção." }
+      }
+    }
+  }
+
   // Apply scope (products, categories, services)
   if (coupon.apply_scope !== "all") {
     const items = input.items || []
@@ -179,6 +206,7 @@ export async function validateCouponRow(
     discountValue: Number(coupon.discount_value || 0),
     maxDiscountValue: coupon.max_discount_value != null ? Number(coupon.max_discount_value) : null,
     freeShipping: isFreeShipping,
+    allowCombination: Boolean(coupon.allow_combination),
   }
 
   return {

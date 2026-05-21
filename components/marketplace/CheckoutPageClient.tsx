@@ -656,7 +656,7 @@ export function CheckoutPageClient() {
 
     const getCouponTitle = (coupon: MarketplaceAvailableCoupon) => {
         if (coupon.freeShipping || coupon.discountType === "free_shipping") {
-            return `${coupon.code} - Entrega gratis`
+            return `${coupon.code} - Entrega grátis`
         }
 
         return `${coupon.code} - ${formatCurrency(coupon.discountAmount)} OFF`
@@ -712,7 +712,7 @@ export function CheckoutPageClient() {
                     setCouponCode("")
                     setCouponDiscount(0)
                     setSelectedCouponId("")
-                    setCouponError("O cupom aplicado nao se encaixa mais neste pedido.")
+                    setCouponError("O cupom aplicado não se encaixa mais neste pedido.")
                 }
             }
         } catch (error) {

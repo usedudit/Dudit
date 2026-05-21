@@ -92,7 +92,7 @@ const AppointmentsPage = ({
         { id: "staff", label: "Profissional", align: "left", width: "180px", minWidth: "160px" },
         { id: "price", label: "Valor", align: "left", width: "120px", minWidth: "120px" },
         { id: "status", label: "Status", align: "center", width: "110px", minWidth: "100px" },
-        { id: "actions", label: "Acoes", align: "center", width: "70px", minWidth: "70px" },
+        { id: "actions", label: "Açoes", align: "center", width: "70px", minWidth: "70px" },
     ]), []);
 
     const [viewMode, setViewMode] = useState<ModeType>('calendar');

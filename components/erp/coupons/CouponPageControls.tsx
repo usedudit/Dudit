@@ -159,7 +159,7 @@ const CouponPageControls: React.FC<CouponPageControlsProps> = ({
                         <div className="w-80">
                             <Input
                                 name="search"
-                                placeholder="Buscar por codigo..."
+                                placeholder="Buscar cupons..."
                                 prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
