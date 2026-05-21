@@ -33,6 +33,23 @@ export default function OfflinePage() {
                     />
                 </div>
             </main>
+
+            <footer className="w-full py-8 border-t border-white/10 bg-brand-dark">
+                <div className="max-w-[1300px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <a href="/" className="opacity-80 hover:opacity-100 transition-opacity">
+                        <img
+                            src="https://img.dudit.com.br/static/Logo.png"
+                            alt="Dudit"
+                            width={110}
+                            height={32}
+                            className="h-8 w-auto object-contain"
+                        />
+                    </a>
+                    <p className="text-gray-500 text-xs sm:text-sm font-medium tracking-tight">
+                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
+                    </p>
+                </div>
+            </footer>
         </div>
     )
 }

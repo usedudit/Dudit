@@ -48,7 +48,6 @@ interface CreateOrderProps {
     onBack: () => void
     partnerId: string
     editOrderId?: string
-    manualOverrideReason?: string
 }
 
 type PaymentBreakdownEntry = {
@@ -127,7 +126,7 @@ function normalizeCustomerForCard(customer: any) {
     }
 }
 
-export default function CreateOrder({ onBack, partnerId, editOrderId, manualOverrideReason }: CreateOrderProps) {
+export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug, role } = usePermissions()
@@ -273,9 +272,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
     const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
     const isMarketplaceOrder = Boolean(editOrderId)
 
-    const isManualOverrideActive = Boolean(manualOverrideReason)
-    const isMarketplaceLocked = isMarketplaceOrder && !isManualOverrideActive
     const isPaidOrder = originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid'
+    const isDeliveredOrder = originalDeliveryStatus === 'delivered'
+    const isMarketplaceLocked = isMarketplaceOrder && isPaidOrder
 
     const normalizeSalesChannel = useCallback((value?: string | null) => {
         if (!value) return "Manual"
@@ -907,6 +906,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
         paymentBreakdown?: PaymentBreakdownEntry[]
         deliveryStatus?: string
         isPendingDelivery?: boolean
+        paymentProvider?: string
+        mpPaymentId?: string
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
         let finalDeliveryStatus = deliveryStatus;
@@ -958,7 +959,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
             totalAmount,
             notes,
             csrf_token: csrfToken || undefined,
-            manualOverrideReason: manualOverrideReason || undefined
+            paymentProvider: paymentOverrides?.paymentProvider || undefined,
+            mpPaymentId: paymentOverrides?.mpPaymentId || undefined,
         }
     }
 
@@ -1003,6 +1005,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
         paymentBreakdown?: PaymentBreakdownEntry[]
         deliveryStatus?: string
         isPendingDelivery?: boolean
+        paymentProvider?: string
+        mpPaymentId?: string
     }) => {
         setIsSaving(true)
         try {
@@ -1065,6 +1069,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
             paymentBreakdown: paymentData.paymentBreakdown,
             paidAmount: paymentData.paidAmount,
             isPendingDelivery: paymentData.isPendingDelivery,
+            paymentProvider: paymentData.paymentProvider,
+            mpPaymentId: paymentData.mpPaymentId,
         })
     }
 
@@ -1202,24 +1208,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
                     </div>
 
                     <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        {isMarketplaceOrder && (
+                        {isPaidOrder && (
                             <div className="mb-6 p-4 rounded-2xl border transition-all duration-300 shadow-sm flex flex-col md:flex-row md:items-center gap-4 bg-brand-light-gray dark:bg-dark-border/10 border-brand-border dark:border-dark-border">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isManualOverrideActive ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'}`}>
-                                        {isManualOverrideActive ? (
-                                            <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">✓</span>
-                                        ) : (
-                                            <span className="text-xl font-bold text-amber-600 dark:text-amber-400">!</span>
-                                        )}
+                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+                                        <span className="text-xl font-bold text-amber-600 dark:text-amber-400">!</span>
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                            {isManualOverrideActive ? "Edição Manual Habilitada (Admin/Dono)" : "Edição de Venda Existente Restrita"}
+                                            Edição Restrita (Pedido Pago)
                                         </h4>
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 leading-relaxed">
-                                            {isManualOverrideActive
-                                                ? `Esta venda está com a edição manual liberada sob justificativa: "${manualOverrideReason}".`
-                                                : "Campos críticos como itens, descontos, frete e canal de venda estão bloqueados. Se necessário, libere a edição manual nos detalhes do pedido."}
+                                            Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas dados de entrega, observações e status de expedição podem ser atualizados.
                                         </p>
                                     </div>
                                 </div>
@@ -1227,7 +1227,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
                         )}
                         <TabsContent value="general" className="mt-0">
                             <FadeIn key="general">
-                                <div className={isPaidOrderLocked && !isMarketplaceOrder ? "pointer-events-none opacity-60" : ""}>
+                                <div>
                                     <OrderGeneralTab
                                         items={items}
                                         searchQuery={productBucket.searchQuery}
@@ -1305,6 +1305,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
                                         isMarketplaceOrder={isMarketplaceOrder}
                                         isMarketplaceLocked={isMarketplaceLocked}
                                         isPaidOrder={isPaidOrder}
+                                        role={role}
                                     />
                                 </div>
                             </FadeIn>
@@ -1312,7 +1313,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
 
                         <TabsContent value="delivery" className="mt-0">
                             <FadeIn key="delivery">
-                                <div className={isPaidOrderLocked && !isMarketplaceOrder ? "pointer-events-none opacity-60" : ""}>
+                                <div>
                                     <AddressTab
                                         cep={cep}
                                         street={street}
@@ -1345,6 +1346,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
                                         originalDeliveryStatus={originalDeliveryStatus}
                                         isMarketplaceLocked={isMarketplaceLocked}
                                         isPaidOrder={isPaidOrder}
+                                        role={role}
                                     />
                                 </div>
                             </FadeIn>
@@ -1355,6 +1357,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId, manualOver
                                 <OrderObservationsTab
                                     notes={notes}
                                     setNotes={setNotes}
+                                    disabled={role === 'DELIVERY'}
                                 />
                             </FadeIn>
                         </TabsContent>

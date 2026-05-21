@@ -8,9 +8,10 @@ import { FileIcon } from "@/lib/icons"
 interface OrderObservationsTabProps {
     notes: string
     setNotes: (val: string) => void
+    disabled?: boolean
 }
 
-export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ notes, setNotes }) => {
+export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ notes, setNotes, disabled = false }) => {
     return (
         <FadeIn>
             <div className="max-w-[800px] flex flex-col gap-4">
@@ -26,6 +27,7 @@ export const OrderObservationsTab: React.FC<OrderObservationsTabProps> = ({ note
                     value={notes}
                     onChange={(e: any) => setNotes(e.target.value)}
                     className="min-h-[250px]"
+                    disabled={disabled}
                 />
             </div>
         </FadeIn>

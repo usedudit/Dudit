@@ -170,6 +170,7 @@ export async function createOrderAction(data: {
   let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
 
   // Try manual coupon code first, then auto-detect
+  const admin = getAdminClient()
   if (data.couponCode?.trim()) {
     const couponResult = await validateCoupon({
       partnerId: data.partnerId,
@@ -177,7 +178,7 @@ export async function createOrderAction(data: {
       customerId: buyerId,
       subtotal: expectedTotal,
       items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
-    })
+    }, admin)
     if (couponResult.valid) {
       couponIdToSave = couponResult.couponId || null
       couponDiscountAmount = couponResult.discountAmount
@@ -191,7 +192,7 @@ export async function createOrderAction(data: {
       customerId: buyerId,
       subtotal: expectedTotal,
       items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
-    })
+    }, admin)
     if (autoResult.valid) {
       couponIdToSave = autoResult.couponId || null
       couponDiscountAmount = autoResult.discountAmount

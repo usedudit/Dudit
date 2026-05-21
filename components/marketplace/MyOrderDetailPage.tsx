@@ -261,9 +261,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             icon={PaymentIcon}
                                             title={
                                                 loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <span>{formatCurrency(totalAmount)}</span>
-                                                        <span className="font-normal text-brand-inactive-text">• {paymentMethodName}</span>
+                                                        <span className="font-normal text-brand-inactive-text flex items-center gap-1.5">
+                                                            • 
+                                                            {order.payment_provider === "Mercado Pago" && (
+                                                                <span className="w-6 h-6 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border inline-flex">
+                                                                    <img
+                                                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                                        alt="Mercado Pago"
+                                                                        className="w-3.5 h-3.5 object-contain"
+                                                                    />
+                                                                </span>
+                                                            )}
+                                                            {paymentMethodName}
+                                                        </span>
                                                     </div>
                                             }
                                             // description={statusConfig.statusText}

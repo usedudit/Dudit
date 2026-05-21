@@ -125,7 +125,7 @@ const QuotePreview = ({
                                     </div>
                                 </div>
 
-                                <div className="relative z-10 mt-2">
+                                <div className="relative z-10">
                                     <div className="flex items-center gap-3 mb-6">
                                         {partnerAvatar ? (
                                             <div className="w-8 h-8 rounded-full overflow-hidden bg-white shrink-0">
@@ -136,12 +136,12 @@ const QuotePreview = ({
                                                 {partnerName.charAt(0).toUpperCase()}
                                             </div>
                                         )}
-                                        <span className="text-white font-bold text-sm tracking-wide">{partnerName.toUpperCase()}</span>
+                                        <span className="text-white font-bold text-sm">{partnerName}</span>
                                     </div>
 
                                     <div>
-                                        <h1 className="text-3xl font-medium text-white tracking-wide leading-none">{quoteTitle}</h1>
-                                        <p className="text-white/60 text-[10px] tracking-widest font-light mt-1 uppercase">
+                                        <h1 className="text-3xl font-medium text-white">{quoteTitle}</h1>
+                                        <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
                                             {quoteSubtitle || `Proposta Comercial #${invoiceNumber}`}
                                         </p>
                                     </div>
@@ -153,22 +153,18 @@ const QuotePreview = ({
                                 {page.type === 'first' && (
                                     <>
                                         <div className="px-8 py-6">
-                                            <div className="grid grid-cols-4 gap-4 border-b border-gray-100 pb-6 w-full">
+                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Tipo</span>
-                                                    <span className="font-bold text-sm text-black">Fatura Financeira</span>
+                                                    <span className="text-xs text-brand-inactive-text uppercase tracking-wide mb-0.5">Número</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Data</span>
-                                                    <span className="font-bold text-sm text-black">{formatDate(quoteDate)}</span>
+                                                    <span className="text-xs text-brand-inactive-text uppercase tracking-wide mb-0.5">Data</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(quoteDate)}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Número</span>
-                                                    <span className="font-bold text-sm text-black">{invoiceNumber}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Vencimento</span>
-                                                    <span className="font-bold text-sm text-black">{formatDate(expiryDate)}</span>
+                                                    <span className="text-xs text-brand-inactive-text uppercase tracking-wide mb-0.5">Vencimento</span>
+                                                    <span className="font-bold text-sm text-brand-dark">{formatDate(expiryDate)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -176,17 +172,17 @@ const QuotePreview = ({
                                         <div className="px-8 pb-6">
                                             <div className="grid grid-cols-2 gap-8">
                                                 <div>
-                                                    <h3 className="font-bold text-sm text-black mb-3">Emitente</h3>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Emitente</h3>
                                                     <div className="text-xs text-gray-600 space-y-1">
-                                                        <p className="font-bold uppercase text-black">{partnerName}</p>
+                                                        <p className="font-bold uppercase text-brand-dark">{partnerName}</p>
                                                         <p className="whitespace-pre-wrap">{partnerAddress}</p>
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-sm text-black mb-3">Destinatário</h3>
+                                                    <h3 className="font-bold text-sm text-brand-dark mb-3">Destinatário</h3>
                                                     {selectedCustomer ? (
                                                         <div className="text-xs text-gray-600 space-y-1">
-                                                            <p className="font-bold text-black">{selectedCustomer.name}</p>
+                                                            <p className="font-bold text-brand-dark">{selectedCustomer.name}</p>
                                                             <p>{selectedCustomer.email}</p>
                                                             {selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
                                                         </div>

@@ -181,7 +181,6 @@ export default function OrdersPage({
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
-    const [manualOverrideReason, setManualOverrideReason] = useState<string | null>(null)
 
     const isLoading = storeLoading || entityPage.isListLoading
 
@@ -192,7 +191,6 @@ export default function OrdersPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
     const invalidateAndRefresh = useCallback(() => {
-        setManualOverrideReason(null)
         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
@@ -296,7 +294,7 @@ export default function OrdersPage({
 
                 return {
                     originalId: o.id,
-                    displayId: o.mp_payment_id || o.order_number || `#${o.id.substring(0, 8)}`,
+                    displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
                     customer_name: o.customer_name || "Consumidor final",
                     customer_id: o.buyer_id || "-",
                     total_amount: Number(o.total_amount),
@@ -600,9 +598,7 @@ export default function OrdersPage({
                             orderId={entityState.entityId}
                             partnerId={partnerId}
                             onBack={invalidateAndRefresh}
-                            onEditOrder={(order: any, reason?: string) => {
-                                if (reason) setManualOverrideReason(reason)
-                                else setManualOverrideReason(null)
+                            onEditOrder={(order: any) => {
                                 openEntity('edit', order.id)
                             }}
                             onUpdateDeliveryStatus={(order: any) => {
@@ -642,7 +638,6 @@ export default function OrdersPage({
                             partnerId={partnerId}
                             editOrderId={entityState.entityId}
                             onBack={invalidateAndRefresh}
-                            manualOverrideReason={manualOverrideReason || undefined}
                         />
                     </FadeIn>
                 ) : entityState.isOpen && entityState.action === 'create' ? (

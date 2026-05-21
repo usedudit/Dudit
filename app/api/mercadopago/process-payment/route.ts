@@ -213,7 +213,7 @@ async function handler(request: NextRequest) {
         customerId: buyerId,
         subtotal: totalAmount,
         items: validatedItems.map(i => ({ productId: i.product_id }))
-      })
+      }, adminClient)
 
       if (couponResult.valid) {
         couponIdToSave = couponResult.couponId || null

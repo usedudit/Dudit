@@ -102,6 +102,7 @@ interface OrderGeneralTabProps {
     isMarketplaceOrder?: boolean
     isMarketplaceLocked?: boolean
     isPaidOrder?: boolean
+    role?: string
 }
 
 export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
@@ -121,9 +122,11 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     fieldErrors, setFieldErrors,
     isQuickMode = false,
     isMarketplaceOrder = false,
-    isMarketplaceLocked = false,
-    isPaidOrder = false
+    isMarketplaceLocked: passedIsMarketplaceLocked = false,
+    isPaidOrder = false,
+    role = "OPERATOR"
 }) => {
+    const isMarketplaceLocked = isPaidOrder || role === 'DELIVERY';
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
     const [currentPage, setCurrentPage] = React.useState(1);

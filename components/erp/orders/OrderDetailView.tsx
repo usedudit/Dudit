@@ -41,8 +41,6 @@ interface OrderDetailViewProps {
 
 export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
     const { role } = usePermissions()
-    const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false)
-    const [overrideReason, setOverrideReason] = useState("")
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -132,11 +130,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const isMarketplaceOrder = true
 
-    const handleConfirmOverride = () => {
-        if (!overrideReason.trim()) return
-        setIsOverrideModalOpen(false)
-        onEditOrder(order, overrideReason.trim())
-    }
+
     const timelineDate = (isActive: boolean) => {
         if (!isActive) return { date: "", time: "" }
         const when = order.updated_at || order.created_at
@@ -216,17 +210,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Criado em {formatDateTime(order.created_at)} • {order.order_source || "Manual"}
                                         </div>
-                                    </div>                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        {isMarketplaceOrder && canEdit && (role === "OWNER" || role === "ADMIN") && (
-                                            <Button
-                                                className="bg-brand-red hover:bg-red-750 text-white border border-transparent font-bold flex items-center justify-center rounded-xl h-10 px-4 transition-colors shrink-0"
-                                                onClick={() => setIsOverrideModalOpen(true)}
-                                            >
-                                                Liberar Edição Manual (Perigoso)
-                                            </Button>
-                                        )}
+                                    </div>
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
-                                            onEdit={canEdit ? () => onEditOrder(order) : undefined}
+                                            onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                                             onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                                             cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                                         >
@@ -347,7 +334,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <div className="space-y-3">
                                                         <PaymentRow
                                                             label="Método de Pagamento"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>} />
+                                                            value={
+                                                                <div className="flex items-center gap-2">
+                                                                    {order.payment_provider === "Mercado Pago" && (
+                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                            <img
+                                                                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                                                alt="Mercado Pago"
+                                                                                className="w-5 h-5 object-contain"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                        {paymentMethodLabel}
+                                                                    </span>
+                                                                </div>
+                                                            } />
 
                                                         {paymentBreakdown.length > 1 && (
                                                             <PaymentRow
@@ -449,16 +451,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             </FadeIn>
 
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                {isMarketplaceOrder && canEdit && (role === "OWNER" || role === "ADMIN") && (
-                    <Button
-                        className="bg-brand-red hover:bg-red-705 text-white border border-transparent font-bold flex-1 h-10 transition-colors shrink-0"
-                        onClick={() => setIsOverrideModalOpen(true)}
-                    >
-                        Edição Manual
-                    </Button>
-                )}
                 <ActionsDropdown
-                    onEdit={canEdit ? () => onEditOrder(order) : undefined}
+                    onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                     cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                     trigger={<Button variant="outline" className="flex-1">
@@ -473,46 +467,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     )}
                 </ActionsDropdown>
             </div>
-            <DefaultModal
-                isOpen={isOverrideModalOpen}
-                onClose={() => {
-                    setIsOverrideModalOpen(false)
-                    setOverrideReason("")
-                }}
-                title="Justificativa de Edição Manual (Perigoso)"
-                footer={<div className="flex justify-end gap-3 w-full">
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            setIsOverrideModalOpen(false)
-                            setOverrideReason("")
-                        }}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        className="bg-brand-red hover:bg-red-700 text-white border-transparent"
-                        onClick={handleConfirmOverride}
-                        disabled={!overrideReason.trim()}
-                    >
-                        Confirmar
-                    </Button>
-                </div>}
-            >
-                <div className="flex flex-col gap-4 p-4">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Este é um pedido proveniente da vitrine online/marketplace. Alterar sensivelmente itens ou valores pode causar divergências graves nos relatórios.
-                        Por favor, insira o motivo obrigatório para autorizar e registrar essa edição manual no histórico:
-                    </p>
-                    <Input
-                        label="Motivo da Edição Manual"
-                        placeholder="Ex: Corrigir frete cobrado incorretamente..."
-                        value={overrideReason}
-                        onChange={(e) => setOverrideReason(e.target.value)}
-                        maxLength={250}
-                        required />
-                </div>
-            </DefaultModal>
         </>
     )
 }

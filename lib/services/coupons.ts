@@ -257,8 +257,8 @@ export type AutoCouponInput = {
   items?: Array<{ productId?: string | null; serviceId?: string | null }>
 }
 
-export async function findBestAutomaticCoupon(input: AutoCouponInput): Promise<CouponValidationResult> {
-  const supabase = await getSupabaseServerClient()
+export async function findBestAutomaticCoupon(input: AutoCouponInput, supabaseOverride?: any): Promise<CouponValidationResult> {
+  const supabase = supabaseOverride || await getSupabaseServerClient()
 
   // Fetch all active automatic coupons for this partner
   const { data: autoCoupons, error } = await supabase

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     XIcon,
     ChevronLeftIcon,
@@ -20,11 +20,13 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip } from '@/components/reusable';
+import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, InfoCard } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
+import { getMercadoPagoStatusAction } from '@/app/actions/mercadopago';
+import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -301,6 +303,7 @@ const PaymentModal = ({
     const [view, setView] = useState<string>('methods');
     /** Valor base alocado ao pedido neste meio (antes de desconto/juros/taxa do método); servidor recalcula o líquido a cobrar. */
     const [paymentBaseAmount, setPaymentBaseAmount] = useState<number>(0);
+    const [calcBaseAmount, setCalcBaseAmount] = useState<number>(0);
     const [installments, setInstallments] = useState<string>('1');
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
@@ -317,6 +320,25 @@ const PaymentModal = ({
     const [isPendingPayment, setIsPendingPayment] = useState(false);
     const [isPendingDelivery, setIsPendingDelivery] = useState(false);
     const [cashCalculatorInput, setCashCalculatorInput] = useState("");
+
+    // Mercado Pago State
+    const [mpConnected, setMpConnected] = useState(false);
+    const [mpPublicKey, setMpPublicKey] = useState<string | null>(null);
+    const [mpStep, setMpStep] = useState<"brick" | "pix" | "boleto" | "mp_redirect" | "error">("brick");
+    const [mpSdkLoaded, setMpSdkLoaded] = useState(false);
+    const [mpBrickReady, setMpBrickReady] = useState(false);
+    const [mpBrickError, setMpBrickError] = useState<string | null>(null);
+    const [mpIsProcessing, setMpIsProcessing] = useState(false);
+    const [mpPixData, setMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
+    const [mpBoletoData, setMpBoletoData] = useState<{ barcode: string; ticketUrl: string } | null>(null);
+    const [mpPaymentId, setMpPaymentId] = useState<string | null>(null);
+    const [mpCopied, setMpCopied] = useState(false);
+    const [mpIsCheckingStatus, setMpIsCheckingStatus] = useState(false);
+    const mpInstanceRef = useRef<any>(null);
+    const mpBricksBuilderRef = useRef<any>(null);
+    const mpBrickIdRef = useRef<string | null>(null);
+    const mpBrickInitializedRef = useRef(false);
+
 
     // Split: user-defined base amount per method (not weights / percentages)
     const [payments, setPayments] = useState<{
@@ -479,23 +501,267 @@ const PaymentModal = ({
             setIsPaymentCalculationLoading(false);
             setSplitPreview(null);
             setSuccessSnapshot(null);
+
+            // Reset MP state
+            setMpStep("brick");
+            setMpBrickReady(false);
+            setMpBrickError(null);
+            setMpIsProcessing(false);
+            setMpPixData(null);
+            setMpBoletoData(null);
+            setMpPaymentId(null);
+            setMpCopied(false);
+            setMpIsCheckingStatus(false);
+            mpBrickInitializedRef.current = false;
+            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
+                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+                mpBrickIdRef.current = null;
+            }
         }
         // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
     }, [isOpen]);
+
+    // Fetch MP connection status
+    useEffect(() => {
+        if (!isOpen) return;
+        getMercadoPagoStatusAction().then((res) => {
+            if ('connected' in res && res.connected) {
+                setMpConnected(true);
+                setMpPublicKey(res.publicKey || null);
+            } else {
+                setMpConnected(false);
+                setMpPublicKey(null);
+            }
+        }).catch(() => {
+            setMpConnected(false);
+        });
+    }, [isOpen]);
+
+    // Load MP SDK when entering mercadopago view
+    useEffect(() => {
+        if (view !== 'mercadopago' || !isOpen || mpSdkLoaded) return;
+        if ((window as any).MercadoPago) {
+            setMpSdkLoaded(true);
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://sdk.mercadopago.com/js/v2";
+        script.async = true;
+        script.onload = () => setMpSdkLoaded(true);
+        document.body.appendChild(script);
+    }, [view, isOpen, mpSdkLoaded]);
+
+    // Initialize MP Payment Brick
+    useEffect(() => {
+        if (mpBrickInitializedRef.current) return;
+        if (!isOpen || !mpSdkLoaded || view !== 'mercadopago' || mpStep !== 'brick') return;
+        mpBrickInitializedRef.current = true;
+        initializeMpBrick();
+
+        return () => {
+            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
+                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+                mpBrickIdRef.current = null;
+                setMpBrickReady(false);
+                mpBrickInitializedRef.current = false;
+            }
+        };
+    }, [isOpen, mpSdkLoaded, view, mpStep]);
+
+    const initializeMpBrick = async () => {
+        if (typeof window === "undefined" || !(window as any).MercadoPago) {
+            setMpBrickError("Erro ao carregar Mercado Pago.");
+            return;
+        }
+        try {
+            if (!mpPublicKey) {
+                setMpBrickError("Chave pública do Mercado Pago não configurada.");
+                return;
+            }
+            const mp = new (window as any).MercadoPago(mpPublicKey);
+            const bricksBuilder = mp.bricks();
+            mpInstanceRef.current = mp;
+            mpBricksBuilderRef.current = bricksBuilder;
+
+            const container = document.getElementById("erpPaymentBrick_container");
+            if (!container) return;
+
+            let preferenceData: any;
+            try {
+                preferenceData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+                    method: "POST",
+                    body: {
+                        products: cart.map((item: any) => ({
+                            id: item.id || item.productId,
+                            name: item.name,
+                            price: item.unitPrice,
+                            quantity: item.quantity,
+                        })),
+                        partnerId,
+                    },
+                });
+            } catch (err: any) {
+                setMpBrickError(err?.message || "Erro ao preparar pagamento");
+                return;
+            }
+
+            const brickController = await bricksBuilder.create("payment", "erpPaymentBrick_container", {
+                initialization: {
+                    amount: chargeTarget,
+                    preferenceId: preferenceData.preference_id,
+                },
+                customization: {
+                    visual: {
+                        style: {
+                            theme: "flat",
+                            customVariables: {
+                                textPrimaryColor: "#003d32", textSecondaryColor: "#6b7280",
+                                inputBackgroundColor: "#FFFFFF", formBackgroundColor: "#FFFFFF",
+                                baseColor: "#059669", baseColorFirstVariant: "#059669E6", baseColorSecondVariant: "#059669E6",
+                                errorColor: "#f04438", successColor: "#059669",
+                                outlinePrimaryColor: "#ebebeb", outlineSecondaryColor: "#ebebeb",
+                                buttonTextColor: "#FFFFFF",
+                                fontSizeExtraSmall: "12px", fontSizeSmall: "14px", fontSizeMedium: "15px",
+                                fontSizeLarge: "17px", fontSizeExtraLarge: "20px",
+                                fontWeightNormal: "400", fontWeightSemiBold: "600",
+                                formInputsTextTransform: "none",
+                                inputVerticalPadding: "12px", inputHorizontalPadding: "16px",
+                                inputBorderWidth: "1px", inputFocusedBorderWidth: "1px",
+                                inputFocusedBoxShadow: "0 0 0 3px rgba(5,150,105,0.15)",
+                                inputErrorFocusedBoxShadow: "0 0 0 3px rgba(239,68,68,0.15)",
+                                borderRadiusSmall: "6px", borderRadiusMedium: "8px", borderRadiusLarge: "12px",
+                                formPadding: "16px",
+                            },
+                        },
+                        texts: { formTitle: "", formSubmit: "Pagar" },
+                        hidePaymentButton: false,
+                        hideFormTitle: false,
+                    },
+                    paymentMethods: {
+                        ticket: "all", bankTransfer: "all", creditCard: "all",
+                        debitCard: "all", mercadoPago: "all", atm: "all",
+                    },
+                },
+                callbacks: {
+                    onReady: () => setMpBrickReady(true),
+                    onSubmit: async (formData: any) => await handleMpBrickSubmit(formData),
+                    onError: (error: any) => setMpBrickError(error.message || "Erro ao processar pagamento"),
+                },
+            });
+            mpBrickIdRef.current = brickController;
+        } catch (err: any) {
+            setMpBrickError(err.message || "Erro ao inicializar Payment Brick");
+        }
+    };
+
+    const handleMpBrickSubmit = async (formData: any) => {
+        setMpIsProcessing(true);
+        setMpBrickError(null);
+        try {
+            const resolvedFormData = formData.formData || formData;
+            const paymentMethodId = resolvedFormData?.payment_method_id;
+            const isRedirectMethod = !paymentMethodId || ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethodId);
+
+            if (isRedirectMethod) {
+                setMpStep("mp_redirect");
+                setMpIsProcessing(false);
+                return;
+            }
+
+            const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
+                method: "POST",
+                body: {
+                    paymentFormData: resolvedFormData,
+                    partnerId,
+                    amount: chargeTarget,
+                    description: `Venda ERP - ${customer?.name || "Cliente"}`,
+                },
+            });
+
+            if (responseData.mpPaymentId) setMpPaymentId(responseData.mpPaymentId);
+
+            const status = responseData.paymentStatus;
+            const paymentMethod = responseData.paymentMethod;
+
+            if (status === "approved") {
+                // Payment approved — register the sale via onConfirm
+                handleStartProcessing({
+                    paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
+                    paymentProvider: "Mercado Pago",
+                    mpPaymentId: responseData.mpPaymentId,
+                    paymentStatus: "paid",
+                    paidAmount: chargeTarget,
+                    paymentBreakdown: [{ method: responseData.paymentMethodDisplayName || "Mercado Pago", amount: chargeTarget, paymentMethodId: null, installmentNumber: 1 }],
+                    splitPayments: [],
+                    isPendingDelivery,
+                });
+            } else if (status === "pending" && paymentMethod === "pix") {
+                const pix = responseData.pixData;
+                if (pix?.qrCode && pix?.qrCodeBase64) {
+                    setMpPixData({ qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64 });
+                    setMpStep("pix");
+                } else {
+                    setMpBrickError("Dados do Pix não retornados pelo provedor.");
+                }
+            } else if (status === "pending" && (paymentMethod === "bolbradesco" || paymentMethod === "boleto" || paymentMethod === "ticket")) {
+                const boleto = responseData.boletoData;
+                if (boleto?.barcode || boleto?.ticketUrl) {
+                    setMpBoletoData(boleto);
+                    setMpStep("boleto");
+                } else {
+                    setMpBrickError("Dados do Boleto não retornados pelo provedor.");
+                }
+            } else if (status === "in_process" || status === "pending") {
+                // Payment in analysis — register as pending
+                handleStartProcessing({
+                    paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
+                    paymentProvider: "Mercado Pago",
+                    mpPaymentId: responseData.mpPaymentId,
+                    paymentStatus: "unpaid",
+                    paidAmount: 0,
+                    paymentBreakdown: [],
+                    splitPayments: [],
+                    isPendingDelivery,
+                });
+            } else {
+                setMpBrickError(`Pagamento não aprovado. Status: ${status || "desconhecido"}`);
+                setMpStep("error");
+            }
+        } catch (error: any) {
+            console.error("Erro ao processar pagamento ERP MP:", error);
+            setMpBrickError(error.message || "Falha ao processar o pagamento.");
+            setMpStep("error");
+        } finally {
+            setMpIsProcessing(false);
+        }
+    };
+
+    const handleMpConfirmPix = () => {
+        handleStartProcessing({
+            paymentMethod: "Pix (Mercado Pago)",
+            paymentProvider: "Mercado Pago",
+            mpPaymentId: mpPaymentId,
+            paymentStatus: "paid",
+            paidAmount: chargeTarget,
+            paymentBreakdown: [{ method: "Pix (Mercado Pago)", amount: chargeTarget, paymentMethodId: null, installmentNumber: 1 }],
+            splitPayments: [],
+            isPendingDelivery,
+        });
+    };
+
+    const handleMpCopyPixCode = () => {
+        if (mpPixData?.qrCode) {
+            navigator.clipboard.writeText(mpPixData.qrCode);
+            setMpCopied(true);
+            toast({ title: "Código Pix copiado!", description: "Use a opção 'Pix Copia e Cola' no banco." });
+            setTimeout(() => setMpCopied(false), 2000);
+        }
+    };
 
     const activeSplitLegs = useMemo(
         () => payments.filter((p) => p.method && p.amount > 0.009),
         [payments],
     );
-
-    /** Base sobre a qual incidem taxas/desconto do método — sempre o total do pedido, NUNCA o "valor a receber" digitado pelo operador. */
-    const basisForMethodCalc = useMemo(() => {
-        if (view === 'split' || editingPaymentIndex !== null) {
-            return Math.max(0, Number(paymentBaseAmount || 0));
-        }
-        // Para pagamento único (pix, card, money): calcula sempre sobre o total do pedido
-        return Math.max(0, Number(chargeTarget || 0));
-    }, [view, editingPaymentIndex, paymentBaseAmount, chargeTarget]);
 
     useEffect(() => {
         let active = true;
@@ -546,21 +812,24 @@ const PaymentModal = ({
     useEffect(() => {
         if (view === 'money' || view === 'card' || view === 'pix') {
             setIsPixGenerated(false);
+            let initialAmt = 0;
             if (editingPaymentIndex !== null) {
                 const currentSlot = payments[editingPaymentIndex];
                 if (Number(currentSlot.installmentNumber) > 1) {
                     setInstallments(String(currentSlot.installmentNumber));
                 }
                 if (currentSlot.amount > 0) {
-                    setPaymentBaseAmount(Number(currentSlot.amount));
+                    initialAmt = Number(currentSlot.amount);
                 } else {
                     const otherPaid = payments.reduce((acc, p, idx) => idx !== editingPaymentIndex ? acc + p.amount : acc, 0);
                     const needed = Math.max(0, chargeTarget - otherPaid);
-                    setPaymentBaseAmount(needed > 0 ? needed : 0);
+                    initialAmt = needed > 0 ? needed : 0;
                 }
             } else {
-                setPaymentBaseAmount(Math.max(0, chargeTarget));
+                initialAmt = Math.max(0, chargeTarget);
             }
+            setPaymentBaseAmount(initialAmt);
+            setCalcBaseAmount(initialAmt);
         }
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
@@ -585,7 +854,7 @@ const PaymentModal = ({
             return;
         }
         const installmentNumber = Math.max(1, Number(installments || 1));
-        const base = basisForMethodCalc;
+        const base = calcBaseAmount;
         setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
@@ -608,9 +877,7 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
-        // basisForMethodCalc agora depende apenas de chargeTarget (não de paymentBaseAmount),
-        // então mudar o "Valor a receber" NÃO dispara recálculo.
-    }, [selectedMethodId, installments, chargeTarget, view, basisForMethodCalc]);
+    }, [selectedMethodId, installments, chargeTarget, view, calcBaseAmount]);
 
 
     const handleQuickDenomination = (val: number) => {
@@ -643,7 +910,7 @@ const PaymentModal = ({
     );
 
     const legFinalCharged =
-        paymentCalculation?.success && basisForMethodCalc > 0.009
+        paymentCalculation?.success && calcBaseAmount > 0.009
             ? Number(paymentCalculation.finalAmount || 0)
             : null;
 
@@ -687,7 +954,9 @@ const PaymentModal = ({
             const other = payments.reduce((acc, p, idx) => (idx !== editingPaymentIndex ? acc + p.amount : acc), 0);
             return other + paymentBaseAmount;
         }
-        if (view === 'money') return paymentBaseAmount;
+        if (view === 'money' || view === 'pix' || view === 'card') {
+            return paymentBaseAmount;
+        }
         if (legFinalCharged != null) return legFinalCharged;
         return paymentBaseAmount;
     }, [view, splitPreview, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount, legFinalCharged]);
@@ -761,6 +1030,33 @@ const PaymentModal = ({
         : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
 
     const selectedMethodObj = selectedMethodId ? activeMethods.find((m) => m.id === selectedMethodId) : null;
+
+    const getBaseAmountFromFinal = (finalAmt: number) => {
+        if (!paymentCalculation?.success || !selectedMethodObj) {
+            return finalAmt;
+        }
+        const feePercent = Math.max(0, Number(selectedMethodObj.fee_percent || 0));
+        const feeFixed = Math.max(0, Number(selectedMethodObj.fee_fixed || 0));
+        const feeBearer = selectedMethodObj.fee_bearer || "merchant";
+        const discountPercent = Number(selectedMethodObj.discount_percent || 0);
+        const totalInterestPercent = Number(paymentCalculation.appliedInterestPercent || 0);
+
+        const d = discountPercent / 100;
+        const r = totalInterestPercent / 100;
+        const fp = feePercent / 100;
+        const fx = feeFixed;
+
+        const A = (1 - d) * (1 + r);
+        if (A <= 0) return finalAmt;
+
+        if (feeBearer === "customer") {
+            if (finalAmt <= fx) return 0;
+            return (finalAmt - fx) / (A * (1 + fp));
+        } else {
+            return finalAmt / A;
+        }
+    };
+
     const getTitle = () => {
         const selectedTypeLabel =
             selectedMethodType === "pix" ? "Pix" :
@@ -775,12 +1071,27 @@ const PaymentModal = ({
             case 'pix': return `Pix${methodSuffix}`;
             case 'split': return 'Dividir Pagamento';
             case 'split_method_select': return 'Selecionar Método';
+            case 'mercadopago': return mpStep === 'pix' ? 'Pix (Mercado Pago)' : mpStep === 'boleto' ? 'Boleto (Mercado Pago)' : 'Mercado Pago';
             default: return 'Pagamento';
         }
     };
 
     const handleGoBack = () => {
-        if (view === 'money' || view === 'card' || view === 'pix') {
+        if (view === 'mercadopago') {
+            // Clean up brick when going back
+            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
+                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+                mpBrickIdRef.current = null;
+            }
+            mpBrickInitializedRef.current = false;
+            setMpBrickReady(false);
+            setMpBrickError(null);
+            setMpStep('brick');
+            setMpPixData(null);
+            setMpBoletoData(null);
+            setMpPaymentId(null);
+            setView('methods');
+        } else if (view === 'money' || view === 'card' || view === 'pix') {
             resetSelectedMethodPricing();
             if (editingPaymentIndex !== null) {
                 setView('split_method_select');
@@ -891,7 +1202,9 @@ const PaymentModal = ({
                         }
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
-                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged) ? basisForMethodCalc : Number(paymentBaseAmount || 0),
+                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged)
+                        ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.01 ? calcBaseAmount : getBaseAmountFromFinal(paymentBaseAmount))
+                        : Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -907,7 +1220,7 @@ const PaymentModal = ({
 
         const singleRegisterAmount =
             view !== 'split' && paymentCalculation?.success && legFinalCharged != null && Number.isFinite(legFinalCharged)
-                ? legFinalCharged
+                ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.01 ? legFinalCharged : Number(paymentBaseAmount || 0))
                 : view !== 'split'
                     ? Number(paymentBaseAmount || 0)
                     : 0;
@@ -1219,6 +1532,17 @@ const PaymentModal = ({
                                                     disabled={isMarketplaceOrder && role !== 'owner' && role !== 'admin'}
                                                     onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                 />
+                                                {mpConnected && (
+                                                    <button
+                                                        onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
+                                                        className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"
+                                                    >
+                                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00b1ea]/10 flex items-center justify-center transition-colors group-hover:bg-white dark:group-hover:bg-dark-surface overflow-hidden">
+                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-6 h-6 md:w-7 md:h-7 object-contain" />
+                                                        </div>
+                                                        <span className="font-bold text-xs md:text-sm text-brand-dark dark:text-dark-heading">Mercado Pago</span>
+                                                    </button>
+                                                )}
                                             </div>
 
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
@@ -1256,18 +1580,18 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'money' && (
-                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "pointer-events-none opacity-60")}>
+                                        <motion.div key="money" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("w-full h-full flex flex-col items-center px-2", isSinglePricingBusy && "opacity-60")}>
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="w-full max-w-sm space-y-3">
                                                 <div className="rounded-[28px] bg-white px-4 pt-2 pb-4 dark:bg-dark-surface">
                                                     <PaymentAmountLabel
                                                         label="Valor recebido (dinheiro)"
                                                         calculation={paymentCalculation}
-                                                        baseAllocated={basisForMethodCalc}
+                                                        baseAllocated={calcBaseAmount}
                                                     />
                                                     <div className="flex justify-center mt-2">
                                                         <MoneyInput
-                                                            value={legFinalCharged ?? paymentBaseAmount}
+                                                            value={paymentBaseAmount}
                                                             onChange={handleMoneyInputSync}
                                                             className="text-center text-[42px] font-black tracking-tight text-brand-dark dark:text-dark-heading border-none bg-transparent h-auto py-0 focus:ring-0 focus:border-none shadow-none"
                                                             prefix=""
@@ -1299,17 +1623,17 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'pix' && (
-                                        <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "pointer-events-none opacity-60")}>
+                                        <motion.div key="pix" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-0 w-full", isSinglePricingBusy && "opacity-60")}>
                                             <div className="w-full max-w-sm space-y-4">
                                                 <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                                 <div className="min-w-0 flex-1">
                                                     <PaymentAmountLabel
                                                         label="Valor a receber"
                                                         calculation={paymentCalculation}
-                                                        baseAllocated={basisForMethodCalc}
+                                                        baseAllocated={calcBaseAmount}
                                                     />
                                                     <MoneyInput
-                                                        value={legFinalCharged != null ? legFinalCharged : paymentBaseAmount}
+                                                        value={paymentBaseAmount}
                                                         onChange={setPaymentBaseAmount}
                                                         className="font-bold text-lg"
                                                     />
@@ -1340,14 +1664,14 @@ const PaymentModal = ({
                                     )}
 
                                     {view === 'card' && (
-                                        <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "pointer-events-none opacity-60")}>
+                                        <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "opacity-60")}>
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
                                                 <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-100 dark:border-green-900/30">
                                                     <CreditCardIcon size={40} className="text-green-600 dark:text-green-400" />
                                                 </div>
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                                    {formatCurrency(legFinalCharged != null ? legFinalCharged : chargeTarget)}
+                                                    {formatCurrency(paymentBaseAmount)}
                                                 </div>
                                                 <p className="text-brand-inactive-text">Aguardando leitura do cartão...</p>
                                             </div>
@@ -1356,10 +1680,10 @@ const PaymentModal = ({
                                                     <PaymentAmountLabel
                                                         label="Valor a receber"
                                                         calculation={paymentCalculation}
-                                                        baseAllocated={basisForMethodCalc}
+                                                        baseAllocated={calcBaseAmount}
                                                     />
                                                     <MoneyInput
-                                                        value={legFinalCharged != null ? legFinalCharged : paymentBaseAmount}
+                                                        value={paymentBaseAmount}
                                                         onChange={setPaymentBaseAmount}
                                                         className="font-bold text-lg"
                                                     />
@@ -1488,6 +1812,173 @@ const PaymentModal = ({
                                                         );
                                                     })}
                                             </div>
+                                        </motion.div>
+                                    )}
+                                    {view === 'mercadopago' && (
+                                        <motion.div key="mercadopago" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col">
+                                            {mpStep === 'brick' && (
+                                                <div className="w-full flex flex-col items-center">
+                                                    {!mpBrickReady && !mpBrickError && (
+                                                        <div className="flex flex-col items-center justify-center py-16 gap-4">
+                                                            <Spinner size={32} className="text-brand-green" />
+                                                            <p className="text-sm font-medium text-brand-inactive-text">Carregando checkout Mercado Pago...</p>
+                                                        </div>
+                                                    )}
+                                                    {mpBrickError && (
+                                                        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                                                            <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                                                                <CancelCircleIcon size={32} className="text-brand-red" />
+                                                            </div>
+                                                            <p className="text-sm font-medium text-brand-red max-w-sm">{mpBrickError}</p>
+                                                            <Button variant="outline" onClick={() => { setMpBrickError(null); mpBrickInitializedRef.current = false; setMpBrickReady(false); initializeMpBrick(); }} className="mt-2">
+                                                                Tentar novamente
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                    {mpIsProcessing && (
+                                                        <div className="absolute inset-0 bg-white/80 dark:bg-dark-surface/80 z-50 flex flex-col items-center justify-center gap-4">
+                                                            <Spinner size={32} className="text-brand-green" />
+                                                            <p className="text-sm font-medium text-brand-inactive-text">Processando pagamento...</p>
+                                                        </div>
+                                                    )}
+                                                    <div id="erpPaymentBrick_container" className="w-full" />
+                                                </div>
+                                            )}
+
+                                            {mpStep === 'pix' && mpPixData && (
+                                                <div className="flex flex-col items-center px-2 pt-4">
+                                                    <div className="text-center mb-6">
+                                                        <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
+                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-8 h-8 object-contain" />
+                                                        </div>
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Pix gerado via Mercado Pago</h3>
+                                                        <p className="text-sm text-brand-inactive-text">Escaneie o QR Code ou copie o código</p>
+                                                    </div>
+
+                                                    <div className="bg-white p-5 rounded-2xl border border-brand-border dark:border-dark-border mb-6 shadow-sm">
+                                                        <img src={`data:image/png;base64,${mpPixData.qrCodeBase64}`} alt="QR Code Pix" className="w-48 h-48 mx-auto" />
+                                                    </div>
+
+                                                    <div className="text-center mb-4">
+                                                        <span className="text-3xl font-black text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
+                                                    </div>
+
+                                                    <div className="w-full max-w-sm relative mb-6">
+                                                        <input
+                                                            type="text" readOnly
+                                                            value={mpPixData.qrCode}
+                                                            className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent focus:border-brand-green outline-none font-medium truncate"
+                                                        />
+                                                        <button
+                                                            onClick={handleMpCopyPixCode}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-dark-border/50 rounded-lg transition-colors text-brand-dark dark:text-dark-heading"
+                                                        >
+                                                            {mpCopied ? <CheckCircleIcon size={18} className="text-brand-green" /> : <CopyIcon size={18} />}
+                                                        </button>
+                                                    </div>
+
+                                                    <Button variant="filled" className="w-full max-w-sm h-12" onClick={handleMpConfirmPix}>
+                                                        Confirmar pagamento recebido
+                                                    </Button>
+                                                    <p className="text-xs text-brand-inactive-text mt-3 text-center max-w-sm">
+                                                        Confirme após o cliente realizar o Pix. O status será atualizado automaticamente pelo webhook.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {mpStep === 'boleto' && mpBoletoData && (
+                                                <div className="flex flex-col items-center px-2 pt-4">
+                                                    <div className="text-center mb-6">
+                                                        <div className="w-16 h-16 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mx-auto mb-4">
+                                                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-8 h-8 object-contain" />
+                                                        </div>
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">Boleto gerado via Mercado Pago</h3>
+                                                        <p className="text-sm text-brand-inactive-text">Compartilhe o boleto com o cliente</p>
+                                                    </div>
+
+                                                    <div className="text-center mb-6">
+                                                        <span className="text-3xl font-black text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
+                                                    </div>
+
+                                                    {mpBoletoData.barcode && (
+                                                        <div className="w-full max-w-sm relative mb-4">
+                                                            <input
+                                                                type="text" readOnly value={mpBoletoData.barcode}
+                                                                className="w-full pl-4 pr-12 py-4 rounded-xl bg-gray-100 dark:bg-dark-border/30 text-sm text-brand-inactive-text border border-transparent outline-none font-medium truncate"
+                                                            />
+                                                            <button
+                                                                onClick={() => { navigator.clipboard.writeText(mpBoletoData.barcode); toast({ title: "Linha digitável copiada!" }); }}
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 rounded-lg transition-colors text-brand-dark"
+                                                            >
+                                                                <CopyIcon size={18} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {mpBoletoData.ticketUrl && (
+                                                        <a href={mpBoletoData.ticketUrl} target="_blank" rel="noopener noreferrer" className="w-full max-w-sm mb-4">
+                                                            <Button variant="outline" className="w-full h-12">
+                                                                <PrinterIcon size={18} className="mr-2" />
+                                                                Abrir Boleto
+                                                            </Button>
+                                                        </a>
+                                                    )}
+
+                                                    <Button variant="filled" className="w-full max-w-sm h-12 mt-2" onClick={() => {
+                                                        handleStartProcessing({
+                                                            paymentMethod: "Boleto (Mercado Pago)",
+                                                            paymentProvider: "Mercado Pago",
+                                                            mpPaymentId: mpPaymentId,
+                                                            paymentStatus: "unpaid",
+                                                            paidAmount: 0,
+                                                            paymentBreakdown: [],
+                                                            splitPayments: [],
+                                                            isPendingDelivery,
+                                                        });
+                                                    }}>
+                                                        Registrar venda (pagamento pendente)
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {mpStep === 'mp_redirect' && (
+                                                <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                                                    <div className="w-20 h-20 rounded-full bg-[#00b1ea]/10 flex items-center justify-center mb-2">
+                                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="MP" className="w-10 h-10 object-contain" />
+                                                    </div>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Nova aba aberta</h3>
+                                                    <p className="text-sm text-brand-inactive-text max-w-sm">
+                                                        O pagamento será processado na aba do Mercado Pago. Após a conclusão, volte aqui para registrar a venda.
+                                                    </p>
+                                                    <Button variant="filled" className="mt-4 h-12 px-8" onClick={() => {
+                                                        handleStartProcessing({
+                                                            paymentMethod: "Mercado Pago",
+                                                            paymentProvider: "Mercado Pago",
+                                                            mpPaymentId: mpPaymentId,
+                                                            paymentStatus: "unpaid",
+                                                            paidAmount: 0,
+                                                            paymentBreakdown: [],
+                                                            splitPayments: [],
+                                                            isPendingDelivery,
+                                                        });
+                                                    }}>
+                                                        Registrar venda (pendente)
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {mpStep === 'error' && (
+                                                <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                                                    <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                                                        <CancelCircleIcon size={32} className="text-brand-red" />
+                                                    </div>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Erro no pagamento</h3>
+                                                    <p className="text-sm text-brand-red max-w-sm">{mpBrickError || "Ocorreu um erro ao processar o pagamento."}</p>
+                                                    <Button variant="outline" onClick={() => { setMpStep("brick"); setMpBrickError(null); mpBrickInitializedRef.current = false; }} className="mt-2">
+                                                        Tentar novamente
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </motion.div>
                                     )}
                                 </motion.div>
@@ -1653,6 +2144,11 @@ const PaymentModal = ({
 
                             {/* 4. Split Method Select Footer */}
                             {(view === 'split_method_select' || view === 'method_type_select') && (
+                                <ActionFooter showConfirm={false} />
+                            )}
+
+                            {/* 5. Mercado Pago Footer (brick has its own button, pix/boleto have inline buttons) */}
+                            {view === 'mercadopago' && (
                                 <ActionFooter showConfirm={false} />
                             )}
                         </div>

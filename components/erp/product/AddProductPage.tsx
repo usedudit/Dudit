@@ -703,7 +703,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             )}
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
                                             {internalMode === "add" && "Preencha as informações do novo produto"}
                                             {internalMode === "duplicate" && <>Original: <span className="font-medium">{originalNameForDuplicate}</span></>}
                                             {(internalMode === "details" || internalMode === "edit") && <>SKU {productData.sku || "N/A"} • Criado em {dateCreated}</>}

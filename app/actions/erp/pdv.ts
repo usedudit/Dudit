@@ -69,6 +69,8 @@ type FinalizePreSaleInput = {
     paymentMethod?: string | null
     paymentBreakdown?: FinalizePaymentEntry[]
     isPendingDelivery?: boolean
+    paymentProvider?: string
+    mpPaymentId?: string | null
 }
 
 type PosPaymentResolveResult =
@@ -219,6 +221,8 @@ async function syncPosSaleToOrders(params: {
     defaultPaymentMethod: string
     actorUserId: string
     isPendingDelivery?: boolean
+    paymentProvider?: string
+    mpPaymentId?: string | null
 }): Promise<string | null> {
     const admin = createAdminClient()
     const { data: existingOrder } = await admin
@@ -348,6 +352,8 @@ async function syncPosSaleToOrders(params: {
         notes: sale.notes || null,
         payment_method: formatPaymentMethodLabel(params.defaultPaymentMethod),
         payment_breakdown: [],
+        payment_provider: params.paymentProvider || null,
+        mp_payment_id: params.mpPaymentId || null,
         finance_account_id: params.financeAccountId || null,
         created_by: params.actorUserId,
         inventory_deducted: true,
@@ -803,6 +809,8 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         defaultPaymentMethod: input.paymentMethod || "PDV",
         actorUserId: user.id,
         isPendingDelivery: input.isPendingDelivery,
+        paymentProvider: input.paymentProvider,
+        mpPaymentId: input.mpPaymentId,
     })
 
     // Invalidate caches (non-blocking - sale is already safely committed)

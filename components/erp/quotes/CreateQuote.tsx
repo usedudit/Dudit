@@ -895,8 +895,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
-                                                    <h1 className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                        <span className="truncate">{pageTitle}</span>
+                                                    <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                        <span className="hidden md:inline truncate">{pageTitle}</span>
                                                         {mode === "edit" && (
                                                             <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
                                                         )}
@@ -912,11 +912,11 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                                             {/* Desktop action buttons */}
                                             <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                                <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving || isEditLoadingLocked} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
+                                                <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving || isEditLoadingLocked}>
                                                     Cancelar
                                                 </Button>
-                                                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
-                                                    {!isSaving && <SaveIcon className={`${isScrolled ? "w-3.5 h-3.5" : "w-[18px] h-[18px]"} mr-2`} />}
+                                                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving}>
+                                                    {!isSaving && <SaveIcon className="w-5 h-5 mr-2" />}
                                                     {mode === 'edit' ? "Salvar" : "Salvar"}
                                                 </Button>
                                             </div>

@@ -81,9 +81,8 @@ export default function Error({
                         />
                     </a>
                     <p className="text-gray-500 text-xs sm:text-sm font-medium tracking-tight">
-                        © 2026 Dudit Tecnologia Ltda. Todos os direitos reservados.
+                        © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os direitos reservados.
                     </p>
-
                 </div>
             </footer>
         </div>

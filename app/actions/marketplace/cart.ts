@@ -536,7 +536,7 @@ export async function checkoutCartAction(
       customerId: user.id,
       subtotal: totalAmount,
       items: partnerItems.map((item) => ({ productId: item.productId })),
-    })
+    }, adminClient)
 
     if (couponResult.valid) {
       couponIdToSave = couponResult.couponId || null
@@ -549,7 +549,7 @@ export async function checkoutCartAction(
       customerId: user.id,
       subtotal: totalAmount,
       items: partnerItems.map((item) => ({ productId: item.productId })),
-    })
+    }, adminClient)
 
     if (autoResult.valid) {
       couponIdToSave = autoResult.couponId || null

@@ -206,7 +206,7 @@ async function handler(request: NextRequest) {
         customerId: user.id,
         subtotal: totalAmount,
         items: items.map(i => ({ productId: i.id })) // simplified
-      })
+      }, adminClient)
 
       if (couponResult.valid) {
         couponDiscount = couponResult.discountAmount

@@ -40,6 +40,7 @@ interface AddressTabProps {
     originalDeliveryStatus?: string
     isMarketplaceLocked?: boolean
     isPaidOrder?: boolean
+    role?: string
 }
 
 export const AddressTab: React.FC<AddressTabProps> = ({
@@ -74,8 +75,12 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     originalDeliveryStatus = 'not_sent',
     isMarketplaceLocked = false,
     isPaidOrder = false,
+    role = "OPERATOR",
 }) => {
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryMethod === "pickup" ? "delivered" : deliveryStatus)
+
+    const isAddressLocked = isPaidOrder || role === 'DELIVERY'
+    const isDeliveryLocked = originalDeliveryStatus === 'delivered' || role === 'DELIVERY'
 
     return (
         <FadeIn>
@@ -95,9 +100,9 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                     setUf(data.state || "SP")
                                     setNoNumber(data.number === "S/N")
                                 }}
-                                disabled={isMarketplaceLocked && isPaidOrder}
+                                disabled={isAddressLocked}
                             />
-                            <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." disabled={isMarketplaceLocked && isPaidOrder} value={street} onChange={(e: any) => setStreet(e.target.value)} />
+                            <Input label="Rua/Avenida" placeholder="Rua, Avenida, etc." disabled={isAddressLocked} value={street} onChange={(e: any) => setStreet(e.target.value)} />
 
                             <div className="grid grid-cols-2 gap-3 flex-row items-center pt-1.5 pb-1.5">
                                 <NumberInputWithCheckbox
@@ -109,20 +114,20 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                         setNoNumber(checked)
                                         if (checked) setNumber("")
                                     }}
-                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    disabled={isAddressLocked}
                                     placeholder="123"
                                 />
-                                <Input label="Complemento" placeholder="Apto, Bloco, etc." disabled={isMarketplaceLocked && isPaidOrder} value={complement} onChange={(e: any) => setComplement(e.target.value)} />
+                                <Input label="Complemento" placeholder="Apto, Bloco, etc." disabled={isAddressLocked} value={complement} onChange={(e: any) => setComplement(e.target.value)} />
                             </div>
-                            <Input label="Bairro" placeholder="Nome do bairro" disabled={isMarketplaceLocked && isPaidOrder} value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
+                            <Input label="Bairro" placeholder="Nome do bairro" disabled={isAddressLocked} value={neighborhood} onChange={(e: any) => setNeighborhood(e.target.value)} />
 
                             <div className="grid grid-cols-2 gap-3 items-end">
-                                <Input label="Cidade" placeholder="Nome da cidade" disabled={isMarketplaceLocked && isPaidOrder} value={city} onChange={(e: any) => setCity(e.target.value)} />
+                                <Input label="Cidade" placeholder="Nome da cidade" disabled={isAddressLocked} value={city} onChange={(e: any) => setCity(e.target.value)} />
                                 <StateComboBox
                                     value={uf}
                                     onChange={setUf}
                                     className="w-full"
-                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                    disabled={isAddressLocked}
                                 />
                             </div>
                         </div>
@@ -138,28 +143,28 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 value={selectedDeliveryPersonId || "none"}
                                 setValue={(val: any) => setSelectedDeliveryPersonId(val === "none" ? "" : val)}
                                 options={[{ value: "none", label: "Sem entregador (não atribuído)" }, ...deliveryPeopleOptions]}
-                                disabled={isMarketplaceLocked && !isPaidOrder}
+                                disabled={isDeliveryLocked}
                             />
                             <FormDropdown
                                 label="Status"
                                 value={deliveryMethod === "pickup" ? "delivered" : deliveryStatus}
                                 setValue={(val: any) => setDeliveryStatus(val)}
                                 options={deliveryStatusOptions}
-                                disabled={deliveryMethod === "pickup" || (isMarketplaceLocked && (!isPaidOrder || originalDeliveryStatus === 'delivered'))}
+                                disabled={deliveryMethod === "pickup" || isDeliveryLocked}
                             />
                             <DatePicker
                                 label="Data de saída"
                                 value={deliveryDate}
                                 onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
                                 placeholder="Selecione a data"
-                                disabled={isMarketplaceLocked && !isPaidOrder}
+                                disabled={isDeliveryLocked}
                             />
                             <TimePicker
                                 label="Horário de saída"
                                 value={deliveryTime}
                                 onChange={setDeliveryTime}
                                 placeholder="Selecione o horário"
-                                disabled={isMarketplaceLocked && !isPaidOrder}
+                                disabled={isDeliveryLocked}
                             />
                         </div>
 

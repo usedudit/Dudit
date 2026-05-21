@@ -75,7 +75,8 @@ type ERPOrderPayload = {
         state: string
     }
     csrf_token?: string
-    manualOverrideReason?: string
+    paymentProvider?: string | null
+    mpPaymentId?: string | null
 }
 
 type OrderStockItem = {
@@ -1367,7 +1368,8 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         notes: data.notes || null,
         payment_method: paymentMethodSummary,
         payment_breakdown: adjustedPaymentBreakdown,
-        payment_provider: null,
+        payment_provider: data.paymentProvider || null,
+        mp_payment_id: data.mpPaymentId || null,
         delivery_address: deliveryAddressStr || null,
         finance_account_id: data.financeAccountId,
         created_by: user.id,
@@ -1706,7 +1708,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
+    const { roleId } = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
 
     const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
     const csrfValidation = await requireCSRF(data.csrf_token)
@@ -1735,6 +1737,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             notes,
             payment_method,
             payment_breakdown,
+            payment_provider,
+            mp_payment_id,
             finance_account_id,
             delivery_address,
             inventory_deducted,
@@ -1746,6 +1750,64 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         .single()
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
+
+    // Enforce role-based and status-based editing locks
+    const isPaidOrder = currentOrder.situation === 'paid' || currentOrder.situation === 'partially_paid'
+    const isDeliveredOrder = currentOrder.delivery_status === 'delivered'
+
+    if (roleId === "delivery") {
+        return { error: "Entregadores não têm permissão para editar pedidos." }
+    }
+
+    // Check if items changed
+    const currentItems = currentOrder.order_items || []
+    const hasItemsChanged = currentItems.length !== sanitizedItems.length ||
+        sanitizedItems.some((itemA: any, idx: number) => {
+            const itemB = currentItems[idx]
+            if (!itemB) return true
+            return itemA.productId !== itemB.product_id ||
+                itemA.variantId !== itemB.variant_id ||
+                itemA.quantity !== itemB.quantity ||
+                Math.abs((itemA.unitPrice || 0) - (itemB.product_price || 0)) > 0.009
+        })
+
+    // Check if address changed
+    let deliveryAddressStr = ""
+    if (data.deliveryMethod === "delivery" && data.address?.street && data.address.number) {
+        const { street, number, neighborhood, city, state, zipCode, complement } = data.address
+        deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
+    }
+    const hasAddressChanged = deliveryAddressStr !== (currentOrder.delivery_address || "")
+
+    // Check if financial / general settings changed
+    const hasFinancialChanged = Math.abs(Number(currentOrder.total_amount || 0) - Number(data.totalAmount || 0)) > 0.009 ||
+        Math.abs(Number(currentOrder.discount_value || 0) - Number(data.discountValue || 0)) > 0.009 ||
+        Math.abs(Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0)) > 0.009 ||
+        Math.abs(Number(currentOrder.additional_costs || 0) - Number(data.additionalCosts || 0)) > 0.009 ||
+        data.financeAccountId !== currentOrder.finance_account_id ||
+        data.salesChannel !== currentOrder.order_source ||
+        data.deliveryMethod !== currentOrder.delivery_type ||
+        data.customerName !== currentOrder.customer_name ||
+        data.paymentStatus !== currentOrder.situation
+
+    const hasGeneralChanged = hasItemsChanged || hasAddressChanged || hasFinancialChanged
+
+    if (isPaidOrder) {
+        if (isDeliveredOrder) {
+            // Paid and delivered: only observations (notes) can change.
+            // If anything else changed, block it.
+            const hasDeliveryChanged = data.deliveryStatus !== currentOrder.delivery_status
+            if (hasGeneralChanged || hasDeliveryChanged) {
+                return { error: "Não é permitido alterar dados após a entrega do pedido pago." }
+            }
+        } else {
+            // Paid but not delivered: items, values, client details, address details are locked.
+            if (hasGeneralChanged) {
+                return { error: "Não é permitido alterar itens, valores ou dados do cliente após o pagamento do pedido." }
+            }
+        }
+    }
+
     const delta = buildInventoryMovementDelta(currentOrder.order_items || [], sanitizedItems)
     const stockItemsToValidate = currentOrder.inventory_deducted
         ? delta.outgoing.map((item) => ({
@@ -1779,7 +1841,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         return { error: "A venda não pode ser salva com valor total zerado." }
     }
 
-    let deliveryAddressStr = ""
+    // Reuse the already declared deliveryAddressStr variable
     if (data.deliveryMethod === "delivery" && data.address?.street && data.address.number) {
         const { street, number, neighborhood, city, state, zipCode, complement } = data.address
         deliveryAddressStr = `${street}, ${number}${complement ? ` (${complement})` : ""}, ${neighborhood}, ${city} - ${state}, ${zipCode}`
@@ -1792,7 +1854,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     })
 
     const changeLines = buildOrderChangeLines(currentOrder, { ...data, items: sanitizedItems })
-    if (changeLines.length === 0 && !data.manualOverrideReason) {
+    if (changeLines.length === 0) {
         return { success: true, noChanges: true }
     }
 
@@ -1894,7 +1956,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         payment_method: paymentMethodSummary,
         payment_breakdown: adjustedPaymentBreakdown,
         finance_account_id: data.financeAccountId,
-        payment_provider: null,
+        payment_provider: data.paymentProvider !== undefined ? data.paymentProvider : ((currentOrder as any).payment_provider || null),
+        mp_payment_id: data.mpPaymentId !== undefined ? data.mpPaymentId : ((currentOrder as any).mp_payment_id || null),
         ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
         ...(preparationEstimate || {}),
     }
@@ -2045,11 +2108,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         entityType: "order",
         entityId: orderId,
         actionType: "updated",
-        changeLines: data.manualOverrideReason
-            ? [`Edição manual autorizada pelo Admin. Motivo: ${data.manualOverrideReason}`, ...changeLines]
-            : changeLines,
+        changeLines: changeLines,
         metadata: {
-            ...(data.manualOverrideReason ? { manualOverrideReason: data.manualOverrideReason } : {}),
             ...(currentOrder.situation !== paymentState.situation
                 ? {
                     oldStatus: getPaymentStatusLabel(currentOrder.situation),
