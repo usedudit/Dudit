@@ -5,6 +5,10 @@ import { revalidateExploreSearch } from './utils/revalidation'
 
 type ItemType = 'produto' | 'servico' | 'loja'
 
+export function getExploreRedisDataKey(type: string, id: string): string {
+  return `data:v2:${type}:${id}`
+}
+
 interface SyncItemOptions {
   id: string
   type: ItemType
@@ -42,7 +46,7 @@ export async function syncToExploreRedis({
 }: SyncItemOptions): Promise<void> {
   const typeIndexKey = `explore:index:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`
   const globalIndexKey = `explore:index:all`
-  const dataKey = `data:v2:${type}:${id}`
+  const dataKey = getExploreRedisDataKey(type, id)
   const memberId = `${type}:${id}`
   const finalScore = score ?? new Date(data.created_at || Date.now()).getTime()
 

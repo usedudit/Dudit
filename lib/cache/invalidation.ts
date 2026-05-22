@@ -43,9 +43,9 @@ export async function invalidateProductCache(
   // 2. Synchronize individual product cache (ZSETs and object cache) for direct requests/FTS
   try {
     if (action === 'delete') {
-      await removeFromExploreRedis(productId, "produto", !!options?.silent)
+      await removeFromExploreRedis(productId, "produto", true)
     } else {
-      await syncToExploreRedis({ id: productId, type: "produto", data: {}, silent: !!options?.silent })
+      await syncToExploreRedis({ id: productId, type: "produto", data: {}, silent: true })
     }
   } catch (error) {
     console.error(`[CACHE] Erro ao sincronizar ZSETs do Redis:`, error)

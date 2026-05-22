@@ -114,9 +114,9 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
     orderId: row.order_id,
     orderNumber: row.order_number_snapshot || row.orders?.order_number || String(row.order_id).slice(0, 8),
     customerId: row.customer_id || row.customer_user_id || "",
-    customerName: row.customer_name_snapshot || row.customers?.name || row.orders?.customer_name || "Cliente",
-    customerEmail: row.customers?.email || undefined,
-    customerPhone: row.customers?.phone || undefined,
+    customerName: row.customer_name_snapshot || row.orders?.customer_name || "Cliente",
+    customerEmail: row.customer_email_snapshot || undefined,
+    customerPhone: undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     source: row.source || "erp",
@@ -157,9 +157,8 @@ export async function getReturnRequestsPageAction(
       .select(`
         id, partner_id, order_id, customer_id, customer_user_id, source, desired_resolution, approved_resolution,
         reason, customer_message, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
-        order_number_snapshot, order_total_snapshot, customer_name_snapshot, expires_at, created_at, updated_at,
+        order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         orders(order_number, customer_name),
-        customers(id, name, email, phone),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
@@ -217,7 +216,6 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
       .select(`
         *,
         orders(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
-        customers(id, name, email, phone),
         return_items(*, products(images)),
         return_evidence(*),
         return_events(*),
@@ -515,11 +513,15 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
     const buyerIds = Array.from(new Set((orders || []).map((o: any) => o.buyer_id).filter(Boolean)))
     const customersMap = new Map<string, any>()
     if (buyerIds.length > 0) {
-      const { data: customersData } = await supabase
-        .from("customers")
-        .select("id, name, email, phone, addresses(*)")
-        .in("id", buyerIds)
-      ;(customersData || []).forEach((c: any) => customersMap.set(c.id, c))
+      try {
+        const { data: customersData } = await supabase
+          .from("customers")
+          .select("id, name, email, phone")
+          .in("id", buyerIds)
+        ;(customersData || []).forEach((c: any) => customersMap.set(c.id, c))
+      } catch (_) {
+        // customers join is optional — snapshot fields cover the essential data
+      }
     }
 
     return (orders || []).map((order: any) => {

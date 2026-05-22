@@ -1,3 +1,11 @@
+/**
+ * @deprecated CÓDIGO MORTO / DEAD CODE
+ * Este endpoint não é mais utilizado pelo sistema. A moderação de imagens agora utiliza
+ * o serviço do Sightengine diretamente no endpoint de upload, e a moderação de texto não
+ * possui chamadas ativas na aplicação.
+ * NÃO remover o arquivo fisicamente sem autorização.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import { Redis } from "@upstash/redis"
 import { Ratelimit } from "@upstash/ratelimit"

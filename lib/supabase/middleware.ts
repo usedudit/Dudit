@@ -19,6 +19,18 @@ const PUBLIC_PATHS = [
 // Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout
 const STATIC_INSTITUTIONAL_PATHS = ["/institucional", "/ajuda"]
 
+// Rotas da API que possuem seu próprio rate limit interno e devem ser isentas do rate limit global no middleware
+const RATE_LIMIT_EXEMPT_PATHS = [
+  "/api/upload-image",
+  "/api/r2/video-upload",
+  "/api/mercadopago/webhook/subscription",
+  "/api/mercadopago/process-payment",
+  "/api/mercadopago/process-erp-payment",
+  "/api/emails/send",
+  "/api/ai/suggest-ncm",
+  "/api/ai/suggest-cest",
+]
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(p =>
     p.endsWith("/") ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + "/")
@@ -107,8 +119,11 @@ export async function middleware(request: NextRequest) {
   const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown"
 
   // 1. RATE LIMITING (APIs e Auth POST)
-  // Uses category-based system with explicit limits
-  if (pathname.startsWith("/api/") || (pathname.startsWith("/auth/") && request.method === "POST")) {
+  // Uses category-based system with explicit limits. Exempts routes with custom rate limits.
+  const isApiOrAuthPost = pathname.startsWith("/api/") || (pathname.startsWith("/auth/") && request.method === "POST")
+  const isRateLimitExempt = RATE_LIMIT_EXEMPT_PATHS.includes(pathname)
+
+  if (isApiOrAuthPost && !isRateLimitExempt) {
     const category = (pathname.startsWith("/auth/") && request.method === "POST")
       ? RateLimitCategory.AUTH_LOGIN
       : RateLimitCategory.API_GENERAL

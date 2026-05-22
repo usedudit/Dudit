@@ -1,3 +1,10 @@
+/**
+ * @deprecated CÓDIGO MORTO / DEAD CODE
+ * Este endpoint não é mais utilizado pelo sistema. A página de explorar (/explorar)
+ * agora carrega os dados diretamente via Server Actions (getCachedExploreProducts).
+ * NÃO remover o arquivo fisicamente sem autorização.
+ */
+
 import { NextResponse } from 'next/server'
 import { redis } from '@/lib/redis'
 import { getAdminClient } from '@/lib/supabase/admin'

@@ -77,6 +77,7 @@ export default function CreateReturnPage({
         () => fetchReturnOrderBucketAction(partnerId) as Promise<any[]>,
         (order, q) =>
             String(order.displayId || "").toLowerCase().includes(q) ||
+            String(order.order_number || "").toLowerCase().includes(q) ||
             String(order.customer_name || "").toLowerCase().includes(q),
         { pageSize: 8 }
     )

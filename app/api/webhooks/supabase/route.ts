@@ -42,23 +42,23 @@ export async function POST(req: Request) {
 
         if (table === 'products') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.show_in_marketplace === false) || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'produto')
+            await removeFromExploreRedis(id, 'produto', true)
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id, type: 'produto', data: {} })
+            await syncToExploreRedis({ id, type: 'produto', data: {}, silent: true })
           }
         }
         else if (table === 'services') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'servico')
+            await removeFromExploreRedis(id, 'servico', true)
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id, type: 'servico', data: {} })
+            await syncToExploreRedis({ id, type: 'servico', data: {}, silent: true })
           }
         }
         else if (table === 'partners') {
           if (type === 'DELETE' || (type === 'UPDATE' && record.is_active === false)) {
-            await removeFromExploreRedis(id, 'loja')
+            await removeFromExploreRedis(id, 'loja', true)
           } else if (type === 'INSERT' || type === 'UPDATE') {
-            await syncToExploreRedis({ id: id, type: 'loja', data: {} })
+            await syncToExploreRedis({ id: id, type: 'loja', data: {}, silent: true })
             await syncPartnerItemsToExploreRedis(id)
           }
         }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { redis } from '@/lib/redis'
-import { syncToExploreRedis } from '@/lib/redis-sync'
+import { syncToExploreRedis, getExploreRedisDataKey } from '@/lib/redis-sync'
 
 export async function GET(req: Request) {
   const start = Date.now()
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     if (recentItems.length > 0) {
       // 1. O(N) memory reconciliation via MGET das chaves do objeto para validar stale data
       // O PIPELINE apenas dizia se existia, o MGET traz os JSONs para comparar updated_at
-      const keys = recentItems.map(item => `data:${item.type}:${item.id}`)
+      const keys = recentItems.map(item => getExploreRedisDataKey(item.type, item.id))
       const cachedObjectsRaw = await redis.mget(...keys)
       
       const missingOrStaleItems = recentItems.filter((dbItem, idx) => {
