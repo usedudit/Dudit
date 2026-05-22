@@ -17,7 +17,9 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
+import { createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
+import { useR2Upload } from '@/hooks/use-r2-upload';
 
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
@@ -127,6 +129,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [pixOrderDetails, setPixOrderDetails] = useState<any>(null);
     const [isCanceling, setIsCanceling] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+    const [returnReason, setReturnReason] = useState("changed_mind");
+    const [returnResolution, setReturnResolution] = useState<"exchange" | "refund" | "store_credit">("refund");
+    const [returnMessage, setReturnMessage] = useState("");
+    const [returnItems, setReturnItems] = useState<Record<string, number>>({});
+    const [returnEvidence, setReturnEvidence] = useState<any[]>([]);
+    const evidenceUploader = useR2Upload({
+        endpoint: "/api/r2/returns-evidence",
+        allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+    });
 
     const handleBack = useCallback(() => onBack(), [onBack]);
 
@@ -192,6 +205,54 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         } finally {
             setIsCanceling(false);
             setIsCancelModalOpen(false);
+        }
+    };
+
+    const handleEvidenceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
+        const remaining = Math.max(0, 5 - returnEvidence.length);
+        for (const file of Array.from(files).slice(0, remaining)) {
+            const uploaded = await evidenceUploader.uploadFile(file);
+            setReturnEvidence(prev => [...prev, {
+                file_url: uploaded.publicUrl,
+                file_key: uploaded.key,
+                file_name: file.name,
+                file_type: uploaded.contentType || file.type,
+                file_size: file.size,
+            }]);
+        }
+        event.target.value = "";
+    };
+
+    const submitReturnRequest = async () => {
+        const items = Object.entries(returnItems)
+            .filter(([, quantity]) => Number(quantity) > 0)
+            .map(([orderItemId, quantity]) => ({ order_item_id: orderItemId, quantity: Number(quantity), reason: returnReason, resolution: returnResolution }));
+
+        if (items.length === 0) {
+            toast({ title: "Selecione ao menos um produto", variant: "destructive" });
+            return;
+        }
+
+        try {
+            setIsSubmittingReturn(true);
+            const result = await createMarketplaceReturnRequestAction({
+                orderId: order.id,
+                resolution: returnResolution,
+                reason: returnReason,
+                message: returnMessage,
+                items,
+                evidence: returnEvidence,
+                idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
+            });
+            if (!result.success) throw new Error(result.error);
+            toast({ title: "Solicitacao enviada", description: "A loja recebeu seu pedido de troca ou devolucao." });
+            setIsReturnModalOpen(false);
+        } catch (err: any) {
+            toast({ title: "Erro ao enviar", description: err.message || "Tente novamente.", variant: "destructive" });
+        } finally {
+            setIsSubmittingReturn(false);
         }
     };
 
@@ -329,6 +390,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 </Button>
                             </>
                         )}
+
+                        {order.situation !== 'pending' && order.situation !== 'cancelled' && (
+                            <>
+                                <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
+                                <Button
+                                    variant="outline"
+                                    className="w-full sm:w-auto h-12 font-bold"
+                                    onClick={() => setIsReturnModalOpen(true)}
+                                >
+                                    Solicitar troca ou devolucao
+                                </Button>
+                            </>
+                        )}
                     </div>
 
                     {/* RIGHT COLUMN - SUMMARY */}
@@ -421,6 +495,106 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 cancelText="Não, voltar"
                 variant="danger"
             />
+
+            <AnimatePresence>
+                {isReturnModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-dark-surface w-full max-w-2xl rounded-2xl overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
+                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Solicitar troca ou devolucao</h3>
+                                <button onClick={() => setIsReturnModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
+                                    <XIcon size={24} />
+                                </button>
+                            </div>
+                            <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-6">
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
+                                    {order.order_items?.map((item: any) => (
+                                        <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={Number(returnItems[item.id] || 0) > 0}
+                                                onChange={(event) => setReturnItems(prev => ({ ...prev, [item.id]: event.target.checked ? 1 : 0 }))}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
+                                                <p className="text-xs text-brand-inactive-text">Comprado: {item.quantity} un.</p>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
+                                                max={item.quantity}
+                                                value={returnItems[item.id] || 0}
+                                                onChange={(event) => setReturnItems(prev => ({
+                                                    ...prev,
+                                                    [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(event.target.value || 0))),
+                                                }))}
+                                                className="w-20 h-10 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-2 text-sm"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        Motivo
+                                        <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                            <option value="wrong_item">Recebi item errado</option>
+                                            <option value="defective">Item com defeito</option>
+                                            <option value="damaged">Item danificado</option>
+                                            <option value="different_from_description">Diferente da descricao</option>
+                                            <option value="missing_parts">Faltam partes</option>
+                                            <option value="arrived_late">Chegou atrasado</option>
+                                            <option value="changed_mind">Mudei de ideia</option>
+                                            <option value="other">Outro</option>
+                                        </select>
+                                    </label>
+                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        Resolucao
+                                        <select value={returnResolution} onChange={(e) => setReturnResolution(e.target.value as any)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                            <option value="exchange">Troca</option>
+                                            <option value="refund">Reembolso</option>
+                                            <option value="store_credit">Vale-compra</option>
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    Mensagem opcional
+                                    <textarea value={returnMessage} onChange={(e) => setReturnMessage(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
+                                </label>
+
+                                <div className="space-y-3">
+                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
+                                    <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-brand-border dark:border-dark-border p-4 text-center text-sm font-semibold text-brand-inactive-text">
+                                        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleEvidenceUpload} />
+                                        {evidenceUploader.isLoading ? "Enviando..." : "Adicionar fotos ou PDF"}
+                                        <span className="mt-1 text-xs font-medium">{returnEvidence.length}/5 arquivos</span>
+                                    </label>
+                                    {returnEvidence.length > 0 && (
+                                        <div className="grid grid-cols-2 gap-2 text-xs text-brand-inactive-text">
+                                            {returnEvidence.map((file, index) => (
+                                                <div key={`${file.file_url}-${index}`} className="truncate rounded-lg border border-brand-border p-2">{file.file_name || file.file_url}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
+                                <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
+                                <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
+                                    {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

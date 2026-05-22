@@ -5,7 +5,8 @@ import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
 import { formatDate } from "@/lib/utils"
 import { ReturnRequest } from "./types"
-import { getReturnStatusMeta, getRefundTypeLabel } from "./ReturnListRow"
+import { getReturnStatusMeta } from "./ReturnListRow"
+import { getReturnResolutionLabel } from "@/lib/returns/types"
 
 interface ReturnGridCardProps {
   returnRequest: ReturnRequest
@@ -44,8 +45,8 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
           <p className="font-bold text-brand-dark dark:text-dark-heading truncate">{returnRequest.orderNumber}</p>
         </div>
         <div>
-          <p className="text-xs text-brand-inactive-text">Tipo Reembolso</p>
-          <p className="font-bold text-brand-dark dark:text-dark-heading">{getRefundTypeLabel(returnRequest.refundType)}</p>
+          <p className="text-xs text-brand-inactive-text">Resolucao</p>
+          <p className="font-bold text-brand-dark dark:text-dark-heading">{getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")}</p>
         </div>
       </div>
 
@@ -62,8 +63,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
         <div onClick={(e) => e.stopPropagation()}>
           <ActionsDropdown 
             onView={onDetails}
-            onEdit={canManage && returnRequest.status === "pending" ? onEdit : undefined}
-            onDelete={canManage ? onDelete : undefined}
+            onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? onEdit : undefined}
           />
         </div>
       </div>

@@ -72,6 +72,7 @@ export type AuditTargetType =
     | "subscription"
     | "system"
     | "review"
+    | "return_request"
 
 export interface AdminAuditLogEntry {
     adminUserId: string
@@ -118,7 +119,7 @@ export interface CursorPaginatedResult<T> {
 
 export interface ModerationItem {
     id: string
-    type: "product" | "service" | "partner"
+    type: "product" | "service" | "partner" | "return_dispute"
     title: string
     description: string | null
     price: number

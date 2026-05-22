@@ -28,6 +28,7 @@ import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket } from "@/components/erp/hooks"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { useR2Upload } from "@/hooks/use-r2-upload"
 
 
 interface CreateReturnPageProps {
@@ -35,7 +36,7 @@ interface CreateReturnPageProps {
     mode: "create" | "edit" | "view"
     returnRequest?: ReturnRequest | null
     onBack: () => void
-    onSave: (data: Partial<ReturnRequest>) => void
+    onSave: (data: Partial<ReturnRequest> & Record<string, any>) => void
     isSaving: boolean
 }
 
@@ -93,10 +94,11 @@ export default function CreateReturnPage({
     // Form fields state
     const [returnItems, setReturnItems] = useState<ReturnItemState[]>([])
     const [returnDate, setReturnDate] = useState<Date>(new Date())
-    const [returnStatus, setReturnStatus] = useState<ReturnRequest["status"]>("pending")
+    const [returnStatus, setReturnStatus] = useState<ReturnRequest["status"]>("PENDING_REVIEW")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
     const [refundValue, setRefundValue] = useState<number>(0)
     const [evidenceImages, setEvidenceImages] = useState<string[]>([])
+    const [evidenceUploads, setEvidenceUploads] = useState<any[]>([])
     const [observations, setObservations] = useState("")
 
     // Load existing return data for edit/view modes
@@ -119,7 +121,8 @@ export default function CreateReturnPage({
             // Setup items checklist
             const items = returnRequest.items.map(item => ({
                 id: item.id,
-                productId: item.productId,
+                orderItemId: item.orderItemId || item.id,
+                productId: item.productId || "",
                 productName: item.productName,
                 sku: item.sku || "",
                 image: item.image || "",
@@ -127,36 +130,47 @@ export default function CreateReturnPage({
                 quantity: item.quantity,
                 maxQuantity: item.quantity, // cap at quantity saved
                 checked: true,
-                reason: item.reason,
-                condition: item.condition,
-                resolution: item.resolution,
+                reason: item.reason || "outro",
+                condition: item.condition || "aberto",
+                resolution: item.resolution || "reembolso",
             }))
             setReturnItems(items)
 
             // Setup details
-            setReturnDate(new Date(returnRequest.returnDate))
+            setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
             setReturnStatus(returnRequest.status)
-            setRefundType(returnRequest.refundType)
+            setRefundType(returnRequest.refundType || (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))
             setRefundValue(returnRequest.refundValue)
             setEvidenceImages(returnRequest.evidenceImages || [])
+            setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.observations || "")
         }
     }, [mode, returnRequest])
 
+    const evidenceUploader = useR2Upload({
+        endpoint: "/api/r2/returns-evidence",
+        allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+    })
 
     // Handle local image file uploading
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files
         if (!files) return
-        Array.from(files).forEach(file => {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                if (typeof reader.result === "string") {
-                    setEvidenceImages(prev => [...prev, reader.result as string])
-                }
-            }
-            reader.readAsDataURL(file)
-        })
+        const remaining = Math.max(0, 5 - evidenceUploads.length)
+        const selected = Array.from(files).slice(0, remaining)
+        for (const file of selected) {
+            const uploaded = await evidenceUploader.uploadFile(file)
+            setEvidenceUploads(prev => [...prev, {
+                file_url: uploaded.publicUrl,
+                file_key: uploaded.key,
+                file_name: file.name,
+                file_type: uploaded.contentType || file.type,
+                file_size: file.size,
+                metadata: { originalName: file.name },
+            }])
+            setEvidenceImages(prev => [...prev, uploaded.publicUrl])
+        }
+        e.target.value = ""
     }
 
     const customerAddress = useMemo(() => {
@@ -231,6 +245,7 @@ export default function CreateReturnPage({
             returnDate: returnDate.toISOString(),
             observations,
             evidenceImages,
+            evidence: evidenceUploads,
             items: checkedItems.map(item => ({
                 id: item.id,
                 productId: item.productId,
@@ -769,16 +784,22 @@ export default function CreateReturnPage({
                                                             value={returnStatus}
                                                             setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
                                                             options={[
-                                                                { value: "pending", label: "Pendente" },
-                                                                { value: "approved", label: "Aprovado" },
-                                                                { value: "rejected", label: "Recusado" }
+                                                                { value: "PENDING_REVIEW", label: "Pendente" },
+                                                                { value: "UNDER_ANALYSIS", label: "Em analise" },
+                                                                { value: "APPROVED", label: "Aprovada" },
+                                                                { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
+                                                                { value: "WAITING_ITEM_RETURN", label: "Aguardando produto" },
+                                                                { value: "PROCESSING", label: "Processando" },
+                                                                { value: "RESOLVED", label: "Resolvida" },
+                                                                { value: "REJECTED", label: "Recusada" },
+                                                                { value: "ESCALATED", label: "Escalada" }
                                                             ]}
                                                         />
 
                                                         <FormDropdown
                                                             label="Opção de Reembolso"
                                                             disabled={mode === "view"}
-                                                            value={refundType}
+                                                            value={refundType || "partial"}
                                                             setValue={(val) => setRefundType(val as ReturnRequest["refundType"])}
                                                             options={[
                                                                 { value: "full", label: "Reembolso Integral" },
@@ -820,7 +841,7 @@ export default function CreateReturnPage({
                                                                 ? {
                                                                     text: "Enviar imagem",
                                                                     type: "file",
-                                                                    accept: "image/*",
+                                                                    accept: "image/jpeg,image/png,image/webp,application/pdf",
                                                                     onChange: handleImageUpload,
                                                                 }
                                                                 : undefined
@@ -836,7 +857,10 @@ export default function CreateReturnPage({
                                                                 <button
                                                                     type="button"
                                                                     className="absolute top-2 right-2 bg-brand-red text-white rounded-full p-2 hover:bg-red-700 shadow-md transition-colors"
-                                                                    onClick={() => setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))}
+                                                                    onClick={() => {
+                                                                        setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))
+                                                                        setEvidenceUploads(prev => prev.filter((_, idx) => idx !== i))
+                                                                    }}
                                                                 >
                                                                     <TrashIcon size={16} />
                                                                 </button>
@@ -846,8 +870,8 @@ export default function CreateReturnPage({
 
                                                     {mode !== "view" && (
                                                         <label className="border-2 border-dashed border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 rounded-2xl flex flex-col items-center justify-center cursor-pointer aspect-square transition-all duration-200">
-                                                            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                                            <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">Adicionar Foto</span>
+                                                            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleImageUpload} />
+                                                            <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">{evidenceUploader.isLoading ? "Enviando..." : "Adicionar evidencia"}</span>
                                                         </label>
                                                     )}
                                                 </div>

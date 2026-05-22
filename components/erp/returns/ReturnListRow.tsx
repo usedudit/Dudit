@@ -6,6 +6,7 @@ import { Badge, ActionsDropdown } from "@/components/reusable"
 import { formatDate } from "@/lib/utils"
 import { ReturnIcon } from "@/lib/icons"
 import { ReturnRequest } from "./types"
+import { getReturnResolutionLabel, getReturnStatusLabel } from "@/lib/returns/types"
 
 interface ReturnListRowProps {
   returnRequest: ReturnRequest
@@ -30,17 +31,27 @@ function getJustifyClass(align?: string) {
 
 export function getReturnStatusMeta(status: ReturnRequest["status"]) {
   switch (status) {
-    case "approved":
-      return { label: "Aprovado", variant: "green" as const }
-    case "rejected":
-      return { label: "Recusado", variant: "red" as const }
-    case "pending":
+    case "APPROVED":
+    case "RESOLVED":
+      return { label: getReturnStatusLabel(status), variant: "green" as const }
+    case "REJECTED":
+    case "EXPIRED":
+      return { label: getReturnStatusLabel(status), variant: "red" as const }
+    case "ESCALATED":
+      return { label: getReturnStatusLabel(status), variant: "blue" as const }
+    case "PROCESSING":
+    case "WAITING_CUSTOMER":
+    case "WAITING_ITEM_RETURN":
+    case "UNDER_ANALYSIS":
+      return { label: getReturnStatusLabel(status), variant: "orange" as const }
+    case "PENDING_REVIEW":
     default:
-      return { label: "Pendente", variant: "orange" as const }
+      return { label: getReturnStatusLabel(status), variant: "orange" as const }
   }
 }
 
 export function getRefundTypeLabel(refundType: ReturnRequest["refundType"]) {
+  if (!refundType) return getReturnResolutionLabel((refundType as any) || "refund")
   switch (refundType) {
     case "full":
       return "Reembolso Integral"
@@ -104,7 +115,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
       case "refund_type":
         return (
           <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-            {getRefundTypeLabel(returnRequest.refundType)}
+            {getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")}
           </span>
         )
       case "quantity":
@@ -118,8 +129,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown 
               onView={() => onDetails(returnRequest)}
-              onEdit={canManage && returnRequest.status === "pending" ? () => onEdit?.(returnRequest) : undefined}
-              onDelete={canManage ? () => onDelete?.(returnRequest) : undefined}
+              onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? () => onEdit?.(returnRequest) : undefined}
             />
           </div>
         )

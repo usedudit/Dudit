@@ -187,8 +187,53 @@ export async function getModerationQueue(
         }
     })
 
+    let returnQuery = supabase
+        .from("return_requests")
+        .select(`
+            id, order_id, partner_id, customer_name_snapshot, customer_message, reason, status, created_at,
+            order_number_snapshot,
+            partners(id, store_name, user_id, risk_score),
+            return_evidence(file_url)
+        `)
+        .eq("status", "ESCALATED")
+        .is("deleted_at", null)
+
+    if (cursor) {
+        returnQuery = returnQuery.lt("created_at", cursor)
+    }
+
+    const { data: returnDisputes, error: returnError } = await returnQuery.order("created_at", { ascending: false }).limit(pageSize)
+    if (returnError) {
+        console.error("[ADMIN_MODERATION] Failed to fetch return disputes:", returnError.message)
+    }
+
+    const returnOwnerIds = [...new Set((returnDisputes || []).map((r: any) => r.partners?.user_id).filter(Boolean))]
+    let returnOwnerMap = new Map<string, string>()
+    if (returnOwnerIds.length > 0) {
+        const { data: returnOwners } = await supabase
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", returnOwnerIds)
+        returnOwnerMap = new Map((returnOwners || []).map((o: any) => [o.user_id, o.full_name]))
+    }
+
+    const mappedReturns: ModerationItem[] = (returnDisputes || []).map((r: any) => ({
+        id: r.id,
+        type: "return_dispute" as const,
+        title: `Disputa de devolucao ${r.order_number_snapshot || String(r.order_id).slice(0, 8)}`,
+        description: [r.reason, r.customer_message].filter(Boolean).join(" - ") || null,
+        price: 0,
+        images: (r.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
+        owner_store_name: r.partners?.store_name || "Desconhecido",
+        partner_id: r.partner_id,
+        owner_user_name: returnOwnerMap.get(r.partners?.user_id) || "",
+        moderation_status: "pending_moderation",
+        risk_score: r.partners?.risk_score || 0,
+        created_at: r.created_at,
+    }))
+
     // Combine and sort
-    const combined = [...mappedProducts, ...mappedPartners]
+    const combined = [...mappedProducts, ...mappedPartners, ...mappedReturns]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, pageSize)
 
@@ -204,7 +249,7 @@ export async function getModerationQueue(
 
 export async function approveModeration(
     entityId: string,
-    type: "product" | "partner" = "product"
+    type: "product" | "partner" | "return_dispute" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -212,6 +257,39 @@ export async function approveModeration(
     const supabase = getAdminClient()
 
     // Anti-IDOR: re-fetch entity
+    if (type === "return_dispute") {
+        const { data: rr, error: rrError } = await supabase
+            .from("return_requests")
+            .select("id, partner_id, order_id, status")
+            .eq("id", entityId)
+            .eq("status", "ESCALATED")
+            .single()
+        if (rrError || !rr) return { success: false, error: "Disputa nao encontrada" }
+
+        const { error } = await supabase.rpc("process_return_request", {
+            p_request_id: entityId,
+            p_actor_user_id: admin.userId,
+            p_action: "moderation_decision",
+            p_next_status: "APPROVED",
+            p_refund_amount: 0,
+            p_refund_status: "PENDING",
+            p_refund_payment_method: null,
+            p_return_to_inventory: false,
+            p_store_credit_amount: 0,
+            p_notes: "Moderacao aprovou o cliente para continuidade da resolucao.",
+            p_idempotency_key: `moderation-approve:${entityId}:${Date.now()}`,
+        })
+        if (error) return { success: false, error: error.message }
+        await adminAuditLog({
+            adminUserId: admin.userId,
+            actionType: AdminActionType.MODERATION_APPROVE,
+            targetType: "return_request",
+            targetId: entityId,
+            metadata: { previousStatus: rr.status, partnerId: rr.partner_id },
+        })
+        return { success: true }
+    }
+
     const { data: entity, error: fetchError } = await supabase
         .from(type === "product" ? "products" : "partners")
         .select(type === "product" ? "id, name, moderation_status, images" : "id, store_name, logo_moderation_status, banner_moderation_status")
@@ -401,7 +479,7 @@ export async function rejectFlaggedImages(
 export async function rejectModeration(
     entityId: string,
     reason: string,
-    type: "product" | "partner" = "product"
+    type: "product" | "partner" | "return_dispute" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -411,6 +489,39 @@ export async function rejectModeration(
     }
 
     const supabase = getAdminClient()
+
+    if (type === "return_dispute") {
+        const { data: rr, error: rrError } = await supabase
+            .from("return_requests")
+            .select("id, partner_id, status")
+            .eq("id", entityId)
+            .single()
+        if (rrError || !rr) return { success: false, error: "Disputa nao encontrada" }
+
+        const { error } = await supabase.rpc("process_return_request", {
+            p_request_id: entityId,
+            p_actor_user_id: admin.userId,
+            p_action: "moderation_decision",
+            p_next_status: "REJECTED",
+            p_refund_amount: 0,
+            p_refund_status: "PENDING",
+            p_refund_payment_method: null,
+            p_return_to_inventory: false,
+            p_store_credit_amount: 0,
+            p_notes: reason.trim(),
+            p_idempotency_key: `moderation-reject:${entityId}:${Date.now()}`,
+        })
+        if (error) return { success: false, error: error.message }
+
+        await adminAuditLog({
+            adminUserId: admin.userId,
+            actionType: AdminActionType.MODERATION_REJECT,
+            targetType: "return_request",
+            targetId: entityId,
+            metadata: { reason: reason.trim(), previousStatus: rr.status, partnerId: rr.partner_id },
+        })
+        return { success: true }
+    }
 
     // Anti-IDOR
     const { data: entity, error: fetchError } = await supabase
