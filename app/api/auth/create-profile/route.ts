@@ -2,6 +2,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { NextRequest, NextResponse } from "next/server"
 import { UnosendService } from "@/lib/services/unosend.service"
+import { escapeHtml } from "@/lib/security/input-sanitizer"
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,13 +55,14 @@ export async function POST(request: NextRequest) {
     // Send welcome email via Unosend
     if (email) {
       try {
+        const escapedFullName = escapeHtml(fullName || "usuário")
         const emailResult = await UnosendService.sendEmail({
           userId,
           from: process.env.UNOSEND_FROM_EMAIL || "noreply@yourdomain.com",
           to: [{ email }],
           subject: "Bem-vindo à Plataforma!",
           html: `
-            <h1>Bem-vindo, ${fullName || "usuário"}!</h1>
+            <h1>Bem-vindo, ${escapedFullName}!</h1>
             <p>Sua conta foi criada com sucesso.</p>
             <p>Você agora pode acessar a plataforma e começar a usar nossos serviços.</p>
             <p>Se tiver dúvidas, entre em contato conosco.</p>

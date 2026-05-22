@@ -427,7 +427,7 @@ export async function getProductReviews(productId: string) {
   }
 
   const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-  let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+  const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
 
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
@@ -437,17 +437,17 @@ export async function getProductReviews(productId: string) {
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
-        profilesMap[p.user_id] = {
+        profilesMap.set(p.user_id, {
           full_name: p.full_name,
           profile_image_url: null
-        }
+        })
       })
     }
   }
 
   return reviewsData.map((r: any) => ({
     ...r,
-    profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
   }))
 }
 
@@ -470,7 +470,7 @@ export async function getPartnerReviews(partnerId: string) {
   }
 
   const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-  let profilesMap: Record<string, { full_name: string; profile_image_url: string | null }> = {}
+  const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
 
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
@@ -480,16 +480,16 @@ export async function getPartnerReviews(partnerId: string) {
 
     if (profilesData) {
       profilesData.forEach((p: any) => {
-        profilesMap[p.user_id] = {
+        profilesMap.set(p.user_id, {
           full_name: p.full_name,
           profile_image_url: null
-        }
+        })
       })
     }
   }
 
   return reviewsData.map((r: any) => ({
     ...r,
-    profiles: profilesMap[r.user_id] || { full_name: "Usuário", profile_image_url: null }
+    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
   }))
 }

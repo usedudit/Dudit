@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Extensao nao permitida." }, { status: 400 })
     }
 
-    const expectedExt = RETURN_EVIDENCE_MIME_TO_EXT[contentType]
+    const expectedExt = Object.entries(RETURN_EVIDENCE_MIME_TO_EXT).find(([k]) => k === contentType)?.[1]
     const normalizedExt = ext === ".jpeg" ? ".jpg" : ext
     if (normalizedExt !== `.${expectedExt}`) {
       return NextResponse.json({ error: "Extensao nao corresponde ao tipo do arquivo." }, { status: 400 })

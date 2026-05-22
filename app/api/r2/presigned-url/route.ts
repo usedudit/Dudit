@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. CROSS-VALIDATE MIME ↔ EXTENSION
-    const expectedExt = MIME_TO_EXT[contentType]
+    const expectedExt = Object.entries(MIME_TO_EXT).find(([k]) => k === contentType)?.[1]
     if (expectedExt) {
       const normalizedExt = ext === ".jpeg" ? ".jpg" : ext
       if (normalizedExt !== `.${expectedExt}`) {

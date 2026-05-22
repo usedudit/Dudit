@@ -290,22 +290,22 @@ async function handler(request: NextRequest) {
     // BACEN: Para boleto registrado, endereço do pagador é obrigatório em additional_info
     // federal_unit deve ser a SIGLA do estado (ex: "SP"), não o nome completo
     if (paymentFormData.payment_method_id === "bolbradesco") {
-      const stateNameToAbbr: Record<string, string> = {
-        "acre": "AC", "alagoas": "AL", "amapá": "AP", "amazonas": "AM",
-        "bahia": "BA", "ceará": "CE", "distrito federal": "DF", "espírito santo": "ES",
-        "goiás": "GO", "maranhão": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
-        "minas gerais": "MG", "pará": "PA", "paraíba": "PB", "paraná": "PR",
-        "pernambuco": "PE", "piauí": "PI", "rio de janeiro": "RJ",
-        "rio grande do norte": "RN", "rio grande do sul": "RS", "rondônia": "RO",
-        "roraima": "RR", "santa catarina": "SC", "são paulo": "SP",
-        "sergipe": "SE", "tocantins": "TO",
-      }
+      const stateNameToAbbr = new Map<string, string>([
+        ["acre", "AC"], ["alagoas", "AL"], ["amapá", "AP"], ["amazonas", "AM"],
+        ["bahia", "BA"], ["ceará", "CE"], ["distrito federal", "DF"], ["espírito santo", "ES"],
+        ["goiás", "GO"], ["maranhão", "MA"], ["mato grosso", "MT"], ["mato grosso do sul", "MS"],
+        ["minas gerais", "MG"], ["pará", "PA"], ["paraíba", "PB"], ["paraná", "PR"],
+        ["pernambuco", "PE"], ["piauí", "PI"], ["rio de janeiro", "RJ"],
+        ["rio grande do norte", "RN"], ["rio grande do sul", "RS"], ["rondônia", "RO"],
+        ["roraima", "RR"], ["santa catarina", "SC"], ["são paulo", "SP"],
+        ["sergipe", "SE"], ["tocantins", "TO"],
+      ])
 
       const rawFederalUnit = mpPaymentRequest.payer?.address?.federal_unit || ""
       // Se já for sigla (2 letras), usar diretamente; caso contrário, converter
       const federalUnitAbbr = rawFederalUnit.length === 2
         ? rawFederalUnit.toUpperCase()
-        : (stateNameToAbbr[rawFederalUnit.toLowerCase()] || rawFederalUnit)
+        : (stateNameToAbbr.get(rawFederalUnit.toLowerCase()) || rawFederalUnit)
 
       // Corrigir a sigla no payer.address também
       if (mpPaymentRequest.payer?.address) {

@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       const cachedObjectsRaw = await redis.mget(...keys)
       
       const missingOrStaleItems = recentItems.filter((dbItem, idx) => {
-        const rawJson = cachedObjectsRaw[idx]
+        const rawJson = cachedObjectsRaw.at(idx)
         if (!rawJson) return true // Está faltando no Redis
         
         try {

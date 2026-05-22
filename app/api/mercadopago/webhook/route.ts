@@ -173,7 +173,8 @@ async function processWebhookWithRetry(
     }
 
     // Wait before processing to avoid race conditions with sync-payment-status
-    const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)]
+    const index = Math.min(Math.max(0, attempt), RETRY_DELAYS.length - 1)
+    const delay = index === 0 ? RETRY_DELAYS[0] : index === 1 ? RETRY_DELAYS[1] : RETRY_DELAYS[2]
     await new Promise((resolve) => setTimeout(resolve, delay))
 
     // ── Fetch payment details from Mercado Pago API (TRUST NOTHING FROM WEBHOOK BODY) ──

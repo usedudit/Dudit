@@ -101,16 +101,21 @@ export function sanitizeObject<T extends Record<string, unknown>>(
 ): Partial<T> {
   if (typeof input !== "object" || input === null) return {}
   
-  const result: Partial<T> = {}
+  const entries: [string, unknown][] = []
+  const inputEntries = Object.entries(input as Record<string, unknown>)
   for (const [key, sanitizer] of Object.entries(schema)) {
-    if (key in input) {
-      const sanitized = sanitizer((input as Record<string, unknown>)[key])
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      continue
+    }
+    const entry = inputEntries.find(([k]) => k === key)
+    if (entry) {
+      const sanitized = sanitizer(entry[1])
       if (sanitized !== null) {
-        result[key as keyof T] = sanitized
+        entries.push([key, sanitized])
       }
     }
   }
-  return result
+  return Object.fromEntries(entries) as Partial<T>
 }
 
 /**
@@ -127,3 +132,17 @@ export function sanitizeId(input: unknown): string | null {
   }
   return null
 }
+
+/**
+ * Escape HTML characters to prevent XSS / HTML injection
+ */
+export function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/\//g, "&#x2F;")
+}
+

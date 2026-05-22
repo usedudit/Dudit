@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         // 3. Postgres Fallback para os 'buracos' nulos
         if (missingIndices.length > 0) {
             const supabase = getAdminClient()
-            const missingIds = missingIndices.map(idx => ids[idx])
+            const missingIds = missingIndices.map(idx => ids.at(idx)).filter((id): id is string => typeof id === 'string')
 
             // Separa os missing IDs por tipo para buscar na tabela certa
             const produtosIds = missingIds.filter((id: string) => id.startsWith('produto:')).map((id: string) => id.replace('produto:', ''))
@@ -149,14 +149,15 @@ export async function GET(request: Request) {
             let shouldExec = false
 
             for (const idx of missingIndices) {
-                const globalId = ids[idx] // ex: 'produto:123'
+                const globalId = ids.at(idx) // ex: 'produto:123'
+                if (!globalId) continue
                 const rawId = globalId.split(':')[1]
                 
                 // Procurar no flat list de fallback
                 const found = fallbackRecords.find(r => r.id === rawId)
                 if (found) {
                     const normalized = normalizeRecord(found)
-                    cachedObjects[idx] = normalized
+                    cachedObjects.splice(idx, 1, normalized)
                     // Cache Aside (Lazy Update)
                     pipeline.set(`data:v2:${globalId}`, JSON.stringify(normalized))
                     shouldExec = true
@@ -176,9 +177,11 @@ export async function GET(request: Request) {
         // Para isso, faremos um ZSCORE rápido do último ID retornado:
         let nextCursor = null
         if (ids.length > 0) {
-            const lastId = ids[ids.length - 1]
-            const lastScore = await redis.zscore(indexKey, lastId)
-            nextCursor = lastScore
+            const lastId = ids.at(-1)
+            if (lastId) {
+                const lastScore = await redis.zscore(indexKey, lastId)
+                nextCursor = lastScore
+            }
         }
 
         return NextResponse.json({

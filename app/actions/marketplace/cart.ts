@@ -2,7 +2,6 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCart, revalidateOrders } from "@/lib/utils/revalidation"
-// Removed createSupabaseAdmin
 import { requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -47,7 +46,7 @@ export const getCachedCart = async (userId: string) => {
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, slug),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
       partners(
         id, 
@@ -79,7 +78,7 @@ export const getCachedCart = async (userId: string) => {
     .eq("is_active", true)
 
   // 2b. Busca Endereços dos Parceiros (separado para não quebrar a query principal)
-  let partnerAddresses: Record<string, any[]> = {}
+  let partnerAddresses: Record<string, any[]> = Object.create(null)
   try {
     const { data: addresses } = await supabase
       .from("addresses")
@@ -88,17 +87,20 @@ export const getCachedCart = async (userId: string) => {
 
     if (addresses) {
       partnerAddresses = addresses.reduce((acc: any, addr: any) => {
-        if (!acc[addr.partner_id]) acc[addr.partner_id] = []
-        acc[addr.partner_id].push(addr)
+        const key = addr.partner_id
+        if (typeof key === "string" && key !== "__proto__" && key !== "constructor" && key !== "prototype") {
+          if (!acc[key]) acc[key] = []
+          acc[key].push(addr)
+        }
         return acc
-      }, {})
+      }, Object.create(null))
     }
   } catch (e) {
     console.error("Erro ao buscar endereços dos parceiros (não-crítico):", e)
   }
 
   // 2c. Busca Configurações de Entrega (novo)
-  let partnerDeliverySettings: Record<string, any> = {}
+  let partnerDeliverySettings: Record<string, any> = Object.create(null)
   try {
     const { data: delSettings } = await supabase
       .from("delivery_settings")
@@ -107,9 +109,12 @@ export const getCachedCart = async (userId: string) => {
 
     if (delSettings) {
       partnerDeliverySettings = delSettings.reduce((acc: any, ds: any) => {
-        acc[ds.partner_id] = ds
+        const key = ds.partner_id
+        if (typeof key === "string" && key !== "__proto__" && key !== "constructor" && key !== "prototype") {
+          acc[key] = ds
+        }
         return acc
-      }, {})
+      }, Object.create(null))
     }
   } catch (e) {
     console.error("Erro ao buscar configs de entrega (não-crítico):", e)
@@ -118,28 +123,30 @@ export const getCachedCart = async (userId: string) => {
   // 3. Agrupa os itens por Loja (Parceiro)
   const itemsByPartner = cartItems.reduce((acc: any, item: any) => {
     const partnerId = item.partner_id
-    if (!acc[partnerId]) {
-      const partner = item.partners ? { ...item.partners } : null
-      // Anexa endereços ao parceiro
-      if (partner) {
-        partner.addresses = partnerAddresses[partnerId] || []
+    if (typeof partnerId === "string" && partnerId !== "__proto__" && partnerId !== "constructor" && partnerId !== "prototype") {
+      if (!acc[partnerId]) {
+        const partner = item.partners ? { ...item.partners } : null
+        // Anexa endereços ao parceiro
+        if (partner) {
+          partner.addresses = partnerAddresses[partnerId] || []
+        }
+        acc[partnerId] = {
+          partner,
+          items: [],
+          paymentMethods: Array.from(
+            new Set(
+              (paymentMethods || [])
+                .filter((pm: any) => pm.partner_id === partnerId)
+                .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
+            )
+          ),
+          deliverySettings: partnerDeliverySettings[partnerId] || null,
+        }
       }
-      acc[partnerId] = {
-        partner,
-        items: [],
-        paymentMethods: Array.from(
-          new Set(
-            (paymentMethods || [])
-              .filter((pm: any) => pm.partner_id === partnerId)
-              .map((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type))
-          )
-        ),
-        deliverySettings: partnerDeliverySettings[partnerId] || null,
-      }
+      acc[partnerId].items.push(item)
     }
-    acc[partnerId].items.push(item)
     return acc
-  }, {})
+  }, Object.create(null))
 
   return itemsByPartner
 }
@@ -609,7 +616,7 @@ export async function checkoutCartAction(
     const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", paymentMethod).single()
     bestMethod = methodData
   }
-  
+
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
 
   if (!bestMethod && !useMercadoPago) {

@@ -223,14 +223,19 @@ async function _searchMarketplaceInternal(
 
         let filteredIds = ids
         if (lastId) {
-            // Mapping client types to Redis prefixes
-            const prefixMap: Record<string, string> = {
-                'tudo': 'produto',
-                'produtos': 'produto',
-                'servicos': 'servico',
-                'vitrines': 'loja'
+            let prefix = 'produto'
+            switch (type) {
+                case 'tudo':
+                case 'produtos':
+                    prefix = 'produto'
+                    break
+                case 'servicos':
+                    prefix = 'servico'
+                    break
+                case 'vitrines':
+                    prefix = 'loja'
+                    break
             }
-            const prefix = prefixMap[type] || 'produto'
             // Buscando o index que foi visto por útimo
             const lastIdx = ids.findIndex(id => id.endsWith(`:${lastId}`))
             if (lastIdx !== -1) {

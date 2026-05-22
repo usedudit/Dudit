@@ -112,19 +112,26 @@ export function validateCNPJ(cnpj: string): boolean {
 }
 
 export function sanitizeObject(obj: any, allowedKeys: string[]): any {
-  const sanitized: any = {}
+  if (typeof obj !== "object" || obj === null) return {}
 
+  const entries: [string, any][] = []
+  const objEntries = Object.entries(obj)
   for (const key of allowedKeys) {
-    if (key in obj) {
-      if (typeof obj[key] === "string") {
-        sanitized[key] = sanitizeInput(obj[key])
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      continue
+    }
+    const entry = objEntries.find(([k]) => k === key)
+    if (entry) {
+      const val = entry[1]
+      if (typeof val === "string") {
+        entries.push([key, sanitizeInput(val)])
       } else {
-        sanitized[key] = obj[key]
+        entries.push([key, val])
       }
     }
   }
 
-  return sanitized
+  return Object.fromEntries(entries)
 }
 
 export function sanitizeHTML(input: string, maxLength = 10000): string {

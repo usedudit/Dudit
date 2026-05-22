@@ -46,7 +46,8 @@ function validateFirstBytes(contentType: string, firstBytesBase64: string) {
 
 async function verifyItemAccess(itemType: ItemType, itemId: string, user: any) {
   const admin = getAdminClient()
-  const table = TABLE_BY_TYPE[itemType]
+  const table = Object.entries(TABLE_BY_TYPE).find(([k]) => k === itemType)?.[1]
+  if (!table) throw new Error("Erro ao validar propriedade do item")
   const { data, error } = await admin.from(table).select("id, partner_id").eq("id", itemId).maybeSingle()
 
   if (error) throw new Error("Erro ao validar propriedade do item")
@@ -81,7 +82,10 @@ export async function POST(req: NextRequest) {
 
     await verifyItemAccess(itemType, itemId, user)
 
-    const ext = VIDEO_MIME_TO_EXT[contentType]
+    const ext = Object.entries(VIDEO_MIME_TO_EXT).find(([k]) => k === contentType)?.[1]
+    if (!ext) {
+      return jsonError("Formato não suportado")
+    }
     const folder = itemType === "product" ? "products" : "services"
     const videoKey = `users/${user.id}/${folder}/${itemId}.${ext}`
     const thumbnailKey = `users/${user.id}/${folder}/${itemId}-thumbnail.jpg`
