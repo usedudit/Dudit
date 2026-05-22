@@ -162,7 +162,7 @@ export async function getReturnRequestsPageAction(
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
-          products(images)
+          products!product_id(images)
         ),
         return_evidence(id, file_url, file_type, thumbnail_url)
       `)
@@ -216,7 +216,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
       .select(`
         *,
         orders(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
-        return_items(*, products(images)),
+        return_items(*, products!product_id(images)),
         return_evidence(*),
         return_events(*),
         return_refunds(*),
