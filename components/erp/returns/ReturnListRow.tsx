@@ -42,6 +42,12 @@ export function getReturnStatusMeta(status: ReturnRequest["status"]) {
 
 export function getRefundTypeLabel(refundType: ReturnRequest["refundType"]) {
   switch (refundType) {
+    case "full":
+      return "Reembolso Integral"
+    case "partial":
+      return "Reembolso Parcial"
+    case "none":
+      return "Sem Reembolso"
     case "pix":
       return "Pix"
     case "credit_card":

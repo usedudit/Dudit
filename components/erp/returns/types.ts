@@ -22,7 +22,7 @@ export interface ReturnRequest {
   customerPhone?: string
   customerAddress?: string
   createdAt: string
-  refundType: "pix" | "credit_card" | "store_credit" | "other"
+  refundType: "full" | "partial" | "none" | "pix" | "credit_card" | "store_credit" | "other"
   status: "pending" | "approved" | "rejected"
   items: ReturnItem[]
   evidenceImages: string[]

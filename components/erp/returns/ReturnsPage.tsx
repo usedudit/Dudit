@@ -3,7 +3,7 @@
 // Main client component for Returns module
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, Pagination, AlertModal, Badge, ActionsDropdown } from "@/components/reusable"
+import { Button, IconPlaceholder, Pagination, AlertModal, Badge, ActionsDropdown, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, ReturnIcon } from "@/lib/icons"
@@ -58,7 +58,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
   const [page, setPage] = useState(1)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [filters, setFilters] = useState<{ refundType: string[] }>({ refundType: [] })
-  
+
   // Sort state
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
     key: "date",
@@ -192,10 +192,10 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
   // Filter returns
   const filteredReturns = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase()
-    
+
     let result = returns.filter(item => {
       // Search matches
-      const matchesSearch = 
+      const matchesSearch =
         !term ||
         item.orderNumber.toLowerCase().includes(term) ||
         item.customerName.toLowerCase().includes(term) ||
@@ -302,7 +302,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
       ) : (
         <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
           <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-            
+
             {/* Page Header (Desktop) */}
             <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
               <div className="flex flex-col gap-2 pt-1">
@@ -327,20 +327,18 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex border-b border-brand-border dark:border-dark-border px-4 md:px-8 mb-4">
-              {(["Todos", "Pendentes", "Aprovados", "Recusados"] as ActiveTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  className={`py-3 px-4 text-sm font-semibold border-b-2 transition-all duration-200 ${
-                    activeTab === tab
-                      ? "border-brand-primary text-brand-primary dark:text-brand-primary"
-                      : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-                  }`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
+            <div className="mb-6 px-4 md:px-8">
+              <Tabs
+                value={activeTab}
+                onValueChange={(val) => setActiveTab(val as ActiveTab)}
+              >
+                <TabsList className="px-0">
+                  <TabsTrigger value="Todos">Todos</TabsTrigger>
+                  <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
+                  <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
+                  <TabsTrigger value="Recusados">Recusados</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
             {/* Listing Page Controls */}
@@ -367,7 +365,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                       imageSrc={
                         hasActiveFilters
                           ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                          : "https://img.dudit.com.br/static/mascots/SemPedidos.png"
+                          : "https://img.dudit.com.br/static/mascots/Devolucoes.png"
                       }
                       imageAlt="Sem devoluções"
                       title={hasActiveFilters ? "Nenhuma devolução encontrada" : "Nenhuma devolução cadastrada"}
@@ -379,9 +377,9 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                       itemButton={
                         !hasActiveFilters && canManage
                           ? {
-                              text: "Criar devolução",
-                              action: () => openEntity("create"),
-                            }
+                            text: "Criar devolução",
+                            action: () => openEntity("create"),
+                          }
                           : undefined
                       }
                     />
@@ -461,7 +459,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                   <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
                     <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                     <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-                    
+
                     <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
                       <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                         <thead>
