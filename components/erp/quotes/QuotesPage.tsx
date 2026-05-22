@@ -599,7 +599,7 @@ export default function QuotesPage({
                                                                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                                         <div className="flex justify-between items-start">
                                                                             <div className="flex flex-col min-w-0 pr-1">
-                                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                                     {q.displayId}
                                                                                 </h3>
                                                                                 <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">

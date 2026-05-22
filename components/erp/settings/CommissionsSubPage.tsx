@@ -266,7 +266,7 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                                         />
                                                         <div className="flex flex-col min-w-0">
                                                             <div className="flex items-center gap-2">
-                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                     {row.name}
                                                                 </h3>
                                                                 {row.userId === currentUserId && (

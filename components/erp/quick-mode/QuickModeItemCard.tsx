@@ -55,11 +55,11 @@ const QuickModeItemCard = ({
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex justify-between items-start gap-1">
-                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                             {item.name}
                         </h3>
                     </div>
-                    
+
                     <div className="mt-1 flex items-center gap-2">
                         <Badge
                             variant={item.is_active ? "green" : "red"}

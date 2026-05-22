@@ -220,6 +220,15 @@ function SelectionSheet({
     )
 }
 
+const sanitizeCouponCode = (value: string): string => {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 20)
+}
+
 export default function CouponFormPage({
     partnerId,
     mode,
@@ -370,7 +379,9 @@ export default function CouponFormPage({
                                                                 label="Código do cupom"
                                                                 placeholder="Ex: BEMVINDO10"
                                                                 value={form.code}
-                                                                onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value.toUpperCase() }))}
+                                                                onChange={(event) => setForm((prev) => ({ ...prev, code: sanitizeCouponCode(event.target.value) }))}
+                                                                maxLength={20}
+                                                                showCharacterCount={true}
                                                             />
                                                         </div>
                                                         <div className="col-span-12 md:col-span-5 mt-[1px]">
@@ -428,7 +439,6 @@ export default function CouponFormPage({
                                                                     maxDiscountValue: value,
                                                                     maxDiscountEnabled: value > 0
                                                                 }))}
-                                                                placeholder="Sem limite"
                                                             />
                                                         </div>
                                                     </div>
@@ -437,7 +447,7 @@ export default function CouponFormPage({
                                                 <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
                                                 <section>
-                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Opcoes</h3>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Opções</h3>
                                                     <div className="space-y-4">
                                                         <label className="flex items-start gap-3">
                                                             <Checkbox checked={form.allowCombination} onChange={(value) => setForm((prev) => ({ ...prev, allowCombination: Boolean(value) }))} />
@@ -493,7 +503,7 @@ export default function CouponFormPage({
                                                             onAction={
                                                                 form.customerScope === "specific"
                                                                     ? () => {
-                                                                         setPickerMode("customers")
+                                                                        setPickerMode("customers")
                                                                     }
                                                                     : undefined
                                                             }

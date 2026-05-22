@@ -248,7 +248,7 @@ const PartnersList = ({ initialData }: PartnersListProps) => {
                                                         <StoreIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                                     </div>
                                                     <div className="min-w-0 flex flex-col">
-                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                             {partner.store_name}
                                                         </span>
                                                         <span className="text-xs font-medium text-brand-inactive-text">

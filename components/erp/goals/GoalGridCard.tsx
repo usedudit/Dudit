@@ -62,7 +62,7 @@ const GoalGridCard = React.memo(function GoalGridCard({
           <div className="flex justify-between items-start gap-3">
             <div className="min-w-0">
               <div className="flex items-center min-w-0 gap-2">
-                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate" title={goal.name}>
+                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={goal.name}>
                   {goal.name}
                 </h3>
                 <Badge variant={statusVariant(goal.status)} className="whitespace-nowrap scale-90 shrink-0">

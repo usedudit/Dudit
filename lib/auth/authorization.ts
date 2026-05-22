@@ -614,6 +614,7 @@ function routeKeyToPermissionKey(routeKey: string): string | null {
   switch (routeKey) {
     case "dashboard": return "dashboard.view"
     case "orders": return "orders.view"
+    case "returns": return "orders.view"
     case "quotes": return "quotes.view"
     case "appointments": return "appointments.view"
     case "customers": return "customers.view"

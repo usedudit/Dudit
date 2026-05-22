@@ -56,7 +56,7 @@ const CustomerGridCard = React.memo(
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center min-w-0 pr-1 gap-2">
                                 <h3
-                                    className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate"
+                                    className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate"
                                     title={customer.name}
                                 >
                                     <span className="truncate">{customer.name}</span>

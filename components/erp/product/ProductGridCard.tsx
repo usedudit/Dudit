@@ -76,7 +76,7 @@ const ProductGridCard = React.memo(
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1">
                                 <h3
-                                    className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate flex items-center gap-1.5"
+                                    className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate"
                                     title={product.name}
                                 >
                                     <span className="truncate">{product.name}</span>
@@ -101,7 +101,7 @@ const ProductGridCard = React.memo(
                         </div>
 
                         {/* Linha 2: SKU • Categoria • Marca */}
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1 flex items-center">
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
                             <span>SKU: {product.sku || "N/A"}</span>
                             {product.category && (
                                 <>

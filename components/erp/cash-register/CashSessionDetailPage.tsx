@@ -341,7 +341,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                                             <Icon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate mb-0.5">
+                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                 {row.label}
                                                             </h3>
                                                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
@@ -383,7 +383,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                                     <MoreHorizontalIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate mb-0.5">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                         Total
                                                     </h3>
                                                     <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">

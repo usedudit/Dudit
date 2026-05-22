@@ -212,7 +212,7 @@ const UserEnforcementList = ({ initialData }: UserEnforcementListProps) => {
                                                         </span>
                                                     </div>
                                                     <div className="min-w-0 flex flex-col">
-                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                        <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                             {user.full_name || "Sem nome"}
                                                         </span>
                                                         <span className="text-xs font-medium text-brand-inactive-text">

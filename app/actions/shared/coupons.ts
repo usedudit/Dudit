@@ -8,7 +8,13 @@ import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/li
 
 const CouponSchema = z.object({
     partnerId: z.string().uuid(),
-    code: z.string().min(1),
+    code: z.preprocess(
+        (val) => typeof val === "string" ? val.trim().toUpperCase() : val,
+        z.string()
+            .min(1, "O código do cupom é obrigatório.")
+            .max(20, "O código do cupom deve ter no máximo 20 caracteres.")
+            .regex(/^[A-Z0-9]+$/, "O código do cupom deve conter apenas letras (sem acentos ou espaços) e números.")
+    ),
     discountType: z.enum(["percentage", "fixed", "free_shipping"]),
     discountValue: z.number().nullable(),
     applyScope: z.enum(["all", "categories", "products", "services"]),

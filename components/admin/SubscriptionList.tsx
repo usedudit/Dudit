@@ -184,7 +184,7 @@ const SubscriptionList = () => {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
-                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                         {sub.tenant}
                                     </h3>
                                     {getStatusBadge(sub.status)}

@@ -161,7 +161,7 @@ const VariationMobileItem = React.memo(({ item, isSelected, isEditing, onSelect,
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                     {/* Linha 1: Nome + Bolinha Status */}
                     <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate pr-1">
+                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                             {item.name || "-"}
                         </h3>
                         <div

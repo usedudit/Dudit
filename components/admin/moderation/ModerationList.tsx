@@ -521,7 +521,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
 
                                             <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                         {item.title}
                                                     </h3>
                                                 </div>

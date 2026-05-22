@@ -71,7 +71,7 @@ const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center
     { id: "usage", label: "Uso", align: "left", width: "180px" },
     { id: "validity", label: "Validade", align: "left", width: "220px" },
     { id: "status", label: "Status", align: "right", width: "240px" },
-    { id: "actions", label: "Açoes", align: "center", width: "220px" },
+    { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 export default function CouponsPage({
     partnerId,
@@ -523,6 +523,16 @@ export default function CouponsPage({
             return
         }
 
+        if (payload.code.length > 20) {
+            toast({ title: "Validacao", description: "O codigo do cupom deve ter no maximo 20 caracteres.", variant: "destructive" })
+            return
+        }
+
+        if (!/^[A-Z0-9]+$/.test(payload.code)) {
+            toast({ title: "Validacao", description: "O codigo do cupom deve conter apenas letras e numeros, sem acentos, espacos ou caracteres especiais.", variant: "destructive" })
+            return
+        }
+
         if (payload.discountType === "percentage" && Number(payload.discountValue || 0) > 100) {
             toast({ title: "Validacao", description: "O percentual maximo permitido e 100%.", variant: "destructive" })
             return
@@ -791,7 +801,7 @@ export default function CouponsPage({
                                                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                                     <div className="flex justify-between items-start">
                                                                         <div className="flex flex-col min-w-0 pr-1">
-                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                                 {coupon.code}
                                                                             </h3>
                                                                             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">

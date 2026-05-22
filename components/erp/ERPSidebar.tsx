@@ -49,7 +49,7 @@ const navItems: NavItem[] = [
             { label: "Orçamentos", href: "/erp/quotes" },
             { label: "Metas", href: "/erp/goals" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
-            { label: "Devoluções", href: "/" },
+            { label: "Devoluções", href: "/erp/returns" },
             { label: "Expedição e Entregas", href: "/erp/logistics" },
         ],
     },

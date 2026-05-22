@@ -1384,7 +1384,7 @@ export default function TransactionsPage({
 
                                                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                         <div className="flex justify-between items-start gap-2">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                 {transaction.description}
                                                             </h3>
                                                             <span className={`text-[15px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
@@ -1723,7 +1723,7 @@ export default function TransactionsPage({
                                         <div key={row.id} className="py-6 flex flex-col gap-4">
                                             <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                         {row.description}
                                                     </h3>
                                                     <div className="flex items-center gap-2 mt-1">

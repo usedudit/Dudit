@@ -75,7 +75,7 @@ const PaymentMethodGridCard = React.memo(
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1">
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                     {method.name || "Sem nome"}
                                 </h3>
                                 <Badge variant={method.is_active ? "green" : "red"} icon={null} className="whitespace-nowrap scale-90 shrink-0">
@@ -88,7 +88,7 @@ const PaymentMethodGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1 flex items-center">
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
                             ID: {method.id.slice(0, 5).toUpperCase()}
                         </div>
                     </div>

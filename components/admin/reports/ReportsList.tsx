@@ -289,7 +289,7 @@ export default function ReportsList({ initialData, initialStats, initialHasMore,
                                         >
                                             <div className="flex justify-between items-start gap-2">
                                                 <div className="flex flex-col gap-1 min-w-0">
-                                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                    <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                         {report.target_name}
                                                     </span>
                                                     <span className="text-xs font-medium text-brand-inactive-text">

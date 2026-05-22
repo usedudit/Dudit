@@ -2,7 +2,7 @@
 
 import React from "react"
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
-import { SparklesIcon, TagIcon } from "@/lib/icons"
+import { SparklesIcon, TagIcon, Users } from "@/lib/icons"
 import {
     CouponRow,
     getCouponApplyScopeLabel,
@@ -39,12 +39,18 @@ const CouponGridCard = React.memo(
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1">
-                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                     {coupon.code}
                                 </h3>
                                 <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap scale-90 shrink-0">
                                     {getCouponStatusLabel(coupon)}
                                 </Badge>
+                                {coupon.is_automatic && (
+                                    <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                )}
+                                {coupon.customer_scope === "specific" && (
+                                    <Badge variant="gray" icon={<Users />} className="whitespace-nowrap scale-90 shrink-0" />
+                                )}
                             </div>
 
                             <div className="shrink-0 -mt-1 -mr-1" onClick={(event) => event.stopPropagation()}>
@@ -52,23 +58,8 @@ const CouponGridCard = React.memo(
                             </div>
                         </div>
 
-                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1">
+                        <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
                             {getCouponPrimaryMeta(coupon)}
-                        </div>
-                        <div className="text-[16px] font-bold text-brand-dark dark:text-dark-heading mt-1.5">
-                            {getCouponApplyScopeLabel(coupon.apply_scope)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {coupon.is_automatic && (
-                                <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
-                                    Automático
-                                </Badge>
-                            )}
-                            {coupon.customer_scope === "specific" && (
-                                <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
-                                    Clientes especificos
-                                </Badge>
-                            )}
                         </div>
                     </div>
                 </div>

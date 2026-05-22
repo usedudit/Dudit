@@ -344,7 +344,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                                         className="w-12 h-12 text-[16px] shrink-0"
                                                                     />
                                                                     <div className="flex flex-col min-w-0">
-                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                             {member.fullName || "Usuário"}
                                                                             {member.userId === currentUserId && (
                                                                                 <Badge variant="gray" icon={null} className="ml-2 text-[10px] py-0 h-4 scale-90">Você</Badge>
@@ -469,7 +469,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                                         <MailIcon size={24} />
                                                                     </div>
                                                                     <div className="flex flex-col min-w-0">
-                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                                                             {inv.email}
                                                                         </h3>
                                                                         <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter mb-1">

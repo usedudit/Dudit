@@ -40,7 +40,7 @@ const FinancialCategoryCard = React.memo(
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex justify-between items-start gap-1">
                             <div className="flex items-center gap-2 min-w-0 pr-1">
-                                <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading leading-tight truncate pr-1 flex items-center gap-1.5">
+                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                     {item.name}
                                 </h3>
                                 <Badge
