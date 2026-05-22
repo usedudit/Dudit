@@ -473,10 +473,24 @@ export default function CouponsPage({
         })
     }, [scopeData.categories])
 
-    const setSelectedCustomerIds = useCallback((value: React.SetStateAction<string[]>) => {
+    const setSelectedCustomerIds = useCallback((value: React.SetStateAction<string[]>, newCustomerObj?: any) => {
         setRelations((prev) => {
             const customerIds = typeof value === "function" ? value(prev.customerIds) : value
-            return { ...prev, customerIds, customers: scopeData.customers.filter((item) => customerIds.includes(item.id)) }
+            const combinedMap = new Map<string, any>()
+            prev.customers.forEach((c) => {
+                if (customerIds.includes(c.id)) {
+                    combinedMap.set(c.id, c)
+                }
+            })
+            scopeData.customers.forEach((c) => {
+                if (customerIds.includes(c.id)) {
+                    combinedMap.set(c.id, c)
+                }
+            })
+            if (newCustomerObj && customerIds.includes(newCustomerObj.id)) {
+                combinedMap.set(newCustomerObj.id, newCustomerObj)
+            }
+            return { ...prev, customerIds, customers: Array.from(combinedMap.values()) }
         })
     }, [scopeData.customers])
 
@@ -650,6 +664,7 @@ export default function CouponsPage({
                 {wrapperMode === "create" || wrapperMode === "edit" ? (
                     <CouponFormPage
                         key="form"
+                        partnerId={partnerId}
                         mode={wrapperMode}
                         coupon={selectedCoupon}
                         form={form}

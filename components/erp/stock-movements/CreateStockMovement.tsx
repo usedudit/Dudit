@@ -271,15 +271,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="Geral" className="px-0 pb-3">
                                             Dados gerais
-                                            {getTabErrorCount("Geral") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("Geral") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="Observações" className="px-0 pb-3">
                                             Observações
-                                            {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="Anexos" className="px-0 pb-3">
                                             Anexos
-                                            {getTabErrorCount("Anexos") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("Anexos") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                     </TabsList>
                                 </div>

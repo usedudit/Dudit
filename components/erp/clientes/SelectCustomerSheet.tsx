@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { SearchIcon, UserIcon, PlusIcon, XIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, Badge, EmailInput, PhoneInput, InfoCard } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, Badge, EmailInput, PhoneInput, InfoCard, Checkbox } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
@@ -35,6 +35,7 @@ interface SelectCustomerSheetProps {
   } | null>
   partnerId: string
   selectedCustomerId?: string
+  selectedCustomerIds?: string[]
   pinnedCustomer?: PinnedCustomerSummary | null
   onRequestRemoveSelected?: () => void
   title?: string
@@ -59,6 +60,7 @@ const SelectCustomerSheet = ({
   onCreateCustomer,
   partnerId,
   selectedCustomerId,
+  selectedCustomerIds,
   pinnedCustomer,
   onRequestRemoveSelected,
   title = "Selecionar Cliente",
@@ -203,15 +205,17 @@ const SelectCustomerSheet = ({
         ) : picker.displayed.length > 0 ? (
           <div className="flex flex-col px-2 pb-2">
             {picker.displayed.map((customer) => {
-              const isSelected = selectedCustomerId === customer.id
+              const isSelected = selectedCustomerIds
+                ? selectedCustomerIds.includes(customer.id)
+                : selectedCustomerId === customer.id
               return (
                 <div
                   key={customer.id}
-                  role={isSelected ? undefined : "button"}
-                  tabIndex={isSelected ? undefined : 0}
-                  onClick={!isSelected ? () => onSelect(customer) : undefined}
+                  role={isSelected && !selectedCustomerIds ? undefined : "button"}
+                  tabIndex={isSelected && !selectedCustomerIds ? undefined : 0}
+                  onClick={!isSelected || selectedCustomerIds ? () => onSelect(customer) : undefined}
                   onKeyDown={
-                    !isSelected
+                    !isSelected || selectedCustomerIds
                       ? (e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
@@ -225,6 +229,14 @@ const SelectCustomerSheet = ({
                     : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
                     }`}
                 >
+                  {selectedCustomerIds && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={() => onSelect(customer)}
+                      />
+                    </div>
+                  )}
                   <UserProfileImage
                     fullName={customer.name || "Cliente"}
                     imageUrl={customer.avatar_url}
@@ -235,7 +247,7 @@ const SelectCustomerSheet = ({
                       <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                         {customer.name}
                       </span>
-                      {isSelected && (
+                      {isSelected && !selectedCustomerIds && (
                         <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
                           Selecionado
                         </Badge>
@@ -249,24 +261,26 @@ const SelectCustomerSheet = ({
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {isSelected && onRequestRemoveSelected ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          onRequestRemoveSelected()
-                        }}
-                      >
-                        Remover
-                      </Button>
-                    ) : !isSelected ? (
-                      <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                        <PlusIcon size={18} />
-                      </div>
+                    {!selectedCustomerIds ? (
+                      isSelected && onRequestRemoveSelected ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onRequestRemoveSelected()
+                          }}
+                        >
+                          Remover
+                        </Button>
+                      ) : !isSelected ? (
+                        <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                          <PlusIcon size={18} />
+                        </div>
+                      ) : null
                     ) : null}
                   </div>
                 </div>

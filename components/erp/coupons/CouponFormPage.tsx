@@ -25,6 +25,7 @@ import { formatCurrency } from "@/lib/utils/formatters"
 import { BoxIcon, ChevronLeftIcon, EditIcon, SaveIcon, SearchIcon, TagIcon, UserIcon } from "@/lib/icons"
 import SelectCouponProductsSheet from "./SelectCouponProductsSheet"
 import SelectCouponCategoriesSheet from "./SelectCouponCategoriesSheet"
+import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import {
     CouponFormState,
     CouponRelations,
@@ -37,6 +38,7 @@ import {
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 
 interface CouponFormPageProps {
+    partnerId: string
     mode: "create" | "edit"
     coupon?: CouponRow | null
     form: CouponFormState
@@ -46,7 +48,7 @@ interface CouponFormPageProps {
     setSelectedProductIds: React.Dispatch<React.SetStateAction<string[]>>
     setSelectedServiceIds: React.Dispatch<React.SetStateAction<string[]>>
     setSelectedCategoryIds: React.Dispatch<React.SetStateAction<string[]>>
-    setSelectedCustomerIds: React.Dispatch<React.SetStateAction<string[]>>
+    setSelectedCustomerIds: (value: React.SetStateAction<string[]>, newCustomerObj?: ScopeCustomer) => void
     onBack: () => void
     onSave: () => void
     isSaving: boolean
@@ -219,6 +221,7 @@ function SelectionSheet({
 }
 
 export default function CouponFormPage({
+    partnerId,
     mode,
     coupon,
     form,
@@ -237,7 +240,6 @@ export default function CouponFormPage({
     const [activeTab, setActiveTab] = useState("general")
     const [pickerMode, setPickerMode] = useState<PickerMode>(null)
     const [scopeSearch, setScopeSearch] = useState("")
-    const [customerSearch, setCustomerSearch] = useState("")
 
     const initialSnapshot = useMemo(() => {
         return JSON.stringify({
@@ -278,17 +280,7 @@ export default function CouponFormPage({
         return scopeData.services.filter((item) => !term || item.name.toLowerCase().includes(term))
     }, [scopeData.services, scopeSearch])
 
-    const filteredCustomers = useMemo(() => {
-        const term = customerSearch.trim().toLowerCase()
-        return scopeData.customers.filter((item) => {
-            if (!term) return true
-            return (
-                item.name.toLowerCase().includes(term) ||
-                String(item.email || "").toLowerCase().includes(term) ||
-                String(item.phone || "").toLowerCase().includes(term)
-            )
-        })
-    }, [scopeData.customers, customerSearch])
+
 
     const applyScopeActionLabel = form.applyScope === "products"
         ? "Selecionar produtos"
@@ -501,8 +493,7 @@ export default function CouponFormPage({
                                                             onAction={
                                                                 form.customerScope === "specific"
                                                                     ? () => {
-                                                                        setCustomerSearch("")
-                                                                        setPickerMode("customers")
+                                                                         setPickerMode("customers")
                                                                     }
                                                                     : undefined
                                                             }
@@ -719,58 +710,28 @@ export default function CouponFormPage({
                     isLoading={isLoadingScope}
                 />
 
-                <SelectionSheet
+                <SelectCustomerSheet
                     isOpen={pickerMode === "customers"}
-                    onOpenChange={(open) => {
-                        if (!open) setPickerMode(null)
+                    onClose={() => setPickerMode(null)}
+                    partnerId={partnerId}
+                    selectedCustomerIds={relations.customerIds}
+                    onSelect={(customer) => {
+                        const isSelected = relations.customerIds.includes(customer.id)
+                        if (isSelected) {
+                            setSelectedCustomerIds((prev) => prev.filter((id) => id !== customer.id))
+                        } else {
+                            const scopeCustomer: ScopeCustomer = {
+                                id: customer.id,
+                                name: customer.name,
+                                email: customer.email,
+                                phone: "phone" in customer ? customer.phone : null,
+                                status: "ativo",
+                                avatarUrl: customer.avatar_url || null,
+                            }
+                            setSelectedCustomerIds((prev) => [...prev, customer.id], scopeCustomer)
+                        }
                     }}
-                    title="Selecionar clientes"
-                    description="Escolha os clientes específicos que podem usar esse cupom."
-                    searchValue={customerSearch}
-                    onSearchChange={setCustomerSearch}
-                    searchPlaceholder="Buscar por nome, e-mail ou telefone..."
-                >
-                    <div className="space-y-3">
-                        {isLoadingScope ? <ThreeDotsLoader /> : null}
-                        {filteredCustomers.map((item) => {
-                            const disabled = item.status === "inativo" || item.status === "bloqueado"
-                            const selected = relations.customerIds.includes(item.id)
-                            return (
-                                <ListItem
-                                    key={item.id}
-                                    title={item.name}
-                                    description={item.email || item.phone || "Sem contato"}
-                                    left={
-                                        <div className="pl-4">
-                                            <Checkbox
-                                                checked={selected}
-                                                disabled={disabled}
-                                                onChange={() => {
-                                                    if (disabled) return
-                                                    setSelectedCustomerIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])
-                                                }}
-                                            />
-                                        </div>
-                                    }
-                                    icon={
-                                        item.avatarUrl ? (
-                                            <img
-                                                src={item.avatarUrl}
-                                                alt={item.name}
-                                                className="w-12 h-12 rounded-full object-cover border border-brand-border dark:border-dark-border"
-                                            />
-                                        ) : (
-                                            <UserIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                                        )
-                                    }
-                                    right={<Badge variant={getCustomerStatusVariant(item.status)}>{getCustomerStatusLabel(item.status)}</Badge>}
-                                    onClick={disabled ? undefined : () => setSelectedCustomerIds((prev) => prev.includes(item.id) ? prev.filter((value) => value !== item.id) : [...prev, item.id])}
-                                    className={`p-3 ${disabled ? "opacity-55 cursor-not-allowed hover:border-brand-border dark:hover:border-dark-border" : ""}`}
-                                />
-                            )
-                        })}
-                    </div>
-                </SelectionSheet>
+                />
             </div>
 
             <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />

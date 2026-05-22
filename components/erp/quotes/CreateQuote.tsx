@@ -883,7 +883,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             >
                                 {/* Header now inside the left column */}
                                 <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">
-                                    <div className="px-4 md:px-6 pt-4 md:pt-6">
+                                    <div className="px-4 md:px-6 pt-4">
 
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-4 min-w-0">
@@ -923,17 +923,17 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                         </div>
 
                                         {/* Tabs */}
-                                        <div className={`w-full transition-all duration-300 ${isScrolled ? "mt-3" : "mt-6"}`}>
-                                            <TabsList className="bg-transparent p-0 w-full justify-start border-b-0 h-auto gap-6 focus-visible:ring-0">
-                                                <TabsTrigger value="Dados Gerais" className={`px-0 transition-all duration-300 ${activeTab === 'Dados Gerais' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
+                                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                                <TabsTrigger value="Dados Gerais">
                                                     Dados Gerais
-                                                    {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                    {getTabErrorCount("Dados Gerais") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
-                                                <TabsTrigger value="Observações" className={`px-0 transition-all duration-300 ${activeTab === 'Observações' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>
+                                                <TabsTrigger value="Observações">
                                                     Observações
-                                                    {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                    {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
-                                                <TabsTrigger value="Visualização" className={`px-0 transition-all duration-300 md:hidden ${activeTab === 'Visualização' ? 'text-brand-primary' : ''} ${isScrolled ? "pb-2 text-[13px]" : "pb-3 text-sm"}`}>Visualização</TabsTrigger>
+                                                <TabsTrigger value="Visualização">Visualização</TabsTrigger>
                                             </TabsList>
                                         </div>
                                     </div>

@@ -1212,18 +1212,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                     <TabsTrigger value="general">
                                         Dados gerais
-                                        {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                        {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                     </TabsTrigger>
                                     {deliveryMethod === 'delivery' && (
                                         <TabsTrigger value="delivery">
                                             Entrega
-                                            {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                     )}
                                     {!isQuick && (
                                         <TabsTrigger value="observations">
                                             Observações
-                                            {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                     )}
                                 </TabsList>

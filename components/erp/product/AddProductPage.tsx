@@ -743,7 +743,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">
                                             Dados gerais
-                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
                                         <TabsTrigger value="variations" disabled={isLoadingDetails}>
                                             <span className="inline-flex items-center gap-2">
@@ -751,19 +751,19 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {variantsPlanBlocked ? (
                                                     <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
                                                 ) : null}
-                                                {getTabErrorCount("variations") > 0 && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                {getTabErrorCount("variations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </span>
                                         </TabsTrigger>
                                         {!isQuick && (
                                             <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
                                                 Fornecedores
-                                                {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
                                         {!isQuick && productData.show_in_marketplace && (
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                 Marketplace
-                                                {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                                                {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
                                     </TabsList>

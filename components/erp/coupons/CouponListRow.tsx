@@ -88,7 +88,7 @@ const CouponListItem = React.memo(
               <div className="flex flex-wrap justify-end gap-2">
                 {coupon.is_automatic && (
                   <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap">
-                    Automatico
+                    Automático
                   </Badge>
                 )}
                 <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap">
