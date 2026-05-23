@@ -496,7 +496,6 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
           subtotal,
           product_id,
           variant_id,
-          sku,
           products (
             sku,
             images,

@@ -20,7 +20,7 @@ import {
     FormSection,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { fetchReturnOrderBucketAction } from "@/app/actions/erp/returns"
 import { ReturnRequest, ReturnItem } from "./types"
@@ -63,6 +63,9 @@ export default function CreateReturnPage({
 }: CreateReturnPageProps) {
     const [activeTab, setActiveTab] = useState("general")
     const [selectedOrder, setSelectedOrder] = useState<any>(null)
+
+    const paymentMeta = useMemo(() => getPaymentStatusMeta(selectedOrder?.status), [selectedOrder?.status])
+    const deliveryMeta = useMemo(() => getDeliveryStatusMeta(selectedOrder?.deliveryStatus), [selectedOrder?.deliveryStatus])
 
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
@@ -108,6 +111,7 @@ export default function CreateReturnPage({
             // Setup order info mock
             setSelectedOrder({
                 id: returnRequest.orderId,
+                displayId: returnRequest.orderNumber,
                 order_number: returnRequest.orderNumber,
                 customer_name: returnRequest.customerName,
                 customer: {
@@ -117,6 +121,10 @@ export default function CreateReturnPage({
                     addresses: returnRequest.customerAddress ? [{ street: returnRequest.customerAddress }] : []
                 },
                 delivery_address: returnRequest.customerAddress,
+                orderDate: returnRequest.createdAt,
+                status: "paid",
+                deliveryStatus: "delivered",
+                totalAmount: returnRequest.refundValue || 0,
             })
 
             // Setup items checklist
@@ -430,28 +438,67 @@ export default function CreateReturnPage({
                                                     ) : null}
 
                                                     {selectedOrder && (
-                                                        <div className="rounded-2xl border border-brand-border dark:border-dark-border p-5 bg-brand-gray/20 dark:bg-dark-surface/10 space-y-3">
-                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Número do Pedido</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedOrder.order_number}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Canal</span>
-                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading capitalize">{selectedOrder.order_source || "-"}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Total Pedido</span>
-                                                                    <span className="font-bold text-brand-primary">{formatCurrency(selectedOrder.total_amount || 0)}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Situação</span>
-                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading capitalize">{selectedOrder.situation || "-"}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+                                                             <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
+                                                                 <div className="flex flex-wrap items-center justify-between gap-3">
+                                                                     <div className="flex items-center gap-2">
+                                                                         <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                             Pedido:
+                                                                         </span>
+                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                             {selectedOrder.displayId || selectedOrder.order_number}
+                                                                         </span>
+                                                                     </div>
+
+                                                                     <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body md:text-right">
+                                                                         Cliente:{" "}
+                                                                         <strong className="text-brand-dark dark:text-dark-heading">
+                                                                             {selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente"}
+                                                                         </strong>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+
+                                                             <div className="bg-white dark:bg-dark-surface">
+                                                                 <div className="grid grid-cols-1 divide-y divide-brand-border dark:divide-dark-border md:grid-cols-4 md:divide-x md:divide-y-0">
+                                                                     <div className="p-5">
+                                                                         <div className="mb-3 flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
+                                                                             <CalendarIcon className="h-4 w-4" />
+                                                                             <span className="text-xs font-bold uppercase tracking-[0.14em]">
+                                                                                 Data
+                                                                             </span>
+                                                                         </div>
+                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                             {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
+                                                                         </p>
+                                                                     </div>
+
+                                                                     <div className="p-5">
+                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                             Pagamento
+                                                                         </p>
+                                                                         <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                                     </div>
+
+                                                                     <div className="p-5">
+                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                             Entrega
+                                                                         </p>
+                                                                         <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
+                                                                     </div>
+
+                                                                     <div className="p-5">
+                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                             Total
+                                                                         </p>
+                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                             {formatCurrency(selectedOrder.totalAmount || selectedOrder.total_amount || 0)}
+                                                                         </p>
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     )}                       </div>
                                             </FormSection>
 
                                             {/* Return Item Checklist */}
