@@ -9,11 +9,14 @@ CREATE TABLE IF NOT EXISTS public.return_requests (
   customer_id UUID NULL,
   customer_user_id UUID NULL,
   source TEXT NOT NULL DEFAULT 'erp' CHECK (source IN ('erp', 'marketplace', 'moderation')),
-  request_type TEXT NOT NULL DEFAULT 'return' CHECK (request_type IN ('return', 'exchange', 'refund', 'store_credit')),
-  desired_resolution TEXT NOT NULL CHECK (desired_resolution IN ('exchange', 'refund', 'store_credit')),
-  approved_resolution TEXT NULL CHECK (approved_resolution IS NULL OR approved_resolution IN ('exchange', 'refund', 'store_credit')),
+  request_type TEXT NOT NULL DEFAULT 'return' CHECK (request_type IN ('cancellation', 'return', 'exchange', 'refund', 'store_credit')),
+  desired_resolution TEXT NOT NULL CHECK (desired_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected')),
+  approved_resolution TEXT NULL CHECK (approved_resolution IS NULL OR approved_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected')),
+  resolution_type TEXT NULL CHECK (resolution_type IS NULL OR resolution_type IN ('exchange', 'refund', 'store_credit', 'none', 'rejected')),
   reason TEXT NOT NULL,
+  customer_reason TEXT NULL,
   customer_message TEXT NULL,
+  customer_details TEXT NULL,
   seller_notes TEXT NULL,
   internal_notes TEXT NULL,
   status TEXT NOT NULL DEFAULT 'PENDING_REVIEW' CHECK (
@@ -61,11 +64,12 @@ CREATE TABLE IF NOT EXISTS public.return_items (
   product_name_snapshot TEXT NOT NULL,
   sku_snapshot TEXT NULL,
   unit_price_snapshot NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  net_item_value_snapshot NUMERIC(14, 2) NOT NULL DEFAULT 0,
   ordered_quantity INTEGER NOT NULL CHECK (ordered_quantity > 0),
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   condition TEXT NULL CHECK (condition IS NULL OR condition IN ('sealed', 'opened', 'damaged')),
   reason TEXT NULL,
-  desired_resolution TEXT NULL CHECK (desired_resolution IS NULL OR desired_resolution IN ('exchange', 'refund', 'store_credit')),
+  desired_resolution TEXT NULL CHECK (desired_resolution IS NULL OR desired_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected')),
   exchange_product_id UUID NULL REFERENCES public.products(id) ON DELETE SET NULL,
   exchange_variant_id UUID NULL REFERENCES public.product_variants(id) ON DELETE SET NULL,
   exchange_quantity INTEGER NULL CHECK (exchange_quantity IS NULL OR exchange_quantity > 0),
@@ -153,6 +157,159 @@ CREATE TABLE IF NOT EXISTS public.return_notifications (
   read_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS subtotal_original NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_total NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_total NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS net_item_value NUMERIC(14,2) NULL;
+
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS resolution_type TEXT NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS customer_reason TEXT NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS customer_details TEXT NULL;
+ALTER TABLE public.return_items ADD COLUMN IF NOT EXISTS net_item_value_snapshot NUMERIC(14,2) NOT NULL DEFAULT 0;
+
+DO $$
+DECLARE
+  constraint_row RECORD;
+BEGIN
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.return_requests'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) LIKE '%desired_resolution%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.return_requests DROP CONSTRAINT IF EXISTS %I', constraint_row.conname);
+  END LOOP;
+
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.return_requests'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) LIKE '%request_type%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.return_requests DROP CONSTRAINT IF EXISTS %I', constraint_row.conname);
+  END LOOP;
+
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.return_requests'::regclass
+      AND contype = 'c'
+      AND (
+        pg_get_constraintdef(oid) LIKE '%approved_resolution%'
+        OR pg_get_constraintdef(oid) LIKE '%resolution_type%'
+      )
+  LOOP
+    EXECUTE format('ALTER TABLE public.return_requests DROP CONSTRAINT IF EXISTS %I', constraint_row.conname);
+  END LOOP;
+
+  FOR constraint_row IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.return_items'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) LIKE '%desired_resolution%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.return_items DROP CONSTRAINT IF EXISTS %I', constraint_row.conname);
+  END LOOP;
+END $$;
+
+ALTER TABLE public.return_requests
+  ADD CONSTRAINT return_requests_request_type_check
+  CHECK (request_type IN ('cancellation', 'return', 'exchange', 'refund', 'store_credit'));
+ALTER TABLE public.return_requests
+  ADD CONSTRAINT return_requests_desired_resolution_check
+  CHECK (desired_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected'));
+ALTER TABLE public.return_requests
+  ADD CONSTRAINT return_requests_approved_resolution_check
+  CHECK (approved_resolution IS NULL OR approved_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected'));
+ALTER TABLE public.return_requests
+  ADD CONSTRAINT return_requests_resolution_type_check
+  CHECK (resolution_type IS NULL OR resolution_type IN ('exchange', 'refund', 'store_credit', 'none', 'rejected'));
+ALTER TABLE public.return_items
+  ADD CONSTRAINT return_items_desired_resolution_check
+  CHECK (desired_resolution IS NULL OR desired_resolution IN ('exchange', 'refund', 'store_credit', 'none', 'rejected'));
+
+UPDATE public.orders o
+SET subtotal_original = COALESCE(NULLIF(o.subtotal_original, 0), totals.subtotal),
+    shipping_total = COALESCE(NULLIF(o.shipping_total, 0), COALESCE(o.delivery_fee, 0)),
+    amount_paid = COALESCE(NULLIF(o.amount_paid, 0), NULLIF(o.paid_amount, 0), COALESCE(o.total_amount, 0)),
+    discount_total = GREATEST(
+      0,
+      COALESCE(NULLIF(o.subtotal_original, 0), totals.subtotal) + COALESCE(NULLIF(o.shipping_total, 0), COALESCE(o.delivery_fee, 0)) - COALESCE(NULLIF(o.amount_paid, 0), NULLIF(o.paid_amount, 0), COALESCE(o.total_amount, 0))
+    )
+FROM (
+  SELECT order_id, ROUND(SUM(COALESCE(subtotal, product_price * quantity, 0))::NUMERIC, 2) AS subtotal
+  FROM public.order_items
+  GROUP BY order_id
+) totals
+WHERE totals.order_id = o.id;
+
+UPDATE public.order_items oi
+SET net_item_value = ROUND(
+  CASE
+    WHEN COALESCE(o.subtotal_original, 0) > 0
+      THEN (COALESCE(oi.subtotal, oi.product_price * oi.quantity, 0) / o.subtotal_original) * COALESCE(NULLIF(o.amount_paid, 0), o.total_amount, 0)
+    ELSE COALESCE(oi.subtotal, oi.product_price * oi.quantity, 0)
+  END::NUMERIC,
+  2
+)
+FROM public.orders o
+WHERE o.id = oi.order_id
+  AND oi.net_item_value IS NULL;
+
+CREATE OR REPLACE FUNCTION public.recalculate_order_paid_values(p_order_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_subtotal NUMERIC(14,2);
+  v_shipping NUMERIC(14,2);
+  v_paid NUMERIC(14,2);
+BEGIN
+  SELECT ROUND(COALESCE(SUM(COALESCE(subtotal, product_price * quantity, 0)), 0)::NUMERIC, 2)
+  INTO v_subtotal
+  FROM public.order_items
+  WHERE order_id = p_order_id;
+
+  SELECT COALESCE(delivery_fee, 0), COALESCE(NULLIF(amount_paid, 0), NULLIF(paid_amount, 0), total_amount, 0)
+  INTO v_shipping, v_paid
+  FROM public.orders
+  WHERE id = p_order_id;
+
+  UPDATE public.orders
+  SET subtotal_original = v_subtotal,
+      shipping_total = v_shipping,
+      amount_paid = v_paid,
+      discount_total = GREATEST(0, v_subtotal + v_shipping - v_paid)
+  WHERE id = p_order_id;
+
+  UPDATE public.order_items oi
+  SET net_item_value = ROUND(
+    CASE
+      WHEN v_subtotal > 0 THEN (COALESCE(oi.subtotal, oi.product_price * oi.quantity, 0) / v_subtotal) * v_paid
+      ELSE COALESCE(oi.subtotal, oi.product_price * oi.quantity, 0)
+    END::NUMERIC,
+    2
+  )
+  WHERE oi.order_id = p_order_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.recalculate_order_paid_values_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM public.recalculate_order_paid_values(NEW.order_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_order_items_recalculate_paid_values ON public.order_items;
+CREATE TRIGGER trg_order_items_recalculate_paid_values
+AFTER INSERT OR UPDATE OF subtotal, product_price, quantity, order_id
+ON public.order_items
+FOR EACH ROW EXECUTE FUNCTION public.recalculate_order_paid_values_trigger();
 
 CREATE INDEX IF NOT EXISTS idx_return_requests_partner_created
   ON public.return_requests(partner_id, created_at DESC, id DESC)
@@ -291,6 +448,7 @@ CREATE POLICY return_notifications_select_visible
     OR EXISTS (SELECT 1 FROM public.partner_users pu WHERE pu.partner_id = return_notifications.partner_id AND pu.user_id = auth.uid())
   );
 
+DROP FUNCTION IF EXISTS public.create_return_request(UUID, UUID, UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, TEXT, TIMESTAMPTZ);
 CREATE OR REPLACE FUNCTION public.create_return_request(
   p_partner_id UUID,
   p_order_id UUID,
@@ -302,7 +460,8 @@ CREATE OR REPLACE FUNCTION public.create_return_request(
   p_items JSONB,
   p_evidence JSONB DEFAULT '[]'::JSONB,
   p_idempotency_key TEXT DEFAULT NULL,
-  p_expires_at TIMESTAMPTZ DEFAULT NULL
+  p_expires_at TIMESTAMPTZ DEFAULT NULL,
+  p_request_type TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
   v_existing_id UUID;
@@ -316,6 +475,13 @@ DECLARE
   v_already_requested INTEGER;
   v_total_amount NUMERIC(14,2) := 0;
   v_evidence_count INTEGER;
+  v_sku TEXT;
+  v_request_type TEXT;
+  v_order_subtotal NUMERIC(14,2);
+  v_amount_paid NUMERIC(14,2);
+  v_line_subtotal NUMERIC(14,2);
+  v_line_net NUMERIC(14,2);
+  v_return_net NUMERIC(14,2);
 BEGIN
   IF p_idempotency_key IS NOT NULL THEN
     SELECT id INTO v_existing_id
@@ -329,11 +495,16 @@ BEGIN
     END IF;
   END IF;
 
-  IF p_resolution NOT IN ('exchange', 'refund', 'store_credit') THEN
+  IF p_resolution NOT IN ('exchange', 'refund', 'store_credit', 'none', 'rejected') THEN
     RAISE EXCEPTION 'Invalid resolution';
   END IF;
 
-  IF COALESCE(jsonb_array_length(p_items), 0) = 0 THEN
+  v_request_type := COALESCE(NULLIF(p_request_type, ''), CASE WHEN p_resolution = 'exchange' THEN 'exchange' WHEN p_resolution = 'store_credit' THEN 'store_credit' WHEN p_resolution = 'refund' THEN 'refund' ELSE 'return' END);
+  IF v_request_type NOT IN ('cancellation', 'return', 'exchange', 'refund', 'store_credit') THEN
+    RAISE EXCEPTION 'Invalid request type';
+  END IF;
+
+  IF v_request_type <> 'cancellation' AND COALESCE(jsonb_array_length(p_items), 0) = 0 THEN
     RAISE EXCEPTION 'At least one item is required';
   END IF;
 
@@ -352,6 +523,28 @@ BEGIN
     RAISE EXCEPTION 'Order not found';
   END IF;
 
+  IF v_request_type = 'cancellation' AND (
+    LOWER(COALESCE(v_order.situation, '')) IN ('cancelled', 'shipped', 'delivered', 'completed')
+    OR LOWER(COALESCE(v_order.delivery_status, '')) IN ('sent', 'shipped', 'out_for_delivery', 'delivered', 'picked_up', 'completed', 'delivery_failed', 'cancelled')
+  ) THEN
+    RAISE EXCEPTION 'Order is already being delivered';
+  END IF;
+
+  SELECT ROUND(COALESCE(SUM(COALESCE(oi.subtotal, oi.product_price * oi.quantity, 0)), 0)::NUMERIC, 2)
+  INTO v_order_subtotal
+  FROM public.order_items oi
+  WHERE oi.order_id = p_order_id;
+
+  v_order_subtotal := COALESCE(NULLIF(v_order.subtotal_original, 0), v_order_subtotal, 0);
+  v_amount_paid := COALESCE(NULLIF(v_order.amount_paid, 0), NULLIF(v_order.paid_amount, 0), COALESCE(v_order.total_amount, 0));
+
+  UPDATE public.orders
+  SET subtotal_original = v_order_subtotal,
+      shipping_total = COALESCE(NULLIF(shipping_total, 0), COALESCE(delivery_fee, 0)),
+      amount_paid = v_amount_paid,
+      discount_total = GREATEST(0, v_order_subtotal + COALESCE(NULLIF(shipping_total, 0), COALESCE(delivery_fee, 0)) - v_amount_paid)
+  WHERE id = p_order_id;
+
   SELECT store_name INTO v_partner_name
   FROM public.partners
   WHERE id = p_partner_id;
@@ -364,8 +557,12 @@ BEGIN
     source,
     request_type,
     desired_resolution,
+    approved_resolution,
+    resolution_type,
     reason,
+    customer_reason,
     customer_message,
+    customer_details,
     status,
     order_number_snapshot,
     order_total_snapshot,
@@ -381,13 +578,17 @@ BEGIN
     v_order.buyer_id,
     CASE WHEN p_source = 'marketplace' THEN v_order.buyer_id ELSE NULL END,
     COALESCE(NULLIF(p_source, ''), 'erp'),
-    CASE WHEN p_resolution = 'exchange' THEN 'exchange' WHEN p_resolution = 'store_credit' THEN 'store_credit' ELSE 'refund' END,
+    v_request_type,
+    p_resolution,
+    NULL,
     p_resolution,
     LEFT(TRIM(p_reason), 120),
+    LEFT(TRIM(p_reason), 120),
+    NULLIF(LEFT(TRIM(COALESCE(p_message, '')), 2000), ''),
     NULLIF(LEFT(TRIM(COALESCE(p_message, '')), 2000), ''),
     'PENDING_REVIEW',
     v_order.order_number,
-    COALESCE(v_order.total_amount, 0),
+    v_amount_paid,
     v_order.customer_name,
     v_partner_name,
     p_idempotency_key,
@@ -397,7 +598,7 @@ BEGIN
   )
   RETURNING id INTO v_request_id;
 
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_items, '[]'::JSONB))
   LOOP
     v_qty := COALESCE((v_item->>'quantity')::INTEGER, 0);
     IF v_qty <= 0 THEN
@@ -415,6 +616,17 @@ BEGIN
       RAISE EXCEPTION 'Order item not found';
     END IF;
 
+    v_sku := NULL;
+    IF v_order_item.variant_id IS NOT NULL THEN
+      SELECT sku INTO v_sku FROM public.product_variants WHERE id = v_order_item.variant_id;
+    END IF;
+    IF v_sku IS NULL AND v_order_item.product_id IS NOT NULL THEN
+      SELECT sku INTO v_sku FROM public.products WHERE id = v_order_item.product_id;
+    END IF;
+    IF v_sku IS NULL THEN
+      v_sku := v_item->>'sku';
+    END IF;
+
     SELECT COALESCE(SUM(ri.quantity), 0)
     INTO v_already_requested
     FROM public.return_items ri
@@ -427,6 +639,15 @@ BEGIN
       RAISE EXCEPTION 'Returned quantity exceeds ordered quantity';
     END IF;
 
+    v_line_subtotal := COALESCE(v_order_item.subtotal, v_order_item.product_price * v_order_item.quantity, 0);
+    v_line_net := COALESCE(NULLIF(v_order_item.net_item_value, 0), CASE WHEN v_order_subtotal > 0 THEN ROUND(((v_line_subtotal / v_order_subtotal) * v_amount_paid)::NUMERIC, 2) ELSE v_line_subtotal END);
+    v_return_net := ROUND(((v_line_net / GREATEST(COALESCE(v_order_item.quantity, 1), 1)) * v_qty)::NUMERIC, 2);
+
+    UPDATE public.order_items
+    SET net_item_value = v_line_net
+    WHERE id = v_order_item.id
+      AND net_item_value IS NULL;
+
     INSERT INTO public.return_items (
       return_request_id,
       order_item_id,
@@ -435,6 +656,7 @@ BEGIN
       product_name_snapshot,
       sku_snapshot,
       unit_price_snapshot,
+      net_item_value_snapshot,
       ordered_quantity,
       quantity,
       condition,
@@ -447,18 +669,23 @@ BEGIN
       v_order_item.product_id,
       v_order_item.variant_id,
       COALESCE(v_order_item.product_name, 'Item'),
-      COALESCE(v_order_item.sku, v_item->>'sku'),
+      COALESCE(v_sku, v_item->>'sku'),
       COALESCE(v_order_item.product_price, 0),
+      v_return_net,
       COALESCE(v_order_item.quantity, 1),
       v_qty,
       NULLIF(v_item->>'condition', ''),
       NULLIF(LEFT(COALESCE(v_item->>'reason', p_reason), 120), ''),
-      COALESCE(NULLIF(v_item->>'resolution', ''), p_resolution),
+      p_resolution,
       COALESCE(v_item->'metadata', '{}'::JSONB)
     );
 
-    v_total_amount := v_total_amount + (COALESCE(v_order_item.product_price, 0) * v_qty);
+    v_total_amount := v_total_amount + v_return_net;
   END LOOP;
+
+  IF v_request_type = 'cancellation' THEN
+    v_total_amount := v_amount_paid;
+  END IF;
 
   UPDATE public.return_requests
   SET refund_amount = CASE WHEN p_resolution = 'refund' THEN v_total_amount ELSE 0 END,
@@ -513,9 +740,9 @@ BEGIN
     p_created_by,
     'created',
     'PENDING_REVIEW',
-    'Return request created',
-    jsonb_build_object('resolution', p_resolution, 'source', p_source),
-    CASE WHEN p_source = 'marketplace' THEN 'user' ELSE 'user' END,
+    CASE WHEN v_request_type = 'cancellation' THEN 'Cancellation request created' ELSE 'Return request created' END,
+    jsonb_build_object('resolution', p_resolution, 'request_type', v_request_type, 'source', p_source, 'amount_basis', v_total_amount),
+    'user',
     CASE WHEN p_idempotency_key IS NULL THEN NULL ELSE p_idempotency_key || ':event' END
   );
 
@@ -524,8 +751,8 @@ BEGIN
     p_order_id,
     p_partner_id,
     p_created_by,
-    'return_created',
-    ARRAY['Return request created']
+    CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_requested' ELSE 'return_created' END,
+    ARRAY[CASE WHEN v_request_type = 'cancellation' THEN 'Cancellation request created' ELSE 'Return request created' END]
   );
 
   INSERT INTO public.return_notifications (
@@ -539,12 +766,12 @@ BEGIN
     v_request_id,
     p_partner_id,
     'seller',
-    'return_created',
-    'New return request',
-    COALESCE(v_order.order_number, 'Order') || ' has a new return request.'
+    CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_created' ELSE 'return_created' END,
+    CASE WHEN v_request_type = 'cancellation' THEN 'New cancellation request' ELSE 'New return request' END,
+    COALESCE(v_order.order_number, 'Order') || CASE WHEN v_request_type = 'cancellation' THEN ' has a new cancellation request.' ELSE ' has a new return request.' END
   );
 
-  RETURN jsonb_build_object('id', v_request_id, 'idempotent', false);
+  RETURN jsonb_build_object('id', v_request_id, 'idempotent', false, 'amount_basis', v_total_amount);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -572,6 +799,7 @@ DECLARE
   v_stock_movement JSON;
   v_items JSONB;
   v_transition_allowed BOOLEAN := FALSE;
+  v_max_action_amount NUMERIC(14,2) := 0;
 BEGIN
   IF p_idempotency_key IS NOT NULL THEN
     SELECT id INTO v_existing_event
@@ -597,6 +825,26 @@ BEGIN
 
   IF v_request.status IN ('RESOLVED', 'REJECTED', 'EXPIRED') THEN
     RAISE EXCEPTION 'Return request is locked';
+  END IF;
+
+  IF v_request.request_type = 'cancellation' THEN
+    SELECT COALESCE(NULLIF(amount_paid, 0), NULLIF(paid_amount, 0), total_amount, 0)
+    INTO v_max_action_amount
+    FROM public.orders
+    WHERE id = v_request.order_id;
+  ELSE
+    SELECT COALESCE(SUM(net_item_value_snapshot), 0)
+    INTO v_max_action_amount
+    FROM public.return_items
+    WHERE return_request_id = p_request_id;
+  END IF;
+
+  IF COALESCE(p_refund_amount, 0) > v_max_action_amount + 0.009 THEN
+    RAISE EXCEPTION 'Refund amount exceeds proportional paid amount';
+  END IF;
+
+  IF COALESCE(p_store_credit_amount, 0) > v_max_action_amount + 0.009 THEN
+    RAISE EXCEPTION 'Store credit amount exceeds proportional paid amount';
   END IF;
 
   v_old_status := v_request.status;
@@ -748,6 +996,10 @@ BEGIN
       approved_resolution = CASE
         WHEN v_new_status IN ('APPROVED', 'PROCESSING', 'RESOLVED') THEN COALESCE(approved_resolution, desired_resolution)
         ELSE approved_resolution
+      END,
+      resolution_type = CASE
+        WHEN v_new_status IN ('APPROVED', 'PROCESSING', 'RESOLVED') THEN COALESCE(approved_resolution, desired_resolution)
+        ELSE resolution_type
       END,
       refund_amount = CASE WHEN COALESCE(p_refund_amount, 0) > 0 THEN ABS(p_refund_amount) ELSE refund_amount END,
       store_credit_amount = CASE WHEN COALESCE(p_store_credit_amount, 0) > 0 THEN ABS(p_store_credit_amount) ELSE store_credit_amount END,

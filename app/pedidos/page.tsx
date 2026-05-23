@@ -18,16 +18,16 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   const user = await requireUser()
   const adminClient = await createAdminClient()
   const orderSelect = `
-    id, order_number, situation, total_amount, created_at, payment_method,
+    id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(city, state)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal,
       product_variants(variant_name, variant_options),
-      products(id, name, images, slug))
+      products(id, name, images, video_thumbnail, slug))
   `
   const fallbackOrderSelect = `
-    id, order_number, situation, total_amount, created_at, payment_method,
+    id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(city, state)),

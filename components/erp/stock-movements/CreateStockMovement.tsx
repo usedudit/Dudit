@@ -223,7 +223,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         }
     };
 
-    const pageTitle = "Nova Movimentação";
+    const pageTitle = "Nova movimentação";
 
     return (
         <FadeIn>

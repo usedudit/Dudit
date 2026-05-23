@@ -11,7 +11,14 @@ import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders, revalidateOrderHistory, revalidateStockMovements, revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
-import type { ReturnEvidenceInput, ReturnItemInput, ReturnRequestListItem, ReturnResolution, ReturnStatus } from "@/lib/returns/types"
+import type { ReturnRequestListItem } from "@/lib/returns/types"
+import {
+    canRequestOrderCancellation,
+    canRequestPostFulfillmentResolution,
+    getLineSubtotal,
+    getOrderAmountPaid,
+    getOrderSubtotalOriginal,
+} from "@/lib/returns/calculations"
 
 const RETURN_STATUS_SET = new Set([
     "PENDING_REVIEW",
@@ -44,7 +51,6 @@ const itemSchema = z.object({
     quantity: z.number().int().positive().max(999),
     reason: z.string().max(120).nullable().optional(),
     condition: z.enum(["sealed", "opened", "damaged"]).nullable().optional(),
-    resolution: z.enum(["exchange", "refund", "store_credit"]).nullable().optional(),
     sku: z.string().max(120).nullable().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
 })
@@ -52,13 +58,20 @@ const itemSchema = z.object({
 const createReturnSchema = z.object({
     partnerId: z.string().uuid(),
     orderId: z.string().uuid(),
-    resolution: z.enum(["exchange", "refund", "store_credit"]),
+    resolution: z.enum(["exchange", "refund", "store_credit", "none", "rejected"]),
     reason: z.string().trim().min(2).max(120),
     message: z.string().trim().max(2000).optional().nullable(),
     items: z.array(itemSchema).min(1).max(100),
     evidence: z.array(evidenceSchema).max(5).default([]),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     expiresAt: z.string().datetime().optional().nullable(),
+})
+
+const createCancellationSchema = z.object({
+    orderId: z.string().uuid(),
+    reason: z.enum(["purchased_by_mistake", "better_price", "delivery_delay", "changed_mind", "payment_issue", "other"]),
+    details: z.string().trim().max(2000).optional().nullable(),
+    idempotencyKey: z.string().trim().max(160).optional().nullable(),
 })
 
 const processReturnSchema = z.object({
@@ -90,7 +103,7 @@ function toNumber(value: unknown) {
 function normalizeReturnRow(row: any): ReturnRequestListItem {
     const items = (row.return_items || []).map((item: any) => {
         const productImages = item.products?.images
-        const image = Array.isArray(productImages) ? productImages[0] : productImages || null
+        const image = Array.isArray(productImages) && productImages[0] ? productImages[0] : item.products?.video_thumbnail || productImages || null
         return {
             id: item.id,
             orderItemId: item.order_item_id,
@@ -100,11 +113,11 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
             sku: item.sku_snapshot,
             image,
             price: toNumber(item.unit_price_snapshot),
+            netItemValue: toNumber(item.net_item_value_snapshot),
             quantity: Number(item.quantity || 0),
             orderedQuantity: Number(item.ordered_quantity || 0),
             reason: item.reason,
             condition: item.condition,
-            resolution: item.desired_resolution,
         }
     })
 
@@ -120,6 +133,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         source: row.source || "erp",
+        requestType: row.request_type || undefined,
         desiredResolution: row.desired_resolution,
         approvedResolution: row.approved_resolution,
         reason: row.reason,
@@ -127,7 +141,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         refundValue: toNumber(row.refund_amount),
         storeCreditValue: toNumber(row.store_credit_amount),
         evidenceImages: (row.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
-        observations: row.customer_message || row.seller_notes || row.internal_notes || "",
+        observations: row.customer_details || row.customer_message || row.seller_notes || row.internal_notes || "",
         expiresAt: row.expires_at,
         items,
     }
@@ -155,14 +169,14 @@ export async function getReturnRequestsPageAction(
         let query = supabase
             .from("return_requests")
             .select(`
-        id, partner_id, order_id, customer_id, customer_user_id, source, desired_resolution, approved_resolution,
-        reason, customer_message, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
+        id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
+        reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
         orders(order_number, customer_name),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
-          unit_price_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
-          products!product_id(images)
+          unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
+          products!product_id(images, video_thumbnail)
         ),
         return_evidence(id, file_url, file_type, thumbnail_url)
       `)
@@ -216,7 +230,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .select(`
         *,
         orders(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
-        return_items(*, products!product_id(images)),
+        return_items(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_events(*),
         return_refunds(*),
@@ -255,6 +269,7 @@ export async function createReturnRequestAction(input: unknown) {
             p_evidence: data.evidence,
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
             p_expires_at: data.expiresAt || null,
+            p_request_type: data.resolution === "none" ? "return" : null,
         })
 
         if (error) throw error
@@ -288,13 +303,16 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, partner_id, buyer_id, situation")
+            .select("id, partner_id, buyer_id, situation, delivery_status")
             .eq("id", base.orderId)
             .single()
 
         if (orderError || !order) throw new Error("Pedido nao encontrado")
         if (order.buyer_id !== user.id) throw new Error("Sem permissao")
         if (String(order.situation || "").toLowerCase() === "cancelled") throw new Error("Pedido cancelado nao aceita devolucao")
+        if (!canRequestPostFulfillmentResolution(order)) {
+            throw new Error("Este pedido ainda nao saiu para entrega. Solicite o cancelamento enquanto a entrega nao iniciou.")
+        }
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: order.partner_id,
@@ -308,6 +326,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
             p_evidence: base.evidence,
             p_idempotency_key: base.idempotencyKey || crypto.randomUUID(),
             p_expires_at: base.expiresAt || null,
+            p_request_type: null,
         })
 
         if (error) throw error
@@ -316,6 +335,50 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         return successResponse({ id: requestId })
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao enviar solicitacao")
+    }
+}
+
+export async function createMarketplaceCancellationRequestAction(input: unknown) {
+    await requireRateLimit(RateLimitCategory.ORDER_CREATE)
+    try {
+        const user = await requireUser()
+        const data = createCancellationSchema.parse(input)
+        await requireOrderAccess(data.orderId)
+        const supabase = createAdminClient()
+
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .select("id, partner_id, buyer_id, situation, delivery_status")
+            .eq("id", data.orderId)
+            .single()
+
+        if (orderError || !order) throw new Error("Pedido nao encontrado")
+        if (order.buyer_id !== user.id) throw new Error("Sem permissao")
+        if (!canRequestOrderCancellation(order)) {
+            throw new Error("Este pedido ja esta em entrega. Para continuar, solicite devolucao, troca ou reembolso.")
+        }
+
+        const { data: created, error } = await supabase.rpc("create_return_request", {
+            p_partner_id: order.partner_id,
+            p_order_id: data.orderId,
+            p_created_by: user.id,
+            p_source: "marketplace",
+            p_resolution: "none",
+            p_reason: data.reason,
+            p_message: data.details || null,
+            p_items: [],
+            p_evidence: [],
+            p_idempotency_key: data.idempotencyKey || `cancel:${data.orderId}:${user.id}`,
+            p_expires_at: null,
+            p_request_type: "cancellation",
+        })
+
+        if (error) throw error
+        const requestId = String((created as any)?.id || "")
+        await revalidateReturns(order.partner_id, data.orderId, requestId)
+        return successResponse({ id: requestId })
+    } catch (e: any) {
+        return errorResponse(e?.message || "Erro ao solicitar cancelamento")
     }
 }
 
@@ -331,7 +394,8 @@ async function maybeRefundMercadoPago(params: {
 
     try {
         const accessToken = await getValidMercadoPagoAccessToken(params.partnerId)
-        const body = params.amount >= toNumber(params.order.total_amount)
+        const refundablePaidAmount = getOrderAmountPaid(params.order || {})
+        const body = params.amount >= refundablePaidAmount
             ? {}
             : { amount: Number(params.amount.toFixed(2)) }
 
@@ -385,7 +449,11 @@ export async function processReturnRequestAction(input: unknown) {
 
         const { data: request, error: requestError } = await supabase
             .from("return_requests")
-            .select("id, partner_id, order_id, status, order_total_snapshot, orders(total_amount, payment_provider, mp_payment_id)")
+            .select(`
+                id, partner_id, order_id, status, request_type, order_total_snapshot,
+                orders(total_amount, amount_paid, payment_provider, mp_payment_id),
+                return_items(net_item_value_snapshot)
+            `)
             .eq("id", data.requestId)
             .eq("partner_id", data.partnerId)
             .is("deleted_at", null)
@@ -393,6 +461,11 @@ export async function processReturnRequestAction(input: unknown) {
 
         if (requestError || !request) throw new Error("Solicitacao nao encontrada")
         if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitacao bloqueada")
+        const maxActionAmount = (request as any).request_type === "cancellation"
+            ? getOrderAmountPaid((request as any).orders || {})
+            : toNumber(((request as any).return_items || []).reduce((sum: number, item: any) => sum + toNumber(item.net_item_value_snapshot), 0))
+        if (data.refundAmount > maxActionAmount + 0.009) throw new Error("Valor de reembolso excede o valor pago proporcional dos itens")
+        if (data.storeCreditAmount > maxActionAmount + 0.009) throw new Error("Valor de credito excede o valor pago proporcional dos itens")
 
         const paymentProvider = String((request as any).orders?.payment_provider || "").toLowerCase()
         const hasMercadoPago = Boolean((request as any).orders?.mp_payment_id) || paymentProvider.includes("mercado")
@@ -478,6 +551,11 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         id,
         order_number,
         total_amount,
+        paid_amount,
+        subtotal_original,
+        discount_total,
+        shipping_total,
+        amount_paid,
         buyer_id,
         customer_name,
         delivery_address,
@@ -494,11 +572,13 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
           product_price,
           quantity,
           subtotal,
+          net_item_value,
           product_id,
           variant_id,
           products (
             sku,
             images,
+            video_thumbnail,
             name
           )
         )
@@ -525,6 +605,9 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
 
         return (orders || []).map((order: any) => {
             const customer = order.buyer_id ? customersMap.get(order.buyer_id) : null
+            const orderItems = order.order_items || []
+            const amountPaid = getOrderAmountPaid(order)
+            const subtotalOriginal = getOrderSubtotalOriginal(order, orderItems)
             return {
                 id: order.id,
                 displayId: order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`,
@@ -533,6 +616,10 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                 deliveryStatus: order.delivery_status || "not_sent",
                 totalAmount: toNumber(order.total_amount),
                 total_amount: toNumber(order.total_amount),
+                amountPaid,
+                subtotalOriginal,
+                discountTotal: toNumber(order.discount_total),
+                shippingTotal: toNumber(order.shipping_total),
                 buyer_id: order.buyer_id,
                 customer_name: order.customer_name || customer?.name || "Cliente",
                 delivery_address: order.delivery_address,
@@ -542,7 +629,16 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
                 payment_method: order.payment_method,
                 payment_provider: order.payment_provider,
                 mp_payment_id: order.mp_payment_id,
-                order_items: order.order_items || [],
+                order_items: orderItems.map((item: any) => {
+                    const persistedNet = toNumber(item.net_item_value)
+                    const fallbackNet = subtotalOriginal > 0
+                        ? (getLineSubtotal(item) / subtotalOriginal) * amountPaid
+                        : getLineSubtotal(item)
+                    return {
+                        ...item,
+                        net_item_value: persistedNet > 0 ? persistedNet : Number(fallbackNet.toFixed(2)),
+                    }
+                }),
                 customer: customer || null,
                 orderDate: order.created_at || null,
             }

@@ -29,6 +29,10 @@ import { usePickerBucket } from "@/components/erp/hooks"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useR2Upload } from "@/hooks/use-r2-upload"
+import { calculateReturnNetTotal } from "@/lib/returns/calculations"
+import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import ImageCropperModal from "@/components/ImageCropperModal"
+import { useNotification } from "@/hooks/use-notification"
 
 
 interface CreateReturnPageProps {
@@ -40,16 +44,16 @@ interface CreateReturnPageProps {
     isSaving: boolean
 }
 
-interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition" | "resolution"> {
+interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition"> {
     maxQuantity: number
     checked: boolean
     reason: ReturnItem["reason"]
     condition: ReturnItem["condition"]
-    resolution: ReturnItem["resolution"]
 }
 
 function getOrderPreviewImage(order?: any | null) {
-    const firstItemImage = (order?.order_items || order?.items)?.find((item: any) => item?.products?.images)?.products?.images
+    const firstItem = (order?.order_items || order?.items)?.find((item: any) => item?.products?.images?.[0] || item?.products?.video_thumbnail)
+    const firstItemImage = firstItem?.products?.images?.[0] || firstItem?.products?.video_thumbnail || null
     return getR2ImageUrl(firstItemImage || null, "thumb")
 }
 
@@ -99,11 +103,22 @@ export default function CreateReturnPage({
     const [returnItems, setReturnItems] = useState<ReturnItemState[]>([])
     const [returnDate, setReturnDate] = useState<Date>(new Date())
     const [returnStatus, setReturnStatus] = useState<ReturnRequest["status"]>("PENDING_REVIEW")
+    const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
     const [refundValue, setRefundValue] = useState<number>(0)
-    const [evidenceImages, setEvidenceImages] = useState<string[]>([])
+    const [creditType, setCreditType] = useState<"full" | "partial">("full")
+    const [creditValue, setCreditValue] = useState<number>(0)
+    const [replacementProduct, setReplacementProduct] = useState("")
+    const [exchangeStatus, setExchangeStatus] = useState("pending")
+    const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
     const [evidenceUploads, setEvidenceUploads] = useState<any[]>([])
     const [observations, setObservations] = useState("")
+
+    const { error: notifyError } = useNotification()
+    const [showImageCropper, setShowImageCropper] = useState(false)
+    const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
+    const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
+    const [isUploading, setIsUploading] = useState(false)
 
     // Load existing return data for edit/view modes
     useEffect(() => {
@@ -136,20 +151,22 @@ export default function CreateReturnPage({
                 sku: item.sku || "",
                 image: item.image || "",
                 price: item.price,
+                netItemValue: item.netItemValue ?? item.price,
                 quantity: item.quantity,
                 maxQuantity: item.quantity, // cap at quantity saved
                 checked: true,
                 reason: item.reason || "outro",
                 condition: item.condition || "aberto",
-                resolution: item.resolution || "reembolso",
             }))
             setReturnItems(items)
 
             // Setup details
             setReturnDate(new Date(returnRequest.returnDate || returnRequest.createdAt))
             setReturnStatus(returnRequest.status)
+            setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
             setRefundType(returnRequest.refundType || (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))
             setRefundValue(returnRequest.refundValue)
+            setCreditValue(returnRequest.storeCreditValue || 0)
             setEvidenceImages(returnRequest.evidenceImages || [])
             setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.observations || "")
@@ -162,25 +179,40 @@ export default function CreateReturnPage({
     })
 
     // Handle local image file uploading
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files
-        if (!files) return
-        const remaining = Math.max(0, 5 - evidenceUploads.length)
-        const selected = Array.from(files).slice(0, remaining)
-        for (const file of selected) {
-            const uploaded = await evidenceUploader.uploadFile(file)
-            setEvidenceUploads(prev => [...prev, {
-                file_url: uploaded.publicUrl,
-                file_key: uploaded.key,
-                file_name: file.name,
-                file_type: uploaded.contentType || file.type,
-                file_size: file.size,
-                metadata: { originalName: file.name },
-            }])
-            setEvidenceImages(prev => [...prev, uploaded.publicUrl])
+    const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        e.currentTarget.value = ""
+        if (file) {
+            setSelectedImageForCrop(file)
+            setShowImageCropper(true)
         }
-        e.target.value = ""
-    }
+    }, [])
+
+    const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
+        try {
+            const blob = await (await fetch(croppedImageDataUrl)).blob()
+            const extension = blob.type === "image/png" ? "png" : "jpg"
+            const file = new File([blob], `evidence-image.${extension}`, { type: blob.type })
+            setEvidenceImages((prev) => [...prev, file])
+        } catch (err) {
+            console.error("Error cropping image:", err)
+        } finally {
+            setShowImageCropper(false)
+            setSelectedImageForCrop(null)
+        }
+    }, [])
+
+    const handleRemoveImage = useCallback((indexToDelete: number) => {
+        setEvidenceImages((prev) => prev.filter((_, i) => i !== indexToDelete))
+    }, [])
+
+    const handleSetPrimaryImage = useCallback((index: number) => {
+        if (!evidenceImages.length) return
+        const images = [...evidenceImages]
+        const [primary] = images.splice(index, 1)
+        images.unshift(primary)
+        setEvidenceImages(images)
+    }, [evidenceImages])
 
     const customerAddress = useMemo(() => {
         if (!selectedOrder) return null
@@ -223,54 +255,130 @@ export default function CreateReturnPage({
 
     // Automatically calculate refund value based on checked items
     const calculatedRefundValue = useMemo(() => {
-        return returnItems
-            .filter(item => item.checked)
-            .reduce((acc, item) => acc + (item.price * item.quantity), 0)
+        return calculateReturnNetTotal(
+            returnItems
+                .filter(item => item.checked)
+                .map(item => ({
+                    netItemValue: item.netItemValue,
+                    price: item.price,
+                    quantity: item.quantity,
+                    orderedQuantity: item.maxQuantity,
+                }))
+        )
     }, [returnItems])
 
     useEffect(() => {
-        if (refundType === "full") {
+        if (resolutionType === "refund" && refundType === "full") {
             setRefundValue(calculatedRefundValue)
-        } else if (refundType === "none") {
+        } else if (resolutionType !== "refund" || refundType === "none") {
             setRefundValue(0)
         }
-    }, [calculatedRefundValue, refundType])
+        if (resolutionType === "store_credit" && creditType === "full") {
+            setCreditValue(calculatedRefundValue)
+        } else if (resolutionType !== "store_credit") {
+            setCreditValue(0)
+        }
+    }, [calculatedRefundValue, creditType, refundType, resolutionType])
 
-    const handleFormSubmit = () => {
+    const handleFormSubmit = async () => {
         const checkedItems = returnItems.filter(item => item.checked)
         if (checkedItems.length === 0) return
 
-        onSave({
-            orderId: selectedOrder.id,
-            orderNumber: selectedOrder.order_number,
-            customerId: selectedOrder.buyer_id || "",
-            customerName: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
-            customerEmail: selectedOrder.customer?.email || "",
-            customerPhone: selectedOrder.customer?.phone || "",
-            customerAddress: customerAddress ? `${customerAddress.street}, ${customerAddress.number || ""} - ${customerAddress.city || ""}` : "",
-            refundType,
-            status: returnStatus,
-            refundValue,
-            returnDate: returnDate.toISOString(),
-            observations,
-            evidenceImages,
-            evidence: evidenceUploads,
-            items: checkedItems.map(item => ({
-                id: item.id,
-                productId: item.productId,
-                productName: item.productName,
-                sku: item.sku,
-                image: item.image,
-                price: item.price,
-                quantity: item.quantity,
-                reason: item.reason,
-                condition: item.condition,
-                resolution: item.resolution,
-            })),
-        })
+        setIsUploading(true)
+
+        try {
+            const finalEvidenceUploads: any[] = []
+            const finalEvidenceImages: string[] = []
+
+            // Find which evidenceImages are Files and which are already uploaded strings
+            const filesToUpload: { file: File; index: number }[] = []
+            evidenceImages.forEach((img, idx) => {
+                if (img instanceof File) {
+                    filesToUpload.push({ file: img, index: idx })
+                } else if (typeof img === "string") {
+                    finalEvidenceImages[idx] = img
+                    const existingUpload = evidenceUploads.find(u => u.file_url === img || u.publicUrl === img)
+                    if (existingUpload) {
+                        finalEvidenceUploads[idx] = existingUpload
+                    } else {
+                        finalEvidenceUploads[idx] = {
+                            file_url: img,
+                            file_name: img.substring(img.lastIndexOf("/") + 1),
+                        }
+                    }
+                }
+            })
+
+            if (filesToUpload.length > 0) {
+                setUploadingImages(new Set(filesToUpload.map(f => f.index)))
+
+                for (const { file, index } of filesToUpload) {
+                    try {
+                        const uploaded = await evidenceUploader.uploadFile(file)
+                        const uploadObj = {
+                            file_url: uploaded.publicUrl,
+                            file_key: uploaded.key,
+                            file_name: file.name,
+                            file_type: uploaded.contentType || file.type,
+                            file_size: file.size,
+                            metadata: { originalName: file.name },
+                        }
+                        finalEvidenceUploads[index] = uploadObj
+                        finalEvidenceImages[index] = uploaded.publicUrl
+                    } catch (uploadErr) {
+                        console.error("Error uploading file:", file.name, uploadErr)
+                        notifyError(`Falha ao fazer upload da imagem ${file.name}.`)
+                        throw uploadErr
+                    }
+                }
+                setUploadingImages(new Set())
+            }
+
+            const cleanEvidenceImages = finalEvidenceImages.filter(Boolean)
+            const cleanEvidenceUploads = finalEvidenceUploads.filter(Boolean)
+
+            onSave({
+                orderId: selectedOrder.id,
+                orderNumber: selectedOrder.order_number,
+                customerId: selectedOrder.buyer_id || "",
+                customerName: selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente",
+                customerEmail: selectedOrder.customer?.email || "",
+                customerPhone: selectedOrder.customer?.phone || "",
+                customerAddress: customerAddress ? `${customerAddress.street}, ${customerAddress.number || ""} - ${customerAddress.city || ""}` : "",
+                desiredResolution: resolutionType,
+                resolutionType,
+                refundType,
+                creditType,
+                status: returnStatus,
+                refundValue,
+                storeCreditValue: creditValue,
+                replacementProduct,
+                exchangeStatus,
+                returnDate: returnDate.toISOString(),
+                observations,
+                evidenceImages: cleanEvidenceImages,
+                evidence: cleanEvidenceUploads,
+                items: checkedItems.map(item => ({
+                    id: item.id,
+                    productId: item.productId,
+                    productName: item.productName,
+                    sku: item.sku,
+                    image: item.image,
+                    price: item.price,
+                    netItemValue: item.netItemValue,
+                    quantity: item.quantity,
+                    reason: item.reason,
+                    condition: item.condition,
+                })),
+            })
+        } catch (err) {
+            console.error("Error saving return request:", err)
+        } finally {
+            setIsUploading(false)
+        }
     }
 
-    const isSaveDisabled = isSaving || !selectedOrder || returnItems.filter(item => item.checked).length === 0
+    const isSaveDisabled = isSaving || isUploading || !selectedOrder || returnItems.filter(item => item.checked).length === 0
 
     const pageTitle = mode === "create" ? "Nova devolução" : mode === "edit" ? "Editar devolução" : "Detalhes da devolução"
 
@@ -311,13 +419,13 @@ export default function CreateReturnPage({
 
                                     {/* Desktop action buttons only */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={onBack} disabled={isSaving}>
+                                        <Button variant="outline" onClick={onBack} disabled={isSaving || isUploading}>
                                             Cancelar
                                         </Button>
                                         {mode !== "view" && (
                                             <Button onClick={handleFormSubmit} disabled={isSaveDisabled}>
                                                 <SaveIcon className="w-5 h-5 mr-2" />
-                                                {isSaving ? "Salvando..." : "Salvar"}
+                                                {isSaving || isUploading ? "Salvando..." : "Salvar"}
                                             </Button>
                                         )}
                                     </div>
@@ -335,7 +443,7 @@ export default function CreateReturnPage({
                         </div>
 
                         {/* Content Area */}
-                        <div className="px-4 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                     <TabsContent value="general" className="mt-0">
@@ -378,7 +486,9 @@ export default function CreateReturnPage({
                                                                                     setIsOrderSearchOpen(false)
                                                                                     // Map order items to returns checklist items
                                                                                     const mappedItems = (order.order_items || []).map((item: any) => {
-                                                                                        const imgKey = Array.isArray(item.products?.images) ? item.products.images[0] : (item.products?.images || null)
+                                                                                        const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
+                                                                                            ? item.products.images[0]
+                                                                                            : (item.products?.video_thumbnail || item.products?.images || null)
                                                                                         return {
                                                                                             id: item.id,
                                                                                             productId: item.product_id || item.products?.sku || item.id,
@@ -386,12 +496,12 @@ export default function CreateReturnPage({
                                                                                             sku: item.products?.sku || "",
                                                                                             image: getR2ImageUrl(imgKey, "thumb") || "",
                                                                                             price: item.product_price || 0,
+                                                                                            netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
                                                                                             quantity: item.quantity || 1,
                                                                                             maxQuantity: item.quantity || 1,
                                                                                             checked: false,
                                                                                             reason: "defeito" as const,
                                                                                             condition: "aberto" as const,
-                                                                                            resolution: "reembolso" as const,
                                                                                         }
                                                                                     })
                                                                                     setReturnItems(mappedItems)
@@ -438,72 +548,72 @@ export default function CreateReturnPage({
                                                     ) : null}
 
                                                     {selectedOrder && (
-                                                         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
-                                                             <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
-                                                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                                                     <div className="flex items-center gap-2">
-                                                                         <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                             Pedido:
-                                                                         </span>
-                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                             {selectedOrder.displayId || selectedOrder.order_number}
-                                                                         </span>
-                                                                     </div>
+                                                        <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
+                                                            <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
+                                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                            Pedido:
+                                                                        </span>
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {selectedOrder.displayId || selectedOrder.order_number}
+                                                                        </span>
+                                                                    </div>
 
-                                                                     <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body md:text-right">
-                                                                         Cliente:{" "}
-                                                                         <strong className="text-brand-dark dark:text-dark-heading">
-                                                                             {selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente"}
-                                                                         </strong>
-                                                                     </div>
-                                                                 </div>
-                                                             </div>
+                                                                    <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body md:text-right">
+                                                                        Cliente:{" "}
+                                                                        <strong className="text-brand-dark dark:text-dark-heading">
+                                                                            {selectedOrder.customer_name || selectedOrder.customer?.name || "Cliente"}
+                                                                        </strong>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
-                                                             <div className="bg-white dark:bg-dark-surface">
-                                                                 <div className="grid grid-cols-1 divide-y divide-brand-border dark:divide-dark-border md:grid-cols-4 md:divide-x md:divide-y-0">
-                                                                     <div className="p-5">
-                                                                         <div className="mb-3 flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
-                                                                             <CalendarIcon className="h-4 w-4" />
-                                                                             <span className="text-xs font-bold uppercase tracking-[0.14em]">
-                                                                                 Data
-                                                                             </span>
-                                                                         </div>
-                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                                             {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
-                                                                         </p>
-                                                                     </div>
+                                                            <div className="bg-white dark:bg-dark-surface">
+                                                                <div className="grid grid-cols-1 divide-y divide-brand-border dark:divide-dark-border md:grid-cols-4 md:divide-x md:divide-y-0">
+                                                                    <div className="p-5">
+                                                                        <div className="mb-3 flex items-center gap-2 text-brand-inactive-text dark:text-dark-body">
+                                                                            <CalendarIcon className="h-4 w-4" />
+                                                                            <span className="text-xs font-bold uppercase tracking-[0.14em]">
+                                                                                Data
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {selectedOrder.orderDate ? formatDate(selectedOrder.orderDate) : "-"}
+                                                                        </p>
+                                                                    </div>
 
-                                                                     <div className="p-5">
-                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
-                                                                             Pagamento
-                                                                         </p>
-                                                                         <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                                                     </div>
+                                                                    <div className="p-5">
+                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                            Pagamento
+                                                                        </p>
+                                                                        <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                                    </div>
 
-                                                                     <div className="p-5">
-                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
-                                                                             Entrega
-                                                                         </p>
-                                                                         <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
-                                                                     </div>
+                                                                    <div className="p-5">
+                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                            Entrega
+                                                                        </p>
+                                                                        <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
+                                                                    </div>
 
-                                                                     <div className="p-5">
-                                                                         <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
-                                                                             Total
-                                                                         </p>
-                                                                         <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                                                             {formatCurrency(selectedOrder.totalAmount || selectedOrder.total_amount || 0)}
-                                                                         </p>
-                                                                     </div>
-                                                                 </div>
-                                                             </div>
-                                                         </div>
-                                                     )}                       </div>
+                                                                    <div className="p-5">
+                                                                        <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-brand-inactive-text dark:text-dark-body">
+                                                                            Total
+                                                                        </p>
+                                                                        <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(selectedOrder.totalAmount || selectedOrder.total_amount || 0)}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}                       </div>
                                             </FormSection>
 
                                             {/* Return Item Checklist */}
                                             {selectedOrder && (
-                                                <FormSection title="Produtos para Devolução">
+                                                <FormSection hasSeparator title="Produtos para Devolução">
                                                     <div className="space-y-4">
                                                         {/* Desktop listrow-style table */}
                                                         <div className="hidden md:block w-full overflow-x-auto pb-4 custom-scrollbar">
@@ -516,7 +626,6 @@ export default function CreateReturnPage({
                                                                         <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-28">Comprado</th>
                                                                         <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Motivo</th>
                                                                         <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Condição</th>
-                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Resolução</th>
                                                                         <th className="py-3 pl-4 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36 rounded-r-lg">Qtd Devolver</th>
                                                                     </tr>
                                                                 </thead>
@@ -605,24 +714,6 @@ export default function CreateReturnPage({
                                                                                         { value: "aberto", label: "Aberto" },
                                                                                         { value: "lacrado", label: "Lacrado" },
                                                                                         { value: "danificado", label: "Danificado" }
-                                                                                    ]}
-                                                                                />
-                                                                            </td>
-                                                                            <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
-                                                                                <FormDropdown
-                                                                                    disabled={mode === "view" || !item.checked}
-                                                                                    value={item.resolution}
-                                                                                    setValue={(val) => {
-                                                                                        setReturnItems(prev => {
-                                                                                            const next = [...prev]
-                                                                                            next[idx] = { ...next[idx], resolution: val as any }
-                                                                                            return next
-                                                                                        })
-                                                                                    }}
-                                                                                    options={[
-                                                                                        { value: "reembolso", label: "Reembolso" },
-                                                                                        { value: "troca", label: "Troca" },
-                                                                                        { value: "vale_compra", label: "Vale-compra" }
                                                                                     ]}
                                                                                 />
                                                                             </td>
@@ -754,23 +845,6 @@ export default function CreateReturnPage({
                                                                                     { value: "danificado", label: "Danificado" }
                                                                                 ]}
                                                                             />
-                                                                            <FormDropdown
-                                                                                label="Resolução"
-                                                                                disabled={mode === "view"}
-                                                                                value={item.resolution}
-                                                                                setValue={(val) => {
-                                                                                    setReturnItems(prev => {
-                                                                                        const next = [...prev]
-                                                                                        next[idx] = { ...next[idx], resolution: val as any }
-                                                                                        return next
-                                                                                    })
-                                                                                }}
-                                                                                options={[
-                                                                                    { value: "reembolso", label: "Reembolso" },
-                                                                                    { value: "troca", label: "Troca" },
-                                                                                    { value: "vale_compra", label: "Vale-compra" }
-                                                                                ]}
-                                                                            />
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5">Qtd Devolver</span>
                                                                                 <div className="flex items-center bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg h-[40px] px-2 w-fit gap-3">
@@ -814,20 +888,19 @@ export default function CreateReturnPage({
                                                     </div>
                                                 </FormSection>
                                             )}
-
                                             {/* Refund/Exchange status details */}
                                             {selectedOrder && (
-                                                <FormSection hasSeparator title="Configurações do Reembolso">
+                                                <FormSection hasSeparator title="Request Resolution">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                                         <DatePicker
-                                                            label="Data de Devolução"
+                                                            label="Data"
                                                             disabled={mode === "view"}
                                                             value={returnDate}
                                                             onChange={(d) => d && setReturnDate(d)}
                                                         />
 
                                                         <FormDropdown
-                                                            label="Status da Devolução"
+                                                            label="Request status"
                                                             disabled={mode === "view"}
                                                             value={returnStatus}
                                                             setValue={(val) => setReturnStatus(val as ReturnRequest["status"])}
@@ -845,23 +918,89 @@ export default function CreateReturnPage({
                                                         />
 
                                                         <FormDropdown
-                                                            label="Opção de Reembolso"
+                                                            label="Resolution type"
                                                             disabled={mode === "view"}
-                                                            value={refundType || "partial"}
-                                                            setValue={(val) => setRefundType(val as ReturnRequest["refundType"])}
+                                                            value={resolutionType}
+                                                            setValue={(val) => setResolutionType(val as any)}
                                                             options={[
-                                                                { value: "full", label: "Reembolso Integral" },
-                                                                { value: "partial", label: "Reembolso Parcial" },
-                                                                { value: "none", label: "Sem Reembolso" }
+                                                                { value: "refund", label: "Reembolso" },
+                                                                { value: "store_credit", label: "Vale-compra" },
+                                                                { value: "exchange", label: "Troca" },
+                                                                { value: "none", label: "Sem resolucao" },
+                                                                { value: "rejected", label: "Recusada" }
                                                             ]}
                                                         />
 
-                                                        <MoneyInput
-                                                            label="Valor Reembolso (R$)"
-                                                            disabled={mode === "view" || refundType === "full" || refundType === "none"}
-                                                            value={refundValue}
-                                                            onChange={(val) => setRefundValue(val)}
-                                                        />
+                                                        {resolutionType === "refund" && (
+                                                            <>
+                                                                <FormDropdown
+                                                                    label="Refund type"
+                                                                    disabled={mode === "view"}
+                                                                    value={refundType || "partial"}
+                                                                    setValue={(val) => setRefundType(val as ReturnRequest["refundType"])}
+                                                                    options={[
+                                                                        { value: "full", label: "Integral" },
+                                                                        { value: "partial", label: "Parcial" },
+                                                                        { value: "none", label: "Sem reembolso" }
+                                                                    ]}
+                                                                />
+                                                                <MoneyInput
+                                                                    label="Refund value"
+                                                                    disabled={mode === "view" || refundType === "full" || refundType === "none"}
+                                                                    value={refundValue}
+                                                                    onChange={(val) => setRefundValue(Math.min(Number(val || 0), calculatedRefundValue))}
+                                                                />
+                                                            </>
+                                                        )}
+
+                                                        {resolutionType === "store_credit" && (
+                                                            <>
+                                                                <FormDropdown
+                                                                    label="Credit type"
+                                                                    disabled={mode === "view"}
+                                                                    value={creditType}
+                                                                    setValue={(val) => setCreditType(val as "full" | "partial")}
+                                                                    options={[
+                                                                        { value: "full", label: "Integral" },
+                                                                        { value: "partial", label: "Parcial" }
+                                                                    ]}
+                                                                />
+                                                                <MoneyInput
+                                                                    label="Store credit amount"
+                                                                    disabled={mode === "view" || creditType === "full"}
+                                                                    value={creditValue}
+                                                                    onChange={(val) => setCreditValue(Math.min(Number(val || 0), calculatedRefundValue))}
+                                                                />
+                                                            </>
+                                                        )}
+
+                                                        {resolutionType === "exchange" && (
+                                                            <>
+                                                                <Input
+                                                                    label="Replacement product"
+                                                                    disabled={mode === "view"}
+                                                                    value={replacementProduct}
+                                                                    onChange={(event) => setReplacementProduct(event.target.value)}
+                                                                    placeholder="Produto de substituicao"
+                                                                />
+                                                                <FormDropdown
+                                                                    label="Exchange status"
+                                                                    disabled={mode === "view"}
+                                                                    value={exchangeStatus}
+                                                                    setValue={setExchangeStatus}
+                                                                    options={[
+                                                                        { value: "pending", label: "Pendente" },
+                                                                        { value: "reserved", label: "Reservado" },
+                                                                        { value: "sent", label: "Enviado" },
+                                                                        { value: "completed", label: "Concluido" }
+                                                                    ]}
+                                                                />
+                                                            </>
+                                                        )}
+
+                                                        <div className="md:col-span-2 rounded-xl border border-brand-border dark:border-dark-border p-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                                                            Valor pago proporcional selecionado: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedRefundValue)}</strong>
+                                                        </div>
                                                     </div>
                                                 </FormSection>
                                             )}
@@ -871,59 +1010,15 @@ export default function CreateReturnPage({
                                     <TabsContent value="evidence" className="mt-0">
                                         <FadeIn key="evidence" className="space-y-6">
                                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Evidências de Retorno</h3>
-
-                                            {evidenceImages.length === 0 ? (
-                                                <div className="flex flex-col items-center justify-center min-h-[350px] border border-dashed border-brand-border dark:border-dark-border rounded-2xl p-8 bg-brand-gray/10">
-                                                    <IconPlaceholder
-                                                        placeholderType="image"
-                                                        imageSrc="https://img.dudit.com.br/static/mascots/SemPedidos.png"
-                                                        imageAlt="Nenhuma evidência por imagem"
-                                                        title="Nenhuma imagem enviada"
-                                                        subtitle={
-                                                            mode === "view"
-                                                                ? "Nenhuma imagem foi registrada como evidência para esta devolução."
-                                                                : "Envie fotos do estado do produto ou pacote retornado."
-                                                        }
-                                                        itemButton={
-                                                            mode !== "view"
-                                                                ? {
-                                                                    text: "Enviar imagem",
-                                                                    type: "file",
-                                                                    accept: "image/jpeg,image/png,image/webp,application/pdf",
-                                                                    onChange: handleImageUpload,
-                                                                }
-                                                                : undefined
-                                                        }
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                                                    {evidenceImages.map((src, i) => (
-                                                        <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border dark:border-dark-border group bg-brand-gray">
-                                                            <img src={src} alt={`Evidência ${i + 1}`} className="w-full h-full object-cover" />
-                                                            {mode !== "view" && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="absolute top-2 right-2 bg-brand-red text-white rounded-full p-2 hover:bg-red-700 shadow-md transition-colors"
-                                                                    onClick={() => {
-                                                                        setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))
-                                                                        setEvidenceUploads(prev => prev.filter((_, idx) => idx !== i))
-                                                                    }}
-                                                                >
-                                                                    <TrashIcon size={16} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-
-                                                    {mode !== "view" && (
-                                                        <label className="border-2 border-dashed border-brand-border dark:border-dark-border hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 rounded-2xl flex flex-col items-center justify-center cursor-pointer aspect-square transition-all duration-200">
-                                                            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleImageUpload} />
-                                                            <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">{evidenceUploader.isLoading ? "Enviando..." : "Adicionar evidencia"}</span>
-                                                        </label>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <ProductImagesSection
+                                                images={evidenceImages}
+                                                onImageUpload={handleImageUpload}
+                                                onRemoveImage={handleRemoveImage}
+                                                onSetPrimaryImage={handleSetPrimaryImage}
+                                                isEditing={mode !== "view"}
+                                                uploadingImages={uploadingImages}
+                                                isSaving={isSaving || isUploading}
+                                            />
                                         </FadeIn>
                                     </TabsContent>
 
@@ -972,15 +1067,24 @@ export default function CreateReturnPage({
 
             {/* Mobile action bar */}
             <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
-                <Button variant="outline" onClick={onBack} className="flex-1" disabled={isSaving}>
+                <Button variant="outline" onClick={onBack} className="flex-1" disabled={isSaving || isUploading}>
                     Cancelar
                 </Button>
                 {mode !== "view" && (
                     <Button onClick={handleFormSubmit} className="flex-1" disabled={isSaveDisabled}>
-                        {isSaving ? "Salvando..." : "Salvar"}
+                        {isSaving || isUploading ? "Salvando..." : "Salvar"}
                     </Button>
                 )}
             </div>
+
+            {showImageCropper && selectedImageForCrop && (
+                <ImageCropperModal
+                    isOpen
+                    imageFile={selectedImageForCrop}
+                    onClose={() => setShowImageCropper(false)}
+                    onCropComplete={handleImageCropComplete}
+                />
+            )}
         </FadeIn>
     )
 }

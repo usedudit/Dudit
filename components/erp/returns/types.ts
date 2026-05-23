@@ -9,11 +9,11 @@ export interface ReturnItem {
   sku?: string | null
   image?: string | null
   price: number
+  netItemValue?: number
   quantity: number
   orderedQuantity?: number
   reason: string
   condition: "sealed" | "opened" | "damaged" | "aberto" | "lacrado" | "danificado"
-  resolution: "refund" | "exchange" | "store_credit" | "reembolso" | "troca" | "vale_compra"
 }
 
 export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
@@ -22,7 +22,9 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
   customerAddress?: string
   createdAt: string
   refundType?: "full" | "partial" | "none" | "pix" | "credit_card" | "store_credit" | "other"
+  creditType?: "full" | "partial"
   refundValue: number
+  storeCreditValue: number
   returnDate?: string
   items: any[]
 }

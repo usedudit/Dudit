@@ -12,6 +12,7 @@ import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon } from '@/lib/icons'
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl } from "@/lib/utils/url-generator";
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate } from "@/lib/utils";
 
 
@@ -179,11 +180,11 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 {/* Items List */}
                                                 <div className="space-y-4">
                                                     {order.order_items?.map((item: any) => {
-                                                        const itemImage = item.products?.images?.[0]
-                                                            ? getR2ImageUrl(item.products.images[0])
-                                                            : item.product_variants?.variant_options?.image
-                                                                ? getR2ImageUrl(item.product_variants.variant_options.image)
-                                                                : "https://img.dudit.com.br/static/Placeholder.png";
+                                                        const itemImage = getPrimaryProductDisplayImage({
+                                                            images: item.products?.images || null,
+                                                            video_thumbnail: item.products?.video_thumbnail || null,
+                                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                                        });
 
                                                         return (
                                                             <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors">

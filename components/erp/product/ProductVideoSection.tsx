@@ -122,10 +122,10 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
   useEffect(() => () => revokeObjectUrl(), [revokeObjectUrl])
 
   useEffect(() => {
-    if (video.video_type === "upload" && video.video_url && localPreview) {
+    if (video.video_type === "upload" && video.video_url && localPreview && !isUploading) {
       clearLocalPreviewState()
     }
-  }, [video.video_url, video.video_type, localPreview, clearLocalPreviewState])
+  }, [video.video_url, video.video_type, localPreview, isUploading, clearLocalPreviewState])
 
   const hasVideo = !!video.video_type && !!video.video_url
   const embedUrl = useMemo(() => getEmbedPreviewUrl(video), [video])
@@ -154,8 +154,8 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     if (!file || isUploading) return
 
     const sessionId = ++uploadSessionRef.current
-    currentFileRef.current = file
     clearLocalPreviewState()
+    currentFileRef.current = file
     setError("")
     setProgress(1)
     setUploadingFile(file)

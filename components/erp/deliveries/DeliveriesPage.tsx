@@ -211,7 +211,7 @@ export default function DeliveriesPage({
                                     Exportar
                                 </Button>
                                 <Button onClick={() => setWrapper("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
-                                    Nova Entrega
+                                    Nova entrega
                                 </Button>
                             </div>
                         </div>

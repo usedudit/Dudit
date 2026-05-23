@@ -287,9 +287,9 @@ export default function CustomersPage({
 
     // Handlers (URL-driven)
     const handleAddCustomer = () => openEntity('create')
-    const handleEditCustomer = (customer: Customer) => openEntity('edit', customer.originalId)
-    const handleDetailsCustomer = (customer: Customer) => openEntity('view', customer.originalId)
-    const handleDeleteCustomer = (customer: Customer) => setCustomerToDelete(customer)
+    const handleEditCustomer = (customer: any) => openEntity('edit', customer.originalId || customer.id)
+    const handleDetailsCustomer = (customer: any) => openEntity('view', customer.originalId || customer.id)
+    const handleDeleteCustomer = (customer: any) => setCustomerToDelete(customer)
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -307,16 +307,17 @@ export default function CustomersPage({
     const confirmDeleteCustomer = async () => {
         if (!customerToDelete) return
         setIsDeletingCustomer(true)
-        const result = await deleteCustomersInBatchAction([customerToDelete.originalId])
+        const idToDelete = customerToDelete.originalId || customerToDelete.id
+        const result = await deleteCustomersInBatchAction([idToDelete])
         if (result.success) {
             afterMutation()
             toast({ title: "Excluído com sucesso" })
             setSelection((p) => {
                 const nextIds = new Set(p.ids)
-                nextIds.delete(customerToDelete.originalId)
+                nextIds.delete(idToDelete)
                 return { ...p, ids: nextIds }
             })
-            if (entityState.entityId === customerToDelete.originalId) {
+            if (entityState.entityId === idToDelete) {
                 closeEntity()
             }
             setCustomerToDelete(null)

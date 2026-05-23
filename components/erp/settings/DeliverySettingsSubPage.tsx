@@ -169,7 +169,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             {/* Distância */}
                             <div className="mt-8">
                                 <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <Accordion 
+                                <Accordion
                                     title={
                                         <span className="flex items-center gap-2">
                                             Distância e Frete
@@ -177,8 +177,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                                 <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
                                             )}
                                         </span>
-                                    } 
-                                    defaultOpen={false} 
+                                    }
+                                    defaultOpen={false}
                                     triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
                                     onToggle={(isOpen) => {
                                         if (isOpen && !advancedEnabled) {
@@ -218,7 +218,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             {/* Regras por horário */}
                             <div className="mt-8">
                                 <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <Accordion 
+                                <Accordion
                                     title={
                                         <span className="flex items-center gap-2">
                                             Regras por Horário
@@ -226,8 +226,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                                 <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
                                             )}
                                         </span>
-                                    } 
-                                    defaultOpen={false} 
+                                    }
+                                    defaultOpen={false}
                                     triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
                                     onToggle={(isOpen) => {
                                         if (isOpen && !advancedEnabled) {
@@ -317,7 +317,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
             <DefaultModal
                 isOpen={isRuleModalOpen}
                 onClose={() => setIsRuleModalOpen(false)}
-                title="Nova Regra por Horário"
+                title="Nova regra por horário"
                 maxWidth="md"
                 footer={
                     <>

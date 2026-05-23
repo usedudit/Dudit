@@ -174,7 +174,7 @@ export default function CreateDeliveryPage({
                                 </Button>
                                 <div>
                                     <h1 className="text-xl font-bold text-brand-dark dark:text-dark-heading md:text-3xl">
-                                        Nova Entrega
+                                        Nova entrega
                                     </h1>
                                     <p className="text-[15px] font-medium text-brand-inactive-text dark:text-dark-body">
                                         Vincule a entrega a um pedido e acompanhe os dados principais antes de salvar.

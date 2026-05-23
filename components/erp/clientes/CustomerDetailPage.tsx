@@ -30,6 +30,7 @@ interface Props {
 }
 
 export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
+    const realCustomerId = customer.originalId || customer.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [activeTab, setActiveTab] = useState('Purchase History');
     const [isScrolled, setIsScrolled] = useState(false);
@@ -77,7 +78,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         const fetchOrders = async () => {
             setIsLoadingOrders(true);
             try {
-                const res = await getCustomerOrdersAction(customer.originalId);
+                const res = await getCustomerOrdersAction(realCustomerId);
                 if (res.orders) setFetchedOrders(res.orders);
             } catch (e) {
                 console.error(e);
@@ -87,7 +88,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         };
         const fetchAddress = async () => {
             try {
-                const res = await getAddressesAction(customer.originalId, "customer");
+                const res = await getAddressesAction(realCustomerId, "customer");
                 if (res.addresses && res.addresses.length > 0) {
                     const primaryAddr = res.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || res.addresses[0];
                     const billingAddr = res.addresses.find((a: any) => a.address_type === "billing");
@@ -111,7 +112,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         };
         fetchOrders();
         fetchAddress();
-    }, [customer.originalId]);
+    }, [realCustomerId]);
 
     const isInformationTab = activeTab === 'Information';
 
@@ -182,7 +183,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         try {
             setIsDeleting(true)
             const token = await (await fetch("/api/csrf-token")).json().then((r: any) => r.token)
-            const res = await deleteCustomerAction(customer.originalId, token)
+            const res = await deleteCustomerAction(realCustomerId, token)
             if (res?.error) {
                 notifyError("Erro ao excluir: " + res.error)
             } else {
@@ -239,7 +240,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                         <ActionsDropdown
                                             onDelete={() => setShowDeleteModal(true)}
                                         />
-                                        <Button className='whitespace-nowrap' onClick={() => onEdit?.(customer)}>
+                                        <Button className='whitespace-nowrap' onClick={() => onEdit?.({ ...customer, originalId: realCustomerId })}>
                                             <EditIcon className="w-4 h-4 mr-2" />
                                             Editar cliente
                                         </Button>

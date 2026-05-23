@@ -13,8 +13,11 @@ export const RETURN_STATUSES = [
 
 export type ReturnStatus = (typeof RETURN_STATUSES)[number]
 
-export const RETURN_RESOLUTIONS = ["exchange", "refund", "store_credit"] as const
+export const RETURN_RESOLUTIONS = ["exchange", "refund", "store_credit", "none", "rejected"] as const
 export type ReturnResolution = (typeof RETURN_RESOLUTIONS)[number]
+
+export const RETURN_REQUEST_TYPES = ["cancellation", "return", "exchange", "refund", "store_credit"] as const
+export type ReturnRequestType = (typeof RETURN_REQUEST_TYPES)[number]
 
 export const RETURN_REASONS = [
   "wrong_item",
@@ -44,7 +47,6 @@ export type ReturnItemInput = {
   quantity: number
   reason?: string | null
   condition?: "sealed" | "opened" | "damaged" | null
-  resolution?: ReturnResolution | null
   sku?: string | null
   metadata?: Record<string, unknown>
 }
@@ -61,6 +63,7 @@ export type ReturnRequestListItem = {
   createdAt: string
   updatedAt: string
   source: "erp" | "marketplace" | "moderation"
+  requestType?: ReturnRequestType
   desiredResolution: ReturnResolution
   approvedResolution?: ReturnResolution | null
   reason: string
@@ -79,11 +82,11 @@ export type ReturnRequestListItem = {
     sku?: string | null
     image?: string | null
     price: number
+    netItemValue?: number
     quantity: number
     orderedQuantity: number
     reason?: string | null
     condition?: string | null
-    resolution?: ReturnResolution | null
   }>
 }
 
@@ -108,6 +111,8 @@ export function getReturnResolutionLabel(resolution: string) {
     case "exchange": return "Troca"
     case "refund": return "Reembolso"
     case "store_credit": return "Vale-compra"
+    case "none": return "Sem resolucao"
+    case "rejected": return "Recusado"
     default: return resolution || "-"
   }
 }

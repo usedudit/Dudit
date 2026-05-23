@@ -100,10 +100,8 @@ function ProductImagesSection({
                         <IconPlaceholder
                             icon={UploadIcon}
                             iconSize="w-8 h-8"
-                            title="Upload de Imagem"
-                            titleClass="text-md"
-                            subtitle="Clique para adicionar imagens"
-                            subtitleClass="text-sm"
+                            title="Enviar imagem"
+                            subtitle="Clique para adicionar"
                         />
                         <input
                             ref={fileInputRef}

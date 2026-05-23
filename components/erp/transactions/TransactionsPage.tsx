@@ -1269,7 +1269,7 @@ export default function TransactionsPage({
 
                         <Button onClick={() => openEntity("create")}>
                             <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                            Nova Transação
+                            Nova transação
                         </Button>
                     </div>
                 </div>

@@ -168,7 +168,7 @@ const Hero = () => {
                                     <TrendingUp className="w-5 h-5 text-brand-dark" />
                                 </div>
                                 <div>
-                                    <div className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Nova Venda</div>
+                                    <div className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Nova venda</div>
                                     <div className="text-sm font-bold text-brand-dark">R$ 150,00</div>
                                 </div>
                             </div>

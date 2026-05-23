@@ -407,7 +407,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
 
                                 <Button onClick={() => openEntity('create')}>
                                     <PlusIcon className="w-[18px] h-[18px]" strokeWidth={3} />
-                                    Nova Movimentação
+                                    Nova movimentação
                                 </Button>
                             </div>
                         </div>
@@ -441,7 +441,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                             title={isFiltered ? "Nenhuma movimentação encontrada" : "Sem movimentações"}
                                             subtitle={isFiltered ? "Tente ajustar seus filtros ou termos de busca." : "Sua história de movimentações aparecerá aqui."}
                                             itemButton={!isFiltered ? {
-                                                text: "Nova Movimentação",
+                                                text: "Nova movimentação",
                                                 action: () => openEntity('create'),
                                             } : {
                                                 text: "Limpar Filtros",

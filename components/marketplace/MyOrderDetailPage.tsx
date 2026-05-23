@@ -12,14 +12,15 @@ import {
     AlertCircleIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, AlertModal } from '@/components/reusable';
+import { Button, Spinner } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
-import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
-import { createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
+import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
+import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from '@/lib/returns/calculations';
+import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
@@ -129,6 +130,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [pixOrderDetails, setPixOrderDetails] = useState<any>(null);
     const [isCanceling, setIsCanceling] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState("changed_mind");
+    const [cancelDetails, setCancelDetails] = useState("");
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
     const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
     const [returnReason, setReturnReason] = useState("changed_mind");
@@ -156,6 +159,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isDelivery = order.delivery_type === "delivery";
     const sellerName = order.partners?.store_name || "Loja Parceira";
     const totalAmount = Number(order.total_amount);
+    const canCancelOrder = canRequestOrderCancellation(order);
+    const canRequestResolution = canRequestPostFulfillmentResolution(order);
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
@@ -187,24 +192,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const handleCancelOrder = async () => {
         try {
             setIsCanceling(true);
-            const res = await cancelBuyerOrderAction(order.id);
-            if (res?.error) throw new Error(res.error);
+            const res = await createMarketplaceCancellationRequestAction({
+                orderId: order.id,
+                reason: cancelReason,
+                details: cancelDetails,
+                idempotencyKey: `cancel:${order.id}:${Date.now()}`,
+            });
+            if (!res.success) throw new Error(res.error);
 
             toast({
-                title: "Pedido cancelado",
-                description: "Seu pedido foi cancelado com sucesso."
+                title: "Solicitacao enviada",
+                description: "O vendedor recebeu seu pedido de cancelamento."
             });
 
-            onBack(); // fecha o modal de detalhes do pedido
+            setIsCancelModalOpen(false);
         } catch (err: any) {
             toast({
-                title: "Erro ao cancelar",
-                description: err.message || "Ocorreu um erro ao cancelar o pedido.",
+                title: "Erro ao solicitar cancelamento",
+                description: err.message || "Ocorreu um erro ao solicitar o cancelamento.",
                 variant: "destructive"
             });
         } finally {
             setIsCanceling(false);
-            setIsCancelModalOpen(false);
         }
     };
 
@@ -228,7 +237,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const submitReturnRequest = async () => {
         const items = Object.entries(returnItems)
             .filter(([, quantity]) => Number(quantity) > 0)
-            .map(([orderItemId, quantity]) => ({ order_item_id: orderItemId, quantity: Number(quantity), reason: returnReason, resolution: returnResolution }));
+            .map(([orderItemId, quantity]) => ({ order_item_id: orderItemId, quantity: Number(quantity), reason: returnReason }));
 
         if (items.length === 0) {
             toast({ title: "Selecione ao menos um produto", variant: "destructive" });
@@ -373,7 +382,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </Link>
                         </div>
 
-                        {order.situation === 'pending' && (
+                        {canCancelOrder && (
                             <>
                                 <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
                                 <Button
@@ -385,15 +394,24 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     {isCanceling ? (
                                         <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
                                     ) : (
-                                        "Cancelar compra"
+                                        "Cancelar pedido"
                                     )}
                                 </Button>
                             </>
                         )}
 
-                        {order.situation !== 'pending' && order.situation !== 'cancelled' && (
+                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                            <div className="mt-6 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                            </div>
+                        )}
+
+                        {canRequestResolution && (
                             <>
                                 <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
+                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body">
+                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                </p>
                                 <Button
                                     variant="outline"
                                     className="w-full sm:w-auto h-12 font-bold"
@@ -414,11 +432,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="p-6">
                                 <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                                     {order.order_items?.map((item: any) => {
-                                        const itemImage = item.products?.images?.[0]
-                                            ? getR2ImageUrl(item.products.images[0])
-                                            : item.product_variants?.variant_options?.image
-                                                ? getR2ImageUrl(item.product_variants.variant_options.image)
-                                                : "https://img.dudit.com.br/static/Placeholder.png";
+                                        const itemImage = getPrimaryProductDisplayImage({
+                                            images: item.products?.images || null,
+                                            video_thumbnail: item.products?.video_thumbnail || null,
+                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                        });
                                         const itemTotal = Number(item.subtotal || item.product_price * item.quantity);
 
                                         return (
@@ -485,16 +503,48 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 />
             )}
 
-            <AlertModal
-                isOpen={isCancelModalOpen}
-                onClose={() => setIsCancelModalOpen(false)}
-                onConfirm={handleCancelOrder}
-                title="Cancelar pedido?"
-                description="Tem certeza que deseja cancelar esta compra? Esta ação não pode ser desfeita."
-                confirmText={isCanceling ? "Cancelando..." : "Sim, cancelar"}
-                cancelText="Não, voltar"
-                variant="danger"
-            />
+            <AnimatePresence>
+                {isCancelModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white dark:bg-dark-surface w-full max-w-lg rounded-2xl overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
+                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Cancelar pedido</h3>
+                                <button onClick={() => setIsCancelModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
+                                    <XIcon size={24} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    Motivo do cancelamento
+                                    <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                        <option value="purchased_by_mistake">Comprei por engano</option>
+                                        <option value="better_price">Encontrei preco melhor</option>
+                                        <option value="delivery_delay">Atraso na entrega</option>
+                                        <option value="changed_mind">Mudei de ideia</option>
+                                        <option value="payment_issue">Problema no pagamento</option>
+                                        <option value="other">Outro</option>
+                                    </select>
+                                </label>
+                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    Detalhes
+                                    <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
+                                <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
+                                <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
+                                    {isCanceling ? "Enviando..." : "Solicitar cancelamento"}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {isReturnModalOpen && (
@@ -514,13 +564,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-6">
                                 <div className="space-y-3">
                                     <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
-                                    {order.order_items?.map((item: any) => (
+                                    {order.order_items?.map((item: any) => {
+                                        const itemImage = getPrimaryProductDisplayImage({
+                                            images: item.products?.images || null,
+                                            video_thumbnail: item.products?.video_thumbnail || null,
+                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                        });
+                                        return (
                                         <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
                                             <input
                                                 type="checkbox"
                                                 checked={Number(returnItems[item.id] || 0) > 0}
                                                 onChange={(event) => setReturnItems(prev => ({ ...prev, [item.id]: event.target.checked ? 1 : 0 }))}
                                             />
+                                            <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
                                                 <p className="text-xs text-brand-inactive-text">Comprado: {item.quantity} un.</p>
@@ -537,7 +594,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 className="w-20 h-10 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-2 text-sm"
                                             />
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
