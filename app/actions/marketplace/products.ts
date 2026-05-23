@@ -313,3 +313,144 @@ export const getCachedExploreProducts = async (query: string, type: MarketplaceS
     servicos: 20
   })
 }
+
+// Helper to extract fallback values from product variants
+function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
+  if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
+  const withImage = variants.find((v: any) => v.is_active && v.variant_options?.image)
+  const first = variants.find((v: any) => v.is_active) || variants[0]
+  const image = withImage?.variant_options?.image || null
+  const priceAdj = first?.price_adjustment
+  const price = priceAdj && priceAdj > 0 ? priceAdj : null
+  return { fallback_variant_image: image, fallback_variant_price: price }
+}
+
+/**
+ * Resolves a city-uf slug to capitalized/accented city name and state.
+ * Queries unique addresses in the DB to match them. Fallback to formatting.
+ */
+export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city: string; state: string } | null> {
+  if (!slug) return null
+  const parts = slug.split("-")
+  const state = parts.pop()?.toUpperCase()
+  const citySlugWithoutState = parts.join("-")
+  if (!state) return null
+
+  const supabase = getAdminClient()
+
+  // Find a matching address row in the DB to preserve correct accents and capitalization
+  const { data: addresses } = await supabase
+    .from("addresses")
+    .select("city, state")
+    .eq("state", state)
+
+  if (addresses && addresses.length > 0) {
+    const matched = addresses.find((addr: any) => {
+      if (!addr.city) return false
+      const normalized = addr.city
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      return normalized === citySlugWithoutState
+    })
+
+    if (matched) {
+      return { city: matched.city, state: matched.state }
+    }
+  }
+
+  // Fallback formatting if no address exists in the DB yet
+  const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
+  return { city: fallbackCityName, state }
+}
+
+/**
+ * Fetches products and vitrines (partners) located in the specified city and state.
+ */
+export async function getHomeDataByCity(city: string, state: string) {
+  const supabase = getAdminClient()
+
+  const [productsRes, partnersRes] = await Promise.all([
+    supabase
+      .from("products")
+      .select(`
+        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+        category_id, category:product_categories!category_id(name), created_at,
+        partners!inner(
+          id, store_name, store_image_url, latitude, longitude,
+          addresses!inner(city, state)
+        ),
+        product_variants(variant_options, price_adjustment, is_active)
+      `)
+      .eq("is_active", true)
+      .eq("show_in_marketplace", true)
+      .ilike("partners.addresses.city", city)
+      .ilike("partners.addresses.state", state),
+    supabase
+      .from("partners")
+      .select(`
+        id, store_name, store_description, store_image_url, banner_url,
+        logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
+        created_at,
+        addresses!inner(city, state)
+      `)
+      .eq("is_active", true)
+      .ilike("addresses.city", city)
+      .ilike("addresses.state", state)
+  ])
+
+  const products = productsRes.data || []
+  const partners = partnersRes.data || []
+
+  // Normalize products data
+  const normalizedProducts = products.map((item: any) => {
+    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const partner = rawPartner ? {
+      ...rawPartner,
+      store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawPartner.latitude,
+      longitude: rawPartner.longitude,
+      city: rawPartner.addresses?.[0]?.city || null,
+      state: rawPartner.addresses?.[0]?.state || null
+    } : null
+    const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+    const { product_variants, ...rest } = item
+    return {
+      ...rest,
+      category: item.category?.name || null,
+      itemType: 'produto',
+      partners: partner,
+      ...variantFallback
+    }
+  })
+
+  // Normalize partners (vitrines) data
+  const normalizedVitrines = partners.map((item: any) => {
+    return {
+      id: item.id,
+      name: item.store_name,
+      description: item.store_description,
+      images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+      rating: item.rating,
+      itemType: 'loja',
+      category: 'Loja Parceira',
+      partners: {
+        id: item.id,
+        store_name: item.store_name,
+        store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+        banner_url: item.banner_url || null,
+        logo_moderation_status: item.logo_moderation_status || "approved",
+        banner_moderation_status: item.banner_moderation_status || "approved",
+        latitude: item.latitude,
+        longitude: item.longitude,
+        city: item.addresses?.[0]?.city || null,
+        state: item.addresses?.[0]?.state || null
+      }
+    }
+  })
+
+  return { products: normalizedProducts, vitrines: normalizedVitrines }
+}
+

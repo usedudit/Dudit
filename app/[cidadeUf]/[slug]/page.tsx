@@ -103,11 +103,24 @@ export default async function CityTermPage({ params }: Props) {
             })}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <h2 className="text-2xl font-semibold mb-4">Nenhum resultado encontrado</h2>
-            <p className="text-gray-500 mb-8 max-w-md">
-              Ainda não temos parceiros para <strong>{termFormatted}</strong> em <strong>{cityFormatted}</strong>.
-            </p>
+          <div className="bg-[#f0f9ff] rounded-[24px] border border-[#e0f2fe] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm my-8">
+            <div className="flex-grow text-center md:text-left md:max-w-[65%] text-[#003d32]">
+              <h2 className="text-3xl font-black text-[#0369a1] mb-4 leading-tight">Estamos Chegando!</h2>
+              <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                Ainda não temos parceiros ou produtos cadastrados para <strong className="text-brand-dark">{termFormatted}</strong> em <strong className="text-brand-dark">{cityFormatted}</strong>. Que tal ser o pioneiro e começar a divulgar seus produtos ou serviços de graça na sua cidade?
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                <Link
+                  href="/auth/login?mode=partner"
+                  className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
+                >
+                  Anunciar Grátis na Dudit
+                </Link>
+              </div>
+            </div>
+            <div className="w-[180px] md:w-[240px] shrink-0 transform hover:scale-105 transition-transform duration-300">
+              <img src="https://img.dudit.com.br/static/mascots/EstamosChegando.png" alt="Estamos Chegando!" className="w-full h-auto object-contain" />
+            </div>
           </div>
         )}
       </main>

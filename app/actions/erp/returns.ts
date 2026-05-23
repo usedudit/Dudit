@@ -179,7 +179,7 @@ export async function getReturnRequestsPageAction(
         id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
-        orders(order_number, customer_name),
+        orders!order_id(order_number, customer_name),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
@@ -236,7 +236,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
+        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
         return_items(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_events(*),
@@ -458,7 +458,7 @@ export async function processReturnRequestAction(input: unknown) {
             .from("return_requests")
             .select(`
                 id, partner_id, order_id, status, request_type, order_total_snapshot,
-                orders(total_amount, amount_paid, payment_provider, mp_payment_id),
+                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id),
                 return_items(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)

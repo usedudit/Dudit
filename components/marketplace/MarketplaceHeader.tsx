@@ -11,19 +11,20 @@ import {
     SearchIcon,
     ChevronRightIcon,
     ChevronLeftIcon,
-    MenuIcon,
     Package,
     HeartIcon,
     ShareIcon,
+    XIcon,
 } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
-import { Button } from "@/components/reusable"
+import { Button, DefaultModal, Input } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
+import citiesData from "@/lib/data/cities.json"
 
 interface HeaderProps {
     setView?: (
@@ -107,6 +108,161 @@ const Header: React.FC<HeaderProps> = ({
     const [isScrolled, setIsScrolled] = useState(false)
     const [isPending, startTransition] = useTransition()
     const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
+
+    const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
+    const [visitorSearchQuery, setVisitorSearchQuery] = useState("")
+    const [isIpLoading, setIsIpLoading] = useState(false)
+
+    const filteredCities = useMemo(() => {
+        if (!visitorSearchQuery || visitorSearchQuery.trim().length < 2) return []
+        const q = visitorSearchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        return (citiesData as string[])
+            .filter((slug: string) => slug.includes(q))
+            .slice(0, 5)
+    }, [visitorSearchQuery])
+
+    const formatCitySlugForDisplay = (slug: string): string => {
+        const parts = slug.split("-")
+        const state = parts.pop()?.toUpperCase() || ""
+        const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
+        return `${city} - ${state}`
+    }
+
+    const handleSelectCitySlug = (slug: string) => {
+        document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
+        localStorage.setItem('dudit_city', slug)
+        window.location.href = `/${slug}`
+    }
+
+    const handleIpLocation = async () => {
+        setIsIpLoading(true)
+        try {
+            const res = await fetch("https://ipapi.co/json/")
+            if (!res.ok) throw new Error("Falha ao buscar IP")
+            const data = await res.json()
+            if (data.city && data.region_code) {
+                const cityStr = data.city
+                const stateIso = data.region_code
+                const uf = stateIso.toLowerCase()
+                const formattedCity = cityStr
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '')
+                const slug = `${formattedCity}-${uf}`
+                
+                document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem('dudit_city', slug)
+                window.location.href = `/${slug}`
+            } else {
+                throw new Error("Dados de IP incompletos")
+            }
+        } catch (err) {
+            console.warn("IP location failed, falling back to navigator geolocation:", err)
+            requestLocation()
+        } finally {
+            setIsIpLoading(false)
+        }
+    }
+
+    const renderVisitorModal = () => {
+        return (
+            <DefaultModal
+                isOpen={isVisitorModalOpen}
+                onClose={() => setIsVisitorModalOpen(false)}
+                maxWidth="md"
+                hideHeader={true}
+            >
+                <div className="flex flex-col relative text-[#003d32]">
+                    <button
+                        onClick={() => setIsVisitorModalOpen(false)}
+                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <XIcon size={16} />
+                    </button>
+                    
+                    {/* Header with gradient and mascot */}
+                    <div
+                        className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
+                        style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
+                    >
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                            alt="Onde você está?"
+                            className="w-48 h-auto object-contain transform translate-y-4"
+                        />
+                    </div>
+
+                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde você está?</h4>
+                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+                        Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
+                    </p>
+
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <Input
+                                label="Digite sua cidade"
+                                id="visitorCitySearchHeader"
+                                name="visitorCitySearchHeader"
+                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                value={visitorSearchQuery}
+                                onChange={(e) => setVisitorSearchQuery(e.target.value)}
+                            />
+                            {filteredCities.length > 0 && (
+                                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100">
+                                    {filteredCities.map((slug) => (
+                                        <button
+                                            key={slug}
+                                            onClick={() => handleSelectCitySlug(slug)}
+                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2"
+                                        >
+                                            <MapPinIcon size={14} className="text-brand-green shrink-0" />
+                                            {formatCitySlugForDisplay(slug)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleIpLocation}
+                            disabled={isIpLoading || isLocationLoading}
+                            className="w-full flex items-center justify-center gap-2 border-2 border-brand-green text-brand-green font-bold py-3 px-4 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 text-sm shadow-sm"
+                        >
+                            {isIpLoading || isLocationLoading ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
+                                    Detectando...
+                                </>
+                            ) : (
+                                <>
+                                    <MapPinIcon size={16} className="shrink-0" />
+                                    Usar minha localização
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    <div className="text-center mt-8 pt-5 border-t border-gray-100">
+                        <p className="text-xs text-gray-400">
+                            Já tem uma conta cadastrada com endereço salvo?
+                        </p>
+                        <button
+                            onClick={() => {
+                                setIsVisitorModalOpen(false)
+                                router.push("/auth/login")
+                            }}
+                            className="text-brand-green font-bold text-sm hover:underline mt-1 inline-block"
+                        >
+                            Entrar na minha conta
+                        </button>
+                    </div>
+                </div>
+            </DefaultModal>
+        )
+    }
 
     // DERIVED VALUES - useMemo instead of useState+useEffect to avoid extra re-render
     const { userName, fullName } = useMemo(() => {
@@ -396,7 +552,16 @@ const Header: React.FC<HeaderProps> = ({
 
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
-                        <Link href="/perfil?tab=enderecos" className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden hover:opacity-80 transition-opacity">
+                        <Link
+                            href={user ? "/perfil?tab=enderecos" : "#"}
+                            onClick={(e) => {
+                                if (!user) {
+                                    e.preventDefault()
+                                    setIsVisitorModalOpen(true)
+                                }
+                            }}
+                            className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden hover:opacity-80 transition-opacity"
+                        >
                             <MapPinIcon size={14} className="shrink-0 text-white" />
                             <span className="text-[12px] font-normal truncate ml-0.5 text-white">
                                 {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
@@ -489,7 +654,7 @@ const Header: React.FC<HeaderProps> = ({
                             onClick={() => setIsMobileCategoryMenuOpen(false)}
                             className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
                         >
-                            <span>Começar a vender</span>
+                            <span>Anunciar grátis</span>
                             <ChevronRightIcon size={16} />
                         </Link>
                     </div>
@@ -509,7 +674,16 @@ const Header: React.FC<HeaderProps> = ({
                         />
                     </Link>
 
-                    <Link href="/perfil?tab=enderecos" className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1">
+                    <Link
+                        href={user ? "/perfil?tab=enderecos" : "#"}
+                        onClick={(e) => {
+                            if (!user) {
+                                e.preventDefault()
+                                setIsVisitorModalOpen(true)
+                            }
+                        }}
+                        className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
+                    >
                         {userLocation ? (
                             <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
                                 Você está em
@@ -689,11 +863,12 @@ const Header: React.FC<HeaderProps> = ({
                         prefetch={true}
                         className="ml-auto font-bold text-brand-orange hover:text-brand-orange/70 cursor-pointer text-[13px] flex items-center gap-1 py-1"
                     >
-                        <span>Começar a vender</span>
+                        <span>Anunciar grátis</span>
                         <ChevronRightIcon size={14} />
                     </Link>
                 </div>
             </header>
+            {renderVisitorModal()}
         </>
     )
 }

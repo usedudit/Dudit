@@ -22,7 +22,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(city, state)),
-    return_requests(id, request_type, status),
+    return_requests!order_id(id, request_type, status),
     order_items(id, product_id, product_name, product_price, quantity, subtotal,
       product_variants(variant_name, variant_options),
       products(id, name, images, video_thumbnail, slug))
@@ -32,7 +32,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(city, state)),
-    return_requests(id, request_type, status),
+    return_requests!order_id(id, request_type, status),
     order_items(id, product_id, product_name, product_price, quantity, subtotal)
   `
 

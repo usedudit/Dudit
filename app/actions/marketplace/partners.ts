@@ -533,6 +533,8 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   }
   if (data.isShowcaseActive !== undefined) updateData.is_showcase_active = data.isShowcaseActive
   if (data.category !== undefined) updateData.category = data.category
+  if (data.categoryId !== undefined) updateData.category_id = data.categoryId
+  if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
   if (data.logoModerationStatus !== undefined) updateData.logo_moderation_status = data.logoModerationStatus
   if (data.bannerModerationStatus !== undefined) updateData.banner_moderation_status = data.bannerModerationStatus
 
@@ -720,7 +722,9 @@ export async function registerPartner(data: any) {
       cpf: cpfEncrypted,
       business_info: normalizeBusinessInfo(data.businessInfo),
       opening_hours: data.businessHours || null,
-      is_active: true
+      is_active: true,
+      category_id: data.categoryId || null,
+      subcategory_id: data.subcategoryId || null
     }
 
     // 2. Inserir o Parceiro

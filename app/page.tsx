@@ -1,5 +1,5 @@
 import MarketplaceHome from "@/components/marketplace/MarketplaceHomepage"
-import { getCachedHomeProducts } from "@/app/actions/marketplace/products"
+import { getHomeDataByCity, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
@@ -8,7 +8,7 @@ import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
-import { searchMarketplaceDirect } from "@/app/actions/marketplace/search"
+import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
   title: "Dudit | Encontre produtos e serviços perto de você",
@@ -37,14 +37,19 @@ export const metadata: Metadata = {
   ]
 }
 
-async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
+async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, cityName }: any) {
   const t0 = performance.now()
-  console.log(`[SSR] Home (Feed Payload) | START`)
+  console.log(`[SSR] Home (Feed Payload) | START for city: ${cityName || "global"}`)
 
-  const [products, vitrines] = await Promise.all([
-    getCachedHomeProducts(),
-    searchMarketplaceDirect("", "vitrines", { vitrines: 10 })
-  ])
+  let products: any[] = []
+  let vitrines: any[] = []
+
+  if (cityName && citySlug) {
+    const state = citySlug.split("-").pop()?.toUpperCase() || ""
+    const cityData = await getHomeDataByCity(cityName, state)
+    products = cityData.products
+    vitrines = cityData.vitrines
+  }
 
   const productsWithDistance = enrichMarketplaceDistance(products || [], userProfile?.latitude && userProfile?.longitude
     ? { lat: userProfile.latitude, lng: userProfile.longitude }
@@ -60,6 +65,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount }: any) {
       user={user}
       userProfile={userProfile}
       cartCount={cartCount}
+      selectedCitySlug={citySlug}
+      selectedCityName={cityName}
       hideHeaderAndFooter={true}
     />
   )
@@ -82,16 +89,53 @@ export default async function HomePage() {
   const tSession = performance.now()
   console.log(`[SSR] Home (Page) | Session resolved in ${(tSession - tUser).toFixed(2)}ms`)
 
-  const userProfile = sessionData?.profile
-    ? {
-      full_name: sessionData.profile.full_name,
-      latitude: sessionData.profile.latitude,
-      longitude: sessionData.profile.longitude,
-      address: sessionData.profile.city
-        ? `${sessionData.profile.city} - ${sessionData.profile.state}`
-        : null,
+  const dbProfile = sessionData?.profile
+
+  // Resolve city selection (either from user profile or visitor cookie)
+  let citySlug: string | null = null
+  let cityName: string | null = null
+
+  if (dbProfile?.city && dbProfile?.state) {
+    cityName = dbProfile.city
+    const normalizedCity = dbProfile.city
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+    citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
+  } else {
+    // If not logged in or has no profile address, check cookie
+    const cookieStore = await cookies()
+    const cookieCity = cookieStore.get("dudit_city")?.value
+    if (cookieCity) {
+      const resolved = await resolveCityAndStateFromSlug(cookieCity)
+      if (resolved) {
+        citySlug = cookieCity
+        cityName = resolved.city
+      }
     }
-    : null
+  }
+
+  const userProfile = dbProfile
+    ? {
+      full_name: dbProfile.full_name,
+      latitude: dbProfile.latitude,
+      longitude: dbProfile.longitude,
+      address: dbProfile.city
+        ? `${dbProfile.city} - ${dbProfile.state}`
+        : null,
+      city: dbProfile.city || null,
+      state: dbProfile.state || null,
+    }
+    : (cityName && citySlug ? {
+      full_name: null,
+      latitude: null,
+      longitude: null,
+      address: `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`,
+      city: cityName,
+      state: citySlug.split("-").pop()?.toUpperCase(),
+    } : null)
 
   const cartCount = sessionData?.cartCount || 0
 
@@ -113,10 +157,12 @@ export default async function HomePage() {
           user={user}
           userProfile={userProfile}
           cartCount={cartCount}
+          citySlug={citySlug}
+          cityName={cityName}
         />
       </Suspense>
 
       <MarketplaceFooter />
     </div>
   )
-}
+}

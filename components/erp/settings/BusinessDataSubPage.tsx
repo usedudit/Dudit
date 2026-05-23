@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useTransition, useMemo } from "react"
+import React, { useState, useCallback, useRef, useTransition, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Button,
@@ -23,7 +23,9 @@ import {
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon } from "@/lib/icons"
+import PartnerCategoryModal from "./PartnerCategoryModal"
+import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import ImageCropperModal from "@/components/ImageCropperModal"
@@ -107,7 +109,25 @@ export const BusinessDataSubPage = ({
         bannerUrl: partner.banner_url || "",
         isShowcaseActive: partner.is_showcase_active ?? true,
         category: partner.category || "",
+        categoryId: partner.category_id || null,
+        subcategoryId: partner.subcategory_id || null,
     })
+
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+    const [categoryPath, setCategoryPath] = useState("")
+
+    useEffect(() => {
+        const loadCategoryPath = async () => {
+            const activeId = generalInfo.subcategoryId || generalInfo.categoryId
+            if (activeId) {
+                const path = await getPartnerCategoryPathClient(activeId)
+                setCategoryPath(path)
+            } else {
+                setCategoryPath("")
+            }
+        }
+        loadCategoryPath()
+    }, [generalInfo.categoryId, generalInfo.subcategoryId])
 
     const address = partner.addresses?.[0] || {};
     const [addresses, setAddresses] = useState({
@@ -295,6 +315,8 @@ export const BusinessDataSubPage = ({
                     bannerModerationStatus: (finalBannerUrl && finalBannerUrl !== partner.banner_url) ? 'pending_moderation' : undefined,
                     isShowcaseActive: generalInfo.isShowcaseActive,
                     category: generalInfo.category || null,
+                    categoryId: generalInfo.categoryId,
+                    subcategoryId: generalInfo.subcategoryId,
                     userId: partner.user_id,
                 })
 
@@ -557,11 +579,33 @@ export const BusinessDataSubPage = ({
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Categoria do Negócio</h3>
 
                                                 <div className="flex flex-col gap-4">
-                                                    <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-background/30 flex items-center justify-between opacity-60 cursor-not-allowed">
-                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Selecione uma categoria...</span>
-                                                        <div className="w-5 h-5 border-2 border-brand-border dark:border-dark-border rounded-full" />
-                                                    </div>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Em breve você poderá categorizar seu negócio para facilitar buscas no marketplace.</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsCategoryModalOpen(true)}
+                                                        className="w-full text-left p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/10 hover:bg-brand-gray/20 dark:bg-dark-background/10 dark:hover:bg-dark-background/20 flex items-center justify-between transition-all"
+                                                    >
+                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                            {categoryPath || "Selecione uma categoria..."}
+                                                        </span>
+                                                        <ChevronRightIcon className="w-5 h-5 text-gray-400 shrink-0" />
+                                                    </button>
+                                                    
+                                                    {categoryPath && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setGeneralInfo(prev => ({
+                                                                    ...prev,
+                                                                    categoryId: null,
+                                                                    subcategoryId: null
+                                                                }))
+                                                                setCategoryPath("")
+                                                            }}
+                                                            className="text-xs font-bold text-brand-red hover:underline self-start"
+                                                        >
+                                                            Remover categoria
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -864,6 +908,19 @@ export const BusinessDataSubPage = ({
                     imageFile={tempBannerFile}
                     onCropComplete={handleBannerCropComplete}
                     aspectRatio={1300 / 300}
+                />
+
+                <PartnerCategoryModal
+                    isOpen={isCategoryModalOpen}
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    onSelect={({ categoryId, subcategoryId, path }) => {
+                        setGeneralInfo(prev => ({
+                            ...prev,
+                            categoryId,
+                            subcategoryId
+                        }))
+                        setCategoryPath(path)
+                    }}
                 />
 
             </div>

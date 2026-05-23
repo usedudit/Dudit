@@ -2772,7 +2772,7 @@ export async function getERPOrdersPageAction(
                 order_source,
                 created_at,
                 stores(name),
-                return_requests(id),
+                return_requests!order_id(id),
                 order_items(quantity)
             `
 
