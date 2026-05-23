@@ -2772,6 +2772,7 @@ export async function getERPOrdersPageAction(
                 order_source,
                 created_at,
                 stores(name),
+                return_requests(id),
                 order_items(quantity)
             `
 
@@ -2815,6 +2816,7 @@ export async function getERPOrdersPageAction(
             quantity: Number(row?.quantity || 0) || (Array.isArray(row?.order_items)
                 ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
                 : 0),
+            return_count: Array.isArray(row?.return_requests) ? row.return_requests.length : 0,
             // Backward-compatible field used by UI, with fallback when column doesn't exist in DB
             order_date: row?.order_date || row?.created_at || null,
         }))

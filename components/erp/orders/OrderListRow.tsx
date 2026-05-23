@@ -80,9 +80,19 @@ const OrderListItem = React.memo(
                                 <ShoppingCartIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </div>
                             <div className="flex flex-col text-left min-w-0">
-                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
-                                    {order.displayId}
-                                </span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
+                                        {order.displayId}
+                                    </span>
+                                    {Number(order.returnCount || 0) > 0 && (
+                                        <span
+                                            className="inline-flex shrink-0 items-center rounded-full border border-brand-border px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:text-dark-heading"
+                                            title="Contains return/exchange history"
+                                        >
+                                            ↩{Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                     {order.secondaryLine || `${order.items_count} ${order.items_count === 1 ? 'item' : 'itens'}`}
                                 </span>

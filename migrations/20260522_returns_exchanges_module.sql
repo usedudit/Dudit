@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS public.return_requests (
   customer_email_snapshot TEXT NULL,
   seller_name_snapshot TEXT NULL,
   moderation_case_id UUID NULL,
+  inventory_movement_id UUID NULL REFERENCES public.stock_movements(id) ON DELETE SET NULL,
+  refund_transaction_id UUID NULL REFERENCES public.transactions(id) ON DELETE SET NULL,
+  store_credit_transaction_id UUID NULL REFERENCES public.transactions(id) ON DELETE SET NULL,
+  exchange_order_id UUID NULL REFERENCES public.orders(id) ON DELETE SET NULL,
+  exchange_shortfall_amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  exchange_surplus_amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
   idempotency_key TEXT NULL,
   expires_at TIMESTAMPTZ NULL,
   locked_at TIMESTAMPTZ NULL,
@@ -163,11 +169,41 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS discount_total NUMERIC(14,2) 
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_total NUMERIC(14,2) NOT NULL DEFAULT 0;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS amount_paid NUMERIC(14,2) NOT NULL DEFAULT 0;
 ALTER TABLE public.order_items ADD COLUMN IF NOT EXISTS net_item_value NUMERIC(14,2) NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS exchange_parent_order_id UUID NULL REFERENCES public.orders(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS exchange_return_request_id UUID NULL REFERENCES public.return_requests(id) ON DELETE SET NULL;
 
 ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS resolution_type TEXT NULL;
 ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS customer_reason TEXT NULL;
 ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS customer_details TEXT NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS inventory_movement_id UUID NULL REFERENCES public.stock_movements(id) ON DELETE SET NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS refund_transaction_id UUID NULL REFERENCES public.transactions(id) ON DELETE SET NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS store_credit_transaction_id UUID NULL REFERENCES public.transactions(id) ON DELETE SET NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS exchange_order_id UUID NULL REFERENCES public.orders(id) ON DELETE SET NULL;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS exchange_shortfall_amount NUMERIC(14, 2) NOT NULL DEFAULT 0;
+ALTER TABLE public.return_requests ADD COLUMN IF NOT EXISTS exchange_surplus_amount NUMERIC(14, 2) NOT NULL DEFAULT 0;
 ALTER TABLE public.return_items ADD COLUMN IF NOT EXISTS net_item_value_snapshot NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.stock_movements ADD COLUMN IF NOT EXISTS source_return_request_id UUID NULL REFERENCES public.return_requests(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.transactions'::regclass
+      AND conname = 'transactions_status_check'
+  ) THEN
+    ALTER TABLE public.transactions DROP CONSTRAINT transactions_status_check;
+  END IF;
+
+  ALTER TABLE public.transactions
+    ADD CONSTRAINT transactions_status_check CHECK (status IN ('pending', 'paid', 'overdue', 'active'));
+END;
+$$;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_movements_source_return_request
+  ON public.stock_movements(source_return_request_id)
+  WHERE source_return_request_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_exchange_parent
+  ON public.orders(exchange_parent_order_id)
+  WHERE exchange_parent_order_id IS NOT NULL;
 
 DO $$
 DECLARE
@@ -740,7 +776,7 @@ BEGIN
     p_created_by,
     'created',
     'PENDING_REVIEW',
-    CASE WHEN v_request_type = 'cancellation' THEN 'Cancellation request created' ELSE 'Return request created' END,
+    CASE WHEN v_request_type = 'cancellation' THEN 'Solicitacao de cancelamento criada' ELSE 'Solicitacao criada' END,
     jsonb_build_object('resolution', p_resolution, 'request_type', v_request_type, 'source', p_source, 'amount_basis', v_total_amount),
     'user',
     CASE WHEN p_idempotency_key IS NULL THEN NULL ELSE p_idempotency_key || ':event' END
@@ -752,7 +788,7 @@ BEGIN
     p_partner_id,
     p_created_by,
     CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_requested' ELSE 'return_created' END,
-    ARRAY[CASE WHEN v_request_type = 'cancellation' THEN 'Cancellation request created' ELSE 'Return request created' END]
+    ARRAY[CASE WHEN v_request_type = 'cancellation' THEN 'Solicitacao de cancelamento criada' ELSE 'Solicitacao criada' END]
   );
 
   INSERT INTO public.return_notifications (
@@ -767,8 +803,8 @@ BEGIN
     p_partner_id,
     'seller',
     CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_created' ELSE 'return_created' END,
-    CASE WHEN v_request_type = 'cancellation' THEN 'New cancellation request' ELSE 'New return request' END,
-    COALESCE(v_order.order_number, 'Order') || CASE WHEN v_request_type = 'cancellation' THEN ' has a new cancellation request.' ELSE ' has a new return request.' END
+    CASE WHEN v_request_type = 'cancellation' THEN 'Nova solicitacao de cancelamento' ELSE 'Nova solicitacao' END,
+    COALESCE(v_order.order_number, 'Pedido') || CASE WHEN v_request_type = 'cancellation' THEN ' recebeu uma solicitacao de cancelamento.' ELSE ' recebeu uma solicitacao de devolucao ou troca.' END
   );
 
   RETURN jsonb_build_object('id', v_request_id, 'idempotent', false, 'amount_basis', v_total_amount);
@@ -785,6 +821,8 @@ CREATE OR REPLACE FUNCTION public.process_return_request(
   p_refund_payment_method TEXT DEFAULT NULL,
   p_return_to_inventory BOOLEAN DEFAULT FALSE,
   p_store_credit_amount NUMERIC DEFAULT 0,
+  p_exchange_items JSONB DEFAULT '[]'::JSONB,
+  p_exchange_balance_resolution TEXT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
   p_idempotency_key TEXT DEFAULT NULL
 ) RETURNS JSONB AS $$
@@ -796,8 +834,17 @@ DECLARE
   v_refund_id UUID;
   v_credit_id UUID;
   v_transaction_id UUID;
+  v_credit_transaction_id UUID;
   v_stock_movement JSON;
+  v_stock_movement_id UUID;
   v_items JSONB;
+  v_exchange_item JSONB;
+  v_exchange_items JSONB := COALESCE(p_exchange_items, '[]'::JSONB);
+  v_exchange_order_id UUID;
+  v_exchange_order_number TEXT;
+  v_exchange_total NUMERIC(14,2) := 0;
+  v_exchange_difference NUMERIC(14,2) := 0;
+  v_exchange_surplus NUMERIC(14,2) := 0;
   v_transition_allowed BOOLEAN := FALSE;
   v_max_action_amount NUMERIC(14,2) := 0;
 BEGIN
@@ -847,6 +894,10 @@ BEGIN
     RAISE EXCEPTION 'Store credit amount exceeds proportional paid amount';
   END IF;
 
+  IF COALESCE(p_refund_amount, 0) + COALESCE(p_store_credit_amount, 0) > v_max_action_amount + 0.009 THEN
+    RAISE EXCEPTION 'Combined refund and store credit amount exceeds proportional paid amount';
+  END IF;
+
   v_old_status := v_request.status;
   v_new_status := COALESCE(p_next_status, v_old_status);
 
@@ -873,6 +924,9 @@ BEGIN
   END IF;
 
   IF p_return_to_inventory THEN
+    IF v_request.inventory_movement_id IS NOT NULL THEN
+      v_stock_movement := jsonb_build_object('id', v_request.inventory_movement_id, 'idempotent', true)::JSON;
+    ELSE
     SELECT COALESCE(
       jsonb_agg(jsonb_build_object(
         'product_id', ri.product_id,
@@ -890,21 +944,36 @@ BEGIN
       v_stock_movement := public.create_batch_stock_movement(
         v_request.partner_id,
         'in',
-        'RETURN',
-        'Return request ' || p_request_id::TEXT,
+        'RETURN_IN',
+        'Customer return - source request ' || p_request_id::TEXT,
         p_actor_user_id,
         v_items
       );
+      v_stock_movement_id := NULLIF(v_stock_movement->>'id', '')::UUID;
+      UPDATE public.stock_movements
+      SET source_return_request_id = p_request_id
+      WHERE id = v_stock_movement_id
+        AND source_return_request_id IS NULL;
+    END IF;
     END IF;
   END IF;
 
   IF COALESCE(p_refund_amount, 0) > 0 THEN
+    IF v_request.refund_transaction_id IS NOT NULL THEN
+      v_transaction_id := v_request.refund_transaction_id;
+      SELECT id INTO v_refund_id
+      FROM public.return_refunds
+      WHERE return_request_id = p_request_id
+      ORDER BY created_at DESC
+      LIMIT 1;
+    ELSE
     INSERT INTO public.transactions (
       partner_id,
       description,
       category,
       amount,
       due_date,
+      payment_date,
       status,
       notes,
       payment_type,
@@ -918,11 +987,12 @@ BEGIN
       created_by_user_id
     ) VALUES (
       v_request.partner_id,
-      'Refund ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
-      'Refunds',
+      'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
+      'Refund',
       ABS(p_refund_amount),
       CURRENT_DATE,
-      CASE WHEN p_refund_status = 'APPROVED' THEN 'paid' ELSE 'pending' END,
+      NOW(),
+      'paid',
       NULLIF(LEFT(COALESCE(p_notes, ''), 2000), ''),
       NULLIF(p_refund_payment_method, ''),
       'refund',
@@ -930,7 +1000,7 @@ BEGIN
       'customer',
       'revenue_refund',
       'return:' || p_request_id::TEXT,
-      CASE WHEN p_refund_status = 'MANUAL' THEN 'manual' ELSE 'system' END,
+      'system',
       NULL,
       p_actor_user_id
     )
@@ -962,9 +1032,18 @@ BEGIN
       p_actor_user_id
     )
     RETURNING id INTO v_refund_id;
+    END IF;
   END IF;
 
   IF COALESCE(p_store_credit_amount, 0) > 0 THEN
+    IF v_request.store_credit_transaction_id IS NOT NULL THEN
+      v_credit_transaction_id := v_request.store_credit_transaction_id;
+      SELECT id INTO v_credit_id
+      FROM public.store_credits
+      WHERE return_request_id = p_request_id
+      ORDER BY created_at DESC
+      LIMIT 1;
+    ELSE
     INSERT INTO public.store_credits (
       partner_id,
       customer_id,
@@ -989,6 +1068,330 @@ BEGIN
         updated_at = NOW()
     WHERE id = v_request.customer_id
       AND partner_id = v_request.partner_id;
+
+    INSERT INTO public.transactions (
+      partner_id,
+      description,
+      category,
+      amount,
+      due_date,
+      payment_date,
+      status,
+      notes,
+      payment_type,
+      transaction_type,
+      customer_id,
+      contact_type,
+      reference_note,
+      origin,
+      account_id,
+      created_by_user_id
+    ) VALUES (
+      v_request.partner_id,
+      'Credito para cliente ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
+      'Store Credit Liability',
+      ABS(p_store_credit_amount),
+      CURRENT_DATE,
+      NOW(),
+      'active',
+      'Customer store credit generated',
+      'store_credit',
+      'adjustment',
+      v_request.customer_id,
+      'customer',
+      'return:' || p_request_id::TEXT,
+      'system',
+      NULL,
+      p_actor_user_id
+    )
+    RETURNING id INTO v_credit_transaction_id;
+    END IF;
+  END IF;
+
+  IF jsonb_array_length(v_exchange_items) > 0 THEN
+    IF v_request.exchange_order_id IS NOT NULL THEN
+      v_exchange_order_id := v_request.exchange_order_id;
+    ELSE
+      FOR v_exchange_item IN SELECT * FROM jsonb_array_elements(v_exchange_items)
+      LOOP
+        v_exchange_total := v_exchange_total
+          + ROUND((COALESCE((v_exchange_item->>'unit_price')::NUMERIC, 0) * COALESCE((v_exchange_item->>'quantity')::INTEGER, 1))::NUMERIC, 2);
+      END LOOP;
+
+      v_exchange_difference := GREATEST(0, v_exchange_total - v_max_action_amount);
+      v_exchange_surplus := GREATEST(0, v_max_action_amount - v_exchange_total);
+
+      SELECT COALESCE(v_request.order_number_snapshot, 'EX') || '-EX' ||
+             (COALESCE(COUNT(*), 0) + 1)::TEXT
+      INTO v_exchange_order_number
+      FROM public.orders
+      WHERE exchange_parent_order_id = v_request.order_id;
+
+      INSERT INTO public.orders (
+        order_number,
+        buyer_id,
+        customer_name,
+        partner_id,
+        total_amount,
+        delivery_fee,
+        delivery_type,
+        delivery_address,
+        payment_method,
+        payment_provider,
+        situation,
+        delivery_status,
+        order_source,
+        notes,
+        exchange_parent_order_id,
+        exchange_return_request_id,
+        created_at,
+        updated_at
+      )
+      SELECT
+        v_exchange_order_number,
+        buyer_id,
+        customer_name,
+        partner_id,
+        v_exchange_difference,
+        0,
+        delivery_type,
+        delivery_address,
+        COALESCE(NULLIF(p_refund_payment_method, ''), payment_method, 'exchange'),
+        payment_provider,
+        CASE WHEN v_exchange_difference > 0 THEN 'pending' ELSE 'paid' END,
+        'not_sent',
+        'Troca',
+        'Pedido gerado pela troca ' || p_request_id::TEXT,
+        id,
+        p_request_id,
+        NOW(),
+        NOW()
+      FROM public.orders
+      WHERE id = v_request.order_id
+      RETURNING id INTO v_exchange_order_id;
+
+      FOR v_exchange_item IN SELECT * FROM jsonb_array_elements(v_exchange_items)
+      LOOP
+        INSERT INTO public.order_items (
+          order_id,
+          product_id,
+          variant_id,
+          product_name,
+          product_price,
+          quantity,
+          subtotal,
+          net_item_value
+        )
+        SELECT
+          v_exchange_order_id,
+          p.id,
+          NULLIF(v_exchange_item->>'variant_id', '')::UUID,
+          p.name,
+          COALESCE((v_exchange_item->>'unit_price')::NUMERIC, p.price, 0),
+          COALESCE((v_exchange_item->>'quantity')::INTEGER, 1),
+          ROUND((COALESCE((v_exchange_item->>'unit_price')::NUMERIC, p.price, 0) * COALESCE((v_exchange_item->>'quantity')::INTEGER, 1))::NUMERIC, 2),
+          ROUND((COALESCE((v_exchange_item->>'unit_price')::NUMERIC, p.price, 0) * COALESCE((v_exchange_item->>'quantity')::INTEGER, 1))::NUMERIC, 2)
+        FROM public.products p
+        WHERE p.id = (v_exchange_item->>'product_id')::UUID
+          AND p.partner_id = v_request.partner_id;
+      END LOOP;
+
+      PERFORM public.recalculate_order_paid_values(v_exchange_order_id);
+
+      SELECT COALESCE(
+        jsonb_agg(jsonb_build_object(
+          'product_id', oi.product_id,
+          'variant_id', oi.variant_id,
+          'quantity', oi.quantity
+        )),
+        '[]'::JSONB
+      )
+      INTO v_items
+      FROM public.order_items oi
+      WHERE oi.order_id = v_exchange_order_id
+        AND oi.product_id IS NOT NULL;
+
+      IF jsonb_array_length(v_items) > 0 THEN
+        PERFORM public.create_batch_stock_movement(
+          v_request.partner_id,
+          'out',
+          'SALE_OUT',
+          'Replacement products - source request ' || p_request_id::TEXT,
+          p_actor_user_id,
+          v_items
+        );
+      END IF;
+
+      IF v_exchange_difference > 0 THEN
+        INSERT INTO public.transactions (
+          partner_id,
+          description,
+          category,
+          amount,
+          due_date,
+          status,
+          notes,
+          payment_type,
+          transaction_type,
+          customer_id,
+          contact_type,
+          reference_note,
+          origin,
+          account_id,
+          created_by_user_id
+        ) VALUES (
+          v_request.partner_id,
+          'Receita troca ' || v_exchange_order_number,
+          'Exchange Payment',
+          v_exchange_difference,
+          CURRENT_DATE,
+          'pending',
+          'Valor complementar da troca',
+          COALESCE(NULLIF(p_refund_payment_method, ''), 'exchange'),
+          'income',
+          v_request.customer_id,
+          'customer',
+          'return:' || p_request_id::TEXT,
+          'system',
+          NULL,
+          p_actor_user_id
+        );
+      ELSIF v_exchange_surplus > 0 AND p_exchange_balance_resolution = 'store_credit' THEN
+        p_store_credit_amount := p_store_credit_amount + v_exchange_surplus;
+        IF v_credit_id IS NULL THEN
+          INSERT INTO public.store_credits (
+            partner_id,
+            customer_id,
+            customer_user_id,
+            return_request_id,
+            amount,
+            remaining_amount,
+            created_by
+          ) VALUES (
+            v_request.partner_id,
+            v_request.customer_id,
+            v_request.customer_user_id,
+            p_request_id,
+            v_exchange_surplus,
+            v_exchange_surplus,
+            p_actor_user_id
+          )
+          RETURNING id INTO v_credit_id;
+
+          UPDATE public.customers
+          SET store_credit = COALESCE(store_credit, 0) + v_exchange_surplus,
+              updated_at = NOW()
+          WHERE id = v_request.customer_id
+            AND partner_id = v_request.partner_id;
+
+          INSERT INTO public.transactions (
+            partner_id,
+            description,
+            category,
+            amount,
+            due_date,
+            payment_date,
+            status,
+            notes,
+            payment_type,
+            transaction_type,
+            customer_id,
+            contact_type,
+            reference_note,
+            origin,
+            account_id,
+            created_by_user_id
+          ) VALUES (
+            v_request.partner_id,
+            'Credito de saldo da troca ' || v_exchange_order_number,
+            'Store Credit Liability',
+            v_exchange_surplus,
+            CURRENT_DATE,
+            NOW(),
+            'active',
+            'Customer store credit generated',
+            'store_credit',
+            'adjustment',
+            v_request.customer_id,
+            'customer',
+            'return:' || p_request_id::TEXT,
+            'system',
+            NULL,
+            p_actor_user_id
+          )
+          RETURNING id INTO v_credit_transaction_id;
+        END IF;
+      ELSIF v_exchange_surplus > 0 AND p_exchange_balance_resolution = 'refund' THEN
+        p_refund_amount := p_refund_amount + v_exchange_surplus;
+        IF v_refund_id IS NULL THEN
+          INSERT INTO public.transactions (
+            partner_id,
+            description,
+            category,
+            amount,
+            due_date,
+            payment_date,
+            status,
+            notes,
+            payment_type,
+            transaction_type,
+            customer_id,
+            contact_type,
+            refund_kind,
+            reference_note,
+            origin,
+            account_id,
+            created_by_user_id
+          ) VALUES (
+            v_request.partner_id,
+            'Reembolso saldo troca ' || v_exchange_order_number,
+            'Refund',
+            v_exchange_surplus,
+            CURRENT_DATE,
+            NOW(),
+            'paid',
+            'Saldo da troca devolvido ao cliente',
+            NULLIF(p_refund_payment_method, ''),
+            'refund',
+            v_request.customer_id,
+            'customer',
+            'revenue_refund',
+            'return:' || p_request_id::TEXT,
+            'system',
+            NULL,
+            p_actor_user_id
+          )
+          RETURNING id INTO v_transaction_id;
+
+          INSERT INTO public.return_refunds (
+            return_request_id,
+            partner_id,
+            order_id,
+            customer_id,
+            amount,
+            refund_type,
+            status,
+            payment_method,
+            financial_transaction_id,
+            idempotency_key,
+            created_by
+          ) VALUES (
+            p_request_id,
+            v_request.partner_id,
+            v_request.order_id,
+            v_request.customer_id,
+            v_exchange_surplus,
+            'partial',
+            'APPROVED',
+            NULLIF(p_refund_payment_method, ''),
+            v_transaction_id,
+            CASE WHEN p_idempotency_key IS NULL THEN NULL ELSE p_idempotency_key || ':exchange-refund' END,
+            p_actor_user_id
+          )
+          RETURNING id INTO v_refund_id;
+        END IF;
+      END IF;
+    END IF;
   END IF;
 
   UPDATE public.return_requests
@@ -1003,6 +1406,12 @@ BEGIN
       END,
       refund_amount = CASE WHEN COALESCE(p_refund_amount, 0) > 0 THEN ABS(p_refund_amount) ELSE refund_amount END,
       store_credit_amount = CASE WHEN COALESCE(p_store_credit_amount, 0) > 0 THEN ABS(p_store_credit_amount) ELSE store_credit_amount END,
+      inventory_movement_id = COALESCE(inventory_movement_id, v_stock_movement_id),
+      refund_transaction_id = COALESCE(refund_transaction_id, v_transaction_id),
+      store_credit_transaction_id = COALESCE(store_credit_transaction_id, v_credit_transaction_id),
+      exchange_order_id = COALESCE(exchange_order_id, v_exchange_order_id),
+      exchange_shortfall_amount = CASE WHEN v_exchange_difference > 0 THEN v_exchange_difference ELSE exchange_shortfall_amount END,
+      exchange_surplus_amount = CASE WHEN v_exchange_surplus > 0 THEN v_exchange_surplus ELSE exchange_surplus_amount END,
       seller_notes = COALESCE(NULLIF(LEFT(COALESCE(p_notes, ''), 2000), ''), seller_notes),
       locked_at = CASE WHEN v_new_status IN ('RESOLVED', 'REJECTED', 'EXPIRED') THEN NOW() ELSE locked_at END,
       resolved_at = CASE WHEN v_new_status = 'RESOLVED' THEN NOW() ELSE resolved_at END,
@@ -1035,6 +1444,10 @@ BEGIN
       'refund_id', v_refund_id,
       'store_credit_id', v_credit_id,
       'transaction_id', v_transaction_id,
+      'credit_transaction_id', v_credit_transaction_id,
+      'exchange_order_id', v_exchange_order_id,
+      'exchange_shortfall_amount', v_exchange_difference,
+      'exchange_surplus_amount', v_exchange_surplus,
       'stock_movement', v_stock_movement,
       'return_to_inventory', p_return_to_inventory
     ),
@@ -1050,25 +1463,30 @@ BEGIN
     'return_' || LOWER(COALESCE(NULLIF(p_action, ''), 'updated')),
     ARRAY[
       CASE
-        WHEN v_new_status <> v_old_status THEN 'Return status changed from ' || v_old_status || ' to ' || v_new_status
-        ELSE 'Return request updated'
+        WHEN v_new_status <> v_old_status THEN 'Solicitacao atualizada: ' || v_old_status || ' para ' || v_new_status
+        ELSE 'Solicitacao atualizada'
       END
     ]
   );
 
   IF p_return_to_inventory THEN
     INSERT INTO public.orders_history(order_id, partner_id, actor_user_id, entry_type, change_lines)
-    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_stock', ARRAY['Stock returned from return request']);
+    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_stock', ARRAY['Produto devolvido ao estoque']);
   END IF;
 
   IF v_refund_id IS NOT NULL THEN
     INSERT INTO public.orders_history(order_id, partner_id, actor_user_id, entry_type, change_lines)
-    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_refund', ARRAY['Refund generated']);
+    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_refund', ARRAY['Reembolso aprovado']);
   END IF;
 
   IF v_credit_id IS NOT NULL THEN
     INSERT INTO public.orders_history(order_id, partner_id, actor_user_id, entry_type, change_lines)
-    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_credit', ARRAY['Store credit generated']);
+    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_credit', ARRAY['Credito gerado']);
+  END IF;
+
+  IF v_exchange_order_id IS NOT NULL THEN
+    INSERT INTO public.orders_history(order_id, partner_id, actor_user_id, entry_type, change_lines)
+    VALUES (v_request.order_id, v_request.partner_id, p_actor_user_id, 'return_exchange', ARRAY['Troca concluida']);
   END IF;
 
   INSERT INTO public.return_notifications (
@@ -1087,8 +1505,8 @@ BEGIN
     v_request.customer_id,
     'customer',
     'return_status',
-    'Return request updated',
-    'Your return request is now ' || v_new_status || '.'
+    'Solicitacao atualizada',
+    'Sua solicitacao agora esta ' || v_new_status || '.'
   );
 
   RETURN jsonb_build_object(
@@ -1097,6 +1515,10 @@ BEGIN
     'refund_id', v_refund_id,
     'store_credit_id', v_credit_id,
     'transaction_id', v_transaction_id,
+    'credit_transaction_id', v_credit_transaction_id,
+    'exchange_order_id', v_exchange_order_id,
+    'exchange_shortfall_amount', v_exchange_difference,
+    'exchange_surplus_amount', v_exchange_surplus,
     'stock_movement', v_stock_movement,
     'idempotent', false
   );

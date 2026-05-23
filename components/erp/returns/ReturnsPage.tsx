@@ -17,7 +17,7 @@ import { formatDate } from "@/lib/utils"
 import { createReturnRequestAction, getReturnRequestsPageAction, processReturnRequestAction } from "@/app/actions/erp/returns"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
 
-type ActiveTab = "Todos" | "Pendentes" | "Analise" | "Aprovados" | "Escalados" | "Finalizados"
+type ActiveTab = "Todos" | "Pendentes" | "Analise" | "AguardandoCliente" | "Aprovados" | "Finalizados"
 type SortKey = "id" | "order_number" | "customer" | "date" | "refund_type" | "quantity"
 type SortDirection = "asc" | "desc"
 
@@ -143,10 +143,12 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                     action: "updated",
                     nextStatus: data.status,
           refundAmount: Number(data.refundValue || 0),
-          refundStatus: Number(data.refundValue || 0) > 0 ? "PENDING" : "PENDING",
+          refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
           refundPaymentMethod: data.resolutionType === "refund" ? data.refundType || null : null,
           returnToInventory: Boolean(data.returnToInventory),
           storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+          exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+          exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                 })
@@ -173,9 +175,9 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
 
             let matchesTab = true
             if (activeTab === "Pendentes") matchesTab = item.status === "PENDING_REVIEW"
-            else if (activeTab === "Analise") matchesTab = ["UNDER_ANALYSIS", "WAITING_CUSTOMER", "WAITING_ITEM_RETURN", "PROCESSING"].includes(item.status)
-            else if (activeTab === "Aprovados") matchesTab = item.status === "APPROVED"
-            else if (activeTab === "Escalados") matchesTab = item.status === "ESCALATED"
+            else if (activeTab === "Analise") matchesTab = ["UNDER_ANALYSIS", "ESCALATED"].includes(item.status)
+            else if (activeTab === "AguardandoCliente") matchesTab = item.status === "WAITING_CUSTOMER"
+            else if (activeTab === "Aprovados") matchesTab = ["APPROVED", "WAITING_ITEM_RETURN", "PROCESSING"].includes(item.status)
             else if (activeTab === "Finalizados") matchesTab = ["RESOLVED", "REJECTED", "EXPIRED"].includes(item.status)
             return matchesSearch && matchesTab
         })
@@ -265,8 +267,8 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                                     <TabsTrigger value="Todos">Todos</TabsTrigger>
                                     <TabsTrigger value="Pendentes">Pendentes</TabsTrigger>
                                     <TabsTrigger value="Analise">Análise</TabsTrigger>
+                                    <TabsTrigger value="AguardandoCliente">Aguardando cliente</TabsTrigger>
                                     <TabsTrigger value="Aprovados">Aprovados</TabsTrigger>
-                                    <TabsTrigger value="Escalados">Escalados</TabsTrigger>
                                     <TabsTrigger value="Finalizados">Finalizados</TabsTrigger>
                                 </TabsList>
                             </Tabs>

@@ -117,6 +117,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                         ? getR2ImageUrl(order.partners.store_image_url)
                                         : "https://img.dudit.com.br/static/Placeholder.png";
                                     const hasReviewAction = (order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0]) || reviewedOrderIds.has(order.id);
+                                    const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
                                     return (
                                         <div 
@@ -151,6 +152,14 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                         {/* Order ID & Store Name Bottom */}
                                                         <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5">
                                                             Pedido #{order.order_number || order.id.slice(0, 8)}
+                                                            {returnHistoryCount > 0 && (
+                                                                <span
+                                                                    className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
+                                                                    title="Contains return/exchange history"
+                                                                >
+                                                                    ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                                                </span>
+                                                            )}
                                                             <span>•</span>
                                                             {order.partners?.store_name || "Loja Parceira"}
                                                         </div>

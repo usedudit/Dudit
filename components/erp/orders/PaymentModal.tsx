@@ -177,19 +177,24 @@ function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculatio
     return (
         <Tooltip
             text={(
-                <div className="min-w-[240px] text-left">
+                <div className="w-[240px] text-left">
                     <div className="mb-2 font-bold">Detalhes do meio de pagamento</div>
                     <div className="space-y-1.5">
                         {rows.map((row) => (
                             <div
                                 key={`${row.label}-${row.value}`}
                                 className={cn(
-                                    "flex justify-between gap-3",
+                                    "flex justify-between items-center gap-3 min-w-0 w-full",
                                     row.isTotal && "mt-2 border-t border-white/20 pt-2 font-bold dark:border-black/10",
                                 )}
                             >
-                                <span className={cn(!row.isTotal && "text-white/70 dark:text-black/60")}>{row.label}</span>
-                                <span className="font-semibold">{row.value}</span>
+                                <span 
+                                    className={cn("truncate min-w-0", !row.isTotal && "text-white/70 dark:text-black/60")}
+                                    title={row.label}
+                                >
+                                    {row.label}
+                                </span>
+                                <span className="font-semibold shrink-0">{row.value}</span>
                             </div>
                         ))}
                     </div>

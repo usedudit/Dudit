@@ -79,6 +79,7 @@ interface Order {
     delivery_status?: string;
     notes?: string;
     previousSituationBeforeCancel?: string | null;
+    returnCount: number;
     canEdit: boolean;
     paidAmount: number;
     statusIcon?: React.ReactNode;
@@ -315,6 +316,7 @@ export default function OrdersPage({
                     delivery_status: o.delivery_status,
                     notes: o.notes || "",
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
+                    returnCount: Number(o.return_count || 0),
                     canEdit: o.situation !== "cancelled",
                     paidAmount: Number(o.paid_amount || 0)
                 }
@@ -622,6 +624,7 @@ export default function OrdersPage({
                                     situation: order.situation || "pending",
                                     notes: order.notes || "",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                    returnCount: Number(order.return_count || order.return_requests?.length || 0),
                                     canEdit: order.situation !== "cancelled",
                                     paidAmount: Number(order.paid_amount || 0),
                                 })

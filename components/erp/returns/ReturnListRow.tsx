@@ -32,16 +32,16 @@ function getJustifyClass(align?: string) {
 export function getReturnStatusMeta(status: ReturnRequest["status"]) {
   switch (status) {
     case "APPROVED":
+    case "PROCESSING":
+    case "WAITING_ITEM_RETURN":
     case "RESOLVED":
+    case "EXPIRED":
       return { label: getReturnStatusLabel(status), variant: "green" as const }
     case "REJECTED":
-    case "EXPIRED":
       return { label: getReturnStatusLabel(status), variant: "red" as const }
     case "ESCALATED":
-      return { label: getReturnStatusLabel(status), variant: "blue" as const }
-    case "PROCESSING":
+      return { label: getReturnStatusLabel(status), variant: "orange" as const }
     case "WAITING_CUSTOMER":
-    case "WAITING_ITEM_RETURN":
     case "UNDER_ANALYSIS":
       return { label: getReturnStatusLabel(status), variant: "orange" as const }
     case "PENDING_REVIEW":

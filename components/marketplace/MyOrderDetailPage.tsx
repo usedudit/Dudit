@@ -161,6 +161,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const totalAmount = Number(order.total_amount);
     const canCancelOrder = canRequestOrderCancellation(order);
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
+    const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
@@ -298,6 +299,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <div>
                                     <div className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
                                         Detalhes do Pedido #{orderNumber}
+                                        {returnHistoryCount > 0 && (
+                                            <span
+                                                className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
+                                                title="Contains return/exchange history"
+                                            >
+                                                ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 {/* <span className={`text-sm font-bold ${statusConfig.color}`}>{statusConfig.label}</span> */}

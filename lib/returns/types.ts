@@ -97,11 +97,11 @@ export function getReturnStatusLabel(status: string) {
     case "APPROVED": return "Aprovada"
     case "REJECTED": return "Recusada"
     case "WAITING_CUSTOMER": return "Aguardando cliente"
-    case "WAITING_ITEM_RETURN": return "Aguardando produto"
-    case "PROCESSING": return "Processando"
-    case "RESOLVED": return "Resolvida"
-    case "EXPIRED": return "Expirada"
-    case "ESCALATED": return "Escalada"
+    case "WAITING_ITEM_RETURN": return "Aprovada"
+    case "PROCESSING": return "Aprovada"
+    case "RESOLVED": return "Concluida"
+    case "EXPIRED": return "Concluida"
+    case "ESCALATED": return "Em analise"
     default: return status || "Pendente"
   }
 }

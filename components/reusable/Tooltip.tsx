@@ -1,16 +1,29 @@
 import React from "react"
+import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
 interface TooltipProps {
-  text: React.ReactNode
-  children: React.ReactNode
+    text: React.ReactNode
+    children: React.ReactNode
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({ text, children }) => (
-  <div className="relative group/tooltip flex items-center justify-center">
-    {children}
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[240px] xs:max-w-xs p-2 bg-dark-surface dark:bg-white text-white text-xs text-center dark:text-dark-heading rounded-lg shadow-xl opacity-0 scale-95 origin-bottom group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 transition-all duration-300 pointer-events-none z-[100]">
-      {text}
-      <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-dark-surface dark:border-t-white"></div>
-    </div>
-  </div>
+    <TooltipPrimitive.Provider delayDuration={100}>
+        <TooltipPrimitive.Root>
+            <TooltipPrimitive.Trigger asChild>
+                {children}
+            </TooltipPrimitive.Trigger>
+            <TooltipPrimitive.Portal>
+                <TooltipPrimitive.Content
+                    side="top"
+                    align="center"
+                    sideOffset={8}
+                    className="z-[9999] bg-dark-surface dark:bg-white text-white dark:text-dark-heading rounded-xl p-3 text-xs shadow-xl animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 max-w-[min(100vw-32px,320px)] select-none"
+                >
+                    {text}
+                    <TooltipPrimitive.Arrow className="fill-dark-surface dark:fill-white z-[9999] size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+                </TooltipPrimitive.Content>
+            </TooltipPrimitive.Portal>
+        </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
 )
+

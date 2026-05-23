@@ -84,6 +84,13 @@ const processReturnSchema = z.object({
     refundPaymentMethod: z.string().max(120).optional().nullable(),
     returnToInventory: z.boolean().default(false),
     storeCreditAmount: z.number().nonnegative().max(99999999).default(0),
+    exchangeItems: z.array(z.object({
+        product_id: z.string().uuid(),
+        variant_id: z.string().uuid().nullable().optional(),
+        quantity: z.number().int().positive().max(999),
+        unit_price: z.number().nonnegative().max(99999999),
+    })).max(100).default([]),
+    exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
     notes: z.string().max(2000).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
 })
@@ -466,6 +473,7 @@ export async function processReturnRequestAction(input: unknown) {
             : toNumber(((request as any).return_items || []).reduce((sum: number, item: any) => sum + toNumber(item.net_item_value_snapshot), 0))
         if (data.refundAmount > maxActionAmount + 0.009) throw new Error("Valor de reembolso excede o valor pago proporcional dos itens")
         if (data.storeCreditAmount > maxActionAmount + 0.009) throw new Error("Valor de credito excede o valor pago proporcional dos itens")
+        if (data.refundAmount + data.storeCreditAmount > maxActionAmount + 0.009) throw new Error("A soma de reembolso e credito excede o valor pago proporcional dos itens")
 
         const paymentProvider = String((request as any).orders?.payment_provider || "").toLowerCase()
         const hasMercadoPago = Boolean((request as any).orders?.mp_payment_id) || paymentProvider.includes("mercado")
@@ -483,6 +491,8 @@ export async function processReturnRequestAction(input: unknown) {
             p_refund_payment_method: data.refundPaymentMethod || null,
             p_return_to_inventory: data.returnToInventory,
             p_store_credit_amount: data.storeCreditAmount,
+            p_exchange_items: data.exchangeItems,
+            p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
             p_notes: data.notes || null,
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
         })
@@ -490,12 +500,17 @@ export async function processReturnRequestAction(input: unknown) {
         if (error) throw error
 
         const result = processed as any
-        if (hasMercadoPago && data.refundAmount > 0) {
+        const mercadoPagoRefundAmount = data.refundAmount > 0
+            ? data.refundAmount
+            : data.exchangeBalanceResolution === "refund"
+                ? toNumber(result?.exchange_surplus_amount)
+                : 0
+        if (hasMercadoPago && mercadoPagoRefundAmount > 0) {
             await maybeRefundMercadoPago({
                 partnerId: data.partnerId,
                 requestId: data.requestId,
                 refundId: result?.refund_id,
-                amount: data.refundAmount,
+                amount: mercadoPagoRefundAmount,
                 order: (request as any).orders,
             })
         }
@@ -511,13 +526,15 @@ export async function processReturnRequestAction(input: unknown) {
                 refundAmount: data.refundAmount,
                 storeCreditAmount: data.storeCreditAmount,
                 returnToInventory: data.returnToInventory,
+                exchangeItems: data.exchangeItems.length,
+                exchangeBalanceResolution: data.exchangeBalanceResolution || null,
             },
             source: "manual",
         })
 
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
         if (data.returnToInventory) await revalidateStockMovements(data.partnerId)
-        if (data.refundAmount > 0 || data.storeCreditAmount > 0) await revalidateTransactions(data.partnerId)
+        if (data.refundAmount > 0 || data.storeCreditAmount > 0 || toNumber(result?.exchange_shortfall_amount) > 0 || toNumber(result?.exchange_surplus_amount) > 0) await revalidateTransactions(data.partnerId)
 
         return successResponse(result)
     } catch (e: any) {

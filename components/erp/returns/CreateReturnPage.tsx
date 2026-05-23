@@ -23,9 +23,10 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { fetchReturnOrderBucketAction } from "@/app/actions/erp/returns"
+import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem } from "./types"
 import { getReturnStatusMeta } from "./ReturnListRow"
-import { usePickerBucket } from "@/components/erp/hooks"
+import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useR2Upload } from "@/hooks/use-r2-upload"
@@ -33,6 +34,7 @@ import { calculateReturnNetTotal } from "@/lib/returns/calculations"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
+import AlertModal from "@/components/reusable/AlertModal"
 
 
 interface CreateReturnPageProps {
@@ -49,6 +51,11 @@ interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition"> {
     checked: boolean
     reason: ReturnItem["reason"]
     condition: ReturnItem["condition"]
+}
+
+type ReplacementItemState = {
+    product: ProductBucketItem
+    quantity: number
 }
 
 function getOrderPreviewImage(order?: any | null) {
@@ -73,6 +80,7 @@ export default function CreateReturnPage({
 
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
+    const replacementSearchRef = useRef<HTMLDivElement>(null)
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -88,11 +96,15 @@ export default function CreateReturnPage({
             String(order.customer_name || "").toLowerCase().includes(q),
         { pageSize: 8 }
     )
+    const productBucket = useProductBucket(fetchPartnerProductsBucket)
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
                 setIsOrderSearchOpen(false)
+            }
+            if (replacementSearchRef.current && !replacementSearchRef.current.contains(event.target as Node)) {
+                setIsReplacementSearchOpen(false)
             }
         }
         document.addEventListener("mousedown", handleClickOutside)
@@ -109,7 +121,12 @@ export default function CreateReturnPage({
     const [creditType, setCreditType] = useState<"full" | "partial">("full")
     const [creditValue, setCreditValue] = useState<number>(0)
     const [replacementProduct, setReplacementProduct] = useState("")
+    const [replacementItems, setReplacementItems] = useState<ReplacementItemState[]>([])
+    const [isReplacementSearchOpen, setIsReplacementSearchOpen] = useState(false)
+    const [exchangeBalanceResolution, setExchangeBalanceResolution] = useState<"store_credit" | "refund">("store_credit")
     const [exchangeStatus, setExchangeStatus] = useState("pending")
+    const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
+    const [isInventoryRestoreModalOpen, setIsInventoryRestoreModalOpen] = useState(false)
     const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
     const [evidenceUploads, setEvidenceUploads] = useState<any[]>([])
     const [observations, setObservations] = useState("")
@@ -167,11 +184,16 @@ export default function CreateReturnPage({
             setRefundType(returnRequest.refundType || (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))
             setRefundValue(returnRequest.refundValue)
             setCreditValue(returnRequest.storeCreditValue || 0)
+            setReplacementProduct((returnRequest as any).replacementProduct || "")
             setEvidenceImages(returnRequest.evidenceImages || [])
             setEvidenceUploads((returnRequest.evidenceImages || []).map((url) => ({ file_url: url })))
             setObservations(returnRequest.observations || "")
         }
     }, [mode, returnRequest])
+
+    useEffect(() => {
+        setReplacementProduct(replacementItems.map(item => item.product.name).join(", "))
+    }, [replacementItems])
 
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
@@ -280,6 +302,39 @@ export default function CreateReturnPage({
         }
     }, [calculatedRefundValue, creditType, refundType, resolutionType])
 
+    const replacementTotal = useMemo(() => {
+        return replacementItems.reduce((sum, item) => sum + Number(item.product.price || 0) * item.quantity, 0)
+    }, [replacementItems])
+
+    const exchangeDifference = useMemo(() => Math.max(0, replacementTotal - calculatedRefundValue), [calculatedRefundValue, replacementTotal])
+    const exchangeSurplus = useMemo(() => Math.max(0, calculatedRefundValue - replacementTotal), [calculatedRefundValue, replacementTotal])
+
+    const addReplacementProduct = useCallback((product: ProductBucketItem) => {
+        setReplacementItems(prev => {
+            if (prev.some(item => item.product.id === product.id)) return prev
+            return [...prev, { product, quantity: 1 }]
+        })
+        productBucket.setSearchQuery("")
+        setIsReplacementSearchOpen(false)
+    }, [productBucket])
+
+    const updateReplacementQty = useCallback((index: number, quantity: number) => {
+        setReplacementItems(prev => prev.map((item, itemIndex) => (
+            itemIndex === index ? { ...item, quantity: Math.max(1, quantity) } : item
+        )))
+    }, [])
+
+    const removeReplacementProduct = useCallback((index: number) => {
+        setReplacementItems(prev => prev.filter((_, itemIndex) => itemIndex !== index))
+    }, [])
+
+    const completeSave = useCallback((returnToInventory: boolean) => {
+        if (!pendingSaveData) return
+        onSave({ ...pendingSaveData, returnToInventory })
+        setPendingSaveData(null)
+        setIsInventoryRestoreModalOpen(false)
+    }, [onSave, pendingSaveData])
+
     const handleFormSubmit = async () => {
         const checkedItems = returnItems.filter(item => item.checked)
         if (checkedItems.length === 0) return
@@ -337,7 +392,7 @@ export default function CreateReturnPage({
             const cleanEvidenceImages = finalEvidenceImages.filter(Boolean)
             const cleanEvidenceUploads = finalEvidenceUploads.filter(Boolean)
 
-            onSave({
+            const payload = {
                 orderId: selectedOrder.id,
                 orderNumber: selectedOrder.order_number,
                 customerId: selectedOrder.buyer_id || "",
@@ -354,6 +409,13 @@ export default function CreateReturnPage({
                 storeCreditValue: creditValue,
                 replacementProduct,
                 exchangeStatus,
+                exchangeItems: replacementItems.map(item => ({
+                    product_id: item.product.id,
+                    variant_id: null,
+                    quantity: item.quantity,
+                    unit_price: Number(item.product.price || 0),
+                })),
+                exchangeBalanceResolution: exchangeSurplus > 0 ? exchangeBalanceResolution : null,
                 returnDate: returnDate.toISOString(),
                 observations,
                 evidenceImages: cleanEvidenceImages,
@@ -370,7 +432,22 @@ export default function CreateReturnPage({
                     reason: item.reason,
                     condition: item.condition,
                 })),
-            })
+            }
+
+            const shouldAskInventoryRestore =
+                mode === "edit" &&
+                returnRequest &&
+                returnStatus === "APPROVED" &&
+                returnRequest.status !== "APPROVED" &&
+                ["cancellation", "return", "exchange"].includes(returnRequest.requestType || "return")
+
+            if (shouldAskInventoryRestore) {
+                setPendingSaveData(payload)
+                setIsInventoryRestoreModalOpen(true)
+                return
+            }
+
+            onSave({ ...payload, returnToInventory: false })
         } catch (err) {
             console.error("Error saving return request:", err)
         } finally {
@@ -907,13 +984,10 @@ export default function CreateReturnPage({
                                                             options={[
                                                                 { value: "PENDING_REVIEW", label: "Pendente" },
                                                                 { value: "UNDER_ANALYSIS", label: "Em analise" },
-                                                                { value: "APPROVED", label: "Aprovada" },
                                                                 { value: "WAITING_CUSTOMER", label: "Aguardando cliente" },
-                                                                { value: "WAITING_ITEM_RETURN", label: "Aguardando produto" },
-                                                                { value: "PROCESSING", label: "Processando" },
-                                                                { value: "RESOLVED", label: "Resolvida" },
+                                                                { value: "APPROVED", label: "Aprovada" },
                                                                 { value: "REJECTED", label: "Recusada" },
-                                                                { value: "ESCALATED", label: "Escalada" }
+                                                                { value: "RESOLVED", label: "Concluida" }
                                                             ]}
                                                         />
 
@@ -976,13 +1050,104 @@ export default function CreateReturnPage({
 
                                                         {resolutionType === "exchange" && (
                                                             <>
-                                                                <Input
-                                                                    label="Replacement product"
-                                                                    disabled={mode === "view"}
-                                                                    value={replacementProduct}
-                                                                    onChange={(event) => setReplacementProduct(event.target.value)}
-                                                                    placeholder="Produto de substituicao"
-                                                                />
+                                                                <div ref={replacementSearchRef} className="relative md:col-span-2">
+                                                                    <Input
+                                                                        label="Replacement products"
+                                                                        disabled={mode === "view"}
+                                                                        value={productBucket.searchQuery}
+                                                                        onChange={(event) => {
+                                                                            productBucket.setSearchQuery(event.target.value)
+                                                                            setIsReplacementSearchOpen(true)
+                                                                        }}
+                                                                        onFocus={() => {
+                                                                            setIsReplacementSearchOpen(true)
+                                                                            void productBucket.loadBucket()
+                                                                        }}
+                                                                        placeholder="Buscar por nome ou SKU"
+                                                                        prefix={<SearchIcon size={18} className="shrink-0 text-brand-inactive-text" />}
+                                                                    />
+
+                                                                    {isReplacementSearchOpen && productBucket.searchQuery.trim() && (
+                                                                        <div className="absolute z-50 left-0 right-0 top-full mt-2 max-h-72 overflow-y-auto rounded-xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
+                                                                            {productBucket.isLoading ? (
+                                                                                <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
+                                                                            ) : productBucket.filteredResults.length > 0 ? (
+                                                                                productBucket.filteredResults.map((product) => {
+                                                                                    const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={product.id}
+                                                                                            type="button"
+                                                                                            disabled={alreadyAdded}
+                                                                                            onClick={() => addReplacementProduct(product)}
+                                                                                            className="flex w-full items-center gap-3 border-b border-brand-border p-3 text-left transition-colors last:border-0 hover:bg-brand-gray/40 disabled:cursor-default disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-border/30"
+                                                                                        >
+                                                                                            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
+                                                                                                <img
+                                                                                                    src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                                    alt={product.name}
+                                                                                                    className="h-full w-full object-cover"
+                                                                                                />
+                                                                                            </div>
+                                                                                            <div className="min-w-0 flex-1">
+                                                                                                <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
+                                                                                                <p className="truncate text-xs text-brand-inactive-text dark:text-dark-body">{product.sku || "Sem SKU"}</p>
+                                                                                            </div>
+                                                                                            <div className="text-right text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                                                                                {formatCurrency(product.price || 0)}
+                                                                                            </div>
+                                                                                        </button>
+                                                                                    )
+                                                                                })
+                                                                            ) : (
+                                                                                <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {replacementItems.length > 0 && (
+                                                                    <div className="md:col-span-2 space-y-3 rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                        {replacementItems.map((item, index) => (
+                                                                            <div key={item.product.id} className="flex flex-col gap-3 border-b border-brand-border pb-3 last:border-0 last:pb-0 dark:border-dark-border md:flex-row md:items-center">
+                                                                                <div className="min-w-0 flex-1">
+                                                                                    <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{item.product.name}</p>
+                                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.product.price || 0)} cada</p>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled={mode === "view" || item.quantity <= 1}
+                                                                                        onClick={() => updateReplacementQty(index, item.quantity - 1)}
+                                                                                        className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
+                                                                                    >
+                                                                                        -
+                                                                                    </button>
+                                                                                    <span className="w-8 text-center text-sm font-bold text-brand-dark dark:text-dark-heading">{item.quantity}</span>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        disabled={mode === "view"}
+                                                                                        onClick={() => updateReplacementQty(index, item.quantity + 1)}
+                                                                                        className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
+                                                                                    >
+                                                                                        +
+                                                                                    </button>
+                                                                                    {mode !== "view" && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => removeReplacementProduct(index)}
+                                                                                            className="h-9 w-9 rounded-full text-brand-red hover:bg-brand-red-light"
+                                                                                            title="Remover produto"
+                                                                                        >
+                                                                                            <TrashIcon size={17} className="mx-auto" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+
                                                                 <FormDropdown
                                                                     label="Exchange status"
                                                                     disabled={mode === "view"}
@@ -995,6 +1160,32 @@ export default function CreateReturnPage({
                                                                         { value: "completed", label: "Concluido" }
                                                                     ]}
                                                                 />
+                                                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                        <p className="text-brand-inactive-text dark:text-dark-body">Total dos substitutos</p>
+                                                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(replacementTotal)}</p>
+                                                                    </div>
+                                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                        <p className="text-brand-inactive-text dark:text-dark-body">Credito disponivel</p>
+                                                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedRefundValue)}</p>
+                                                                    </div>
+                                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border p-4">
+                                                                        <p className="text-brand-inactive-text dark:text-dark-body">{exchangeDifference > 0 ? "Diferenca a cobrar" : "Saldo restante"}</p>
+                                                                        <p className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(exchangeDifference > 0 ? exchangeDifference : exchangeSurplus)}</p>
+                                                                    </div>
+                                                                </div>
+                                                                {exchangeSurplus > 0 && (
+                                                                    <FormDropdown
+                                                                        label="Destino do saldo"
+                                                                        disabled={mode === "view"}
+                                                                        value={exchangeBalanceResolution}
+                                                                        setValue={(val) => setExchangeBalanceResolution(val as "store_credit" | "refund")}
+                                                                        options={[
+                                                                            { value: "store_credit", label: "Gerar vale-compra" },
+                                                                            { value: "refund", label: "Gerar reembolso" }
+                                                                        ]}
+                                                                    />
+                                                                )}
                                                             </>
                                                         )}
 
@@ -1085,6 +1276,19 @@ export default function CreateReturnPage({
                     onCropComplete={handleImageCropComplete}
                 />
             )}
+
+            <AlertModal
+                isOpen={isInventoryRestoreModalOpen}
+                title="Restore returned items to inventory?"
+                description="Escolha se os itens desta solicitacao devem voltar ao estoque. A movimentacao sera registrada como RETURN_IN."
+                confirmText="Restore inventory"
+                cancelText="Do not restore"
+                variant="info"
+                onConfirm={() => completeSave(true)}
+                onClose={() => completeSave(false)}
+                disabled={isSaving}
+                isLoading={isSaving}
+            />
         </FadeIn>
     )
 }
