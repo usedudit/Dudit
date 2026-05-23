@@ -341,8 +341,8 @@ export async function requireProductOwnership(productId: string): Promise<void> 
 export async function requireCustomerOwnership(customerId: string): Promise<void> {
   const user = await requireUser()
 
-  const supabase = await getSupabaseServerClient()
-  const { data: customer } = await supabase
+  const admin = getAdminClient()
+  const { data: customer } = await admin
     .from("customers")
     .select("partner_id")
     .eq("id", customerId)
@@ -644,6 +644,8 @@ function specificPermissionToPermissionKey(specificPermission: string): string |
     case "can_assign_delivery": return "orders.can_add_delivery"
     case "can_discount": return "pdv.can_apply_discount"
     case "can_add_delivery": return "pdv.can_add_delivery"
+    case "can_view_delivery_details": return "delivery.view"
+    case "can_update_delivery_status": return "delivery.update_status"
     default: return null
   }
 }
