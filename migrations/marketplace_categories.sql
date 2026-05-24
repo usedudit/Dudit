@@ -3,43 +3,101 @@ TRUNCATE marketplace_product_categories CASCADE;
 TRUNCATE marketplace_service_categories CASCADE;
 
 -- ============================================================
--- PRODUTOS (4 PRINCIPAIS + OUTROS)
+-- PRODUTOS (9 CATEGORIAS PRINCIPAIS)
 -- ============================================================
 DO $$
 DECLARE
-  cat_tech uuid;
-  cat_style uuid;
-  cat_home uuid;
-  cat_auto uuid;
+  cat_casa_utilidades uuid;
+  cat_moda_beleza uuid;
+  cat_saude_bem_estar uuid;
+  cat_tecnologia_eletronicos uuid;
+  cat_auto_moto uuid;
+  cat_pets uuid;
+  cat_construcao_ferramentas uuid;
+  cat_agro_jardim uuid;
+  cat_infantil_brinquedos uuid;
 BEGIN
-  -- 1. Tecnologia
-  INSERT INTO marketplace_product_categories (name, icon_url) VALUES ('Tecnologia', 'smartphone') RETURNING id INTO cat_tech;
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Celulares e Acessórios', cat_tech);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Computadores e Informática', cat_tech);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('TV e Áudio', cat_tech);
+  -- 1. Casa & Utilidades
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Casa & Utilidades', 'https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png') 
+  RETURNING id INTO cat_casa_utilidades;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('mercado', cat_casa_utilidades);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('utensílios', cat_casa_utilidades);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('variedades', cat_casa_utilidades);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('construção leve', cat_casa_utilidades);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('decoração', cat_casa_utilidades);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('limpeza', cat_casa_utilidades);
 
-  -- 2. Moda e Beleza
-  INSERT INTO marketplace_product_categories (name, icon_url) VALUES ('Moda e Beleza', 'shirt') RETURNING id INTO cat_style;
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Roupas e Calçados', cat_style);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Bolsas e Acessórios', cat_style);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Beleza e Cuidados Pessoais', cat_style);
+  -- 2. Moda & Beleza
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Moda & Beleza', 'https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png') 
+  RETURNING id INTO cat_moda_beleza;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('roupas', cat_moda_beleza);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('acessórios', cat_moda_beleza);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('cosméticos', cat_moda_beleza);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('salão', cat_moda_beleza);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('maquiagem', cat_moda_beleza);
 
-  -- 3. Casa e Lazer
-  INSERT INTO marketplace_product_categories (name, icon_url) VALUES ('Casa e Lazer', 'home') RETURNING id INTO cat_home;
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Móveis e Decoração', cat_home);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Eletrodomésticos', cat_home);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Esportes e Camping', cat_home);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Ferramentas e Construção', cat_home);
+  -- 3. Saúde & Bem-estar
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Saúde & Bem-estar', 'https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png') 
+  RETURNING id INTO cat_saude_bem_estar;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('farmácia', cat_saude_bem_estar);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('suplementos', cat_saude_bem_estar);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('ótica', cat_saude_bem_estar);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('produtos médicos', cat_saude_bem_estar);
 
-  -- 4. Veículos e Peças
-  INSERT INTO marketplace_product_categories (name, icon_url) VALUES ('Veículos e Peças', 'car') RETURNING id INTO cat_auto;
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Peças e Acessórios', cat_auto);
-    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Som e Vídeo Automotivo', cat_auto);
+  -- 4. Tecnologia & Eletrônicos
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Tecnologia & Eletrônicos', 'https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png') 
+  RETURNING id INTO cat_tecnologia_eletronicos;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('celular', cat_tecnologia_eletronicos);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('informática', cat_tecnologia_eletronicos);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('acessórios', cat_tecnologia_eletronicos);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('games', cat_tecnologia_eletronicos);
 
-  -- 5. Outros (A Rede de Segurança)
-  INSERT INTO marketplace_product_categories (name, icon_url) VALUES ('Outros', 'grid');
-    -- Não precisa de subcategorias aqui, ou pode por um genérico:
-    -- INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('Diversos', (SELECT id FROM marketplace_product_categories WHERE name = 'Outros'));
+  -- 5. Auto & Moto
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Auto & Moto', 'https://img.dudit.com.br/static/categories/products/Auto-e-moto.png') 
+  RETURNING id INTO cat_auto_moto;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('peças', cat_auto_moto);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('acessórios', cat_auto_moto);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('pneus', cat_auto_moto);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('oficina leve', cat_auto_moto);
+
+  -- 6. Pets
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Pets', 'https://img.dudit.com.br/static/categories/products/Pets.png') 
+  RETURNING id INTO cat_pets;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('ração', cat_pets);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('banho/tosa', cat_pets);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('acessórios', cat_pets);
+
+  -- 7. Construção & Ferramentas
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Construção & Ferramentas', 'https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png') 
+  RETURNING id INTO cat_construcao_ferramentas;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('material', cat_construcao_ferramentas);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('elétrica', cat_construcao_ferramentas);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('hidráulica', cat_construcao_ferramentas);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('ferramentas', cat_construcao_ferramentas);
+
+  -- 8. Agro & Jardim
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Agro & Jardim', 'https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png') 
+  RETURNING id INTO cat_agro_jardim;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('ração animal', cat_agro_jardim);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('ferramentas', cat_agro_jardim);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('plantas', cat_agro_jardim);
+
+  -- 9. Infantil & Brinquedos
+  INSERT INTO marketplace_product_categories (name, icon_url) 
+  VALUES ('Infantil & Brinquedos', 'https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png') 
+  RETURNING id INTO cat_infantil_brinquedos;
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('bebê', cat_infantil_brinquedos);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('brinquedos', cat_infantil_brinquedos);
+    INSERT INTO marketplace_product_categories (name, parent_id) VALUES ('escolar', cat_infantil_brinquedos);
+
 END $$;
 
 -- ============================================================

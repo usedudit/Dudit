@@ -35,6 +35,7 @@ export default async function ExplorarPage({
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
     const cidade = typeof resolvedSearchParams.cidade === "string" ? resolvedSearchParams.cidade : ""
+    const categoria = typeof resolvedSearchParams.categoria === "string" ? resolvedSearchParams.categoria : ""
 
     // Fetch user and products in parallel
     const [user, products] = await Promise.all([
@@ -77,6 +78,7 @@ export default async function ExplorarPage({
                 query={query}
                 type={type}
                 cidade={cidade}
+                categoria={categoria}
                 userProfile={userProfile}
                 cartCount={cartCount}
                 hideHeaderAndFooter={true}
