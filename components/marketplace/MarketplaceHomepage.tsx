@@ -79,9 +79,21 @@ export default function MarketplaceHome({
 
   const filteredCities = useMemo(() => {
     if (!searchQuery || searchQuery.trim().length < 2) return []
-    const q = searchQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const q = searchQuery
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[-\s]+/g, " ")
+      .trim()
     return (citiesData as string[])
-      .filter((slug: string) => slug.includes(q))
+      .filter((slug: string) => {
+        const norm = slug
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[-\s]+/g, " ")
+        return norm.includes(q)
+      })
       .slice(0, 5)
   }, [searchQuery])
 

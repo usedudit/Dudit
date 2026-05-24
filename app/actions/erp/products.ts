@@ -280,6 +280,8 @@ export async function createProductComprehensiveAction(data: {
     showInMarketplace?: boolean
     requiresManualModeration?: boolean
     csrf_token?: string
+    marketplace_category_id?: string | null
+    marketplaceCategoryId?: string | null
 }): Promise<ActionResponse<any>> {
     const actionStart = performance.now()
     try {
@@ -368,6 +370,7 @@ export async function createProductComprehensiveAction(data: {
             category_id: (data as any).category_id || data.categoryId || null,
             subcategory: data.subcategory || null,
             subcategory_id: data.subcategoryId || data.subcategory_id || null, // Handle both names
+            marketplace_category_id: (data as any).marketplace_category_id || data.marketplaceCategoryId || null,
             condition: data.condition || "Novo",
             unit: data.unit || null,
             brand_id: (data as any).brand_id || (data as any).brandId || null,
@@ -532,6 +535,8 @@ interface UpdateProductData {
     showPriceInStore?: boolean
     subcategoryId?: string
     subcategory_id?: string
+    marketplace_category_id?: string | null
+    marketplaceCategoryId?: string | null
     locationId?: string
     featured?: boolean
     productType?: string
@@ -602,7 +607,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             'name', 'description', 'category', 'brand', 'sku', 'gtin', 'condition',
             'price', 'images',
             'availability_value', 'availability_unit', 'warranty', 'unit',
-            'category_id', 'brand_id', 'location_id', 'subcategory_id'
+            'category_id', 'brand_id', 'location_id', 'subcategory_id', 'marketplace_category_id'
         ]
 
         const fiscalMapFields = [
@@ -665,6 +670,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         // Novos campos (Marketplace/Outros)
         if (data.subcategoryId !== undefined) payload.subcategory_id = data.subcategoryId
         if (data.subcategory_id !== undefined) payload.subcategory_id = data.subcategory_id
+        if (data.marketplaceCategoryId !== undefined) payload.marketplace_category_id = data.marketplaceCategoryId
+        if (data.marketplace_category_id !== undefined) payload.marketplace_category_id = data.marketplace_category_id
         if (data.categoryId !== undefined) payload.category_id = data.categoryId
         if (data.brandId !== undefined) payload.brand_id = data.brandId
         if (data.locationId !== undefined) payload.location_id = data.locationId

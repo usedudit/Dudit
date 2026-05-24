@@ -286,6 +286,7 @@ async function _searchMarketplaceInternal(
                     supabase.from("products").select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
+                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
@@ -350,7 +351,7 @@ async function _searchMarketplaceInternal(
                     const { product_variants, ...rest } = item
                     return {
                         ...rest,
-                        category: item.category?.name || null,
+                        category: item.marketplace_category?.name || item.category?.name || null,
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
@@ -461,6 +462,7 @@ async function searchMarketplacePostgresFTS(
             let req = supabase.from("products").select(`
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
+                marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
             `).eq("is_active", true).eq("show_in_marketplace", true)
@@ -484,7 +486,7 @@ async function searchMarketplacePostgresFTS(
                     const { product_variants, ...rest } = item
                     return {
                         ...rest,
-                        category: item.category?.name || null,
+                        category: item.marketplace_category?.name || item.category?.name || null,
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
@@ -582,6 +584,7 @@ async function searchMarketplaceByCity(
                     .select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                         category_id, category:product_categories!category_id(name), created_at,
+                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
                         partners!inner(
                             id, store_name, store_image_url, latitude, longitude,
                             addresses!inner(city, state)
@@ -659,7 +662,7 @@ async function searchMarketplaceByCity(
         const { product_variants, ...rest } = item
         return {
             ...rest,
-            category: item.category?.name || null,
+            category: item.marketplace_category?.name || item.category?.name || null,
             itemType: 'produto',
             partners: partner,
             ...variantFallback

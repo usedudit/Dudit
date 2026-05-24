@@ -78,7 +78,7 @@ export const getCachedCart = async (userId: string) => {
     .eq("is_active", true)
 
   // 2b. Busca Endereços dos Parceiros (separado para não quebrar a query principal)
-  let partnerAddresses: Record<string, any[]> = Object.create(null)
+  let partnerAddresses: Record<string, any[]> = {}
   try {
     const { data: addresses } = await supabase
       .from("addresses")
@@ -93,14 +93,14 @@ export const getCachedCart = async (userId: string) => {
           acc[key].push(addr)
         }
         return acc
-      }, Object.create(null))
+      }, {})
     }
   } catch (e) {
     console.error("Erro ao buscar endereços dos parceiros (não-crítico):", e)
   }
 
   // 2c. Busca Configurações de Entrega (novo)
-  let partnerDeliverySettings: Record<string, any> = Object.create(null)
+  let partnerDeliverySettings: Record<string, any> = {}
   try {
     const { data: delSettings } = await supabase
       .from("delivery_settings")
@@ -114,7 +114,7 @@ export const getCachedCart = async (userId: string) => {
           acc[key] = ds
         }
         return acc
-      }, Object.create(null))
+      }, {})
     }
   } catch (e) {
     console.error("Erro ao buscar configs de entrega (não-crítico):", e)
@@ -146,7 +146,7 @@ export const getCachedCart = async (userId: string) => {
       acc[partnerId].items.push(item)
     }
     return acc
-  }, Object.create(null))
+  }, {})
 
   return itemsByPartner
 }

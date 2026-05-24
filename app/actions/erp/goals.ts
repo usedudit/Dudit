@@ -48,7 +48,7 @@ async function _fetchSellerNameMap(partnerId: string) {
         .map((row: any) => row.user_id),
     ),
   )
-  if (sellerIds.length === 0) return Object.create(null) as Record<string, string>
+  if (sellerIds.length === 0) return {} as Record<string, string>
 
   const { data: profiles } = await admin
     .from("user_profiles")

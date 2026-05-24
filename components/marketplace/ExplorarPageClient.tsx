@@ -27,6 +27,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
+import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -41,28 +42,27 @@ interface ExplorarPageClientProps {
 type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-  "alimentacao": "Alimentação",
-  "mercado-e-conveniencia": "Mercado & Conveniência",
-  "casa-e-construcao": "Casa & Construção",
-  "servicos-residenciais": "Serviços residenciais",
-  "automotivo": "Automotivo",
-  "beleza-e-bem-estar": "Beleza & Bem-estar",
-  "moda-e-acessorios": "Moda & Acessórios",
-  "tecnologia": "Tecnologia",
-  "saude": "Saúde",
-  "outros": "Outros"
+  "casa-e-utilidades": "Casa & Utilidades",
+  "moda-e-beleza": "Moda & Beleza",
+  "saude-e-bem-estar": "Saúde & Bem-estar",
+  "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
+  "auto-e-moto": "Auto & Moto",
+  "pets": "Pets",
+  "construcao-e-ferramentas": "Construção & Ferramentas",
+  "agro-e-jardim": "Agro & Jardim",
+  "infantil-e-brinquedos": "Infantil & Brinquedos"
 }
 
-const MARKETPLACE_CATEGORIES = [
-  { name: "Alimentação", icon: "🍔", desc: "Lanches e pratos" },
-  { name: "Mercado & Conveniência", icon: "🛒", desc: "Compras e pet" },
-  { name: "Casa & Construção", icon: "🛠️", desc: "Reparos e materiais" },
-  { name: "Serviços residenciais", icon: "🧹", desc: "Profissionais locais" },
-  { name: "Moda & Acessórios", icon: "👕", desc: "Vestuário e acessórios" },
-  { name: "Beleza & Bem-estar", icon: "💅", desc: "Estética e bem-estar" },
-  { name: "Automotivo", icon: "🚗", desc: "Oficinas e peças" },
-  { name: "Tecnologia", icon: "💻", desc: "Informática e celulares" },
-  { name: "Saúde", icon: "🩺", desc: "Cuidados e farmácia" }
+const FALLBACK_CATEGORIES = [
+  { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
+  { name: "Moda & Beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
+  { name: "Saúde & Bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
+  { name: "Tecnologia & Eletrônicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
+  { name: "Auto & Moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
+  { name: "Pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
+  { name: "Construção & Ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
+  { name: "Agro & Jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
+  { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
 ]
 
 function formatCitySlug(slug: string | null) {
@@ -71,6 +71,57 @@ function formatCitySlug(slug: string | null) {
   const state = parts.pop()?.toUpperCase() || ""
   const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
   return `${city} - ${state}`
+}
+
+const ExploreContentSkeleton = ({ type }: { type: string }) => {
+    return (
+        <div className="space-y-12 animate-pulse">
+            {type === 'tudo' && (
+                <div>
+                    <div className="flex justify-between items-center mb-4">
+                        <SkeletonLoader width={220} height={24} className="rounded" />
+                        <SkeletonLoader width={60} height={16} className="rounded" />
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto scrollbar-none">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="shrink-0 w-[270px] sm:w-[320px]">
+                                <SkeletonLoader height={140} className="rounded-[16px] mb-3" />
+                                <div className="flex items-center gap-3">
+                                    <SkeletonLoader width={48} height={48} circle />
+                                    <div className="flex-1 space-y-2">
+                                        <SkeletonLoader width="60%" height={16} className="rounded" />
+                                        <SkeletonLoader width="40%" height={12} className="rounded" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div>
+                <div className="mb-6">
+                    <SkeletonLoader width={200} height={24} className="rounded" />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="flex flex-col gap-3">
+                            <SkeletonLoader height={170} className="rounded-[16px]" />
+                            <SkeletonLoader height={16} width="85%" className="rounded" />
+                            <SkeletonLoader height={14} width="50%" className="rounded" />
+                            <div className="flex justify-between items-center pt-1 border-t border-gray-50 mt-2">
+                                <div className="flex items-center gap-2">
+                                    <SkeletonLoader width={24} height={24} circle />
+                                    <SkeletonLoader width={60} height={12} className="rounded" />
+                                </div>
+                                <SkeletonLoader width={40} height={14} className="rounded" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
 }
 
 // Reusable Horizontal Carousel with Scroll-Aware Navigation Chevrons
@@ -145,7 +196,7 @@ const HorizontalCarousel = ({
                         {showLeftArrow && (
                             <button 
                                 onClick={() => scroll('left')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 active:scale-95 transition-all shadow-sm cursor-pointer"
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
                                 <ChevronLeft className="w-4 h-4 text-brand-dark" />
                             </button>
@@ -153,7 +204,7 @@ const HorizontalCarousel = ({
                         {showRightArrow && (
                             <button 
                                 onClick={() => scroll('right')}
-                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 active:scale-95 transition-all shadow-sm cursor-pointer"
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
                                 <ChevronRight className="w-4 h-4 text-brand-dark" />
                             </button>
@@ -195,6 +246,19 @@ export function ExplorarPageClient({
     const [currentType, setCurrentType] = useState(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
     const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || null)
+    const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
+
+    const categoriesList = useMemo(() => {
+        return dbCategories.length > 0 ? dbCategories : FALLBACK_CATEGORIES
+    }, [dbCategories])
+
+    useEffect(() => {
+        getMarketplaceCategoriesClient(null).then(cats => {
+            if (cats && cats.length > 0) {
+                setDbCategories(cats)
+            }
+        })
+    }, [])
     
     // Modal states
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
@@ -282,28 +346,49 @@ export function ExplorarPageClient({
         if (urlCity) {
             document.cookie = `dudit_city=${urlCity}; path=/; max-age=${60 * 60 * 24 * 30}`
             localStorage.setItem("dudit_city", urlCity)
+            setSelectedCitySlug(urlCity)
             return
         }
 
-        let savedCity = localStorage.getItem("dudit_city")
-        if (!savedCity) {
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match) savedCity = match[1]
-        }
-
-        if (!savedCity && userProfile?.city && userProfile?.state) {
+        // 1. If logged in, prioritize userProfile address
+        if (userProfile?.city && userProfile?.state) {
             const normCity = userProfile.city
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
                 .replace(/[^a-z0-9]+/g, "-")
                 .replace(/(^-|-$)/g, "")
-            savedCity = `${normCity}-${userProfile.state.toLowerCase()}`
+            const userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
+            
+            document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            localStorage.setItem("dudit_city", userCitySlug)
+            setSelectedCitySlug(userCitySlug)
+            updateUrl(userCitySlug, selectedCategories, query, currentType)
+            return
+        }
+
+        // 2. If logged out (or logged in but no profile city), fall back to cookie/localStorage
+        let savedCity = localStorage.getItem("dudit_city")
+        if (!savedCity) {
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match) savedCity = match[1]
         }
 
         if (savedCity) {
             setSelectedCitySlug(savedCity)
             updateUrl(savedCity, selectedCategories, query, currentType)
+            return
+        }
+
+        // 3. For logged-out users without a saved location, auto-locate ONLY if permission is already granted
+        if (!userProfile && typeof window !== "undefined" && navigator?.permissions) {
+            navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
+                if (result.state === "granted") {
+                    requestLocation()
+                }
+            }).catch((err) => {
+                console.error("Error querying geolocation permission:", err)
+            })
         }
     }, [searchParams, userProfile])
 
@@ -315,7 +400,7 @@ export function ExplorarPageClient({
     }, [currentType])
 
     // Query fetch
-    const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<
+    const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isFetching } = useInfiniteList<
         any,
         MarketplaceListCursor
     >({
@@ -406,13 +491,30 @@ export function ExplorarPageClient({
 
         if (currentType === 'tudo') {
             const vitrines = normalizedInitialResults.filter(r => r.itemType === 'loja')
+            const sortedVitrines = [...vitrines]
+                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                .slice(0, 20)
             const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
-            return { vitrinesDestaque: vitrines, dataToFilter: list }
+            return { vitrinesDestaque: sortedVitrines, dataToFilter: list }
         }
 
         const list = normalizedInitialResults.filter(r => r.itemType !== 'loja')
         return { vitrinesDestaque: [], dataToFilter: list }
     }, [normalizedInitialResults, currentType])
+
+    const activeCategoriesList = useMemo(() => {
+        if (currentType !== 'produtos') {
+            return categoriesList
+        }
+        return categoriesList.filter(cat => {
+            return dataToFilter.some(p => {
+                const itemCat = p.category || ""
+                const normItem = itemCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                const normTarget = cat.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                return normItem.includes(normTarget) || normTarget.includes(normItem)
+            })
+        })
+    }, [categoriesList, currentType, dataToFilter])
 
     // In-memory filters for advanced filters
     const filteredResults = useMemo(() => {
@@ -486,10 +588,19 @@ export function ExplorarPageClient({
     // Filter cities list by search input
     const filteredCitiesSuggestions = useMemo(() => {
         if (!citySearchText) return []
-        const q = citySearchText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const q = citySearchText
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[-\s]+/g, " ")
+            .trim()
         return citiesData
             .filter((slug: string) => {
-                const norm = slug.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                const norm = slug
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[-\s]+/g, " ")
                 return norm.includes(q)
             })
             .slice(0, 5)
@@ -535,8 +646,8 @@ export function ExplorarPageClient({
             <div className="min-h-screen bg-white font-sans animate-fade-in flex flex-col pt-2">
                 <style>{`
                     .scrollbar-none::-webkit-scrollbar { display: none; }
-                    .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-                    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+                    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+                    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 `}</style>
 
                 {/* 1. TITLE SECTION */}
@@ -546,12 +657,12 @@ export function ExplorarPageClient({
                     </h1>
                 </div>
 
-                {/* 2. CATEGORIES CIRCULAR SLIDER (VISIBLE ONLY WHEN VER TUDO IS NOT ACTIVE) */}
-                {currentType === 'tudo' && (
+                {/* 2. CATEGORIES CIRCULAR SLIDER */}
+                {(currentType === 'tudo' || currentType === 'produtos') && activeCategoriesList.length > 0 && (
                     <div className="bg-white py-6 border-b border-gray-100">
                         <div className="container mx-auto px-4 max-w-[1300px]">
                             <div className="flex gap-6 overflow-x-auto scrollbar-none py-2 px-1">
-                                {MARKETPLACE_CATEGORIES.map((cat) => {
+                                {activeCategoriesList.map((cat) => {
                                     const isSelected = selectedCategories.includes(cat.name)
                                     return (
                                         <div 
@@ -560,17 +671,25 @@ export function ExplorarPageClient({
                                             className="flex flex-col items-center cursor-pointer select-none shrink-0 group w-[70px] sm:w-[90px]"
                                         >
                                             <div 
-                                                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-50 flex items-center justify-center border transition-all duration-300 group-hover:border-brand-green group-hover:scale-105 select-none ${
+                                                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-50 flex items-center justify-center border select-none ${
                                                     isSelected 
-                                                        ? "bg-[#ecfdf5] border-brand-green shadow-sm ring-2 ring-brand-green/20" 
+                                                        ? "bg-[#ecfdf5] border-brand-green" 
                                                         : "border-gray-200"
                                                 }`}
                                             >
-                                                <span className="text-2xl sm:text-3xl filter drop-shadow-sm select-none">{cat.icon}</span>
+                                                {cat.icon_url ? (
+                                                    <img 
+                                                        src={cat.icon_url} 
+                                                        alt={cat.name} 
+                                                        className="w-10 h-10 object-contain select-none" 
+                                                    />
+                                                ) : (
+                                                    <span className="text-2xl sm:text-3xl filter drop-shadow-sm select-none">📦</span>
+                                                )}
                                             </div>
                                             <span 
                                                 className={`text-[11px] sm:text-[12px] font-bold text-center mt-2 leading-tight truncate w-full select-none ${
-                                                    isSelected ? "text-brand-green font-extrabold" : "text-brand-dark group-hover:text-brand-green"
+                                                    isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
                                                 }`}
                                             >
                                                 {cat.name.toLowerCase()}
@@ -591,10 +710,10 @@ export function ExplorarPageClient({
                             {/* CITY FILTER CHIP */}
                             <button 
                                 onClick={() => setIsCityModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                     selectedCitySlug 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
+                                        : "bg-white border-gray-200 text-brand-dark"
                                 }`}
                             >
                                 <MapPin className="w-3.5 h-3.5" />
@@ -605,10 +724,10 @@ export function ExplorarPageClient({
                             {/* SORT FILTER CHIP */}
                             <button 
                                 onClick={() => setIsSortModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                     sortBy !== "relevancia" 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
+                                        : "bg-white border-gray-200 text-brand-dark"
                                 }`}
                             >
                                 <ArrowUpDown className="w-3.5 h-3.5" />
@@ -619,10 +738,10 @@ export function ExplorarPageClient({
                             {/* TYPE FILTER CHIP */}
                             <button 
                                 onClick={() => setIsTypeModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                     currentType !== "tudo" 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
+                                        : "bg-white border-gray-200 text-brand-dark"
                                 }`}
                             >
                                 <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -631,13 +750,13 @@ export function ExplorarPageClient({
                             </button>
 
                             {/* CATEGORY FILTER CHIP (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
-                            {currentType !== 'tudo' && (
+                            {currentType !== 'tudo' && currentType !== 'produtos' && (
                                 <button 
                                     onClick={() => setIsCategoryModalOpen(true)}
-                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                         selectedCategories.length > 0
-                                            ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                            : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                            ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
+                                            : "bg-white border-gray-200 text-brand-dark"
                                     }`}
                                 >
                                     <span>Categoria</span>
@@ -649,10 +768,10 @@ export function ExplorarPageClient({
                             {/* PROMOTION FILTER CHIP */}
                             <button 
                                 onClick={() => setPromoOn(!promoOn)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                     promoOn 
-                                        ? "bg-brand-green text-white border-brand-green shadow-md animate-pulse-subtle" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                        ? "bg-brand-green text-white border-brand-green" 
+                                        : "bg-white border-gray-200 text-brand-dark"
                                 }`}
                             >
                                 <Tag className="w-3.5 h-3.5" />
@@ -662,10 +781,10 @@ export function ExplorarPageClient({
                             {/* PRICE FILTER CHIP */}
                             <button 
                                 onClick={() => setIsPriceModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
                                     minPrice || maxPrice 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:bg-gray-50"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
+                                        : "bg-white border-gray-200 text-brand-dark"
                                 }`}
                             >
                                 <span>Preço</span>
@@ -689,7 +808,6 @@ export function ExplorarPageClient({
                                     <X className="w-3 h-3" />
                                 </button>
                             )}
-
                         </div>
                     </div>
                 </div>
@@ -698,104 +816,166 @@ export function ExplorarPageClient({
                 <div className="container mx-auto px-4 max-w-[1300px] flex-grow pb-24 lg:pb-12 mt-8">
                     <AnimatePresence mode="wait">
                         <motion.div
-                            key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}`}
+                            key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <>
-                                {/* A. VITRINES (LOJAS) RELACIONADAS CAROUSEL (DOORDASH STYLE) */}
-                                {vitrinesDestaque.length > 0 && (
-                                    <HorizontalCarousel 
-                                        title="Lojas e Profissionais Recomendados"
-                                        items={vitrinesDestaque}
-                                        onSeeAll={() => handleTypeChange('vitrines')}
-                                        renderItem={(item) => <VitrineCard vitrine={item} />}
-                                    />
-                                )}
+                            {isLoading || (isFetching && !isFetchingNextPage) ? (
+                                <ExploreContentSkeleton type={currentType} />
+                            ) : !selectedCitySlug ? (
+                                <div className="py-12 flex justify-center">
+                                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm max-w-[1000px]">
+                                        <div className="flex-grow text-center md:text-left md:max-w-[65%] text-brand-dark">
+                                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
+                                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                                                Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
+                                            </p>
+                                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                                                <button
+                                                    onClick={() => setIsCityModalOpen(true)}
+                                                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors duration-200 shadow-md flex items-center gap-2"
+                                                >
+                                                    Escolher Cidade
+                                                </button>
+                                                <button
+                                                    onClick={requestLocation}
+                                                    disabled={isLocationLoading}
+                                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                                                >
+                                                    {isLocationLoading ? (
+                                                        <>
+                                                            <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
+                                                            Localizando...
+                                                        </>
+                                                    ) : (
+                                                        "Usar localização atual"
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="w-[180px] md:w-[240px] shrink-0">
+                                            <img src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png" alt="Onde você está?" className="w-full h-auto object-contain" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : rawItems.length === 0 ? (
+                                <div className="py-12 flex justify-center">
+                                    <div className="bg-[#f0f9ff] rounded-[24px] border border-[#e0f2fe] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm max-w-[1000px]">
+                                        <div className="flex-grow text-center md:text-left md:max-w-[65%]">
+                                            <h2 className="text-3xl font-black text-[#0369a1] mb-4 leading-tight">Estamos Chegando!</h2>
+                                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                                                Ainda não temos vendedores ou produtos cadastrados em <strong className="text-brand-dark">{formatCitySlug(selectedCitySlug).split(" - ")[0]}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?
+                                            </p>
+                                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                                                <button
+                                                    onClick={() => router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")}
+                                                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors duration-200 shadow-md flex items-center gap-2"
+                                                >
+                                                    Começar a vender na Dudit
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="w-[180px] md:w-[240px] shrink-0">
+                                            <img src="https://img.dudit.com.br/static/mascots/EstamosChegando.png" alt="Estamos Chegando!" className="w-full h-auto object-contain" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* A. VITRINES (LOJAS) RELACIONADAS CAROUSEL (DOORDASH STYLE) */}
+                                    {vitrinesDestaque.length > 0 && (
+                                        <HorizontalCarousel 
+                                            title="Lojas e Profissionais Recomendados"
+                                            items={vitrinesDestaque}
+                                            onSeeAll={() => handleTypeChange('vitrines')}
+                                            renderItem={(item) => <VitrineCard vitrine={item} />}
+                                        />
+                                    )}
 
-                                {/* B. FEED MODE: SHOW CAROUSELS BY CATEGORY FIRST */}
-                                {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && (
-                                    <div className="space-y-4">
-                                        {categoriesWithProducts.map((catGroup) => (
-                                            <HorizontalCarousel 
-                                                key={catGroup.name}
-                                                title={`${catGroup.name} em destaque`}
-                                                items={catGroup.list}
-                                                renderItem={(item) => {
+                                    {/* B. FEED MODE: SHOW CAROUSELS BY CATEGORY FIRST */}
+                                    {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && (
+                                        <div className="space-y-4">
+                                            {categoriesWithProducts.map((catGroup) => (
+                                                <HorizontalCarousel 
+                                                    key={catGroup.name}
+                                                    title={`${catGroup.name} em destaque`}
+                                                    items={catGroup.list}
+                                                    renderItem={(item) => {
+                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                            : null
+                                                        return <ItemCard product={item} userCoords={userCoords} />
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* C. MAIN LISTINGS (GRID OR CAROUSEL FALLBACK) */}
+                                    <div className="mt-8">
+                                        {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
+                                            <h3 className="text-[16px] lg:text-[20px] font-bold text-brand-dark mb-6 opacity-90 tracking-wide border-t border-gray-100 pt-8">
+                                                Outras ofertas incríveis
+                                            </h3>
+                                        )}
+
+                                        {remainingResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
+                                            <div className="py-12 flex flex-col items-center">
+                                                <IconPlaceholder
+                                                    placeholderType="image"
+                                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                    imageAlt="O Dino revirou tudo e não achou!"
+                                                    title="O Dino revirou tudo e não achou!"
+                                                    subtitle="Ainda não temos parceiros ativos nessa cidade ou com essa combinação de filtros. Que tal mudar de cidade ou limpar os filtros?"
+                                                />
+                                                {activeFiltersCount > 0 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedCategories([])
+                                                            setMinPrice("")
+                                                            setMaxPrice("")
+                                                            setPromoOn(false)
+                                                            updateUrl(selectedCitySlug, [], query, currentType)
+                                                        }}
+                                                        className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
+                                                    >
+                                                        Limpar filtros de busca
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                                {remainingResults.map((item) => {
+                                                    if (item.itemType === 'loja') {
+                                                        return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
+                                                    }
                                                     const userCoords = userProfile?.latitude && userProfile?.longitude
                                                         ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                         : null
-                                                    return <ItemCard product={item} userCoords={userCoords} />
-                                                }}
-                                            />
-                                        ))}
+                                                    return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
+                                                })}
+
+                                                {/* INFINITE SCROLL OBSERVER */}
+                                                {hasNextPage && (
+                                                    <div
+                                                        ref={observerTarget}
+                                                        className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
+                                                    >
+                                                        {isFetchingNextPage ? (
+                                                            <div className="flex flex-col items-center gap-2 animate-pulse">
+                                                                <SkeletonLoader height={24} width={180} />
+                                                                <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-
-                                {/* C. MAIN LISTINGS (GRID OR CAROUSEL FALLBACK) */}
-                                <div className="mt-8">
-                                    {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
-                                        <h3 className="text-[16px] lg:text-[20px] font-bold text-brand-dark mb-6 opacity-90 tracking-wide border-t border-gray-100 pt-8">
-                                            Outras ofertas incríveis
-                                        </h3>
-                                    )}
-
-                                    {remainingResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
-                                        <div className="py-12 flex flex-col items-center">
-                                            <IconPlaceholder
-                                                placeholderType="image"
-                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                imageAlt="O Dino revirou tudo e não achou!"
-                                                title="O Dino revirou tudo e não achou!"
-                                                subtitle="Ainda não temos parceiros ativos nessa cidade ou com essa combinação de filtros. Que tal mudar de cidade ou limpar os filtros?"
-                                            />
-                                            {activeFiltersCount > 0 && (
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedCategories([])
-                                                        setMinPrice("")
-                                                        setMaxPrice("")
-                                                        setPromoOn(false)
-                                                        updateUrl(selectedCitySlug, [], query, currentType)
-                                                    }}
-                                                    className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark active:scale-95 transition-all select-none cursor-pointer"
-                                                >
-                                                    Limpar filtros de busca
-                                                </button>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                                            {remainingResults.map((item) => {
-                                                if (item.itemType === 'loja') {
-                                                    return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
-                                                }
-                                                const userCoords = userProfile?.latitude && userProfile?.longitude
-                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
-                                                    : null
-                                                return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
-                                            })}
-
-                                            {/* INFINITE SCROLL OBSERVER */}
-                                            {hasNextPage && (
-                                                <div
-                                                    ref={observerTarget}
-                                                    className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
-                                                >
-                                                    {isFetchingNextPage ? (
-                                                        <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                            <SkeletonLoader height={24} width={180} />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </>
+                                </>
+                            )}
                         </motion.div>
                     </AnimatePresence>
                 </div>
@@ -811,14 +991,14 @@ export function ExplorarPageClient({
                 isOpen={isSortModalOpen} 
                 onClose={() => setIsSortModalOpen(false)} 
                 title="Ordenar por" 
-                maxWidth="lg"
+                maxWidth="md"
             >
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 py-4 justify-items-center">
+                <div className="flex flex-col gap-2 py-2">
                     {[
-                        { value: "relevancia", label: "Ordenação Padrão", icon: "↕️" },
-                        { value: "preco_menor", label: "Menor Preço", icon: "💵" },
-                        { value: "preco_maior", label: "Maior Preço", icon: "📈" },
-                        { value: "recentes", label: "Mais Recentes", icon: "🕒" }
+                        { value: "relevancia", label: "Relevância" },
+                        { value: "preco_menor", label: "Menor Preço" },
+                        { value: "preco_maior", label: "Maior Preço" },
+                        { value: "recentes", label: "Mais Recentes" }
                     ].map((opt) => {
                         const isSelected = sortBy === opt.value
                         return (
@@ -828,20 +1008,10 @@ export function ExplorarPageClient({
                                     setSortBy(opt.value as any)
                                     setIsSortModalOpen(false)
                                 }}
-                                className="flex flex-col items-center cursor-pointer select-none focus:outline-none group w-full"
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
                             >
-                                <div 
-                                    className={`w-16 h-16 rounded-full border flex items-center justify-center text-2xl transition-all duration-200 ${
-                                        isSelected 
-                                            ? "bg-brand-green/5 border-brand-green text-brand-green scale-105 shadow-sm" 
-                                            : "bg-white border-gray-200 text-brand-dark hover:border-brand-green"
-                                    }`}
-                                >
-                                    {opt.icon}
-                                </div>
-                                <span className={`text-[11px] font-bold mt-2 text-center ${isSelected ? "text-brand-green" : "text-brand-dark group-hover:text-brand-green"}`}>
-                                    {opt.label}
-                                </span>
+                                <span>{opt.label}</span>
+                                {isSelected && <Check className="w-4 h-4 text-brand-green" />}
                             </button>
                         )
                     })}
@@ -853,14 +1023,14 @@ export function ExplorarPageClient({
                 isOpen={isTypeModalOpen} 
                 onClose={() => setIsTypeModalOpen(false)} 
                 title="Tipo de Negócio" 
-                maxWidth="lg"
+                maxWidth="md"
             >
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 py-4 justify-items-center">
+                <div className="flex flex-col gap-2 py-2">
                     {[
-                        { value: "tudo", label: "Ver Tudo", icon: "🌐" },
-                        { value: "produtos", label: "Produtos", icon: "📦" },
-                        { value: "servicos", label: "Serviços", icon: "🛠️" },
-                        { value: "vitrines", label: "Lojas e Vitrines", icon: "🏪" }
+                        { value: "tudo", label: "Ver Tudo" },
+                        { value: "produtos", label: "Produtos" },
+                        { value: "servicos", label: "Serviços" },
+                        { value: "vitrines", label: "Lojas e Vitrines" }
                     ].map((opt) => {
                         const isSelected = currentType === opt.value
                         return (
@@ -870,20 +1040,10 @@ export function ExplorarPageClient({
                                     handleTypeChange(opt.value)
                                     setIsTypeModalOpen(false)
                                 }}
-                                className="flex flex-col items-center cursor-pointer select-none focus:outline-none group w-full"
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
                             >
-                                <div 
-                                    className={`w-16 h-16 rounded-full border flex items-center justify-center text-2xl transition-all duration-200 ${
-                                        isSelected 
-                                            ? "bg-brand-green/5 border-brand-green text-brand-green scale-105 shadow-sm" 
-                                            : "bg-white border-gray-200 text-brand-dark hover:border-brand-green"
-                                    }`}
-                                >
-                                    {opt.icon}
-                                </div>
-                                <span className={`text-[11px] font-bold mt-2 text-center ${isSelected ? "text-brand-green" : "text-brand-dark group-hover:text-brand-green"}`}>
-                                    {opt.label}
-                                </span>
+                                <span>{opt.label}</span>
+                                {isSelected && <Check className="w-4 h-4 text-brand-green" />}
                             </button>
                         )
                     })}
@@ -897,31 +1057,30 @@ export function ExplorarPageClient({
                 title="📍 Localização" 
                 maxWidth="md"
             >
-                <div className="flex flex-col gap-4 py-2">
+                <div className="flex flex-col gap-4 py-2 text-brand-dark">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-brand-inactive-text">Filtrar vendedores da cidade:</span>
+                        <span className="text-xs font-bold text-gray-500">Filtrar vendedores da cidade:</span>
                         {selectedCitySlug && (
                             <button 
                                 onClick={() => {
                                     handleSelectCity(null)
                                     setIsCityModalOpen(false)
                                 }}
-                                className="text-xs text-red-500 font-extrabold hover:underline"
+                                className="text-xs text-red-500 font-bold underline"
                             >
-                                Remover filtro de cidade
+                                Remover filtro
                             </button>
                         )}
                     </div>
                     
-                    <div className="relative">
+                    <div className="relative flex items-center">
                         <input 
                             type="text" 
                             placeholder="Buscar cidade... (ex: São Paulo, Bauru)"
-                            className="w-full px-3.5 py-2.5 pl-10 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green bg-gray-50 font-medium"
+                            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none text-brand-dark"
                             value={citySearchText}
                             onChange={(e) => setCitySearchText(e.target.value)}
                         />
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
                     </div>
 
                     <button
@@ -929,26 +1088,26 @@ export function ExplorarPageClient({
                             requestLocation()
                             setIsCityModalOpen(false)
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-brand-green/5 text-brand-green rounded-xl text-xs font-bold hover:bg-brand-green/10 active:scale-[0.99] transition-all select-none cursor-pointer border border-brand-green/10"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border rounded-md text-xs font-bold text-brand-dark"
                     >
-                        <MapPin className="w-3.5 h-3.5" />
+                        <MapPin className="w-4 h-4" />
                         <span>Usar minha localização</span>
                     </button>
 
                     {filteredCitiesSuggestions.length > 0 && (
-                        <div className="mt-2 border-t border-gray-100 pt-3 space-y-1">
+                        <div className="flex flex-col gap-1 border-t pt-2">
                             {filteredCitiesSuggestions.map((slug) => (
-                                <div 
+                                <button 
                                     key={slug}
                                     onClick={() => {
                                         handleSelectCity(slug)
                                         setIsCityModalOpen(false)
                                     }}
-                                    className="px-3 py-2.5 hover:bg-[#ecfdf5]/30 rounded-xl text-sm text-brand-dark cursor-pointer transition-colors flex items-center justify-between font-bold"
+                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
                                 >
                                     <span>{formatCitySlug(slug)}</span>
                                     {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
-                                </div>
+                                </button>
                             ))}
                         </div>
                     )}
@@ -962,29 +1121,29 @@ export function ExplorarPageClient({
                 title="Filtrar por Preço" 
                 maxWidth="sm"
                 footer={
-                    <div className="flex items-center justify-between w-full border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between w-full border-t pt-4">
                         <button 
                             onClick={() => {
                                 setMinPrice("")
                                 setMaxPrice("")
                                 setIsPriceModalOpen(false)
                             }}
-                            className="text-xs font-bold text-gray-500 hover:underline"
+                            className="text-xs text-gray-500 font-bold"
                         >
                             Limpar
                         </button>
                         <button 
                             onClick={() => setIsPriceModalOpen(false)}
-                            className="px-6 py-2.5 bg-brand-green text-white text-xs font-bold rounded-xl hover:bg-brand-dark active:scale-95 transition-all shadow-md"
+                            className="px-4 py-2 border rounded-md text-xs font-bold text-brand-dark"
                         >
                             Aplicar
                         </button>
                     </div>
                 }
             >
-                <div className="flex gap-4 py-4">
+                <div className="flex gap-4 py-4 text-brand-dark">
                     <div className="flex-1">
-                        <label className="text-[11px] font-bold text-brand-inactive-text mb-1 block">Preço Mínimo</label>
+                        <label className="text-[11px] font-bold text-gray-500 mb-1 block">Preço Mínimo</label>
                         <MoneyInput
                             placeholder="Mínimo"
                             value={minPrice}
@@ -992,7 +1151,7 @@ export function ExplorarPageClient({
                         />
                     </div>
                     <div className="flex-1">
-                        <label className="text-[11px] font-bold text-brand-inactive-text mb-1 block">Preço Máximo</label>
+                        <label className="text-[11px] font-bold text-gray-500 mb-1 block">Preço Máximo</label>
                         <MoneyInput
                             placeholder="Máximo"
                             value={maxPrice}
@@ -1009,25 +1168,25 @@ export function ExplorarPageClient({
                 title="Filtrar por Categoria" 
                 maxWidth="md"
             >
-                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1 py-2 custom-scrollbar">
-                    {MARKETPLACE_CATEGORIES.map((cat) => {
+                <div className="flex flex-col gap-2 py-2 max-h-[350px] overflow-y-auto pr-1">
+                    {categoriesList.map((cat) => {
                         const isSelected = selectedCategories.includes(cat.name)
                         return (
-                            <div
+                            <button
                                 key={cat.name}
                                 onClick={() => toggleCategory(cat.name)}
-                                className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer select-none transition-all duration-200 ${
-                                    isSelected 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green shadow-sm" 
-                                        : "bg-white border-gray-200 text-brand-dark hover:border-brand-green"
-                                }`}
+                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
                             >
                                 <div className="flex items-center gap-3">
-                                    <span className="text-xl">{cat.icon}</span>
-                                    <span className="text-sm font-bold">{cat.name}</span>
+                                    {cat.icon_url ? (
+                                        <img src={cat.icon_url} alt={cat.name} className="w-6 h-6 object-contain" />
+                                    ) : (
+                                        <span className="text-lg">📦</span>
+                                    )}
+                                    <span>{cat.name}</span>
                                 </div>
                                 {isSelected && <Check className="w-4 h-4 text-brand-green" />}
-                            </div>
+                            </button>
                         )
                     })}
                 </div>

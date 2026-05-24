@@ -5,16 +5,15 @@ import { isValidCitySlug } from '@/lib/validation/city'
 import ExplorarPage from '@/app/explorar/page'
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-  "alimentacao": "Alimentação",
-  "mercado-e-conveniencia": "Mercado & Conveniência",
-  "casa-e-construcao": "Casa & Construção",
-  "servicos-residenciais": "Serviços residenciais",
-  "automotivo": "Automotivo",
-  "beleza-e-bem-estar": "Beleza & Bem-estar",
-  "moda-e-acessorios": "Moda & Acessórios",
-  "tecnologia": "Tecnologia",
-  "saude": "Saúde",
-  "outros": "Outros"
+  "casa-e-utilidades": "Casa & Utilidades",
+  "moda-e-beleza": "Moda & Beleza",
+  "saude-e-bem-estar": "Saúde & Bem-estar",
+  "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
+  "auto-e-moto": "Auto & Moto",
+  "pets": "Pets",
+  "construcao-e-ferramentas": "Construção & Ferramentas",
+  "agro-e-jardim": "Agro & Jardim",
+  "infantil-e-brinquedos": "Infantil & Brinquedos"
 }
 
 export const revalidate = 86400 // Cache 24h
