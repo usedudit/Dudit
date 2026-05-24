@@ -31,7 +31,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
 export const searchMarketplaceDirect = cache(async (
     query: string,
     type: MarketplaceSearchType,
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
 ) => {
     const { results } = await _searchMarketplaceCore(query, type, limits)
     const user = await getCurrentUser()
@@ -54,7 +54,7 @@ export type MarketplaceListCursor = { createdAt: string; id: string }
 export const searchMarketplace = async (
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: MarketplaceListCursor | null } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: MarketplaceListCursor | null; cidade?: string } = {}
 ) => {
     // Rate limit APENAS para chamadas do client (POST / Server Actions)
     const { success } = await requireRateLimit(RateLimitCategory.API_GENERAL)
@@ -74,6 +74,7 @@ export const searchMarketplace = async (
         geral: limits.geral,
         cursor: Number.isFinite(cursorMs as any) ? cursorMs : undefined,
         lastId,
+        cidade: limits.cidade,
     })
 
     const user = await getCurrentUser()
@@ -101,7 +102,7 @@ export const searchMarketplace = async (
                     ? (limits.produtos ?? 20)
                     : (limits.servicos ?? 20)
 
-    const hasMore = items.length >= limitCount && !!nextCursor
+    const hasMore = !limits.cidade && items.length >= limitCount && !!nextCursor
     return { items, nextCursor, hasMore }
 }
 
@@ -116,8 +117,11 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
 async function _searchMarketplaceCore(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
+    if (limits.cidade) {
+        return searchMarketplaceByCity(query, type, limits.cidade, limits)
+    }
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
 
     // Inline version read
@@ -371,7 +375,7 @@ async function _searchMarketplaceInternal(
 
         const cleanData = finalData.filter(Boolean)
         if (process.env.NODE_ENV !== "production" && cleanData.length < filteredIds.length) {
-          console.warn(`[MarketplaceTrace] API/search: ${filteredIds.length - cleanData.length} ids sem objeto (${type}, query="${query}")`)
+            console.warn(`[MarketplaceTrace] API/search: ${filteredIds.length - cleanData.length} ids sem objeto (${type}, query="${query}")`)
         }
         const tFinal = performance.now()
 
@@ -521,5 +525,185 @@ async function searchMarketplacePostgresFTS(
         console.error("Search FTS Postgres Error:", error)
         return { results: [], filteredIds: [] }
     }
+}
+
+async function searchMarketplaceByCity(
+    query: string,
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo',
+    cidadeSlug: string,
+    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number }
+) {
+    const supabase = getAdminClient()
+    const parts = cidadeSlug.split("-")
+    const state = parts.pop()?.toUpperCase() || ""
+    const targetCitySlug = parts.join("-")
+
+    // Fetch all active partners in this state
+    const partnersRes = await supabase
+        .from("partners")
+        .select(`
+            id, store_name, store_description, store_image_url, banner_url,
+            logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
+            created_at,
+            addresses!inner(city, state)
+        `)
+        .eq("is_active", true)
+        .ilike("addresses.state", state)
+
+    const rawPartners = partnersRes.data || []
+
+    // Filter partners in memory by normalized city slug
+    const filteredPartners = rawPartners.filter((item: any) => {
+        const addr = item.addresses?.[0] || item.addresses
+        if (!addr || !addr.city) return false
+        const itemCitySlug = addr.city
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+        return itemCitySlug === targetCitySlug
+    })
+
+    const partnerIds = filteredPartners.map((p: any) => p.id)
+
+    let rawProducts: any[] = []
+    let rawServices: any[] = []
+
+    // Fetch products and services for these partners
+    if (partnerIds.length > 0) {
+        const promises = []
+        if (type === 'tudo' || type === 'produtos') {
+            promises.push(
+                supabase
+                    .from("products")
+                    .select(`
+                        id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+                        category_id, category:product_categories!category_id(name), created_at,
+                        partners!inner(
+                            id, store_name, store_image_url, latitude, longitude,
+                            addresses!inner(city, state)
+                        ),
+                        product_variants(variant_options, price_adjustment, is_active)
+                    `)
+                    .eq("is_active", true)
+                    .eq("show_in_marketplace", true)
+                    .in("partner_id", partnerIds)
+            )
+        }
+        if (type === 'tudo' || type === 'servicos') {
+            promises.push(
+                supabase
+                    .from("services")
+                    .select(`
+                        id, name, description, price, images, rating, category, created_at,
+                        partners!inner(
+                            id, store_name, store_image_url, latitude, longitude,
+                            addresses!inner(city, state)
+                        )
+                    `)
+                    .eq("is_active", true)
+                    .in("partner_id", partnerIds)
+            )
+        }
+
+        const resList = await Promise.all(promises)
+        let idx = 0
+        if (type === 'tudo' || type === 'produtos') {
+            rawProducts = resList[idx++]?.data || []
+        }
+        if (type === 'tudo' || type === 'servicos') {
+            rawServices = resList[idx++]?.data || []
+        }
+    }
+
+    // Normalize
+    const normalizedPartners = filteredPartners.map((item: any) => {
+        return {
+            id: item.id,
+            name: item.store_name,
+            description: item.store_description,
+            images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+            rating: item.rating,
+            itemType: 'loja',
+            category: 'Loja Parceira',
+            partners: {
+                id: item.id,
+                store_name: item.store_name,
+                store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                banner_url: item.banner_url || null,
+                logo_moderation_status: item.logo_moderation_status || "approved",
+                banner_moderation_status: item.banner_moderation_status || "approved",
+                latitude: item.latitude,
+                longitude: item.longitude,
+                city: item.addresses?.[0]?.city || null,
+                state: item.addresses?.[0]?.state || null
+            },
+            created_at: item.created_at
+        }
+    })
+
+    const normalizedProducts = rawProducts.map((item: any) => {
+        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const partner = rawPartner ? {
+            ...rawPartner,
+            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            latitude: rawPartner.latitude,
+            longitude: rawPartner.longitude,
+            city: rawPartner.addresses?.[0]?.city || null,
+            state: rawPartner.addresses?.[0]?.state || null
+        } : null
+        const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+        const { product_variants, ...rest } = item
+        return {
+            ...rest,
+            category: item.category?.name || null,
+            itemType: 'produto',
+            partners: partner,
+            ...variantFallback
+        }
+    })
+
+    const normalizedServices = rawServices.map((item: any) => {
+        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const partner = rawPartner ? {
+            ...rawPartner,
+            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            latitude: rawPartner.latitude,
+            longitude: rawPartner.longitude,
+            city: rawPartner.addresses?.[0]?.city || null,
+            state: rawPartner.addresses?.[0]?.state || null
+        } : null
+        return { ...item, itemType: 'servico', partners: partner }
+    })
+
+    // Combine
+    let results: any[] = []
+    if (type === 'tudo') {
+        results = [...normalizedPartners, ...normalizedProducts, ...normalizedServices]
+    } else if (type === 'vitrines') {
+        results = normalizedPartners
+    } else if (type === 'produtos') {
+        results = normalizedProducts
+    } else if (type === 'servicos') {
+        results = normalizedServices
+    }
+
+    // Apply text search filter if query is specified
+    if (query) {
+        const cleanQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        results = results.filter((r: any) => {
+            const nameMatch = (r.name || r.store_name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
+            const descMatch = (r.description || r.store_description || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
+            const catMatch = (r.category || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
+            return nameMatch || descMatch || catMatch
+        })
+    }
+
+    // Sort by created_at desc (standard score)
+    results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    const finalIds = results.map(r => `${r.itemType}:${r.id}`)
+    return { results, filteredIds: finalIds }
 }
 

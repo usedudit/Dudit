@@ -25,7 +25,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     return_requests!order_id(id, request_type, status),
     order_items(id, product_id, product_name, product_price, quantity, subtotal,
       product_variants(variant_name, variant_options),
-      products(id, name, images, video_thumbnail, slug))
+      products(id, name, images, video_thumbnail))
   `
   const fallbackOrderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total, created_at, payment_method,

@@ -34,11 +34,12 @@ export default async function ExplorarPage({
 
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
+    const cidade = typeof resolvedSearchParams.cidade === "string" ? resolvedSearchParams.cidade : ""
 
     // Fetch user and products in parallel
     const [user, products] = await Promise.all([
         getCurrentUser(),
-        getCachedExploreProducts(query, type),
+        getCachedExploreProducts(query, type, cidade),
     ])
 
     const sessionData = user
@@ -53,6 +54,8 @@ export default async function ExplorarPage({
             address: sessionData.profile.city
                 ? `${sessionData.profile.city} - ${sessionData.profile.state}`
                 : null,
+            city: sessionData.profile.city || null,
+            state: sessionData.profile.state || null,
         }
         : null
 
@@ -73,6 +76,7 @@ export default async function ExplorarPage({
                 initialResults={productsWithDistance}
                 query={query}
                 type={type}
+                cidade={cidade}
                 userProfile={userProfile}
                 cartCount={cartCount}
                 hideHeaderAndFooter={true}

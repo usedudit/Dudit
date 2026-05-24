@@ -306,11 +306,12 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 
 // NO unstable_cache - Redis is the single source of truth.
 // searchMarketplaceDirect already uses react.cache() for per-request deduplication.
-export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType) => {
+export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType, cidade?: string) => {
   return await searchMarketplaceDirect(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
     produtos: 20,
-    servicos: 20
+    servicos: 20,
+    cidade
   })
 }
 
@@ -372,8 +373,51 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
 export async function getHomeDataByCity(city: string, state: string) {
   const supabase = getAdminClient()
 
-  const [productsRes, partnersRes] = await Promise.all([
-    supabase
+  // 1. Fetch all active partners in the state (filtering state on database)
+  const partnersRes = await supabase
+    .from("partners")
+    .select(`
+      id, store_name, store_description, store_image_url, banner_url,
+      logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
+      created_at,
+      addresses!inner(city, state)
+    `)
+    .eq("is_active", true)
+    .ilike("addresses.state", state)
+
+  if (partnersRes.error) {
+    console.error("[getHomeDataByCity] Error fetching partners:", partnersRes.error)
+  }
+
+  const rawPartners = partnersRes.data || []
+
+  // Normalize target city slug
+  const targetCitySlug = city
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+
+  // Filter partners in JS to match target city (case-insensitive and accent-insensitive)
+  const filteredPartners = rawPartners.filter((item: any) => {
+    const addr = item.addresses?.[0] || item.addresses
+    if (!addr || !addr.city) return false
+    const itemCitySlug = addr.city
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+    return itemCitySlug === targetCitySlug
+  })
+
+  const partnerIds = filteredPartners.map((p: any) => p.id)
+
+  // 2. Fetch products only for the matching partners in this city
+  let rawProducts: any[] = []
+  if (partnerIds.length > 0) {
+    const productsRes = await supabase
       .from("products")
       .select(`
         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
@@ -386,26 +430,17 @@ export async function getHomeDataByCity(city: string, state: string) {
       `)
       .eq("is_active", true)
       .eq("show_in_marketplace", true)
-      .ilike("partners.addresses.city", city)
-      .ilike("partners.addresses.state", state),
-    supabase
-      .from("partners")
-      .select(`
-        id, store_name, store_description, store_image_url, banner_url,
-        logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
-        created_at,
-        addresses!inner(city, state)
-      `)
-      .eq("is_active", true)
-      .ilike("addresses.city", city)
-      .ilike("addresses.state", state)
-  ])
+      .in("partner_id", partnerIds)
 
-  const products = productsRes.data || []
-  const partners = partnersRes.data || []
+    if (productsRes.error) {
+      console.error("[getHomeDataByCity] Error fetching products:", productsRes.error)
+    } else {
+      rawProducts = productsRes.data || []
+    }
+  }
 
   // Normalize products data
-  const normalizedProducts = products.map((item: any) => {
+  const normalizedProducts = rawProducts.map((item: any) => {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
     const partner = rawPartner ? {
       ...rawPartner,
@@ -427,7 +462,7 @@ export async function getHomeDataByCity(city: string, state: string) {
   })
 
   // Normalize partners (vitrines) data
-  const normalizedVitrines = partners.map((item: any) => {
+  const normalizedVitrines = filteredPartners.map((item: any) => {
     return {
       id: item.id,
       name: item.store_name,

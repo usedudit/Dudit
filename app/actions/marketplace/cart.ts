@@ -46,7 +46,7 @@ export const getCachedCart = async (userId: string) => {
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, slug),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
       partners(
         id, 
