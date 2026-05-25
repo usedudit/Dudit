@@ -27,6 +27,9 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDateTime, formatTime, formatDayMonth } from "@/lib/utils"
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
+import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
+import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
+import { useStore } from "@/lib/store-context"
 
 interface OrderDetailViewProps {
     orderId: string
@@ -41,6 +44,7 @@ interface OrderDetailViewProps {
 
 export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
     const { role } = usePermissions()
+    const { selectedStore } = useStore()
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -50,6 +54,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
+    const [isReceiptPrintOpen, setIsReceiptPrintOpen] = useState(false)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -174,6 +179,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const timelineSteps = getTimelineSteps(order.delivery_status)
 
+    const receiptData = buildSaleReceiptFromOrder(
+        order,
+        {
+            fantasyName: "",
+            legalName: "",
+            addressLine: "",
+            taxIdLine: "",
+        },
+        { partnerAvatar: selectedStore?.image_url || undefined },
+    )
+
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
         <div className="flex justify-between items-start text-[14px] gap-4">
             <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
@@ -213,6 +229,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     </div>
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
+                                            onPrint={() => setIsReceiptPrintOpen(true)}
                                             onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                                             onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                                             cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
@@ -452,6 +469,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <ActionsDropdown
+                    onPrint={() => setIsReceiptPrintOpen(true)}
                     onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                     cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
@@ -467,6 +485,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     )}
                 </ActionsDropdown>
             </div>
+
+            <SaleReceiptPrintModal
+                isOpen={isReceiptPrintOpen}
+                onClose={() => setIsReceiptPrintOpen(false)}
+                receiptData={isReceiptPrintOpen ? receiptData : null}
+            />
         </>
     )
 }

@@ -21,6 +21,7 @@ interface OrderListItemProps {
     onEdit: (order: any) => void
     onCancel?: (order: any) => void
     onDetails: (order: any) => void
+    onPrint?: (order: any) => void
     canEdit?: boolean
     cancelLabel?: string
     showCheckbox?: boolean
@@ -42,6 +43,7 @@ const OrderListItem = React.memo(
         onEdit,
         onCancel,
         onDetails,
+        onPrint,
         canEdit = true,
         cancelLabel = "Cancelar",
         showCheckbox = true,
@@ -171,6 +173,7 @@ const OrderListItem = React.memo(
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ActionsDropdown
+                                onPrint={onPrint ? () => onPrint(order) : undefined}
                                 onEdit={canEdit ? () => onEdit(order) : undefined}
                                 onCancel={onCancel ? () => onCancel(order) : undefined}
                                 cancelLabel={cancelLabel}

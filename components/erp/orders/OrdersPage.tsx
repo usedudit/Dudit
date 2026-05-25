@@ -55,6 +55,8 @@ import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
+import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
+import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
 
 // --- TYPES & INTERFACES ---
 
@@ -182,6 +184,8 @@ export default function OrdersPage({
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
+    const [receiptPrintOpen, setReceiptPrintOpen] = useState(false)
+    const [receiptPrintData, setReceiptPrintData] = useState<ReturnType<typeof buildSaleReceiptFromOrder> | null>(null)
 
     const isLoading = storeLoading || entityPage.isListLoading
 
@@ -591,6 +595,45 @@ export default function OrdersPage({
         setActiveTab("Todos")
     }
 
+    const handlePrintReceipt = useCallback(
+        async (order: Order) => {
+            setReceiptPrintOpen(true)
+            setReceiptPrintData(null)
+            try {
+                const res = await getOrderDetailsAction(order.originalId, partnerId)
+                if (res.success && res.data) {
+                    setReceiptPrintData(
+                        buildSaleReceiptFromOrder(
+                            res.data,
+                            {
+                                fantasyName: "",
+                                legalName: "",
+                                addressLine: "",
+                                taxIdLine: "",
+                            },
+                            { partnerAvatar: selectedStore?.image_url || undefined },
+                        ),
+                    )
+                } else {
+                    toast({
+                        title: "Erro",
+                        description: res.error || "Não foi possível carregar o pedido para impressão.",
+                        variant: "destructive",
+                    })
+                    setReceiptPrintOpen(false)
+                }
+            } catch {
+                toast({
+                    title: "Erro",
+                    description: "Não foi possível carregar o pedido para impressão.",
+                    variant: "destructive",
+                })
+                setReceiptPrintOpen(false)
+            }
+        },
+        [partnerId, selectedStore?.image_url, toast],
+    )
+
     return (
         <>
             <AnimatePresence mode="wait">
@@ -812,6 +855,7 @@ export default function OrdersPage({
                                                                 selected={selection.ids.has(o.originalId)}
                                                                 onSelect={() => handleSelectRow(o.originalId)}
                                                                 onDetails={() => handleDetailsOrder(o)}
+                                                                onPrint={() => handlePrintReceipt(o)}
                                                                 onEdit={() => handleEditOrder(o)}
                                                                 canEdit={o.canEdit}
                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
@@ -891,6 +935,7 @@ export default function OrdersPage({
                                                                             selected={selection.ids.has(o.originalId)}
                                                                             onSelect={handleSelectRow}
                                                                             onEdit={handleEditOrder}
+                                                                            onPrint={handlePrintReceipt}
                                                                             canEdit={o.canEdit}
                                                                             cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
@@ -1092,6 +1137,15 @@ export default function OrdersPage({
                     </select>
                 </div>
             </DefaultModal>
+
+            <SaleReceiptPrintModal
+                isOpen={receiptPrintOpen}
+                onClose={() => {
+                    setReceiptPrintOpen(false)
+                    setReceiptPrintData(null)
+                }}
+                receiptData={receiptPrintOpen ? receiptPrintData : null}
+            />
         </>
     )
 }

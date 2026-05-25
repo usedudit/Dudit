@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
+import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 
 interface QuotePreviewProps {
     invoiceNumber: string;
@@ -37,8 +38,8 @@ const QuotePreview = ({
     discountValue,
     total,
     note,
-    primaryColor = '#003d32',
-    secondaryColor = '#059669',
+    primaryColor = QUOTE_PREVIEW_PRIMARY_COLOR,
+    secondaryColor = QUOTE_PREVIEW_SECONDARY_COLOR,
     quoteTitle = 'ORÇAMENTO',
     quoteSubtitle,
     partnerName = 'Parceiro',

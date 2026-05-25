@@ -27,6 +27,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import { getMercadoPagoStatusAction } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
+import SaleReceiptPrintModal from './receipt/SaleReceiptPrintModal';
+import { buildSaleReceiptFromCartSnapshot } from '@/lib/sales/sale-receipt';
+import { formatDateTime } from '@/lib/utils';
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -311,6 +314,7 @@ const PaymentModal = ({
     const [calcBaseAmount, setCalcBaseAmount] = useState<number>(0);
     const [installments, setInstallments] = useState<string>('1');
     const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+    const [isSaleReceiptPrintOpen, setIsSaleReceiptPrintOpen] = useState(false);
 
     // Payment Status State
     const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
@@ -1034,6 +1038,36 @@ const PaymentModal = ({
             total: successSnapshot.displayOrderTotal,
         }
         : { cart, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total: displayTransactionTotal };
+
+    const saleReceiptData = useMemo(() => {
+        if (!successSnapshot) return null
+        return buildSaleReceiptFromCartSnapshot(
+            {
+                cart: successSnapshot.receiptCart,
+                orderNumber: saleId || "—",
+                saleDateTime: formatDateTime(new Date()),
+                customerName: customer?.name,
+                subTotal: successSnapshot.subTotal,
+                shippingFee: successSnapshot.shippingFee,
+                otherCosts: successSnapshot.otherCosts,
+                discountAmount: successSnapshot.discountAmount,
+                total: successSnapshot.displayOrderTotal,
+                totalPaid: successSnapshot.totalPaid,
+                change: successSnapshot.change,
+                paymentBreakdown: lastPaymentPayload?.paymentBreakdown,
+                paymentMethod: lastPaymentPayload?.paymentMethod,
+                methodDiscount: successSnapshot.paymentMethodDiscountAmount,
+                methodFee: successSnapshot.feeAmount,
+                methodInterest: successSnapshot.interestAmount,
+            },
+            {
+                fantasyName: "",
+                legalName: "",
+                addressLine: "",
+                taxIdLine: "",
+            },
+        )
+    }, [successSnapshot, saleId, customer?.name, lastPaymentPayload])
 
     const selectedMethodObj = selectedMethodId ? activeMethods.find((m) => m.id === selectedMethodId) : null;
 
@@ -2085,7 +2119,7 @@ const PaymentModal = ({
                                         <SuccessActionCard
                                             icon={FileIcon}
                                             label="Imprimir recibo"
-                                            onClick={() => { }}
+                                            onClick={() => setIsSaleReceiptPrintOpen(true)}
                                         />
                                         <SuccessActionCard
                                             icon={PrinterIcon}
@@ -2223,6 +2257,12 @@ const PaymentModal = ({
                     )}
                 </AnimatePresence>
             </motion.div>
+
+            <SaleReceiptPrintModal
+                isOpen={isSaleReceiptPrintOpen}
+                onClose={() => setIsSaleReceiptPrintOpen(false)}
+                receiptData={isSaleReceiptPrintOpen ? saleReceiptData : null}
+            />
         </div>
     );
 };

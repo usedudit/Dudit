@@ -27,6 +27,7 @@ import {
     duplicateQuoteAction,
 } from '@/app/actions/erp/quotes';
 import { getQuoteEditCaps, QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
+import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders";
 import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
@@ -111,8 +112,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     }, [mode, status, existingQuote?.converted]);
 
     // Layout Settings State
-    const [primaryColor, setPrimaryColor] = useState('#113833');
-    const [secondaryColor, setSecondaryColor] = useState('#d4f995');
+    const [primaryColor, setPrimaryColor] = useState(QUOTE_PREVIEW_PRIMARY_COLOR);
+    const [secondaryColor, setSecondaryColor] = useState(QUOTE_PREVIEW_SECONDARY_COLOR);
     const [quoteTitle, setQuoteTitle] = useState('ORÇAMENTO');
     const [quoteSubtitle, setQuoteSubtitle] = useState('');
 
