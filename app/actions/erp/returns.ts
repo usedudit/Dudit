@@ -204,7 +204,7 @@ export async function getReturnRequestsPageAction(
         id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
-        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer:buyer_id(name, email, phone)),
+        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer_id),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
@@ -261,7 +261,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer:buyer_id(name, email, phone)),
+        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer_id),
         return_items(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_events(*),
@@ -274,7 +274,35 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .single()
 
         if (error) throw error
-        return successResponse(normalizeReturnRow(data))
+
+        // Fetch buyer/customer details separately if buyer_id is present
+        let buyerDetails = null
+        if (data?.orders?.buyer_id) {
+            const { data: customerData } = await supabase
+                .from("customers")
+                .select("email, phone")
+                .eq("id", data.orders.buyer_id)
+                .maybeSingle()
+            buyerDetails = customerData
+
+            // If not found in customers, check if there's a user profile (marketplace user)
+            if (!buyerDetails) {
+                const { data: profileData } = await supabase
+                    .from("profiles")
+                    .select("email")
+                    .eq("id", data.orders.buyer_id)
+                    .maybeSingle()
+                buyerDetails = profileData ? { email: profileData.email, phone: null } : null
+            }
+        }
+
+        const normalized = normalizeReturnRow(data)
+        if (buyerDetails) {
+            normalized.customerEmail = normalized.customerEmail || buyerDetails.email || undefined
+            normalized.customerPhone = normalized.customerPhone || buyerDetails.phone || undefined
+        }
+
+        return successResponse(normalized)
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao carregar devolucao")
     }

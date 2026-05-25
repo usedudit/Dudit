@@ -38,12 +38,12 @@ export function MarketplaceBottomMenu() {
     // Dynamically apply bottom padding to body to prevent bottom bar from overlapping content
     useEffect(() => {
         if (!isExcluded) {
-            document.body.classList.add("pb-[72px]")
+            document.body.classList.add("max-lg:pb-[72px]")
         } else {
-            document.body.classList.remove("pb-[72px]")
+            document.body.classList.remove("max-lg:pb-[72px]")
         }
         return () => {
-            document.body.classList.remove("pb-[72px]")
+            document.body.classList.remove("max-lg:pb-[72px]")
         }
     }, [isExcluded])
 
@@ -119,7 +119,7 @@ export function MarketplaceBottomMenu() {
                 style={{ paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))" }}
             >
                 <Link
-                    href={homePath}
+                    href="/"
                     className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 active:scale-95 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-inactive-text font-medium"
                         }`}
                 >
@@ -203,7 +203,7 @@ export function MarketplaceBottomMenu() {
                             Minha atividade
                         </span>
                         <div className="space-y-1">
-                            <MenuItem label="Início" href={homePath} icon={HomeIcon} />
+                            <MenuItem label="Início" href="/" icon={HomeIcon} />
                             <MenuItem
                                 label="Central de Vendedores"
                                 href={user ? "/erp/switch" : "/auth/login?mode=partner"}
