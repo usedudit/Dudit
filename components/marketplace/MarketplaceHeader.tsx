@@ -163,7 +163,7 @@ const Header: React.FC<HeaderProps> = ({
                     .replace(/[^a-z0-9]+/g, '-')
                     .replace(/(^-|-$)/g, '')
                 const slug = `${formattedCity}-${uf}`
-                
+
                 document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
                 localStorage.setItem('dudit_city', slug)
                 window.location.href = `/${slug}`
@@ -194,7 +194,7 @@ const Header: React.FC<HeaderProps> = ({
                     >
                         <XIcon size={16} />
                     </button>
-                    
+
                     {/* Header with gradient and mascot */}
                     <div
                         className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
@@ -834,13 +834,13 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
 
                         <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
-                            <Package size={20} strokeWidth={2} />
+                            <Package size={20} />
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
                         </Link>
 
                         <Link href="/cart" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <div className="relative">
-                                <ShoppingBagIcon size={20} strokeWidth={2} />
+                                <ShoppingBagIcon size={20} />
                                 {cartCount > 0 && (
                                     <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                         {cartCount}

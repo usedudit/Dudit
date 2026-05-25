@@ -5,6 +5,7 @@ import "./globals.css"
 import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
+import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
 
 const inter = Inter({
     subsets: ["latin"],
@@ -165,6 +166,7 @@ export default async function RootLayout({
                     </QueryProvider>
                 </SupabaseProvider>
                 <PWAUpdatePrompt />
+                <MarketplaceBottomMenu />
             </body>
         </html>
     )

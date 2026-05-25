@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, Fragment } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -282,260 +282,260 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const sellerImage = data.partner?.store_image_url
 
                                 return (
-                                    <div key={partnerId} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                                        <div className="lg:col-span-8 bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border overflow-hidden">
-                                            {/* Header do vendedor - clicável para expand/collapse */}
-                                            <div
-                                                className="px-6 py-4 border-b border-brand-border flex items-center justify-between bg-brand-gray cursor-pointer"
-                                                onClick={() => toggleVendor(partnerId)}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div onClick={e => e.stopPropagation()} className="flex items-center">
-                                                        <Checkbox
-                                                            id={`select-partner-${partnerId}`}
-                                                            checked={allSelected}
-                                                            onChange={() => togglePartnerSelection(partnerId, data.items, allSelected)}
-                                                            disabled={loading === partnerId}
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <img
-                                                            src={getImageUrl(sellerImage) || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                            alt={data.partner?.store_name}
-                                                            className="bg-white border border-brand-border w-6 h-6 rounded-full object-cover"
-                                                            onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
-                                                        />
-                                                        <h3
-                                                            className="text-[16px] font-bold text-brand-dark hover:text-brand-green transition-colors"
-                                                            onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
-                                                        >
-                                                            {data.partner?.store_name || "Loja"}
-                                                        </h3>
-                                                    </div>
-                                                </div>
-                                                <button className="text-brand-dark hover:bg-white/50 rounded-full transition-colors">
-                                                    {expanded ? <ChevronUpIcon size={20} /> : <ChevronDownIcon size={20} />}
-                                                </button>
-                                            </div>
-
-                                            {/* Conteúdo com animação suave de expand/collapse */}
-                                            <AnimatePresence initial={false}>
-                                                {expanded && (
-                                                    <motion.div
-                                                        key="content"
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: "auto", opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        transition={{ duration: 0.22, ease: "easeInOut" }}
-                                                        className="overflow-hidden"
-                                                    >
-                                                        <div className="px-4 md:px-6 pt-6 pb-6">
-                                                            {data.items.map((item: any, index: number) => {
-                                                                const itemSelected = getItemSelected(item)
-                                                                const itemQty = getItemQuantity(item)
-
-                                                                return (
-                                                                    <div key={item.id} className={`pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border mb-6" : "mb-2"}`}>
-
-                                                                        {/* Mobile/Tablet Layout (< md) */}
-                                                                        <div className="flex md:hidden gap-3">
-                                                                            <div className="flex items-start pt-1 shrink-0">
-                                                                                <Checkbox
-                                                                                    id={`cart-item-mob-${item.id}`}
-                                                                                    checked={itemSelected}
-                                                                                    onChange={() => toggleItemSelection(item.id, itemSelected)}
-                                                                                    disabled={loading === item.id}
-                                                                                />
-                                                                            </div>
-
-                                                                            <Link
-                                                                                href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                prefetch={false}
-                                                                                className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
-                                                                            >
-                                                                                <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                                                            </Link>
-
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <div className="flex items-start justify-between gap-2">
-                                                                                    <Link
-                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                        prefetch={false}
-                                                                                        className="text-[14px] font-medium text-brand-dark line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
-                                                                                    >
-                                                                                        {item.products.name}
-                                                                                    </Link>
-                                                                                    <button
-                                                                                        onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                        className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
-                                                                                        disabled={loading === item.id}
-                                                                                    >
-                                                                                        <TrashIcon size={16} />
-                                                                                    </button>
-                                                                                </div>
-
-                                                                                {item.variant_id && item.product_variants && (
-                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">
-                                                                                        {item.product_variants.variant_type}: <span className="font-medium text-brand-dark">{item.product_variants.variant_name}</span>
-                                                                                    </p>
-                                                                                )}
-
-                                                                                <div className="flex items-center justify-between mt-2">
-                                                                                    <QuantitySelector
-                                                                                        value={itemQty}
-                                                                                        onChange={(val) => updateQty(item.id, val, itemQty)}
-                                                                                        disabled={loading === item.id}
-                                                                                    />
-                                                                                    <span className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item) * itemQty)}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Desktop Layout (>= md) */}
-                                                                        <div className="hidden md:flex gap-4">
-                                                                            <div className="flex items-center shrink-0">
-                                                                                <Checkbox
-                                                                                    id={`cart-item-${item.id}`}
-                                                                                    checked={itemSelected}
-                                                                                    onChange={() => toggleItemSelection(item.id, itemSelected)}
-                                                                                    disabled={loading === item.id}
-                                                                                />
-                                                                            </div>
-
-                                                                            <div className="flex-1 flex md:justify-between md:items-center gap-4">
-                                                                                <Link
-                                                                                    href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                    prefetch={false}
-                                                                                    className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border shrink-0 cursor-pointer block"
-                                                                                >
-                                                                                    <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                                                                </Link>
-
-                                                                                <div className="flex-1">
-                                                                                    <Link
-                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                        prefetch={false}
-                                                                                        className="text-[16px] font-medium text-brand-dark mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
-                                                                                    >
-                                                                                        {item.products.name}
-                                                                                    </Link>
-                                                                                    {item.variant_id && item.product_variants && (
-                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">
-                                                                                            {item.product_variants.variant_type}: <span className="font-medium text-brand-dark">{item.product_variants.variant_name}</span>
-                                                                                        </p>
-                                                                                    )}
-                                                                                    <p className="text-[15px] font-semibold text-brand-dark">{formatCurrency(getItemPrice(item))}</p>
-                                                                                </div>
-
-                                                                                <div className="flex items-center justify-end gap-4">
-                                                                                    <QuantitySelector
-                                                                                        value={itemQty}
-                                                                                        onChange={(val) => updateQty(item.id, val, itemQty)}
-                                                                                        disabled={loading === item.id}
-                                                                                        size="sm"
-                                                                                    />
-                                                                                    <div className="text-right min-w-[80px] font-semibold">{formatCurrency(getItemPrice(item) * itemQty)}</div>
-                                                                                    <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                )
-                                                            })}
-
-                                                            {/* Mobile/Tablet: resumo inline + botão */}
-                                                            <div className="mt-4 pt-4 border-t border-brand-border md:hidden space-y-3">
-                                                                <div className="flex justify-between items-center text-sm">
-                                                                    <span className="text-brand-inactive-text">Total dos itens</span>
-                                                                    <span className="font-semibold">{formatCurrency(partnerItemsTotal)}</span>
-                                                                </div>
-                                                                 <div className="flex justify-between items-center text-sm">
-                                                                    <span className="text-brand-inactive-text">Entrega</span>
-                                                                    <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
-                                                                </div>
-                                                                <div className="h-[1px] bg-gray-100 w-full" />
-                                                                <div className="flex justify-between items-center text-base font-bold text-brand-dark">
-                                                                    <span>Total</span>
-                                                                    <span>{formatCurrency(partnerTotalWithDelivery)}</span>
-                                                                </div>
-                                                                <Button
-                                                                    onClick={() => handleOpenCheckout(partnerId)}
-                                                                    className="w-full"
-                                                                    disabled={partnerItemsTotal === 0}
-                                                                >
-                                                                    Finalizar Pedido desta Loja
-                                                                </Button>
-                                                            </div>
-
-                                                            {/* Desktop: "Escolher mais itens" abaixo do separator */}
-                                                            <div className="hidden md:block mt-4 pt-4 border-t border-brand-border">
-                                                                <Link
-                                                                    href={getPartnerUrl(data.partner)}
-                                                                    prefetch={false}
-                                                                    onClick={() => setDirection("back")}
-                                                                    className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
-                                                                >
-                                                                    <ChevronLeftIcon size={16} />Escolher mais itens
-                                                                </Link>
-                                                            </div>
+                                    <Fragment key={partnerId}>
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 lg:gap-y-0 relative items-start">
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 bg-transparent overflow-hidden">
+                                                {/* Header do vendedor - estilo Accordion / FormSection */}
+                                                <div
+                                                    className="flex items-center justify-between pb-4 mb-4 border-b border-brand-border dark:border-dark-border cursor-pointer select-none"
+                                                    onClick={() => toggleVendor(partnerId)}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div onClick={e => e.stopPropagation()} className="flex items-center">
+                                                            <Checkbox
+                                                                id={`select-partner-${partnerId}`}
+                                                                checked={allSelected}
+                                                                onChange={() => togglePartnerSelection(partnerId, data.items, allSelected)}
+                                                                disabled={loading === partnerId}
+                                                            />
                                                         </div>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
-
-                                        {/* Desktop sidebar para esta loja especificamente */}
-                                        <div className="hidden lg:block lg:col-span-4 self-start">
-                                            <div className="border border-brand-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface sticky top-[100px]">
-                                                <div className="bg-brand-gray px-6 py-4 border-b border-brand-border font-bold text-brand-dark">
-                                                    Resumo do Pedido{!expanded && partnerTotalWithDelivery > 0 && (
-                                                        <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerTotalWithDelivery)})</span>
-                                                    )}
+                                                        <div className="flex items-center gap-2">
+                                                            <img
+                                                                src={getImageUrl(sellerImage) || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                alt={data.partner?.store_name}
+                                                                className="bg-white border border-brand-border dark:border-dark-border w-6 h-6 rounded-full object-cover"
+                                                                onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
+                                                            />
+                                                            <h3
+                                                                className="text-lg font-semibold text-brand-dark dark:text-dark-heading hover:text-brand-green transition-colors"
+                                                                onClick={e => { e.stopPropagation(); router.push(getPartnerUrl(data.partner)) }}
+                                                            >
+                                                                {data.partner?.store_name || "Loja"}
+                                                            </h3>
+                                                        </div>
+                                                    </div>
+                                                    <button className="text-brand-dark dark:text-dark-heading hover:bg-brand-gray/50 dark:hover:bg-zinc-800 p-1 rounded-full transition-colors">
+                                                        {expanded ? <ChevronUpIcon size={20} /> : <ChevronDownIcon size={20} />}
+                                                    </button>
                                                 </div>
 
+                                                {/* Conteúdo com animação suave de expand/collapse */}
                                                 <AnimatePresence initial={false}>
                                                     {expanded && (
                                                         <motion.div
-                                                            key="summary-content"
+                                                            key="content"
                                                             initial={{ height: 0, opacity: 0 }}
                                                             animate={{ height: "auto", opacity: 1 }}
                                                             exit={{ height: 0, opacity: 0 }}
                                                             transition={{ duration: 0.22, ease: "easeInOut" }}
                                                             className="overflow-hidden"
                                                         >
-                                                            <div className="p-6 space-y-4">
-                                                                <div className="flex justify-between items-center text-sm font-medium">
-                                                                    <span className="text-brand-inactive-text">Total dos itens</span>
-                                                                    <span className="text-brand-dark">{formatCurrency(partnerItemsTotal)}</span>
+                                                            <div className="pt-2 pb-6">
+                                                                {data.items.map((item: any, index: number) => {
+                                                                    const itemSelected = getItemSelected(item)
+                                                                    const itemQty = getItemQuantity(item)
+
+                                                                    return (
+                                                                        <div key={item.id} className={`pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"}`}>
+
+                                                                            {/* Mobile/Tablet Layout (< md) */}
+                                                                            <div className="flex md:hidden gap-3">
+                                                                                <div className="flex items-start pt-1 shrink-0">
+                                                                                    <Checkbox
+                                                                                        id={`cart-item-mob-${item.id}`}
+                                                                                        checked={itemSelected}
+                                                                                        onChange={() => toggleItemSelection(item.id, itemSelected)}
+                                                                                        disabled={loading === item.id}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <Link
+                                                                                    href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                    prefetch={false}
+                                                                                    className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
+                                                                                >
+                                                                                    <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                </Link>
+
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="flex items-start justify-between gap-2">
+                                                                                        <Link
+                                                                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                            prefetch={false}
+                                                                                            className="text-[14px] font-medium text-brand-dark dark:text-dark-heading line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
+                                                                                        >
+                                                                                            {item.products.name}
+                                                                                        </Link>
+                                                                                        <button
+                                                                                            onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                            className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
+                                                                                            disabled={loading === item.id}
+                                                                                        >
+                                                                                            <TrashIcon size={16} />
+                                                                                        </button>
+                                                                                    </div>
+
+                                                                                    {item.variant_id && item.product_variants && (
+                                                                                        <p className="text-[12px] text-brand-inactive-text mt-0.5">
+                                                                                            {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
+                                                                                        </p>
+                                                                                    )}
+
+                                                                                    <div className="flex items-center justify-between mt-2">
+                                                                                        <QuantitySelector
+                                                                                            value={itemQty}
+                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                            disabled={loading === item.id}
+                                                                                            size="sm"
+                                                                                        />
+                                                                                        <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item) * itemQty)}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Desktop Layout (>= md) */}
+                                                                            <div className="hidden md:flex gap-4">
+                                                                                <div className="flex items-center shrink-0">
+                                                                                    <Checkbox
+                                                                                        id={`cart-item-${item.id}`}
+                                                                                        checked={itemSelected}
+                                                                                        onChange={() => toggleItemSelection(item.id, itemSelected)}
+                                                                                        disabled={loading === item.id}
+                                                                                    />
+                                                                                </div>
+
+                                                                                <div className="flex-1 flex md:justify-between md:items-center gap-4">
+                                                                                    <Link
+                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                        prefetch={false}
+                                                                                        className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
+                                                                                    >
+                                                                                        <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                    </Link>
+
+                                                                                    <div className="flex-1">
+                                                                                        <Link
+                                                                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                            prefetch={false}
+                                                                                            className="text-[16px] font-medium text-brand-dark dark:text-dark-heading mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
+                                                                                        >
+                                                                                            {item.products.name}
+                                                                                        </Link>
+                                                                                        {item.variant_id && item.product_variants && (
+                                                                                            <p className="text-[13px] text-brand-inactive-text mb-1">
+                                                                                                {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
+                                                                                            </p>
+                                                                                        )}
+                                                                                        <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item))}</p>
+                                                                                    </div>
+
+                                                                                    <div className="flex items-center justify-end gap-4">
+                                                                                        <QuantitySelector
+                                                                                            value={itemQty}
+                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                            disabled={loading === item.id}
+                                                                                        />
+                                                                                        <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item) * itemQty)}</div>
+                                                                                        <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+
+                                                                {/* Mobile/Tablet: resumo inline + botão */}
+                                                                <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
+                                                                    <div className="flex justify-between items-center text-sm">
+                                                                        <span className="text-brand-inactive-text">Total dos itens</span>
+                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center text-sm">
+                                                                        <span className="text-brand-inactive-text">Entrega</span>
+                                                                        <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
+                                                                    </div>
+                                                                    <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
+                                                                    <div className="flex justify-between items-center text-base font-bold text-brand-dark dark:text-dark-heading">
+                                                                        <span>Total</span>
+                                                                        <span>{formatCurrency(partnerTotalWithDelivery)}</span>
+                                                                    </div>
+                                                                    <Button
+                                                                        onClick={() => handleOpenCheckout(partnerId)}
+                                                                        className="w-full"
+                                                                        disabled={partnerItemsTotal === 0}
+                                                                    >
+                                                                        Finalizar Pedido desta Loja
+                                                                    </Button>
                                                                 </div>
-                                                                <div className="flex justify-between items-center text-sm font-medium">
-                                                                    <span className="text-brand-inactive-text">Entrega</span>
-                                                                    <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
+
+                                                                {/* Desktop: "Escolher mais itens" abaixo do separator */}
+                                                                <div className="hidden md:block mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
+                                                                    <Link
+                                                                        href={getPartnerUrl(data.partner)}
+                                                                        prefetch={false}
+                                                                        onClick={() => setDirection("back")}
+                                                                        className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
+                                                                    >
+                                                                        <ChevronLeftIcon size={16} />Escolher mais itens
+                                                                    </Link>
                                                                 </div>
-                                                                <div className="h-[1px] bg-gray-100 w-full" />
-                                                                <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
-                                                                    <span>Total Geral</span>
-                                                                    <span>{formatCurrency(partnerTotalWithDelivery)}</span>
-                                                                </div>
-                                                                <Button
-                                                                    onClick={() => handleOpenCheckout(partnerId)}
-                                                                    className="w-full h-[46px]"
-                                                                    disabled={partnerItemsTotal === 0}
-                                                                >
-                                                                    Finalizar Pedido
-                                                                </Button>
                                                             </div>
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
                                             </div>
-                                        </div>
 
+                                            {/* Desktop sidebar para esta loja especificamente */}
+                                            <div className="hidden lg:block col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 self-start">
+                                                <div className="border border-brand-border dark:border-dark-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface sticky top-[100px]">
+                                                    <div className="bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                                        Resumo do Pedido{!expanded && partnerTotalWithDelivery > 0 && (
+                                                            <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerTotalWithDelivery)})</span>
+                                                        )}
+                                                    </div>
+
+                                                    <AnimatePresence initial={false}>
+                                                        {expanded && (
+                                                            <motion.div
+                                                                key="summary-content"
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: "auto", opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                transition={{ duration: 0.22, ease: "easeInOut" }}
+                                                                className="overflow-hidden"
+                                                            >
+                                                                <div className="p-6 space-y-4">
+                                                                    <div className="flex justify-between items-center text-sm font-medium">
+                                                                        <span className="text-brand-inactive-text">Total dos itens</span>
+                                                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-center text-sm font-medium">
+                                                                        <span className="text-brand-inactive-text">Entrega</span>
+                                                                        <span className="text-brand-green font-semibold">{getDeliveryLabel(data)}</span>
+                                                                    </div>
+                                                                    <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
+                                                                    <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
+                                                                        <span>Total Geral</span>
+                                                                        <span>{formatCurrency(partnerTotalWithDelivery)}</span>
+                                                                    </div>
+                                                                    <Button
+                                                                        onClick={() => handleOpenCheckout(partnerId)}
+                                                                        className="w-full h-[46px]"
+                                                                        disabled={partnerItemsTotal === 0}
+                                                                    >
+                                                                        Finalizar Pedido
+                                                                    </Button>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            </div>
+                                        </div>
                                         {index !== array.length - 1 && (
-                                            <div className="lg:col-span-12 w-full h-[1px] bg-brand-border my-4" />
+                                            <div className="w-full h-[1px] bg-brand-border dark:bg-dark-border my-12" />
                                         )}
-                                    </div>
-                                )
+                                    </Fragment>          )
                             })}
 
                             {/* Mobile: "Voltar para as compras" abaixo de tudo */}

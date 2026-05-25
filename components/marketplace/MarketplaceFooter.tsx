@@ -1,4 +1,4 @@
-import type React from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { InstagramIcon, TwitterIcon } from "@/lib/icons"
 
@@ -7,6 +7,21 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ setView }) => {
+    const [isPWA, setIsPWA] = useState(false)
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone
+            if (isStandalone) {
+                setIsPWA(true)
+            }
+        }
+    }, [])
+
+    if (isPWA) {
+        return null
+    }
+
     return (
         <footer className="bg-brand-dark py-16 border-t border-white/10 relative mt-auto w-full">
             <div className="max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">

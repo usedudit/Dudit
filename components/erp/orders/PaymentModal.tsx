@@ -597,7 +597,8 @@ const PaymentModal = ({
                     method: "POST",
                     body: {
                         products: cart.map((item: any) => ({
-                            id: item.id || item.productId,
+                            id: item.productId,
+                            variant_id: item.variantId || undefined,
                             name: item.name,
                             price: item.unitPrice,
                             quantity: item.quantity,

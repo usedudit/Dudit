@@ -2,9 +2,9 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, TrashIcon, CheckCircleIcon, PlusIcon, EditIcon } from "@/lib/icons"
-import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox } from "@/components/reusable"
-import { SectionCard, Feedback, PageHeader, fade, View } from "./profile-shared"
+import { MapPinIcon, TrashIcon, CheckCircleIcon, PlusIcon, EditIcon, HomeIcon, BriefcaseIcon, ThreeDotsIcon } from "@/lib/icons"
+import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, Dropdown, DropdownItem } from "@/components/reusable"
+import { Feedback, PageHeader, fade, View } from "./profile-shared"
 import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
 
@@ -27,6 +27,17 @@ function formatAddressSummary(addr: any): string {
 function getAddressTypeLabel(type: string | null | undefined): string {
   const found = ADDRESS_TYPE_OPTIONS.find(o => o.value === type)
   return found?.label || "Endereço"
+}
+
+function getAddressTypeIcon(type: string | null | undefined) {
+  switch (type) {
+    case "casa":
+      return <HomeIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+    case "trabalho":
+      return <BriefcaseIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+    default:
+      return <MapPinIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+  }
 }
 
 interface AddressViewProps {
@@ -256,72 +267,120 @@ export const AddressView = ({
     <motion.div key="address" {...fade} className="max-w-[800px] mx-auto space-y-6">
       <PageHeader title="Endereços" subtitle="Gerencie seus endereços de entrega." onBack={() => navigate("main")} />
 
-      <SectionCard title="Meus endereços">
-        {/* Address list */}
-        {addresses.length === 0 && editingId !== "new" && (
-          <p className="text-brand-inactive-text text-sm py-4">Nenhum endereço cadastrado.</p>
-        )}
+      {/* Address list */}
+      {addresses.length === 0 && (
+        <p className="text-brand-inactive-text text-sm py-8 text-center">Nenhum endereço cadastrado.</p>
+      )}
 
-        <div className="space-y-3">
+      {addresses.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {addresses.map((addr: any) => (
-            editingId === addr.id ? (
-              <div key={addr.id}>
-                {renderForm()}
-              </div>
-            ) : (
-              <div key={addr.id} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-brand-gray/30 hover:border-gray-200 transition-colors group">
-                <div className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <MapPinIcon size={18} className="text-brand-green" />
+            <div
+              key={addr.id}
+              className={`p-5 rounded-2xl border bg-white dark:bg-dark-surface transition-all flex flex-col justify-between ${
+                addr.is_default
+                  ? "border-brand-green ring-1 ring-brand-green/30"
+                  : "border-brand-border dark:border-dark-border hover:border-brand-dark/20 dark:hover:border-white/20"
+              }`}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  {getAddressTypeIcon(addr.address_type)}
+                  <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
+                    {getAddressTypeLabel(addr.address_type)}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[13px] font-semibold text-brand-dark">{getAddressTypeLabel(addr.address_type)}</span>
-                    {addr.is_default && (
-                      <span className="text-[10px] font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full">Padrão</span>
-                    )}
-                  </div>
-                  <p className="text-[13px] text-brand-inactive-text leading-relaxed truncate">{formatAddressSummary(addr)}</p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!addr.is_default && (
-                    <button onClick={() => handleSetDefault(addr.id)} title="Definir como padrão" disabled={isLoading}
-                      className="p-1.5 rounded-lg hover:bg-brand-green/10 text-brand-inactive-text hover:text-brand-green transition-colors">
-                      <CheckCircleIcon size={16} />
-                    </button>
+                <div className="flex items-center gap-2">
+                  {addr.is_default && (
+                    <CheckCircleIcon size={18} className="text-brand-green" />
                   )}
-                  <button onClick={() => startEdit(addr)} title="Editar" disabled={isLoading}
-                    className="p-1.5 rounded-lg hover:bg-blue-50 text-brand-inactive-text hover:text-blue-500 transition-colors">
-                    <EditIcon size={16} />
-                  </button>
-                  <button onClick={() => handleDelete(addr.id)} title="Excluir" disabled={isLoading}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-brand-inactive-text hover:text-red-500 transition-colors">
-                    <TrashIcon size={16} />
-                  </button>
+                  <Dropdown
+                    trigger={
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                      >
+                        <ThreeDotsIcon size={18} />
+                      </button>
+                    }
+                    align="right"
+                    showChevron={false}
+                    fullWidth={false}
+                    width="w-44"
+                  >
+                    {!addr.is_default && (
+                      <DropdownItem onClick={() => handleSetDefault(addr.id)}>
+                        <CheckCircleIcon size={14} className="text-brand-inactive-text mr-1" />
+                        Tornar padrão
+                      </DropdownItem>
+                    )}
+                    <DropdownItem onClick={() => startEdit(addr)}>
+                      <EditIcon size={14} className="text-brand-inactive-text mr-1" />
+                      Editar
+                    </DropdownItem>
+                    <DropdownItem
+                      onClick={() => handleDelete(addr.id)}
+                      className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    >
+                      <TrashIcon size={14} className="text-red-500 mr-1" />
+                      Excluir
+                    </DropdownItem>
+                  </Dropdown>
                 </div>
               </div>
-            )
+
+              {/* Body: Address Details and Map Image */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0 text-[13px] text-brand-inactive-text leading-relaxed">
+                  <p>
+                    {addr.street && addr.number ? `${addr.street}, ${addr.number}` : addr.street}
+                    {addr.complement && ` - ${addr.complement}`}
+                  </p>
+                  <p>{addr.neighborhood}</p>
+                  <p>
+                    {addr.city && addr.state ? `${addr.city} - ${addr.state}` : addr.city || addr.state}
+                  </p>
+                  <p>{addr.zip_code}</p>
+                </div>
+                <div className="shrink-0">
+                  <img
+                    src="https://img.dudit.com.br/static/Map.png"
+                    alt="Mapa do local"
+                    className="w-14 h-14 object-cover rounded-xl border border-brand-border dark:border-dark-border"
+                  />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
+      )}
 
-        {/* Add button or new form */}
-        <AnimatePresence mode="wait">
-          {editingId === "new" ? (
-            <div className="mt-4">{renderForm()}</div>
-          ) : (
-            addresses.length < 5 && editingId === null && (
-              <motion.button
-                {...fade}
-                onClick={startCreate}
-                disabled={isLoading}
-                className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-gray-200 text-brand-inactive-text hover:border-brand-green hover:text-brand-green transition-all text-[14px] font-medium"
-              >
-                <PlusIcon size={18} />
-                Adicionar endereço ({addresses.length}/5)
-              </motion.button>
-            )
-          )}
-        </AnimatePresence>
-      </SectionCard>
+      {/* Add button */}
+      {addresses.length < 5 && (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={startCreate}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <PlusIcon size={18} />
+            Adicionar endereço ({addresses.length}/5)
+          </Button>
+        </div>
+      )}
+
+      {/* Modal containing the address form */}
+      <DefaultModal
+        isOpen={editingId !== null}
+        onClose={cancel}
+        title={editingId === "new" ? "Adicionar endereço" : "Editar endereço"}
+        maxWidth="xl"
+      >
+        {editingId !== null && renderForm()}
+      </DefaultModal>
     </motion.div>
   )
 }
