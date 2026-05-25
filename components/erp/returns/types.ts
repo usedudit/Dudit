@@ -20,6 +20,9 @@ export type ReturnRequest = Omit<ReturnRequestListItem, "items"> & {
   orderNumber: string
   customerName: string
   customerAddress?: string
+  customerPhone?: string
+  orderStatus?: string
+  deliveryStatus?: string
   createdAt: string
   refundType?: "full" | "partial" | "none" | "pix" | "credit_card" | "store_credit" | "other"
   creditType?: "full" | "partial"

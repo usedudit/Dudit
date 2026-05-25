@@ -65,6 +65,28 @@ const createReturnSchema = z.object({
     evidence: z.array(evidenceSchema).max(5).default([]),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     expiresAt: z.string().datetime().optional().nullable(),
+    status: z.enum([
+        "PENDING_REVIEW",
+        "UNDER_ANALYSIS",
+        "APPROVED",
+        "REJECTED",
+        "WAITING_CUSTOMER",
+        "WAITING_ITEM_RETURN",
+        "PROCESSING",
+        "RESOLVED",
+        "EXPIRED",
+        "ESCALATED",
+    ]).optional().nullable(),
+    refundValue: z.number().nonnegative().optional().nullable(),
+    storeCreditValue: z.number().nonnegative().optional().nullable(),
+    exchangeItems: z.array(z.object({
+        product_id: z.string().uuid(),
+        variant_id: z.string().uuid().nullable().optional(),
+        quantity: z.number().int().positive().max(999),
+        unit_price: z.number().nonnegative().max(99999999),
+    })).max(100).optional().nullable(),
+    exchangeBalanceResolution: z.enum(["refund", "store_credit"]).nullable().optional(),
+    returnToInventory: z.boolean().optional().nullable(),
 })
 
 const createCancellationSchema = z.object({
@@ -135,8 +157,11 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         orderNumber: row.order_number_snapshot || row.orders?.order_number || String(row.order_id).slice(0, 8),
         customerId: row.customer_id || row.customer_user_id || "",
         customerName: row.customer_name_snapshot || row.orders?.customer_name || "Cliente",
-        customerEmail: row.customer_email_snapshot || undefined,
-        customerPhone: undefined,
+        customerEmail: row.customer_email_snapshot || row.orders?.buyer?.email || undefined,
+        customerPhone: row.orders?.buyer?.phone || undefined,
+        customerAddress: row.orders?.delivery_address || undefined,
+        orderStatus: row.orders?.situation || undefined,
+        deliveryStatus: row.orders?.delivery_status || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         source: row.source || "erp",
@@ -179,7 +204,7 @@ export async function getReturnRequestsPageAction(
         id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
-        orders!order_id(order_number, customer_name),
+        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer:buyer_id(name, email, phone)),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
@@ -236,7 +261,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             .from("return_requests")
             .select(`
         *,
-        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id),
+        orders!order_id(order_number, customer_name, total_amount, payment_method, payment_provider, mp_payment_id, situation, delivery_status, delivery_address, buyer:buyer_id(name, email, phone)),
         return_items(*, products!product_id(images, video_thumbnail)),
         return_evidence(*),
         return_events(*),
@@ -263,6 +288,18 @@ export async function createReturnRequestAction(input: unknown) {
         const access = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
         assertRole(access.roleId, MANAGE_ROLES)
         const supabase = createAdminClient()
+
+        // Validate that the order has situation = 'paid'
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .select("id, situation")
+            .eq("id", data.orderId)
+            .single()
+
+        if (orderError || !order) throw new Error("Pedido não encontrado")
+        if (order.situation !== "paid") {
+            throw new Error("Não é permitido criar devolução para pedidos não pagos.")
+        }
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
             p_partner_id: data.partnerId,
@@ -292,6 +329,28 @@ export async function createReturnRequestAction(input: unknown) {
             metadata: { orderId: data.orderId, resolution: data.resolution },
             source: "manual",
         })
+
+        // If status is provided and is not PENDING_REVIEW, process the state change internally
+        if (data.status && data.status !== "PENDING_REVIEW") {
+            const processRes = await processReturnRequestAction({
+                partnerId: data.partnerId,
+                requestId,
+                action: "updated",
+                nextStatus: data.status,
+                refundAmount: data.refundValue || 0,
+                refundStatus: (data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
+                refundPaymentMethod: data.resolution === "refund" ? "MANUAL" : null,
+                returnToInventory: data.returnToInventory || false,
+                storeCreditAmount: data.storeCreditValue || 0,
+                exchangeItems: data.exchangeItems || [],
+                exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                notes: data.message || "",
+                idempotencyKey: `erp-init-process:${requestId}:${Date.now()}`,
+            })
+            if (!processRes.success) {
+                throw new Error(`Criou devolução, mas falhou ao processar status: ${processRes.error}`)
+            }
+        }
 
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
@@ -601,6 +660,7 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
         )
       `)
             .eq("partner_id", partnerId)
+            .eq("situation", "paid")
             .order("created_at", { ascending: false })
             .limit(200)
 

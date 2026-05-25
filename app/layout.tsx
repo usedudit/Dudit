@@ -163,10 +163,10 @@ export default async function RootLayout({
                                 {children}
                             </TransitionProvider>
                         </NotificationProvider>
+                        <PWAUpdatePrompt />
+                        <MarketplaceBottomMenu />
                     </QueryProvider>
                 </SupabaseProvider>
-                <PWAUpdatePrompt />
-                <MarketplaceBottomMenu />
             </body>
         </html>
     )

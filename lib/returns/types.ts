@@ -60,6 +60,9 @@ export type ReturnRequestListItem = {
   customerName: string
   customerEmail?: string
   customerPhone?: string
+  customerAddress?: string
+  orderStatus?: string
+  deliveryStatus?: string
   createdAt: string
   updatedAt: string
   source: "erp" | "marketplace" | "moderation"

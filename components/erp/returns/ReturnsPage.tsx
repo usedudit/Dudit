@@ -118,21 +118,27 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
             if (entityState.action === "create") {
                 if (!data.orderId) throw new Error("Selecione um pedido")
                 const selectedItems = data.items || []
-        const response = await createReturnRequestAction({
-          partnerId,
-          orderId: data.orderId,
-          resolution: mapLegacyResolution(data.resolutionType || data.desiredResolution || data.refundType),
-          reason: mapLegacyReason(selectedItems[0]?.reason || data.reason),
-          message: data.observations || "",
-          items: selectedItems.map((item: any) => ({
-            order_item_id: item.orderItemId || item.id,
-            quantity: Number(item.quantity || 1),
-            reason: mapLegacyReason(item.reason),
-            condition: mapLegacyCondition(item.condition),
-            sku: item.sku || null,
-          })),
+                const response = await createReturnRequestAction({
+                    partnerId,
+                    orderId: data.orderId,
+                    resolution: mapLegacyResolution(data.resolutionType || data.desiredResolution || data.refundType),
+                    reason: mapLegacyReason(selectedItems[0]?.reason || data.reason),
+                    message: data.observations || "",
+                    items: selectedItems.map((item: any) => ({
+                        order_item_id: item.orderItemId || item.id,
+                        quantity: Number(item.quantity || 1),
+                        reason: mapLegacyReason(item.reason),
+                        condition: mapLegacyCondition(item.condition),
+                        sku: item.sku || null,
+                    })),
                     evidence: data.evidence || [],
                     idempotencyKey: `erp:${partnerId}:${data.orderId}:${Date.now()}`,
+                    status: data.status,
+                    refundValue: Number(data.refundValue || 0),
+                    storeCreditValue: Number(data.storeCreditValue || 0),
+                    exchangeItems: data.exchangeItems || [],
+                    exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                    returnToInventory: Boolean(data.returnToInventory),
                 })
                 if (!response.success) throw new Error(response.error)
                 toast({ title: "Sucesso", description: "Solicitacao criada com sucesso." })
