@@ -7,8 +7,8 @@ import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
 import { OrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
-import { Button, IconPlaceholder } from "@/components/reusable";
-import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon } from '@/lib/icons';
+import { Button, IconPlaceholder, Tooltip, Badge } from "@/components/reusable";
+import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl } from "@/lib/utils/url-generator";
@@ -153,12 +153,11 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                         <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5">
                                                             Pedido #{order.order_number || order.id.slice(0, 8)}
                                                             {returnHistoryCount > 0 && (
-                                                                <span
-                                                                    className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
-                                                                    title="Possui histórico de trocas/devoluções"
-                                                                >
-                                                                    ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                                                </span>
+                                                                <Tooltip text="Possui histórico de trocas/devoluções">
+                                                                    <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                                                        {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                                                    </Badge>
+                                                                </Tooltip>
                                                             )}
                                                             <span>•</span>
                                                             {order.partners?.store_name || "Loja Parceira"}

@@ -2,9 +2,9 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon } from "@/lib/icons"
+import { ShoppingCartIcon, TruckIcon, ReturnIcon } from "@/lib/icons"
 
 interface OrderGridCardProps {
     order: any
@@ -68,17 +68,18 @@ const OrderGridCard = React.memo(
                                     {order.displayId}
                                 </h3>
                                 {Number(order.returnCount || 0) > 0 && (
-                                    <span
-                                        className="inline-flex shrink-0 items-center rounded-full border border-brand-border px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:text-dark-heading"
-                                        title="Possui histórico de trocas/devoluções"
-                                    >
-                                        ↩{Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
-                                    </span>
+                                    <Tooltip text="Possui histórico de trocas/devoluções">
+                                        <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                            {Number(order.returnCount || 0) > 1 && (
+                                                <span className="hidden md:inline">{order.returnCount}</span>
+                                            )}
+                                        </Badge>
+                                    </Tooltip>
                                 )}
                                 <div className="flex items-center shrink-0">
                                     {order.situation === "cancelled" ? (
                                         <Badge variant="red" className="whitespace-nowrap scale-90">
-                                            Cancelado
+                                            <span className="hidden md:inline">Cancelado</span>
                                         </Badge>
                                     ) : (
                                         <>
@@ -87,14 +88,14 @@ const OrderGridCard = React.memo(
                                                 icon={order.statusIcon}
                                                 className="whitespace-nowrap scale-90"
                                             >
-                                                {order.statusLabel}
+                                                <span className="hidden md:inline">{order.statusLabel}</span>
                                             </Badge>
                                             <Badge
                                                 variant={order.deliveryStatusColor || "gray"}
-                                                icon={order.deliveryStatusIcon}
+                                                icon={<TruckIcon />}
                                                 className="whitespace-nowrap scale-90"
                                             >
-                                                {order.deliveryStatusLabel || "Não informado"}
+                                                <span className="hidden md:inline">{order.deliveryStatusLabel || "Não informado"}</span>
                                             </Badge>
                                         </>
                                     )}

@@ -310,9 +310,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
 
     return (
-        <div
-            className="w-[150px] md:w-[196px] relative group/card h-full shrink-0"
-        >
+        <div className="w-[200px] md:w-[196px] relative group/card h-full shrink-0">
             <Link
                 href={getProductUrl(product, product.partners)}
                 prefetch={false}
@@ -368,7 +366,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         <UserProfileImage
                             fullName={partner?.store_name || 'Vendedor'}
                             imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
-                            className="w-6 h-6 md:w-8 md:h-8 border border-gray-100 shrink-0 bg-gray-50 mt-0.5"
+                            className="w-8 h-8 border border-gray-100 shrink-0 bg-gray-50"
                         />
                         <div className="flex flex-col min-w-0">
                             <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight">

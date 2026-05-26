@@ -6,7 +6,15 @@ import {
     type SaleReceiptData,
 } from "@/lib/sales/sale-receipt"
 
-const DASH = "-".repeat(42)
+const DASH = "-".repeat(60)
+
+function DashedLine({ className = "my-1" }: { className?: string }) {
+    return (
+        <p className={`text-center overflow-hidden whitespace-nowrap select-none ${className}`}>
+            {DASH}
+        </p>
+    )
+}
 
 type SaleReceiptThermalPreviewProps = {
     data: SaleReceiptData
@@ -50,18 +58,18 @@ export default function SaleReceiptThermalPreview({
                     ) : null}
                 </div>
 
-                <p className="text-center my-1">{DASH}</p>
+                <DashedLine className="my-1" />
 
                 {/* Consumidor + pedido/data */}
                 <p className="text-[10px] mb-1">
                     <span className="font-bold">Consumidor:</span> {data.customerName}
                 </p>
                 <div className="flex justify-between text-[10px] font-bold mb-1">
-                    <span>{data.orderNumber}</span>
+                    <span>Nº DO PEDIDO: {data.orderNumber}</span>
                     <span>{data.saleDateTime}</span>
                 </div>
 
-                <p className="text-center my-1">{DASH}</p>
+                <DashedLine className="my-1" />
 
                 {/* Cabeçalho itens */}
                 <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[8px] font-bold uppercase mb-1">
@@ -70,28 +78,29 @@ export default function SaleReceiptThermalPreview({
                     <span className="text-right">VL UN</span>
                     <span className="text-right">VL ITEM</span>
                 </div>
-                <p className="text-center mb-1">{DASH}</p>
+                <DashedLine className="mb-1" />
 
                 {/* Itens */}
-                <div className="space-y-2 mb-2">
+                <div className="space-y-1 mb-2">
                     {data.items.map((item) => (
-                        <div key={item.index}>
-                            <p className="text-[10px] leading-tight break-words">
+                        <div key={item.index} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px] items-start">
+                            <span className="break-words min-w-0 pr-1">
                                 {String(item.index).padStart(3, "0")} {item.code} {item.description}
-                            </p>
-                            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-1 text-[10px]">
-                                <span />
-                                <span className="text-right">
-                                    {item.quantity} {item.unit}
-                                </span>
-                                <span className="text-right">{formatReceiptAmount(item.unitPrice)}</span>
-                                <span className="text-right font-bold">{formatReceiptAmount(item.totalPrice)}</span>
-                            </div>
+                            </span>
+                            <span className="text-right whitespace-nowrap shrink-0">
+                                {item.quantity} {item.unit}
+                            </span>
+                            <span className="text-right whitespace-nowrap shrink-0 text-gray-700">
+                                {formatReceiptAmount(item.unitPrice)}
+                            </span>
+                            <span className="text-right whitespace-nowrap font-bold shrink-0">
+                                {formatReceiptAmount(item.totalPrice)}
+                            </span>
                         </div>
                     ))}
                 </div>
 
-                <p className="text-center my-1">{DASH}</p>
+                <DashedLine className="my-1" />
 
                 {/* Totais */}
                 <div className="space-y-1">
@@ -129,19 +138,19 @@ export default function SaleReceiptThermalPreview({
                     {data.change > 0.009 && <Row left="Troco" right={formatReceiptAmount(data.change)} />}
                 </div>
 
-                <p className="text-center my-2">{DASH}</p>
+                <DashedLine className="my-2" />
                 <p className="text-[10px] font-bold text-center">Vendedor: {data.sellerName}</p>
 
                 {showAcknowledgment && (
                     <>
-                        <p className="text-center my-2">{DASH}</p>
+                        <DashedLine className="my-2" />
                         <p className="text-[9px] text-center leading-relaxed px-1">{DEFAULT_RECEIPT_ACKNOWLEDGMENT}</p>
-                        <p className="text-center mt-4 mb-1">{DASH}</p>
+                        <DashedLine className="mt-4 mb-1" />
                         <p className="text-[9px] font-bold text-center uppercase tracking-wide">Assinatura do cliente</p>
                     </>
                 )}
 
-                <p className="text-center my-2">{DASH}</p>
+                <DashedLine className="my-2" />
                 <p className="text-[10px] font-bold text-center uppercase tracking-wide">{footerMessage}</p>
             </div>
         </div>

@@ -10,7 +10,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard, Tooltip } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -33,7 +33,8 @@ import {
     CheckCircleIcon,
     DeliveryPickupIcon,
     DeliveryFailedIcon,
-    PartiallyPaidIcon
+    PartiallyPaidIcon,
+    ReturnIcon
 } from "@/lib/icons"
 
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
@@ -810,6 +811,15 @@ export default function OrdersPage({
                                                                             {o.displayId}
                                                                         </h3>
                                                                         <div className="flex gap-1.5 shrink-0 items-center">
+                                                                            {Number(o.returnCount || 0) > 0 && (
+                                                                                <Tooltip text="Possui histórico de trocas/devoluções">
+                                                                                    <Badge variant="gray" icon={<ReturnIcon />} className="h-5 text-[10px] px-1.5 whitespace-nowrap">
+                                                                                        {Number(o.returnCount || 0) > 1 && (
+                                                                                            <span>{o.returnCount}</span>
+                                                                                        )}
+                                                                                    </Badge>
+                                                                                </Tooltip>
+                                                                            )}
                                                                             {o.situation === "cancelled" ? (
                                                                                 <Badge variant="red" className="h-5 text-[10px] px-1.5">
                                                                                     Cancelado

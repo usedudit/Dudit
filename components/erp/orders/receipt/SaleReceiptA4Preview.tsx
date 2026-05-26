@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from "react"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 import {
     DEFAULT_RECEIPT_ACKNOWLEDGMENT,
     type SaleReceiptData,
@@ -161,7 +161,7 @@ const SaleReceiptA4Preview = ({
                                                 <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">
                                                     Data
                                                 </span>
-                                                <span className="font-bold text-sm text-brand-dark">{formatDate(saleDate)}</span>
+                                                <span className="font-bold text-sm text-brand-dark">{saleDate}</span>
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">

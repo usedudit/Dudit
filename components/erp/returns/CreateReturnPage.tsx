@@ -1051,36 +1051,36 @@ export default function CreateReturnPage({
                                             )}
                                             {/* Refund/Exchange status details */}
                                             {selectedOrder && (
-                                                <FormSection hasSeparator title="Request Resolution">
+                                                <FormSection hasSeparator title="Resolução da devolução">
                                                     {mode === "view" ? (
                                                         <div className="space-y-1">
                                                             <PaymentRow label="Data" value={formatDate(returnDate)} />
-                                                            <PaymentRow 
-                                                                label="Status da solicitação" 
+                                                            <PaymentRow
+                                                                label="Status da solicitação"
                                                                 value={
                                                                     <Badge variant={getReturnStatusMeta(returnStatus).variant}>
                                                                         {getReturnStatusMeta(returnStatus).label}
                                                                     </Badge>
-                                                                } 
+                                                                }
                                                             />
-                                                            <PaymentRow 
-                                                                label="Tipo de resolução" 
+                                                            <PaymentRow
+                                                                label="Tipo de resolução"
                                                                 value={
                                                                     resolutionType === "refund" ? "Reembolso" :
-                                                                    resolutionType === "store_credit" ? "Vale-compra" :
-                                                                    resolutionType === "exchange" ? "Troca" :
-                                                                    resolutionType === "rejected" ? "Recusada" : "Sem resolução"
-                                                                } 
+                                                                        resolutionType === "store_credit" ? "Vale-compra" :
+                                                                            resolutionType === "exchange" ? "Troca" :
+                                                                                resolutionType === "rejected" ? "Recusada" : "Sem resolução"
+                                                                }
                                                             />
 
                                                             {resolutionType === "refund" && (
                                                                 <>
-                                                                    <PaymentRow 
-                                                                        label="Tipo de reembolso" 
+                                                                    <PaymentRow
+                                                                        label="Tipo de reembolso"
                                                                         value={
                                                                             refundType === "full" ? "Integral" :
-                                                                            refundType === "partial" ? "Parcial" : "Sem reembolso"
-                                                                        } 
+                                                                                refundType === "partial" ? "Parcial" : "Sem reembolso"
+                                                                        }
                                                                     />
                                                                     <PaymentRow label="Valor do reembolso" value={formatCurrency(refundValue)} />
                                                                 </>
@@ -1088,11 +1088,11 @@ export default function CreateReturnPage({
 
                                                             {resolutionType === "store_credit" && (
                                                                 <>
-                                                                    <PaymentRow 
-                                                                        label="Tipo de crédito" 
+                                                                    <PaymentRow
+                                                                        label="Tipo de crédito"
                                                                         value={
                                                                             creditType === "full" ? "Integral" : "Parcial"
-                                                                        } 
+                                                                        }
                                                                     />
                                                                     <PaymentRow label="Valor do vale-compra" value={formatCurrency(creditValue)} />
                                                                 </>
@@ -1101,8 +1101,8 @@ export default function CreateReturnPage({
                                                             {resolutionType === "exchange" && (
                                                                 <>
                                                                     {replacementItems.length > 0 && (
-                                                                        <PaymentRow 
-                                                                            label="Produtos substitutos" 
+                                                                        <PaymentRow
+                                                                            label="Produtos substitutos"
                                                                             value={
                                                                                 <div className="flex flex-col gap-1 items-end font-normal text-xs text-brand-inactive-text dark:text-dark-body">
                                                                                     {replacementItems.map((item, idx) => (
@@ -1111,29 +1111,29 @@ export default function CreateReturnPage({
                                                                                         </span>
                                                                                     ))}
                                                                                 </div>
-                                                                            } 
+                                                                            }
                                                                         />
                                                                     )}
-                                                                    <PaymentRow 
-                                                                        label="Status da troca" 
+                                                                    <PaymentRow
+                                                                        label="Status da troca"
                                                                         value={
                                                                             exchangeStatus === "pending" ? "Pendente" :
-                                                                            exchangeStatus === "reserved" ? "Reservado" :
-                                                                            exchangeStatus === "sent" ? "Enviado" : "Concluído"
-                                                                        } 
+                                                                                exchangeStatus === "reserved" ? "Reservado" :
+                                                                                    exchangeStatus === "sent" ? "Enviado" : "Concluído"
+                                                                        }
                                                                     />
                                                                     <PaymentRow label="Total dos substitutos" value={formatCurrency(replacementTotal)} />
                                                                     <PaymentRow label="Crédito disponível" value={formatCurrency(calculatedRefundValue)} />
-                                                                    <PaymentRow 
-                                                                        label={exchangeDifference > 0 ? "Diferença a cobrar" : "Saldo restante"} 
-                                                                        value={formatCurrency(exchangeDifference > 0 ? exchangeDifference : exchangeSurplus)} 
+                                                                    <PaymentRow
+                                                                        label={exchangeDifference > 0 ? "Diferença a cobrar" : "Saldo restante"}
+                                                                        value={formatCurrency(exchangeDifference > 0 ? exchangeDifference : exchangeSurplus)}
                                                                     />
                                                                     {exchangeSurplus > 0 && (
-                                                                        <PaymentRow 
-                                                                            label="Destino do saldo" 
+                                                                        <PaymentRow
+                                                                            label="Destino do saldo"
                                                                             value={
                                                                                 exchangeBalanceResolution === "store_credit" ? "Gerar vale-compra" : "Gerar reembolso"
-                                                                            } 
+                                                                            }
                                                                         />
                                                                     )}
                                                                 </>
@@ -1144,9 +1144,9 @@ export default function CreateReturnPage({
                                                                 <span className="font-bold text-2xl tracking-tight text-brand-dark dark:text-dark-heading">
                                                                     {formatCurrency(
                                                                         resolutionType === "refund" ? refundValue :
-                                                                        resolutionType === "store_credit" ? creditValue :
-                                                                        resolutionType === "exchange" ? calculatedRefundValue :
-                                                                        calculatedRefundValue
+                                                                            resolutionType === "store_credit" ? creditValue :
+                                                                                resolutionType === "exchange" ? calculatedRefundValue :
+                                                                                    calculatedRefundValue
                                                                     )}
                                                                 </span>
                                                             </div>

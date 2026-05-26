@@ -2,19 +2,18 @@
 
 import { useState, useCallback } from 'react';
 import {
-    MapPinIcon,
     ChevronRightIcon,
     CreditCardIcon,
-    TruckIcon,
     XIcon,
     CheckCircleIcon,
     ClockIcon,
     AlertCircleIcon,
     ChevronDownIcon,
-    ChevronUpIcon
+    ChevronUpIcon,
+    ReturnIcon
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tooltip, Badge } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
@@ -372,12 +371,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <div className="flex items-center gap-2 mb-4 flex-wrap text-sm text-brand-inactive-text">
                                     Realizado em {dateStrFull}
                                     {returnHistoryCount > 0 && (
-                                        <span
-                                            className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
-                                            title="Possui histórico de trocas/devoluções"
-                                        >
-                                            ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                        </span>
+                                        <Tooltip text="Possui histórico de trocas/devoluções">
+                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                                {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                            </Badge>
+                                        </Tooltip>
                                     )}
                                 </div>
                                 <p className="text-brand-dark dark:text-dark-body text-sm">
@@ -519,9 +517,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <div className="flex items-center gap-2 mb-4 flex-wrap text-sm text-brand-inactive-text">
                                     Realizado em {dateStrFull}
                                     {returnHistoryCount > 0 && (
-                                        <span className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading">
-                                            ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                        </span>
+                                        <Tooltip text="Possui histórico de trocas/devoluções">
+                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                                {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                            </Badge>
+                                        </Tooltip>
                                     )}
                                 </div>
                                 <div className="border-t border-brand-border/40 dark:border-dark-border/40 my-4"></div>
@@ -740,10 +740,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </div>
                         </div>
                     </div>
+                </div>
             </div>
-        </div>
 
-        <AnimatePresence>
+            <AnimatePresence>
                 {isShippingModalOpen && (
                     <ShippingDetailsModal isOpen={isShippingModalOpen} onClose={() => setIsShippingModalOpen(false)} order={order} />
                 )}

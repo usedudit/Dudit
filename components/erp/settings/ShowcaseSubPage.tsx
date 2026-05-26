@@ -1,7 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useRef, useTransition, useMemo, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import React, { useState, useCallback, useRef, useTransition, useMemo } from "react"
 import {
     Button,
     RadioButton,
@@ -9,11 +8,13 @@ import {
     Spinner,
     AlertModal,
     SavingStatusModal,
+    FormSection,
 } from "@/components/reusable"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
-import { ChevronLeftIcon, SaveIcon, Store } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, TrashIcon, PlusIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { usePermissions } from "@/lib/permission-context"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -32,6 +33,7 @@ export const ShowcaseSubPage = ({
     const [isLoading, setIsLoading] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const { planSlug } = usePermissions()
 
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
@@ -41,6 +43,7 @@ export const ShowcaseSubPage = ({
         storeImageUrl: partner.store_image_url || "",
         bannerUrl: partner.banner_url || "",
         isShowcaseActive: partner.is_showcase_active ?? true,
+        gallery: partner.gallery || [],
     })
 
     const [initialState, setInitialState] = useState(() => ({
@@ -69,6 +72,41 @@ export const ShowcaseSubPage = ({
     const [bannerUploading, setBannerUploading] = useState(false)
     const bannerInputRef = useRef<HTMLInputElement>(null)
 
+    // Gallery upload states
+    const [galleryCropModalOpen, setGalleryCropModalOpen] = useState(false)
+    const [tempGalleryImageFile, setTempGalleryImageFile] = useState<File | null>(null)
+    const galleryFileInputRef = useRef<HTMLInputElement>(null)
+
+    const planLimits = {
+        free: 1,
+        crescer: 5,
+        escalar: 10
+    }
+    const limit = planLimits[planSlug as 'free' | 'crescer' | 'escalar'] || 1
+
+    const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        e.currentTarget.value = ""
+        if (!file) return
+        if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB por imagem")
+        setTempGalleryImageFile(file)
+        setGalleryCropModalOpen(true)
+    }
+
+    const handleGalleryCropComplete = (croppedBase64: string) => {
+        if (generalInfo.gallery.length >= limit) {
+            notifyError(`Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.`)
+            return
+        }
+        setGeneralInfo((p: any) => ({ ...p, gallery: [...p.gallery, croppedBase64] }))
+        setGalleryCropModalOpen(false)
+        setTempGalleryImageFile(null)
+    }
+
+    const handleRemoveGalleryImage = (indexToRemove: number) => {
+        setGeneralInfo((p: any) => ({ ...p, gallery: p.gallery.filter((_: any, i: number) => i !== indexToRemove) }))
+    }
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
 
@@ -76,6 +114,7 @@ export const ShowcaseSubPage = ({
         startTransition(async () => {
             let finalLogoUrl = generalInfo.storeImageUrl
             let finalBannerUrl = generalInfo.bannerUrl
+            const finalGalleryUrls = [...generalInfo.gallery]
 
             // 1. Upload logo if it's base64/blob
             if (finalLogoUrl && finalLogoUrl.startsWith("data:")) {
@@ -123,6 +162,42 @@ export const ShowcaseSubPage = ({
                 } finally { setBannerUploading(false) }
             }
 
+            // 3. Upload gallery images if they are base64/blob
+            let galleryUploadingError = false
+            for (let i = 0; i < finalGalleryUrls.length; i++) {
+                const img = finalGalleryUrls[i]
+                if (img.startsWith("data:")) {
+                    try {
+                        const blob = await (await fetch(img)).blob()
+                        const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
+                        const file = new File([blob], `gallery-image-${Date.now()}-${i}.${ext}`, { type: blob.type })
+                        const formData = new FormData()
+                        formData.append("file", file)
+                        const res = await fetchWithCSRF("/api/upload-image?uploadType=products", {
+                            method: "POST",
+                            body: formData
+                        })
+                        const data = await res.json()
+                        if (data.success && data.key) {
+                            finalGalleryUrls[i] = data.key
+                        } else {
+                            notifyError(data.error || "Erro no upload de imagem da galeria")
+                            galleryUploadingError = true
+                            break
+                        }
+                    } catch {
+                        notifyError("Erro no upload de imagem da galeria")
+                        galleryUploadingError = true
+                        break
+                    }
+                }
+            }
+
+            if (galleryUploadingError) {
+                setIsLoading(false)
+                return
+            }
+
             try {
                 const result = await updatePartnerAction(partner.id, {
                     storeImageUrl: finalLogoUrl || null,
@@ -130,6 +205,7 @@ export const ShowcaseSubPage = ({
                     bannerUrl: finalBannerUrl || null,
                     bannerModerationStatus: (finalBannerUrl && finalBannerUrl !== partner.banner_url) ? 'pending_moderation' : undefined,
                     isShowcaseActive: generalInfo.isShowcaseActive,
+                    gallery: finalGalleryUrls,
                     userId: partner.user_id,
                 })
 
@@ -143,6 +219,7 @@ export const ShowcaseSubPage = ({
                             storeImageUrl: finalLogoUrl || "",
                             bannerUrl: finalBannerUrl || "",
                             isShowcaseActive: generalInfo.isShowcaseActive,
+                            gallery: finalGalleryUrls,
                         },
                     })
                     setTimeout(() => {
@@ -196,22 +273,27 @@ export const ShowcaseSubPage = ({
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                            {/* Back button - desktop only */}
+                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                 <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
-                                <div className="flex flex-col">
-                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-2xl flex items-center gap-3">
-                                        Minha Vitrine
+                            </div>
+
+                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="hidden md:inline truncate">Minha Vitrine</span>
                                     </h1>
-                                    <div className="hidden md:block text-brand-inactive-text dark:text-dark-body text-xs font-medium">
-                                        Personalize a logo, banner e status de exibição da sua vitrine
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
+                                        Personalize a logo, banner, galeria e status de exibição da sua vitrine
                                     </div>
                                 </div>
                             </div>
@@ -230,12 +312,12 @@ export const ShowcaseSubPage = ({
                     </div>
 
                     {/* Content Body */}
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        <div className="grid grid-cols-12 gap-6 lg:gap-8">
-                            <div className="col-span-12 lg:col-span-8 space-y-8">
+                    <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
+                        <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
+                            {/* Main Content (Left Column) */}
+                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
                                 {/* Status da Vitrine */}
-                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Status da Vitrine</h3>
+                                <FormSection title="Status da Vitrine">
                                     <div className="grid gap-3">
                                         <ListItem
                                             title="Vitrine Ativa"
@@ -254,11 +336,10 @@ export const ShowcaseSubPage = ({
                                             className="py-4 px-6 gap-4 cursor-pointer"
                                         />
                                     </div>
-                                </div>
+                                </FormSection>
 
                                 {/* Banner da Vitrine */}
-                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Banner da Vitrine</h3>
+                                <FormSection hasSeparator title="Banner da Vitrine">
                                     <div className="relative group overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border aspect-[1300/300] bg-brand-gray dark:bg-dark-background flex items-center justify-center">
                                         {bannerPreview ? (
                                             <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
@@ -288,15 +369,64 @@ export const ShowcaseSubPage = ({
                                     </div>
                                     <p className="mt-3 text-xs text-brand-inactive-text dark:text-dark-body">Tamanho recomendado: 1300x300px. Máximo 3MB.</p>
                                     <input ref={bannerInputRef} type="file" hidden accept="image/*" onChange={handleBannerChange} />
-                                </div>
+                                </FormSection>
+
+                                {/* Galeria de Fotos */}
+                                <FormSection hasSeparator title="Galeria de Fotos">
+                                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-4">
+                                        Adicione fotos do seu estabelecimento, equipe ou produtos (Limite do plano: {limit} foto(s)).
+                                    </p>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {generalInfo.gallery.map((img: string, idx: number) => {
+                                            const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img)
+                                            return (
+                                                <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray group shadow-sm">
+                                                    <img
+                                                        src={srcUrl}
+                                                        alt={`Galeria ${idx + 1}`}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
+                                                        <Button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveGalleryImage(idx);
+                                                            }}
+                                                            className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white p-0 flex items-center justify-center shadow-lg transition-transform hover:scale-110 border-none"
+                                                            title="Remover imagem"
+                                                        >
+                                                            <TrashIcon size={18} />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+
+                                        {generalInfo.gallery.length < limit && (
+                                            <div
+                                                onClick={() => galleryFileInputRef.current?.click()}
+                                                className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-300 hover:border-brand-green dark:border-white/10 dark:hover:border-brand-green flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-brand-green/[0.02] h-full min-h-[120px]"
+                                            >
+                                                <PlusIcon size={24} className="text-brand-inactive-text hover:text-brand-green transition-colors mb-2" />
+                                                <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">Adicionar foto</span>
+                                                <span className="text-[11px] text-brand-inactive-text mt-1">{generalInfo.gallery.length} de {limit}</span>
+                                                <input
+                                                    ref={galleryFileInputRef}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    hidden
+                                                    onChange={handleGalleryFileChange}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </FormSection>
                             </div>
 
-                            <div className="col-span-12 lg:col-span-4">
+                            {/* Sidebar (Right Column) */}
+                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
                                 {/* Logo do Negócio */}
-                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Logo do Negócio</h3>
-
+                                <FormSection title="Logo do Negócio">
                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                         <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                             {imagePreview ? (
@@ -319,7 +449,7 @@ export const ShowcaseSubPage = ({
                                         </div>
                                         <input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleImageChange} />
                                     </div>
-                                </div>
+                                </FormSection>
                             </div>
                         </div>
                     </div>
@@ -373,6 +503,17 @@ export const ShowcaseSubPage = ({
                 imageFile={tempBannerFile}
                 onCropComplete={handleBannerCropComplete}
                 aspectRatio={1300 / 300}
+            />
+
+            <ImageCropperModal
+                isOpen={galleryCropModalOpen}
+                onClose={() => {
+                    setGalleryCropModalOpen(false)
+                    setTempGalleryImageFile(null)
+                }}
+                imageFile={tempGalleryImageFile}
+                onCropComplete={handleGalleryCropComplete}
+                aspectRatio={1}
             />
         </FadeIn>
     )

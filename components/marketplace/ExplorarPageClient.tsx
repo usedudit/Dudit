@@ -4,20 +4,20 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard } from "./shared-components"
-import { IconPlaceholder, Button, DefaultModal } from "@/components/reusable"
+import { IconPlaceholder, Button, DefaultModal, RadioButton } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
-import { 
-    ChevronLeft, 
-    ChevronRight, 
-    SlidersHorizontal, 
-    MapPin, 
-    X, 
-    Tag, 
-    Star, 
-    ArrowUpDown, 
+import {
+    ChevronLeft,
+    ChevronRight,
+    SlidersHorizontal,
+    MapPin,
+    X,
+    Tag,
+    Star,
+    ArrowUpDown,
     Check,
     Search
 } from "lucide-react"
@@ -42,35 +42,46 @@ interface ExplorarPageClientProps {
 type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
-  "casa-e-utilidades": "Casa & Utilidades",
-  "moda-e-beleza": "Moda & Beleza",
-  "saude-e-bem-estar": "Saúde & Bem-estar",
-  "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
-  "auto-e-moto": "Auto & Moto",
-  "pets": "Pets",
-  "construcao-e-ferramentas": "Construção & Ferramentas",
-  "agro-e-jardim": "Agro & Jardim",
-  "infantil-e-brinquedos": "Infantil & Brinquedos"
+    "casa-e-utilidades": "Casa & Utilidades",
+    "moda-e-beleza": "Moda & Beleza",
+    "saude-e-bem-estar": "Saúde & Bem-estar",
+    "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
+    "auto-e-moto": "Auto & Moto",
+    "pets": "Pets",
+    "construcao-e-ferramentas": "Construção & Ferramentas",
+    "agro-e-jardim": "Agro & Jardim",
+    "infantil-e-brinquedos": "Infantil & Brinquedos"
 }
 
+const CATEGORY_COLORS = [
+    { bg: "bg-[#FFEFE5]", circle: "bg-[#FFDCC8]" }, // Peach
+    { bg: "bg-[#ECFDF5]", circle: "bg-[#A7F3D0]" }, // Green
+    { bg: "bg-[#EFF6FF]", circle: "bg-[#DBEAFE]" }, // Blue
+    { bg: "bg-[#F3E8FF]", circle: "bg-[#E9D5FF]" }, // Purple
+    { bg: "bg-[#FFF1F2]", circle: "bg-[#FFE4E6]" }, // Rose
+    { bg: "bg-[#FEF3C7]", circle: "bg-[#FDE68A]" }, // Yellow
+    { bg: "bg-[#E0F2FE]", circle: "bg-[#BAE6FD]" }, // Sky
+    { bg: "bg-[#F0FDF4]", circle: "bg-[#DCFCE7]" }  // Emerald
+]
+
 const FALLBACK_CATEGORIES = [
-  { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
-  { name: "Moda & Beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
-  { name: "Saúde & Bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
-  { name: "Tecnologia & Eletrônicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
-  { name: "Auto & Moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
-  { name: "Pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
-  { name: "Construção & Ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
-  { name: "Agro & Jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
-  { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
+    { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
+    { name: "Moda & Beleza", icon_url: "https://img.dudit.com.br/static/categories/products/Moda-e-beleza.png" },
+    { name: "Saúde & Bem-estar", icon_url: "https://img.dudit.com.br/static/categories/products/Saude-e-bem-estar.png" },
+    { name: "Tecnologia & Eletrônicos", icon_url: "https://img.dudit.com.br/static/categories/products/Tecnologia-e-eletronicos.png" },
+    { name: "Auto & Moto", icon_url: "https://img.dudit.com.br/static/categories/products/Auto-e-moto.png" },
+    { name: "Pets", icon_url: "https://img.dudit.com.br/static/categories/products/Pets.png" },
+    { name: "Construção & Ferramentas", icon_url: "https://img.dudit.com.br/static/categories/products/Construcao-e-ferramentas.png" },
+    { name: "Agro & Jardim", icon_url: "https://img.dudit.com.br/static/categories/products/Agro-e-jardim.png" },
+    { name: "Infantil & Brinquedos", icon_url: "https://img.dudit.com.br/static/categories/products/Infantil-e-brinquedos.png" }
 ]
 
 function formatCitySlug(slug: string | null) {
-  if (!slug) return ""
-  const parts = slug.split("-")
-  const state = parts.pop()?.toUpperCase() || ""
-  const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
-  return `${city} - ${state}`
+    if (!slug) return ""
+    const parts = slug.split("-")
+    const state = parts.pop()?.toUpperCase() || ""
+    const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
+    return `${city} - ${state}`
 }
 
 const ExploreContentSkeleton = ({ type }: { type: string }) => {
@@ -125,16 +136,16 @@ const ExploreContentSkeleton = ({ type }: { type: string }) => {
 }
 
 // Reusable Horizontal Carousel with Scroll-Aware Navigation Chevrons
-const HorizontalCarousel = ({ 
-    title, 
-    items, 
-    renderItem, 
-    onSeeAll 
-}: { 
+const HorizontalCarousel = ({
+    title,
+    items,
+    renderItem,
+    onSeeAll
+}: {
     title: string
     items: any[]
     renderItem: (item: any) => React.ReactNode
-    onSeeAll?: () => void 
+    onSeeAll?: () => void
 }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showLeftArrow, setShowLeftArrow] = useState(false)
@@ -154,10 +165,10 @@ const HorizontalCarousel = ({
             checkScroll()
             el.addEventListener("scroll", checkScroll)
             window.addEventListener("resize", checkScroll)
-            
+
             // Recheck after renders
             const timer = setTimeout(checkScroll, 500)
-            
+
             return () => {
                 el.removeEventListener("scroll", checkScroll)
                 window.removeEventListener("resize", checkScroll)
@@ -185,7 +196,7 @@ const HorizontalCarousel = ({
                 <h2 className="text-[18px] lg:text-[22px] font-bold text-brand-dark tracking-wide">{title}</h2>
                 <div className="flex items-center gap-3">
                     {onSeeAll && (
-                        <button 
+                        <button
                             onClick={onSeeAll}
                             className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
                         >
@@ -194,7 +205,7 @@ const HorizontalCarousel = ({
                     )}
                     <div className="flex items-center gap-1.5">
                         {showLeftArrow && (
-                            <button 
+                            <button
                                 onClick={() => scroll('left')}
                                 className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
@@ -202,7 +213,7 @@ const HorizontalCarousel = ({
                             </button>
                         )}
                         {showRightArrow && (
-                            <button 
+                            <button
                                 onClick={() => scroll('right')}
                                 className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
                             >
@@ -213,7 +224,7 @@ const HorizontalCarousel = ({
                 </div>
             </div>
 
-            <div 
+            <div
                 ref={scrollContainerRef}
                 className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -228,15 +239,15 @@ const HorizontalCarousel = ({
     )
 }
 
-export function ExplorarPageClient({ 
-    initialResults = [], 
-    query = '', 
-    type = 'tudo', 
+export function ExplorarPageClient({
+    initialResults = [],
+    query = '',
+    type = 'tudo',
     cidade = '',
     categoria = '',
-    userProfile, 
-    cartCount, 
-    hideHeaderAndFooter 
+    userProfile,
+    cartCount,
+    hideHeaderAndFooter
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -259,14 +270,14 @@ export function ExplorarPageClient({
             }
         })
     }, [])
-    
+
     // Modal states
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
     const [isTypeModalOpen, setIsTypeModalOpen] = useState(false)
     const [isPriceModalOpen, setIsPriceModalOpen] = useState(false)
     const [isCityModalOpen, setIsCityModalOpen] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-    
+
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
 
@@ -291,16 +302,6 @@ export function ExplorarPageClient({
         searchQ: string,
         typeStr: string
     ) => {
-        // If exactly one category is selected, no query is set, and type is 'tudo', use the clean slug layout
-        if (city && categories.length === 1 && !searchQ && typeStr === "tudo") {
-            const catName = categories[0]
-            const slug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === catName)
-            if (slug) {
-                router.push(`/${city}/${slug}`)
-                return
-            }
-        }
-
         const params = new URLSearchParams()
         if (city) params.set("cidade", city)
         if (categories.length > 0) {
@@ -333,7 +334,7 @@ export function ExplorarPageClient({
         const nextCats = urlCat
             ? urlCat.split(",").map(c => CATEGORY_SLUG_MAP[c.toLowerCase()] || c)
             : []
-        const isCatsEqual = selectedCategories.length === nextCats.length && 
+        const isCatsEqual = selectedCategories.length === nextCats.length &&
             selectedCategories.every((val, index) => val === nextCats[index])
         if (!isCatsEqual) {
             setSelectedCategories(nextCats)
@@ -359,7 +360,7 @@ export function ExplorarPageClient({
                 .replace(/[^a-z0-9]+/g, "-")
                 .replace(/(^-|-$)/g, "")
             const userCitySlug = `${normCity}-${userProfile.state.toLowerCase()}`
-            
+
             document.cookie = `dudit_city=${userCitySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
             localStorage.setItem("dudit_city", userCitySlug)
             setSelectedCitySlug(userCitySlug)
@@ -558,8 +559,42 @@ export function ExplorarPageClient({
         if (selectedCategories.length > 0) count++
         if (minPrice || maxPrice) count++
         if (promoOn) count++
+        if (sortBy !== "relevancia") count++
+        if (currentType !== "tudo") count++
         return count
-    }, [selectedCategories, minPrice, maxPrice, promoOn])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType])
+
+    const categoryShowcases = useMemo(() => {
+        if (selectedCategories.length === 0) return []
+        return normalizedInitialResults.filter(
+            r => r.itemType === 'loja' && 
+            selectedCategories.some(cat => {
+                const normItem = (r.category || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                const normTarget = cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                return normItem.includes(normTarget) || normTarget.includes(normItem)
+            })
+        )
+    }, [normalizedInitialResults, selectedCategories])
+
+    const categoryOffers = useMemo(() => {
+        if (selectedCategories.length === 0) return []
+        return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price)
+    }, [filteredResults, selectedCategories])
+
+    const subcategoryGroups = useMemo(() => {
+        if (selectedCategories.length === 0) return []
+        const groups: { [key: string]: any[] } = {}
+        filteredResults.forEach((item) => {
+            const subName = item.subcategoryName || "Outros"
+            if (!groups[subName]) {
+                groups[subName] = []
+            }
+            groups[subName].push(item)
+        })
+        return Object.entries(groups)
+            .map(([name, list]) => ({ name, list }))
+            .filter(g => g.list.length > 0)
+    }, [filteredResults, selectedCategories])
 
     const handleTypeChange = (newType: string) => {
         if (newType === currentType) return
@@ -658,41 +693,43 @@ export function ExplorarPageClient({
                 </div>
 
                 {/* 2. CATEGORIES CIRCULAR SLIDER */}
-                {(currentType === 'tudo' || currentType === 'produtos') && activeCategoriesList.length > 0 && (
-                    <div className="bg-white py-6 border-b border-gray-100">
+                {(currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
+                    <div className="bg-white py-6">
                         <div className="container mx-auto px-4 max-w-[1300px]">
                             <div className="flex gap-6 overflow-x-auto scrollbar-none py-2 px-1">
-                                {activeCategoriesList.map((cat) => {
+                                {activeCategoriesList.map((cat, idx) => {
                                     const isSelected = selectedCategories.includes(cat.name)
+                                    const colors = CATEGORY_COLORS[idx % CATEGORY_COLORS.length]
                                     return (
-                                        <div 
+                                        <div
                                             key={cat.name}
                                             onClick={() => toggleCategory(cat.name)}
-                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 group w-[70px] sm:w-[90px]"
+                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 group w-[90px] sm:w-[110px]"
                                         >
-                                            <div 
-                                                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-50 flex items-center justify-center border select-none ${
-                                                    isSelected 
-                                                        ? "bg-[#ecfdf5] border-brand-green" 
-                                                        : "border-gray-200"
-                                                }`}
+                                            <div
+                                                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-[24px] overflow-hidden flex items-center justify-center border border-transparent select-none transition-all duration-300 ${colors.bg} ${isSelected
+                                                    ? "ring-2 ring-brand-green ring-offset-2 scale-105"
+                                                    : "hover:scale-102 hover:shadow-sm"
+                                                    }`}
                                             >
+                                                {/* Background Circle Watermark */}
+                                                <div className={`absolute -top-3 -left-3 w-14 h-14 sm:w-16 sm:h-16 rounded-full opacity-50 transition-transform duration-500 group-hover:scale-110 ${colors.circle}`} />
+                                                
                                                 {cat.icon_url ? (
-                                                    <img 
-                                                        src={cat.icon_url} 
-                                                        alt={cat.name} 
-                                                        className="w-10 h-10 object-contain select-none" 
+                                                    <img
+                                                        src={cat.icon_url}
+                                                        alt={cat.name}
+                                                        className="w-12 h-12 sm:w-16 sm:h-16 object-contain z-10 select-none transition-transform duration-300 group-hover:scale-105"
                                                     />
                                                 ) : (
-                                                    <span className="text-2xl sm:text-3xl filter drop-shadow-sm select-none">📦</span>
+                                                    <span className="text-3xl sm:text-4xl filter drop-shadow-sm select-none z-10 transition-transform duration-300 group-hover:scale-105">📦</span>
                                                 )}
                                             </div>
-                                            <span 
-                                                className={`text-[11px] sm:text-[12px] font-bold text-center mt-2 leading-tight truncate w-full select-none ${
-                                                    isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
-                                                }`}
+                                            <span
+                                                className={`text-[12px] sm:text-[13px] font-bold text-center mt-2.5 leading-tight truncate w-full select-none transition-colors ${isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
+                                                    }`}
                                             >
-                                                {cat.name.toLowerCase()}
+                                                {cat.name}
                                             </span>
                                         </div>
                                     )
@@ -703,61 +740,54 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 3. FILTERS BAR (NOT STICKY - SCROLLS ALONG WITH THE PAGE) */}
-                <div className="bg-white border-b border-gray-100 py-4">
+                <div className="bg-white py-4">
                     <div className="container mx-auto px-4 max-w-[1300px] flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 flex-1">
-                            
+
                             {/* CITY FILTER CHIP */}
-                            <button 
+                            <button
                                 onClick={() => setIsCityModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                    selectedCitySlug 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
-                                        : "bg-white border-gray-200 text-brand-dark"
-                                }`}
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCitySlug
+                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                    : "bg-white border-gray-200 text-brand-dark"
+                                    }`}
                             >
-                                <MapPin className="w-3.5 h-3.5" />
                                 <span>{selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecione a Cidade"}</span>
                                 <span className="text-[9px] opacity-60">▼</span>
                             </button>
 
                             {/* SORT FILTER CHIP */}
-                            <button 
+                            <button
                                 onClick={() => setIsSortModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                    sortBy !== "relevancia" 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
-                                        : "bg-white border-gray-200 text-brand-dark"
-                                }`}
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${sortBy !== "relevancia"
+                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                    : "bg-white border-gray-200 text-brand-dark"
+                                    }`}
                             >
-                                <ArrowUpDown className="w-3.5 h-3.5" />
                                 <span>Ordenar por: {sortBy === 'relevancia' ? 'Relevância' : sortBy === 'preco_menor' ? 'Menor Preço' : sortBy === 'preco_maior' ? 'Maior Preço' : 'Mais Recentes'}</span>
                                 <span className="text-[9px] opacity-60">▼</span>
                             </button>
 
                             {/* TYPE FILTER CHIP */}
-                            <button 
+                            <button
                                 onClick={() => setIsTypeModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                    currentType !== "tudo" 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
-                                        : "bg-white border-gray-200 text-brand-dark"
-                                }`}
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${currentType !== "tudo"
+                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                    : "bg-white border-gray-200 text-brand-dark"
+                                    }`}
                             >
-                                <SlidersHorizontal className="w-3.5 h-3.5" />
                                 <span>Ver: {currentType === 'tudo' ? 'Tudo' : currentType === 'produtos' ? 'Produtos' : currentType === 'servicos' ? 'Serviços' : 'Lojas'}</span>
                                 <span className="text-[9px] opacity-60">▼</span>
                             </button>
 
                             {/* CATEGORY FILTER CHIP (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
-                            {currentType !== 'tudo' && currentType !== 'produtos' && (
-                                <button 
+                            {currentType === 'servicos' && (
+                                <button
                                     onClick={() => setIsCategoryModalOpen(true)}
-                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                        selectedCategories.length > 0
-                                            ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
-                                            : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCategories.length > 0
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                        : "bg-white border-gray-200 text-brand-dark"
+                                        }`}
                                 >
                                     <span>Categoria</span>
                                     {selectedCategories.length > 0 && <span className="text-[10px] font-extrabold">({selectedCategories.length})</span>}
@@ -766,26 +796,23 @@ export function ExplorarPageClient({
                             )}
 
                             {/* PROMOTION FILTER CHIP */}
-                            <button 
+                            <button
                                 onClick={() => setPromoOn(!promoOn)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                    promoOn 
-                                        ? "bg-brand-green text-white border-brand-green" 
-                                        : "bg-white border-gray-200 text-brand-dark"
-                                }`}
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${promoOn
+                                    ? "bg-brand-green text-white border-brand-green"
+                                    : "bg-white border-gray-200 text-brand-dark"
+                                    }`}
                             >
-                                <Tag className="w-3.5 h-3.5" />
                                 <span>Em Promoção</span>
                             </button>
 
                             {/* PRICE FILTER CHIP */}
-                            <button 
+                            <button
                                 onClick={() => setIsPriceModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${
-                                    minPrice || maxPrice 
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green" 
-                                        : "bg-white border-gray-200 text-brand-dark"
-                                }`}
+                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${minPrice || maxPrice
+                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                    : "bg-white border-gray-200 text-brand-dark"
+                                    }`}
                             >
                                 <span>Preço</span>
                                 {(minPrice || maxPrice) && <span className="font-extrabold text-[10px]">({minPrice ? `≥R$${minPrice}` : ""} {maxPrice ? `≤R$${maxPrice}` : ""})</span>}
@@ -794,18 +821,19 @@ export function ExplorarPageClient({
 
                             {/* CLEAR ALL FILTERS */}
                             {activeFiltersCount > 0 && (
-                                <button 
+                                <button
                                     onClick={() => {
                                         setSelectedCategories([])
                                         setMinPrice("")
                                         setMaxPrice("")
                                         setPromoOn(false)
-                                        updateUrl(selectedCitySlug, [], query, currentType)
+                                        setSortBy("relevancia")
+                                        setCurrentType("tudo")
+                                        updateUrl(selectedCitySlug, [], query, "tudo")
                                     }}
                                     className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-full text-xs font-bold flex items-center gap-1 transition-all duration-200 select-none cursor-pointer"
                                 >
                                     <span>Limpar Filtros</span>
-                                    <X className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
@@ -885,8 +913,8 @@ export function ExplorarPageClient({
                             ) : (
                                 <>
                                     {/* A. VITRINES (LOJAS) RELACIONADAS CAROUSEL (DOORDASH STYLE) */}
-                                    {vitrinesDestaque.length > 0 && (
-                                        <HorizontalCarousel 
+                                    {selectedCategories.length === 0 && vitrinesDestaque.length > 0 && (
+                                        <HorizontalCarousel
                                             title="Lojas e Profissionais Recomendados"
                                             items={vitrinesDestaque}
                                             onSeeAll={() => handleTypeChange('vitrines')}
@@ -895,10 +923,10 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* B. FEED MODE: SHOW CAROUSELS BY CATEGORY FIRST */}
-                                    {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && (
+                                    {selectedCategories.length === 0 && currentType === 'tudo' && categoriesWithProducts.length > 0 && (
                                         <div className="space-y-4">
                                             {categoriesWithProducts.map((catGroup) => (
-                                                <HorizontalCarousel 
+                                                <HorizontalCarousel
                                                     key={catGroup.name}
                                                     title={`${catGroup.name} em destaque`}
                                                     items={catGroup.list}
@@ -914,66 +942,126 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* C. MAIN LISTINGS (GRID OR CAROUSEL FALLBACK) */}
-                                    <div className="mt-8">
-                                        {currentType === 'tudo' && selectedCategories.length === 0 && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
-                                            <h3 className="text-[16px] lg:text-[20px] font-bold text-brand-dark mb-6 opacity-90 tracking-wide border-t border-gray-100 pt-8">
-                                                Outras ofertas incríveis
-                                            </h3>
-                                        )}
+                                    {selectedCategories.length === 0 && (
+                                        <div className="mt-8">
+                                            {currentType === 'tudo' && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
+                                                <h3 className="text-[16px] lg:text-[20px] font-bold text-brand-dark mb-6 opacity-90 tracking-wide border-t border-gray-100 pt-8">
+                                                    Outras ofertas incríveis
+                                                </h3>
+                                            )}
 
-                                        {remainingResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
-                                            <div className="py-12 flex flex-col items-center">
-                                                <IconPlaceholder
-                                                    placeholderType="image"
-                                                    imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                    imageAlt="O Dino revirou tudo e não achou!"
-                                                    title="O Dino revirou tudo e não achou!"
-                                                    subtitle="Ainda não temos parceiros ativos nessa cidade ou com essa combinação de filtros. Que tal mudar de cidade ou limpar os filtros?"
+                                            {remainingResults.length === 0 && vitrinesDestaque.length === 0 && !hasNextPage ? (
+                                                <div className="py-12 flex flex-col items-center">
+                                                    <IconPlaceholder
+                                                        placeholderType="image"
+                                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                        imageAlt="O Dino revirou tudo e não achou!"
+                                                        title="O Dino revirou tudo e não achou!"
+                                                        subtitle="Ainda não temos parceiros ativos nessa cidade ou com essa combinação de filtros. Que tal mudar de cidade ou limpar os filtros?"
+                                                    />
+                                                    {activeFiltersCount > 0 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedCategories([])
+                                                                setMinPrice("")
+                                                                setMaxPrice("")
+                                                                setPromoOn(false)
+                                                                setSortBy("relevancia")
+                                                                setCurrentType("tudo")
+                                                                updateUrl(selectedCitySlug, [], query, "tudo")
+                                                            }}
+                                                            className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
+                                                        >
+                                                            Limpar filtros de busca
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                                    {remainingResults.map((item) => {
+                                                        if (item.itemType === 'loja') {
+                                                            return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
+                                                        }
+                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                            : null
+                                                        return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
+                                                    })}
+
+                                                    {/* INFINITE SCROLL OBSERVER */}
+                                                    {hasNextPage && (
+                                                        <div
+                                                            ref={observerTarget}
+                                                            className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
+                                                        >
+                                                            {isFetchingNextPage ? (
+                                                                <div className="flex flex-col items-center gap-2 animate-pulse">
+                                                                    <SkeletonLoader height={24} width={180} />
+                                                                    <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* D. CATEGORY-SPECIFIC LAYOUT */}
+                                    {selectedCategories.length > 0 && (
+                                        <div className="space-y-8">
+                                            {/* Vendedores da Categoria */}
+                                            {categoryShowcases.length > 0 && (
+                                                <HorizontalCarousel
+                                                    title="Lojas e Vendedores"
+                                                    items={categoryShowcases}
+                                                    renderItem={(item) => <VitrineCard vitrine={item} />}
                                                 />
-                                                {activeFiltersCount > 0 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedCategories([])
-                                                            setMinPrice("")
-                                                            setMaxPrice("")
-                                                            setPromoOn(false)
-                                                            updateUrl(selectedCitySlug, [], query, currentType)
-                                                        }}
-                                                        className="mt-6 px-6 py-2.5 bg-brand-green text-white font-bold rounded-xl text-xs shadow-md hover:bg-brand-dark transition-colors duration-200 select-none cursor-pointer"
-                                                    >
-                                                        Limpar filtros de busca
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                                                {remainingResults.map((item) => {
-                                                    if (item.itemType === 'loja') {
-                                                        return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
-                                                    }
-                                                    const userCoords = userProfile?.latitude && userProfile?.longitude
-                                                        ? { lat: userProfile.latitude, lng: userProfile.longitude }
-                                                        : null
-                                                    return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
-                                                })}
+                                            )}
 
-                                                {/* INFINITE SCROLL OBSERVER */}
-                                                {hasNextPage && (
-                                                    <div
-                                                        ref={observerTarget}
-                                                        className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
-                                                    >
-                                                        {isFetchingNextPage ? (
-                                                            <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                                <SkeletonLoader height={24} width={180} />
-                                                                <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                            {/* Ofertas da Categoria */}
+                                            {categoryOffers.length > 0 && (
+                                                <HorizontalCarousel
+                                                    title="Ofertas da Categoria"
+                                                    items={categoryOffers}
+                                                    renderItem={(item) => {
+                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                            : null
+                                                        return <ItemCard product={item} userCoords={userCoords} />
+                                                    }}
+                                                />
+                                            )}
+
+                                            {/* Seções por Subcategoria */}
+                                            {subcategoryGroups.map((group) => (
+                                                <HorizontalCarousel
+                                                    key={group.name}
+                                                    title={group.name}
+                                                    items={group.list}
+                                                    renderItem={(item) => {
+                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                            : null
+                                                        return <ItemCard product={item} userCoords={userCoords} />
+                                                    }}
+                                                />
+                                            ))}
+
+                                            {/* Nenhuma correspondência nos filtros da categoria */}
+                                            {categoryShowcases.length === 0 && categoryOffers.length === 0 && subcategoryGroups.length === 0 && (
+                                                <div className="py-12 flex flex-col items-center">
+                                                    <IconPlaceholder
+                                                        placeholderType="image"
+                                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                        imageAlt="Nenhum item encontrado nesta categoria"
+                                                        title="Nenhum item encontrado nesta categoria"
+                                                        subtitle="Ainda não temos parceiros ativos nessa cidade para esta categoria."
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </motion.div>
@@ -987,81 +1075,75 @@ export function ExplorarPageClient({
                 ======================================================== */}
 
             {/* 1. SORT MODAL */}
-            <DefaultModal 
-                isOpen={isSortModalOpen} 
-                onClose={() => setIsSortModalOpen(false)} 
-                title="Ordenar por" 
+            <DefaultModal
+                isOpen={isSortModalOpen}
+                onClose={() => setIsSortModalOpen(false)}
+                title="Ordenar por"
                 maxWidth="md"
             >
-                <div className="flex flex-col gap-2 py-2">
+                <div className="flex flex-col gap-1 py-2 px-4">
                     {[
                         { value: "relevancia", label: "Relevância" },
                         { value: "preco_menor", label: "Menor Preço" },
                         { value: "preco_maior", label: "Maior Preço" },
                         { value: "recentes", label: "Mais Recentes" }
-                    ].map((opt) => {
-                        const isSelected = sortBy === opt.value
-                        return (
-                            <button
-                                key={opt.value}
-                                onClick={() => {
-                                    setSortBy(opt.value as any)
-                                    setIsSortModalOpen(false)
-                                }}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
-                            >
-                                <span>{opt.label}</span>
-                                {isSelected && <Check className="w-4 h-4 text-brand-green" />}
-                            </button>
-                        )
-                    })}
+                    ].map((opt) => (
+                        <RadioButton
+                            key={opt.value}
+                            name="sort_option"
+                            value={opt.value}
+                            checked={sortBy === opt.value}
+                            onChange={() => {
+                                setSortBy(opt.value as any)
+                                setIsSortModalOpen(false)
+                            }}
+                            label={opt.label}
+                        />
+                    ))}
                 </div>
             </DefaultModal>
 
             {/* 2. TYPE MODAL */}
-            <DefaultModal 
-                isOpen={isTypeModalOpen} 
-                onClose={() => setIsTypeModalOpen(false)} 
-                title="Tipo de Negócio" 
+            <DefaultModal
+                isOpen={isTypeModalOpen}
+                onClose={() => setIsTypeModalOpen(false)}
+                title="Tipo de Negócio"
                 maxWidth="md"
             >
-                <div className="flex flex-col gap-2 py-2">
+                <div className="flex flex-col gap-1 py-2 px-4">
                     {[
                         { value: "tudo", label: "Ver Tudo" },
                         { value: "produtos", label: "Produtos" },
                         { value: "servicos", label: "Serviços" },
                         { value: "vitrines", label: "Lojas e Vitrines" }
-                    ].map((opt) => {
-                        const isSelected = currentType === opt.value
-                        return (
-                            <button
-                                key={opt.value}
-                                onClick={() => {
-                                    handleTypeChange(opt.value)
-                                    setIsTypeModalOpen(false)
-                                }}
-                                className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark"
-                            >
-                                <span>{opt.label}</span>
-                                {isSelected && <Check className="w-4 h-4 text-brand-green" />}
-                            </button>
-                        )
-                    })}
+                    ].map((opt) => (
+                        <RadioButton
+                            key={opt.value}
+                            name="business_type"
+                            value={opt.value}
+                            checked={currentType === opt.value}
+                            onChange={() => {
+                                handleTypeChange(opt.value)
+                                setIsTypeModalOpen(false)
+                            }}
+                            label={opt.label}
+                        />
+                    ))}
                 </div>
             </DefaultModal>
 
             {/* 3. CITY SELECTOR MODAL */}
-            <DefaultModal 
-                isOpen={isCityModalOpen} 
-                onClose={() => setIsCityModalOpen(false)} 
-                title="📍 Localização" 
+            <DefaultModal
+                isOpen={isCityModalOpen}
+                onClose={() => setIsCityModalOpen(false)}
+                title="📍 Localização"
                 maxWidth="md"
             >
                 <div className="flex flex-col gap-4 py-2 text-brand-dark">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-500">Filtrar vendedores da cidade:</span>
                         {selectedCitySlug && (
-                            <button 
+                            <button
                                 onClick={() => {
                                     handleSelectCity(null)
                                     setIsCityModalOpen(false)
@@ -1072,10 +1154,10 @@ export function ExplorarPageClient({
                             </button>
                         )}
                     </div>
-                    
+
                     <div className="relative flex items-center">
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             placeholder="Buscar cidade... (ex: São Paulo, Bauru)"
                             className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none text-brand-dark"
                             value={citySearchText}
@@ -1097,7 +1179,7 @@ export function ExplorarPageClient({
                     {filteredCitiesSuggestions.length > 0 && (
                         <div className="flex flex-col gap-1 border-t pt-2">
                             {filteredCitiesSuggestions.map((slug) => (
-                                <button 
+                                <button
                                     key={slug}
                                     onClick={() => {
                                         handleSelectCity(slug)
@@ -1115,44 +1197,41 @@ export function ExplorarPageClient({
             </DefaultModal>
 
             {/* 4. PRICE MODAL */}
-            <DefaultModal 
-                isOpen={isPriceModalOpen} 
-                onClose={() => setIsPriceModalOpen(false)} 
-                title="Filtrar por Preço" 
+            <DefaultModal
+                isOpen={isPriceModalOpen}
+                onClose={() => setIsPriceModalOpen(false)}
+                title="Filtrar por Preço"
                 maxWidth="sm"
                 footer={
-                    <div className="flex items-center justify-between w-full border-t pt-4">
-                        <button 
+                    <div className="flex items-center justify-end w-full pt-4 gap-4">
+                        <Button
+                            variant="outline"
                             onClick={() => {
                                 setMinPrice("")
                                 setMaxPrice("")
                                 setIsPriceModalOpen(false)
                             }}
-                            className="text-xs text-gray-500 font-bold"
                         >
                             Limpar
-                        </button>
-                        <button 
-                            onClick={() => setIsPriceModalOpen(false)}
-                            className="px-4 py-2 border rounded-md text-xs font-bold text-brand-dark"
-                        >
+                        </Button>
+                        <Button onClick={() => setIsPriceModalOpen(false)}>
                             Aplicar
-                        </button>
+                        </Button>
                     </div>
                 }
             >
                 <div className="flex gap-4 py-4 text-brand-dark">
                     <div className="flex-1">
-                        <label className="text-[11px] font-bold text-gray-500 mb-1 block">Preço Mínimo</label>
                         <MoneyInput
+                            label="Preço Mínimo"
                             placeholder="Mínimo"
                             value={minPrice}
                             onChange={(val) => setMinPrice(val || "")}
                         />
                     </div>
                     <div className="flex-1">
-                        <label className="text-[11px] font-bold text-gray-500 mb-1 block">Preço Máximo</label>
                         <MoneyInput
+                            label="Preço Máximo"
                             placeholder="Máximo"
                             value={maxPrice}
                             onChange={(val) => setMaxPrice(val || "")}
@@ -1162,10 +1241,10 @@ export function ExplorarPageClient({
             </DefaultModal>
 
             {/* 5. CATEGORY MODAL (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
-            <DefaultModal 
-                isOpen={isCategoryModalOpen} 
-                onClose={() => setIsCategoryModalOpen(false)} 
-                title="Filtrar por Categoria" 
+            <DefaultModal
+                isOpen={isCategoryModalOpen}
+                onClose={() => setIsCategoryModalOpen(false)}
+                title="Filtrar por Categoria"
                 maxWidth="md"
             >
                 <div className="flex flex-col gap-2 py-2 max-h-[350px] overflow-y-auto pr-1">

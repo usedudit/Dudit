@@ -46,15 +46,15 @@ async function resolvePixKeyFromPartner(
     const supabase = createAdminClient()
     const { data: partner } = await supabase
         .from("partners")
-        .select("cnpj, phone, cpf_encrypted, user_id")
+        .select("cnpj, phone, cpf, user_id")
         .eq("id", partnerId)
         .single()
 
     if (!partner) return null
     if (pixKeyType === "cpf") {
-        if (partner.cpf_encrypted) {
+        if (partner.cpf) {
             try {
-                return await decryptCPF(partner.cpf_encrypted)
+                return await decryptCPF(partner.cpf)
             } catch {
                 return null
             }

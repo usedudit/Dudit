@@ -352,13 +352,14 @@ async function _searchMarketplaceInternal(
                     return {
                         ...rest,
                         category: item.marketplace_category?.name || item.category?.name || null,
+                        subcategoryName: item.subcategory?.name || null,
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
                     }
                 }
 
-                return { ...item, itemType: 'servico', partners: partner }
+                return { ...item, itemType: 'servico', partners: partner, subcategoryName: null }
             }
 
             for (const idx of missingIndices) {
@@ -463,6 +464,7 @@ async function searchMarketplacePostgresFTS(
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
+                subcategory_id, subcategory:marketplace_product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
             `).eq("is_active", true).eq("show_in_marketplace", true)
@@ -487,6 +489,7 @@ async function searchMarketplacePostgresFTS(
                     return {
                         ...rest,
                         category: item.marketplace_category?.name || item.category?.name || null,
+                        subcategoryName: item.category?.name || null,
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
@@ -516,7 +519,7 @@ async function searchMarketplacePostgresFTS(
                         latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                         city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                     } : null
-                    return { ...item, itemType: 'servico', partners: partner }
+                    return { ...item, itemType: 'servico', partners: partner, subcategoryName: item.category || null }
                 }))
             }
         }
@@ -585,6 +588,7 @@ async function searchMarketplaceByCity(
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
+                        subcategory_id, subcategory:marketplace_product_categories!subcategory_id(name),
                         partners!inner(
                             id, store_name, store_image_url, latitude, longitude,
                             addresses!inner(city, state)
@@ -663,6 +667,7 @@ async function searchMarketplaceByCity(
         return {
             ...rest,
             category: item.marketplace_category?.name || item.category?.name || null,
+            subcategoryName: item.subcategory?.name || null,
             itemType: 'produto',
             partners: partner,
             ...variantFallback
@@ -679,7 +684,7 @@ async function searchMarketplaceByCity(
             city: rawPartner.addresses?.[0]?.city || null,
             state: rawPartner.addresses?.[0]?.state || null
         } : null
-        return { ...item, itemType: 'servico', partners: partner }
+        return { ...item, itemType: 'servico', partners: partner, subcategoryName: item.category || null }
     })
 
     // Combine

@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/reusable"
+import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -52,16 +53,6 @@ export const IntegrationCard = ({
 )
 
 // ─── Mercado Pago icon ────────────────────────────────────────────────────────
-
-export const MercadoPagoIcon = () => (
-    <svg viewBox="0 0 48 48" width="24" height="24" fill="none" aria-hidden="true">
-        <circle cx="24" cy="24" r="24" fill="white" fillOpacity="0.2" />
-        <path
-            d="M24 10C16.268 10 10 16.268 10 24c0 7.732 6.268 14 14 14 7.732 0 14-6.268 14-14 0-7.732-6.268-14-14-14zm6.5 16.5h-5v5h-3v-5h-5v-3h5v-5h3v5h5v3z"
-            fill="white"
-        />
-    </svg>
-)
 
 export const IntegrationsSubPage = ({
     partner,
@@ -174,11 +165,11 @@ export const IntegrationsSubPage = ({
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                             {/* Back button - desktop only */}
@@ -188,14 +179,12 @@ export const IntegrationsSubPage = ({
                                 </Button>
                             </div>
 
-                            {/* Title row */}
-                            <div className="hidden md:flex items-start justify-between">
+                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="truncate">Dados do Negócio</span>
+                                    <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="hidden md:inline truncate">Integrações</span>
                                     </h1>
-
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
                                         Conecte seu negócio com ferramentas externas e meios de pagamento.
                                     </div>
                                 </div>
@@ -223,24 +212,68 @@ export const IntegrationsSubPage = ({
 
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Pagamentos</h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <IntegrationCard
-                                name="Mercado Pago"
-                                description="Conecte sua conta para receber pagamentos online com split automático. Aceite cartões, PIX e boleto."
-                                status={mpConnected ? "connected" : "disconnected"}
-                                colorClass="bg-blue-500"
-                                icon={MercadoPagoIcon}
-                            >
-                                {mpConnected ? (
-                                    <Button variant="destructive" onClick={handleDisconnect} isLoading={isLoading}>
-                                        Desconectar Mercado Pago
-                                    </Button>
-                                ) : (
-                                    <Button onClick={handleConnectClick} className="w-full" isLoading={isCheckingPlan}>
-                                        Conectar com Mercado Pago
-                                    </Button>
-                                )}
-                            </IntegrationCard>
+                        <div className="flex flex-col gap-4">
+                            <ListItem
+                                left={
+                                    <img
+                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                        alt="Mercado Pago"
+                                        className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                    />
+                                }
+                                title={
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg leading-none">Mercado Pago</span>
+                                            {mpConnected ? (
+                                                <Badge variant="green">Conectado</Badge>
+                                            ) : (
+                                                <Badge variant="gray">Desconectado</Badge>
+                                            )}
+                                        </div>
+                                        <a
+                                            href="https://www.mercadopago.com.br"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-brand-blue dark:text-blue-400 hover:underline w-max mt-1 font-medium"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            mercadopago.com.br
+                                        </a>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2 leading-relaxed whitespace-normal pr-4 font-normal">
+                                            Conecte sua conta para receber pagamentos online com split automático. Aceite cartões, PIX e boleto.
+                                        </p>
+                                    </div>
+                                }
+                                titleClassName="!whitespace-normal !overflow-visible !truncate-none"
+                                right={
+                                    <div className="flex items-center gap-4 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                                        <Button
+                                            variant="outline"
+                                            className="h-9 px-4 text-xs font-semibold rounded-xl"
+                                            onClick={() => {
+                                                setKnowMoreStep(0)
+                                                setActiveModal("knowMore")
+                                            }}
+                                        >
+                                            Saber mais
+                                        </Button>
+                                        <Switch
+                                            checked={mpConnected}
+                                            onCheckedChange={(checked) => {
+                                                if (isLoading || isCheckingPlan) return
+                                                if (checked) {
+                                                    handleConnectClick()
+                                                } else {
+                                                    handleDisconnect()
+                                                }
+                                            }}
+                                            className={isLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
+                                        />
+                                    </div>
+                                }
+                                className="!border-none !shadow-none !bg-transparent !p-0 !cursor-default hover:!bg-transparent hover:!border-none flex items-start gap-4"
+                            />
                         </div>
                     </div>
                 </div>
@@ -273,7 +306,7 @@ export const IntegrationsSubPage = ({
                         </div>
 
                         <div className="px-2 text-center md:text-left">
-                            <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-6 leading-relaxed">
+                            <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-2 leading-relaxed">
                                 Venda de forma profissional aceitando as principais formas de pagamento do mercado com integração automática.
                             </p>
 
@@ -283,17 +316,17 @@ export const IntegrationsSubPage = ({
                                     setKnowMoreStep(0)
                                     setActiveModal("knowMore")
                                 }}
-                                className="flex items-center gap-2"
+                                className="flex items-center gap-2 mb-4 px-0"
                             >
-                                <InfoIcon size={14} className="ml-1" />
+                                <InfoIcon size={14} />
                                 Saber mais sobre essa integração
                             </Button>
 
                             <div className="flex flex-col md:flex-row gap-3">
-                                <Button variant="outline" className="flex-1 h-12" onClick={() => setActiveModal(null)}>
+                                <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setActiveModal(null)}>
                                     Cancelar
                                 </Button>
-                                <Button className="flex-1 h-12" onClick={() => setActiveModal("permissions")}>
+                                <Button className="flex-1 h-[46px]" onClick={() => setActiveModal("permissions")}>
                                     Conectar agora
                                 </Button>
                             </div>
@@ -342,7 +375,7 @@ export const IntegrationsSubPage = ({
                                     </h3>
 
                                     {KNOW_MORE_STEPS[knowMoreStep].description && (
-                                        <p className="text-[16px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
+                                        <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
                                             {KNOW_MORE_STEPS[knowMoreStep].description}
                                         </p>
                                     )}
@@ -350,8 +383,8 @@ export const IntegrationsSubPage = ({
                                     {KNOW_MORE_STEPS[knowMoreStep].list && (
                                         <ul className="space-y-4 mt-6">
                                             {KNOW_MORE_STEPS[knowMoreStep].list.map((item, i) => (
-                                                <li key={i} className="flex items-start gap-3 text-[15px] text-brand-dark dark:text-dark-heading font-medium">
-                                                    <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-green/10 text-brand-green text-[8px]">
+                                                <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md">
                                                         ●
                                                     </span>
                                                     {item}
@@ -367,21 +400,21 @@ export const IntegrationsSubPage = ({
                                     variant="outline"
                                     disabled={knowMoreStep === 0}
                                     onClick={() => setKnowMoreStep(prev => prev - 1)}
-                                    className="flex-1 h-12"
+                                    className="flex-1 h-[46px]"
                                 >
                                     Anterior
                                 </Button>
 
                                 {knowMoreStep === KNOW_MORE_STEPS.length - 1 ? (
                                     <Button
-                                        className="flex-1 h-12"
+                                        className="flex-1 h-[46px]"
                                         onClick={() => setActiveModal("info")}
                                     >
                                         Entendido
                                     </Button>
                                 ) : (
                                     <Button
-                                        className="flex-1 h-12"
+                                        className="flex-1 h-[46px]"
                                         onClick={() => setKnowMoreStep(prev => prev + 1)}
                                     >
                                         Próximo
@@ -457,11 +490,11 @@ export const IntegrationsSubPage = ({
                             </div>
 
                             <div className="flex flex-col-reverse md:flex-row gap-3">
-                                <Button variant="outline" className="flex-1 h-12" onClick={() => setActiveModal("info")}>
+                                <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setActiveModal("info")}>
                                     Cancelar
                                 </Button>
                                 <Button
-                                    className="flex-1 h-12"
+                                    className="flex-1 h-[46px]"
                                     onClick={handleStartOAuth}
                                     isLoading={isLoading}
                                 >

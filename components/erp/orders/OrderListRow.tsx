@@ -2,9 +2,9 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon } from "@/lib/icons"
+import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon } from "@/lib/icons"
 
 interface ColumnDef {
     id: string
@@ -87,12 +87,11 @@ const OrderListItem = React.memo(
                                         {order.displayId}
                                     </span>
                                     {Number(order.returnCount || 0) > 0 && (
-                                        <span
-                                            className="inline-flex shrink-0 items-center rounded-full border border-brand-border px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:text-dark-heading"
-                                            title="Possui histórico de trocas/devoluções"
-                                        >
-                                            ↩{Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
-                                        </span>
+                                        <Tooltip text="Possui histórico de trocas/devoluções">
+                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                                {Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
+                                            </Badge>
+                                        </Tooltip>
                                     )}
                                 </div>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
