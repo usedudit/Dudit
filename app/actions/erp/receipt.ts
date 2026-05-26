@@ -7,6 +7,7 @@ import {
     buildPartnerTaxIdLine,
     type SaleReceiptPartnerHeader,
 } from "@/lib/sales/sale-receipt"
+import { decryptCPF } from "@/lib/crypto"
 
 export async function getPartnerReceiptHeaderAction(partnerId: string) {
     try {
@@ -22,7 +23,7 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
                 supabase
                     .from("partners")
                     .select(
-                        "store_name, store_description, cnpj, cpf, inscricao_estadual, inscricao_municipal, ie_isento, street, number, complement, neighborhood, city, state, zip_code",
+                        "store_name, store_description, cnpj, cpf_encrypted, inscricao_estadual, inscricao_municipal, ie_isento",
                     )
                     .eq("id", partnerId)
                     .maybeSingle(),
@@ -40,7 +41,7 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
         }
         if (!partner) return errorResponse("Parceiro não encontrado")
 
-        const addr = address || partner
+        const addr = address || {}
         const addressParts = [
             [addr.street, addr.number].filter(Boolean).join(" "),
             addr.neighborhood,
@@ -48,13 +49,22 @@ export async function getPartnerReceiptHeaderAction(partnerId: string) {
             addr.zip_code ? `CEP: ${addr.zip_code}` : null,
         ].filter(Boolean)
 
+        let decryptedCpf: string | null = null
+        if (partner.cpf_encrypted) {
+            try {
+                decryptedCpf = await decryptCPF(partner.cpf_encrypted)
+            } catch (e) {
+                console.error("[getPartnerReceiptHeaderAction] Error decrypting CPF:", e)
+            }
+        }
+
         const header: SaleReceiptPartnerHeader = {
             fantasyName: partner.store_name || "Estabelecimento",
             legalName: partner.store_description || partner.store_name || "Estabelecimento",
             addressLine: addressParts.join(", ") || "Endereço não informado",
             taxIdLine: buildPartnerTaxIdLine({
                 cnpj: partner.cnpj,
-                cpf: partner.cpf,
+                cpf: decryptedCpf,
                 stateRegistration: partner.inscricao_estadual,
                 municipalRegistration: partner.inscricao_municipal,
                 ieIsento: partner.ie_isento,

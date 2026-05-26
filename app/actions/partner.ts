@@ -313,6 +313,19 @@ export async function updatePartnerAction(
   if (data.openingHours !== undefined) updateData.opening_hours = normalizeOpeningHours(data.openingHours)
   if (data.storeImageUrl !== undefined) updateData.store_image_url = data.storeImageUrl
 
+  if ((data as any).gallery !== undefined) {
+    if (!Array.isArray((data as any).gallery)) {
+      return { error: "Formato de galeria inválido" }
+    }
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(partnerId)
+    const limit = plan.slug === "free" ? 1 : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 10 : 10
+    if ((data as any).gallery.length > limit) {
+      return { error: `Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.` }
+    }
+    updateData.gallery = (data as any).gallery
+  }
+
   if (data.offeringType !== undefined) updateData.offering_type = data.offeringType
 
   // Campos de endereço vão para a tabela addresses, não para partners

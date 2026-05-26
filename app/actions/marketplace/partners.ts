@@ -538,6 +538,19 @@ export async function updatePartnerAction(partnerId: string, data: any) {
   if (data.logoModerationStatus !== undefined) updateData.logo_moderation_status = data.logoModerationStatus
   if (data.bannerModerationStatus !== undefined) updateData.banner_moderation_status = data.bannerModerationStatus
 
+  if (data.gallery !== undefined) {
+    if (!Array.isArray(data.gallery)) {
+      return { error: "Formato de galeria inválido" }
+    }
+    const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+    const plan = await getPartnerPlan(partnerId)
+    const limit = plan.slug === "free" ? 1 : plan.slug === "crescer" ? 5 : plan.slug === "escalar" ? 10 : 10
+    if (data.gallery.length > limit) {
+      return { error: `Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.` }
+    }
+    updateData.gallery = data.gallery
+  }
+
   // Handle CPF (Encrypted)
   if (data.cpf !== undefined) {
     const cleanCPF = data.cpf ? data.cpf.replace(/\D/g, "") : null

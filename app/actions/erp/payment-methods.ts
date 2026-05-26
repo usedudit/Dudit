@@ -46,15 +46,15 @@ async function resolvePixKeyFromPartner(
     const supabase = createAdminClient()
     const { data: partner } = await supabase
         .from("partners")
-        .select("cpf, cnpj, email, phone")
+        .select("cnpj, phone, cpf_encrypted, user_id")
         .eq("id", partnerId)
         .single()
 
     if (!partner) return null
     if (pixKeyType === "cpf") {
-        if (partner.cpf) {
+        if (partner.cpf_encrypted) {
             try {
-                return await decryptCPF(partner.cpf)
+                return await decryptCPF(partner.cpf_encrypted)
             } catch {
                 return null
             }
@@ -62,7 +62,14 @@ async function resolvePixKeyFromPartner(
         return null
     }
     if (pixKeyType === "cnpj") return partner.cnpj || null
-    if (pixKeyType === "email") return partner.email || null
+    if (pixKeyType === "email") {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", partner.user_id)
+            .single()
+        return profile?.email || null
+    }
     return partner.phone || null
 }
 

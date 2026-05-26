@@ -16,6 +16,7 @@ import {
   getPartnerStats,
   getPartnerPublicCoupons,
 } from "@/app/actions/marketplace/partners"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 
 // Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
 
@@ -64,7 +65,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
   // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
-  const [user, partner, products, services, reviews, statsBase, coupons] = await Promise.all([
+  const [user, partner, products, services, reviews, statsBase, coupons, plan] = await Promise.all([
     getCurrentUser(),
     getPartnerProfile(id),
     getPartnerProducts(id),
@@ -72,6 +73,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     getPartnerReviews(id),
     getPartnerStats(id),
     getPartnerPublicCoupons(id),
+    getPartnerPlan(id),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
@@ -188,6 +190,8 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     banner_url: partner.banner_url,
     banner_moderation_status: partner.banner_moderation_status || 'approved',
     logo_moderation_status: partner.logo_moderation_status || 'approved',
+    gallery: partner.gallery || [],
+    planSlug: plan?.slug || 'free',
   }
 
   return (

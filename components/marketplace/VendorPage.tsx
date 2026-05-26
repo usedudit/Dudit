@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon } from "@/lib/icons"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -15,11 +15,15 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input } from "@/components/reusable"
+import { Button, DefaultModal, Input, Spinner } from "@/components/reusable"
 import { ItemCard } from "./shared-components"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { usePathname } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { useNotification } from "@/hooks/use-notification"
+import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
+import ImageCropperModal from "@/components/ImageCropperModal"
+import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 
 interface VendorPageClientProps {
     partner: any
@@ -497,12 +501,14 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
 
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")
-    const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info">("products")
+    const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos">("Produtos")
     const [categoryView, setCategoryView] = useState<string | null>(null)
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
-    const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info">("reviews")
+    const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
+    const [gallery, setGallery] = useState<string[]>(() => partner.gallery || [])
+    const [localImages, setLocalImages] = useState<string[]>(() => partner.gallery || [])
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")
     const [isCategorySearchOpen, setIsCategorySearchOpen] = useState(false)
@@ -816,7 +822,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         <div className="mb-8">
                             <h3 className="font-normal text-brand-dark text-[16px] mb-3">Sobre {partner.storeName}</h3>
                             <div className="flex flex-col gap-1">
-                                {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }] as const).map(b => (
+                                {([{ id: "info", label: "Informações" }, { id: "reviews", label: "Avaliações" }, { id: "gallery", label: "Galeria" }] as const).map(b => (
                                     <button key={b.id} onClick={() => setActiveSection(b.id)} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeSection === b.id ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
                                         <span>{b.label}</span>
                                         {activeSection === b.id && <Check size={16} className="ml-auto" />}
@@ -896,6 +902,12 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                 <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
                             </div>
                         )}
+                        {activeSection === "gallery" && (
+                            <div>
+                                <h2 className="text-[24px] font-normal text-brand-dark mb-6">Galeria</h2>
+                                <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
@@ -943,19 +955,232 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                     </div>
                     <div className="sticky top-0 z-40 bg-white border-b border-brand-border mb-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
-                            <TabsList className="justify-center gap-8 bg-transparent">
+                            <TabsList className="justify-center gap-6 bg-transparent">
                                 <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
                                 <TabsTrigger value="info" className="text-[15px] pb-3">Informações</TabsTrigger>
+                                <TabsTrigger value="gallery" className="text-[15px] pb-3">Galeria</TabsTrigger>
                             </TabsList>
                         </Tabs>
                     </div>
                     <div className="px-2 pb-6">
-                        {mobileModalTab === "reviews"
-                            ? <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
-                            : <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />}
+                        {mobileModalTab === "reviews" && (
+                            <ReviewsTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} ratingDistribution={ratingDistribution} reviews={reviews} />
+                        )}
+                        {mobileModalTab === "info" && (
+                            <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} />
+                        )}
+                        {mobileModalTab === "gallery" && (
+                            <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                        )}
                     </div>
                 </div>
             </BottomSheet>
+        </div>
+    )
+}
+
+interface GalleryTabProps {
+    partner: any
+    isStoreOwner: boolean
+    gallery: string[]
+    setGallery: React.Dispatch<React.SetStateAction<string[]>>
+    localImages: string[]
+    setLocalImages: React.Dispatch<React.SetStateAction<string[]>>
+}
+
+function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, setLocalImages }: GalleryTabProps) {
+    const { success: notifySuccess, error: notifyError } = useNotification()
+    const [isSaving, setIsSaving] = useState(false)
+    const [cropModalOpen, setCropModalOpen] = useState(false)
+    const [tempImageFile, setTempImageFile] = useState<File | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [selectedLightboxImage, setSelectedLightboxImage] = useState<string | null>(null)
+
+    const planLimits = {
+        free: 1,
+        crescer: 5,
+        escalar: 10
+    }
+    const limit = planLimits[partner.planSlug as 'free' | 'crescer' | 'escalar'] || 1
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        e.currentTarget.value = ""
+        if (!file) return
+        if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB por imagem")
+        setTempImageFile(file)
+        setCropModalOpen(true)
+    }
+
+    const handleCropComplete = (croppedBase64: string) => {
+        if (localImages.length >= limit) {
+            notifyError(`Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.`)
+            return
+        }
+        setLocalImages(prev => [...prev, croppedBase64])
+        setTempImageFile(null)
+    }
+
+    const handleRemoveImage = (indexToRemove: number) => {
+        setLocalImages(prev => prev.filter((_, i) => i !== indexToRemove))
+    }
+
+    const handleCancel = () => {
+        setLocalImages(gallery)
+    }
+
+    const handleSave = async () => {
+        setIsSaving(true)
+        try {
+            const finalGalleryUrls = [...localImages]
+            for (let i = 0; i < finalGalleryUrls.length; i++) {
+                const img = finalGalleryUrls[i]
+                if (img.startsWith("data:")) {
+                    const blob = await (await fetch(img)).blob()
+                    const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
+                    const file = new File([blob], `gallery-image-${Date.now()}-${i}.${ext}`, { type: blob.type })
+                    const formData = new FormData()
+                    formData.append("file", file)
+                    const res = await fetchWithCSRF("/api/upload-image?uploadType=products", {
+                        method: "POST",
+                        body: formData
+                    })
+                    const data = await res.json()
+                    if (data.success && data.key) {
+                        finalGalleryUrls[i] = data.key
+                    } else {
+                        throw new Error(data.error || "Erro no upload da imagem")
+                    }
+                }
+            }
+
+            const result = await updatePartnerAction(partner.id, {
+                gallery: finalGalleryUrls,
+                userId: partner.userId || partner.user_id,
+            })
+
+            if (result?.error) {
+                notifyError(result.error)
+            } else {
+                notifySuccess("Galeria atualizada com sucesso!")
+                setGallery(finalGalleryUrls)
+            }
+        } catch (err: any) {
+            notifyError(err.message || "Erro ao salvar galeria")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const isDirty = JSON.stringify(localImages) !== JSON.stringify(gallery)
+
+    return (
+        <div className="pb-10 animate-fade-in relative">
+            {localImages.length === 0 && !isStoreOwner ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-inactive-text"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                    </div>
+                    <h3 className="text-md font-semibold text-brand-dark">Galeria de imagens vazia</h3>
+                    <p className="text-[13px] text-brand-inactive-text mt-1">Este vendedor ainda não adicionou fotos ao perfil.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {localImages.map((img, idx) => {
+                        const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img)
+                        return (
+                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray group shadow-sm">
+                                <img
+                                    src={srcUrl}
+                                    alt={`Galeria ${idx + 1}`}
+                                    className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                                    onClick={() => setSelectedLightboxImage(srcUrl)}
+                                />
+                                {isStoreOwner && (
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemoveImage(idx);
+                                            }}
+                                            className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+                                            title="Remover imagem"
+                                        >
+                                            <TrashIcon size={18} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+
+                    {isStoreOwner && localImages.length < limit && (
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-300 hover:border-brand-green dark:border-white/10 dark:hover:border-brand-green flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-brand-green/[0.02]"
+                        >
+                            <PlusIcon size={24} className="text-brand-inactive-text hover:text-brand-green transition-colors mb-2" />
+                            <span className="text-[13px] font-semibold text-brand-dark">Adicionar foto</span>
+                            <span className="text-[11px] text-brand-inactive-text mt-1">{localImages.length} de {limit}</span>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={handleFileChange}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {isStoreOwner && isDirty && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 dark:bg-dark-surface/90 border border-brand-border dark:border-dark-border backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl flex items-center gap-6 animate-slide-up max-w-[90%] md:max-w-md w-full justify-between">
+                    <div className="flex flex-col">
+                        <span className="text-[13px] font-bold text-brand-dark">Alterações pendentes</span>
+                        <span className="text-[11px] text-brand-inactive-text">Galeria modificada ({localImages.length} de {limit})</span>
+                    </div>
+                    <div className="flex gap-2.5">
+                        <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving} className="h-9 px-3">
+                            Descartar
+                        </Button>
+                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-9 px-4 flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-hover text-white border-none">
+                            {isSaving && <Spinner size={14} className="text-white" />}
+                            Salvar
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                onClose={() => {
+                    setCropModalOpen(false)
+                    setTempImageFile(null)
+                }}
+                imageFile={tempImageFile}
+                onCropComplete={handleCropComplete}
+                aspectRatio={1}
+            />
+
+            {selectedLightboxImage && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-fade-in"
+                    onClick={() => setSelectedLightboxImage(null)}
+                >
+                    <button
+                        className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+                        onClick={() => setSelectedLightboxImage(null)}
+                    >
+                        ✕
+                    </button>
+                    <img
+                        src={selectedLightboxImage}
+                        alt="Visualização em tela cheia"
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl selection:bg-transparent"
+                    />
+                </div>
+            )}
         </div>
     )
 }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/icons"
 
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
+import { ShowcaseSubPage } from "./ShowcaseSubPage"
 import { IntegrationsSubPage } from "./IntegrationsSubPage"
 import { TeamSubPage } from "./TeamSubPage"
 import { SubscriptionSubPage } from "./SubscriptionSubPage"
@@ -231,6 +232,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               className="px-4 py-3 gap-4"
                             />
                           )}
+                          {showVitrine && (
+                            <ListItem
+                              icon={Store}
+                              title="Minha Vitrine"
+                              description="Personalize o banner, logo e o status de exibição da sua vitrine online."
+                              onClick={() => setActivePage("vitrine")}
+                              showChevron
+                              className="px-4 py-3 gap-4"
+                            />
+                          )}
                           {!isQuick && canAccessTeam && (
                             <ListItem
                               icon={Users}
@@ -388,7 +399,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} />}
           {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
-          {activePage === "vitrine" && <SimpleSettingsSubPage key="vitrine" title="Minha Vitrine" onBack={() => setActivePage("home")} />}
+          {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
           {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} />}
