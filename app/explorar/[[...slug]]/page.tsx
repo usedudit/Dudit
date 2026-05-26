@@ -18,13 +18,14 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "construcao-e-ferramentas": "Construção & Ferramentas",
     "agro-e-jardim": "Agro & Jardim",
     "infantil-e-brinquedos": "Infantil & Brinquedos",
-    "alimentacao": "Alimentação"
+    "alimentacao": "Alimentação",
+    "outros": "Outros"
 }
 
-export async function generateMetadata({ 
-    params 
-}: { 
-    params: Promise<{ slug?: string[] }> 
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ slug?: string[] }>
 }): Promise<Metadata> {
     return {
         title: "Explorar Produtos e Serviços Perto de Você | Dudit",
@@ -90,7 +91,7 @@ export default async function ExplorarPage({
     )
 
     return (
-        <div className="bg-white min-h-screen font-sans text-[#003d32] flex flex-col pt-[110px] lg:pt-[108px]">
+        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
             <ExplorarPageClient

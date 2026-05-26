@@ -1114,7 +1114,7 @@ export function ProductDetailsPageClient({
                             {/* Technical specs */}
                             {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
                                 <div className="mb-10">
-                                    <h3 className="text-xl font-medium text-brand-dark mb-4">Ficha Técnica</h3>
+                                    <h3 className="text-xl font-medium text-brand-dark mb-4">Especificações</h3>
                                     <div className="border border-brand-border rounded-xl overflow-hidden">
                                         {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
                                             <div key={i} className={`flex justify-between items-center px-4 py-3

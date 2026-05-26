@@ -10,7 +10,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   basic_inventory: "Estoque básico",
   appointments: "Agendamentos",
   quotes: "Orçamentos",
-  technical_specs: "Ficha técnica com campos livres",
+  technical_specs: "Especificações com campos livres",
   pdv_basic: "PDV (Ponto de Venda)",
   whatsapp_orders: "Pedidos via WhatsApp",
   whatsapp_bookings: "Agendamentos via WhatsApp",

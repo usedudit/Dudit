@@ -11,642 +11,640 @@ import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { useNotification } from "@/hooks/use-notification"
 import { createAddressAction } from "@/app/actions/shared/addresses"
 import {
-  Button,
-  Input,
-  CepInput,
-  StateComboBox,
-  NumberInputWithCheckbox,
-  DefaultModal
+    Button,
+    Input,
+    CepInput,
+    StateComboBox,
+    NumberInputWithCheckbox,
+    DefaultModal,
+    IconPlaceholder
 } from "@/components/reusable"
 import citiesData from "@/lib/data/cities.json"
 import { MapPinIcon, XIcon } from "@/lib/icons"
 
 interface MarketplaceHomeProps {
-  products: any[]
-  vitrines?: any[]
-  user?: any
-  userProfile?: any
-  cartCount?: number
-  hideHeaderAndFooter?: boolean
-  selectedCitySlug?: string | null
-  selectedCityName?: string | null
+    products: any[]
+    vitrines?: any[]
+    user?: any
+    userProfile?: any
+    cartCount?: number
+    hideHeaderAndFooter?: boolean
+    selectedCitySlug?: string | null
+    selectedCityName?: string | null
 }
 
 const TRENDS = [
-  "Copos personalizados",
-  "Esculturas",
-  "Presentes de natal",
-  "Bebê reborn",
-  "Tapeçaria",
-  "Terrário",
-  "Papai noel",
+    "Copos personalizados",
+    "Esculturas",
+    "Presentes de natal",
+    "Bebê reborn",
+    "Tapeçaria",
+    "Terrário",
+    "Papai noel",
 ]
 
 export default function MarketplaceHome({
-  products = [],
-  vitrines = [],
-  user,
-  userProfile,
-  cartCount,
-  hideHeaderAndFooter,
-  selectedCitySlug,
-  selectedCityName
+    products = [],
+    vitrines = [],
+    user,
+    userProfile,
+    cartCount,
+    hideHeaderAndFooter,
+    selectedCitySlug,
+    selectedCityName
 }: MarketplaceHomeProps) {
-  const router = useRouter()
-  const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
-  const { success: notifySuccess, error: notifyError } = useNotification()
+    const router = useRouter()
+    const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
+    const { success: notifySuccess, error: notifyError } = useNotification()
 
-  const [activeTrend, setActiveTrend] = useState(TRENDS[0])
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
-  const [isSavingAddress, setIsSavingAddress] = useState(false)
-  const [addressError, setAddressError] = useState<string | null>(null)
+    const [activeTrend, setActiveTrend] = useState(TRENDS[0])
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
+    const [isSavingAddress, setIsSavingAddress] = useState(false)
+    const [addressError, setAddressError] = useState<string | null>(null)
 
-  const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isIpLoading, setIsIpLoading] = useState(false)
+    const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false)
+    const [searchQuery, setSearchQuery] = useState("")
+    const [isIpLoading, setIsIpLoading] = useState(false)
 
-  const [form, setForm] = useState({
-    zipCode: "",
-    street: "",
-    number: "",
-    complement: "",
-    neighborhood: "",
-    city: "",
-    state: "",
-    addressType: "casa",
-    noNumber: false,
-  })
+    const [form, setForm] = useState({
+        zipCode: "",
+        street: "",
+        number: "",
+        complement: "",
+        neighborhood: "",
+        city: "",
+        state: "",
+        addressType: "casa",
+        noNumber: false,
+    })
 
-  const filteredCities = useMemo(() => {
-    if (!searchQuery || searchQuery.trim().length < 2) return []
-    const q = searchQuery
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[-\s]+/g, " ")
-      .trim()
-    return (citiesData as string[])
-      .filter((slug: string) => {
-        const norm = slug
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[-\s]+/g, " ")
-        return norm.includes(q)
-      })
-      .slice(0, 5)
-  }, [searchQuery])
+    const filteredCities = useMemo(() => {
+        if (!searchQuery || searchQuery.trim().length < 2) return []
+        const q = searchQuery
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[-\s]+/g, " ")
+            .trim()
+        return (citiesData as string[])
+            .filter((slug: string) => {
+                const norm = slug
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[-\s]+/g, " ")
+                return norm.includes(q)
+            })
+            .slice(0, 5)
+    }, [searchQuery])
 
-  const formatCitySlugForDisplay = (slug: string): string => {
-    const parts = slug.split("-")
-    const state = parts.pop()?.toUpperCase() || ""
-    const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
-    return `${city} - ${state}`
-  }
+    const formatCitySlugForDisplay = (slug: string): string => {
+        const parts = slug.split("-")
+        const state = parts.pop()?.toUpperCase() || ""
+        const city = parts.join(" ").replace(/\b\w/g, l => l.toUpperCase())
+        return `${city} - ${state}`
+    }
 
-  const handleSelectCitySlug = (slug: string) => {
-    document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-    localStorage.setItem('dudit_city', slug)
-    window.location.href = `/${slug}`
-  }
-
-  const handleIpLocation = async () => {
-    setIsIpLoading(true)
-    try {
-      const res = await fetch("https://ipapi.co/json/")
-      if (!res.ok) throw new Error("Falha ao buscar IP")
-      const data = await res.json()
-      if (data.city && data.region_code) {
-        const cityStr = data.city
-        const stateIso = data.region_code
-        const uf = stateIso.toLowerCase()
-        const formattedCity = cityStr
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '')
-        const slug = `${formattedCity}-${uf}`
-
+    const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
         localStorage.setItem('dudit_city', slug)
         window.location.href = `/${slug}`
-      } else {
-        throw new Error("Dados de IP incompletos")
-      }
-    } catch (err) {
-      console.warn("IP location failed, falling back to navigator geolocation:", err)
-      requestLocation()
-    } finally {
-      setIsIpLoading(false)
-    }
-  }
-
-  // useMemo: Prevent re-computation when activeTrend changes (products don't change)
-  const displayProducts = useMemo(() => products.map((product) => {
-    const images = getProductDisplayImages(product)
-    const basePrice = Number(product.promotional_price || product.price)
-    const price = (!product.promotional_price && product.fallback_variant_price) ? Number(product.fallback_variant_price) : basePrice
-
-    return {
-      id: product.id,
-      name: product.name,
-      price,
-      originalPrice: product.promotional_price ? Number(product.price) : undefined,
-      images,
-      rating: product.rating,
-      reviews: 0,
-      partners: Array.isArray(product.partners) ? product.partners[0] : product.partners,
-    }
-  }), [products])
-
-  const recentProducts = displayProducts.slice(0, 10)
-  const alsoLikeProducts = displayProducts.slice(10, 20)
-
-  const handleAddressFetched = (addr: any) => {
-    setForm(f => ({
-      ...f,
-      street: addr.street || f.street,
-      neighborhood: addr.neighborhood || f.neighborhood,
-      city: addr.city || f.city,
-      state: addr.state || f.state,
-    }))
-  }
-
-  const handleSaveAddress = async () => {
-    const { zipCode, street, number, neighborhood, city, state, addressType, noNumber } = form
-    const finalNumber = noNumber ? "S/N" : number
-    if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-      setAddressError("Preencha todos os campos obrigatórios")
-      return
     }
 
-    setIsSavingAddress(true)
-    setAddressError(null)
+    const handleIpLocation = async () => {
+        setIsIpLoading(true)
+        try {
+            const res = await fetch("https://ipapi.co/json/")
+            if (!res.ok) throw new Error("Falha ao buscar IP")
+            const data = await res.json()
+            if (data.city && data.region_code) {
+                const cityStr = data.city
+                const stateIso = data.region_code
+                const uf = stateIso.toLowerCase()
+                const formattedCity = cityStr
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '')
+                const slug = `${formattedCity}-${uf}`
 
-    try {
-      const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
-      const token = await getCSRFToken()
-
-      const result = await createAddressAction({
-        entityId: user.id,
-        entityType: "user",
-        zipCode,
-        street,
-        number: finalNumber,
-        complement: form.complement,
-        neighborhood,
-        city,
-        state,
-        isDefault: true,
-        addressType,
-        csrf_token: token,
-      })
-
-      if (result.error) {
-        setAddressError(result.error)
-        notifyError("Erro", result.error)
-      } else {
-        notifySuccess("Sucesso", "Endereço cadastrado com sucesso!")
-        setIsAddressModalOpen(false)
-        window.location.reload()
-      }
-    } catch (e: any) {
-      setAddressError("Erro ao cadastrar endereço. Tente novamente.")
-    } finally {
-      setIsSavingAddress(false)
+                document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem('dudit_city', slug)
+                window.location.href = `/${slug}`
+            } else {
+                throw new Error("Dados de IP incompletos")
+            }
+        } catch (err) {
+            console.warn("IP location failed, falling back to navigator geolocation:", err)
+            requestLocation()
+        } finally {
+            setIsIpLoading(false)
+        }
     }
-  }
 
-  const hasNoLocation = !selectedCityName
-  const hasNoProductsOrVitrines = selectedCityName && displayProducts.length === 0 && vitrines.length === 0
+    // useMemo: Prevent re-computation when activeTrend changes (products don't change)
+    const displayProducts = useMemo(() => products.map((product) => {
+        const images = getProductDisplayImages(product)
+        const basePrice = Number(product.promotional_price || product.price)
+        const price = (!product.promotional_price && product.fallback_variant_price) ? Number(product.fallback_variant_price) : basePrice
 
-  const renderMarketingSection = () => (
-    <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto">
-      <div className="mx-auto max-w-[1300px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
-        <div className="flex-1 md:max-w-[500px]">
-          <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight">
-            Pare de trabalhar para pagar comissão. Fique com o lucro.
-          </h1>
-          <p className="font-bold text-gray-800 text-lg mb-4">
-            Chega de dar 20% da sua venda pros aplicativos e depender de algoritmos.
-          </p>
-          <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed">
-            Monte sua vitrine, organize seus clientes e venda direto, de graça. <br /><br />
-            Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
-          </p>
-          <button
-            onClick={() => router.push(user ? "/erp/switch" : "/auth/login?mode=partner")}
-            className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors"
-          >
-            Criar Conta Grátis e Vender Mais
-          </button>
-        </div>
+        return {
+            id: product.id,
+            name: product.name,
+            price,
+            originalPrice: product.promotional_price ? Number(product.price) : undefined,
+            images,
+            rating: product.rating,
+            reviews: 0,
+            partners: Array.isArray(product.partners) ? product.partners[0] : product.partners,
+        }
+    }), [products])
 
-        <div className="flex-1 relative h-[300px] md:h-[400px] w-full mt-8 md:mt-0">
-          <div className="absolute top-0 left-0 w-[55%] md:w-[280px] aspect-[4/3] z-10 shadow-lg rounded-[16px] overflow-hidden border-4 border-white transform -rotate-2">
-            <img src="https://img.elo7.com.br/elo7-assets/Jaque.DbUaCvDP.webp" className="w-full h-full object-cover" alt="Vitrine Local 1" loading="lazy" />
-          </div>
-          <div className="absolute top-[10%] right-0 w-[50%] md:w-[260px] aspect-[3/4] z-20 shadow-xl rounded-[16px] overflow-hidden border-4 border-white transform rotate-3">
-            <img src="https://img.elo7.com.br/elo7-assets/Bolo_2.DbQJb_rC.webp" className="w-full h-full object-cover" alt="Vitrine Local 2" loading="lazy" />
-          </div>
-          <div className="absolute bottom-[-10%] left-[20%] w-[45%] md:w-[240px] aspect-square z-30 shadow-2xl rounded-[16px] overflow-hidden border-4 border-white transform -rotate-6">
-            <img src="https://img.elo7.com.br/elo7-assets/Copo.Ch2n71m8.webp" className="w-full h-full object-cover" alt="Vitrine Local 3" loading="lazy" />
-          </div>
-        </div>
-      </div>
-    </section>
-  )
+    const recentProducts = displayProducts.slice(0, 10)
+    const alsoLikeProducts = displayProducts.slice(10, 20)
 
-  const renderAddressModal = () => {
-    if (!user) return null
+    const handleAddressFetched = (addr: any) => {
+        setForm(f => ({
+            ...f,
+            street: addr.street || f.street,
+            neighborhood: addr.neighborhood || f.neighborhood,
+            city: addr.city || f.city,
+            state: addr.state || f.state,
+        }))
+    }
 
-    return (
-      <DefaultModal
-        isOpen={isAddressModalOpen}
-        onClose={() => setIsAddressModalOpen(false)}
-        title="Cadastrar endereço"
-        maxWidth="md"
-      >
-        <div className="space-y-4 py-2">
-          <div className="flex items-center gap-3 mb-2">
-            {[
-              { value: "casa", label: "Casa" },
-              { value: "trabalho", label: "Trabalho" },
-              { value: "outro", label: "Outro" },
-            ].map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
-                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
-                  ? "bg-brand-green text-white border-brand-green"
-                  : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300"
-                  }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+    const handleSaveAddress = async () => {
+        const { zipCode, street, number, neighborhood, city, state, addressType, noNumber } = form
+        const finalNumber = noNumber ? "S/N" : number
+        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
+            setAddressError("Preencha todos os campos obrigatórios")
+            return
+        }
 
-          <CepInput
-            id="zipCode"
-            name="zipCode"
-            value={form.zipCode}
-            onChange={val => setForm(f => ({ ...f, zipCode: val }))}
-            onAddressFetched={handleAddressFetched}
-          />
+        setIsSavingAddress(true)
+        setAddressError(null)
 
-          <Input
-            label="Rua/Avenida"
-            id="street"
-            name="street"
-            placeholder="Rua, Avenida, etc."
-            value={form.street}
-            onChange={e => setForm(f => ({ ...f, street: e.target.value }))}
-          />
+        try {
+            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
+            const token = await getCSRFToken()
 
-          <div className="grid grid-cols-2 gap-4">
-            <NumberInputWithCheckbox
-              label="Número"
-              number={form.number}
-              noNumber={form.noNumber}
-              onNumberChange={val => setForm(f => ({ ...f, number: val }))}
-              onNoNumberChange={checked => setForm(f => ({ ...f, noNumber: checked, number: checked ? "S/N" : "" }))}
-              placeholder="123"
-            />
-            <Input
-              label="Complemento"
-              id="complement"
-              name="complement"
-              placeholder="Apto, Bloco, etc."
-              value={form.complement}
-              onChange={e => setForm(f => ({ ...f, complement: e.target.value }))}
-            />
-          </div>
+            const result = await createAddressAction({
+                entityId: user.id,
+                entityType: "user",
+                zipCode,
+                street,
+                number: finalNumber,
+                complement: form.complement,
+                neighborhood,
+                city,
+                state,
+                isDefault: true,
+                addressType,
+                csrf_token: token,
+            })
 
-          <Input
-            label="Bairro"
-            id="neighborhood"
-            name="neighborhood"
-            placeholder="Nome do bairro"
-            value={form.neighborhood}
-            onChange={e => setForm(f => ({ ...f, neighborhood: e.target.value }))}
-          />
+            if (result.error) {
+                setAddressError(result.error)
+                notifyError("Erro", result.error)
+            } else {
+                notifySuccess("Sucesso", "Endereço cadastrado com sucesso!")
+                setIsAddressModalOpen(false)
+                window.location.reload()
+            }
+        } catch (e: any) {
+            setAddressError("Erro ao cadastrar endereço. Tente novamente.")
+        } finally {
+            setIsSavingAddress(false)
+        }
+    }
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Cidade"
-              id="city"
-              name="city"
-              placeholder="Nome da cidade"
-              value={form.city}
-              onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-            />
-            <StateComboBox
-              value={form.state}
-              onChange={v => setForm(f => ({ ...f, state: v }))}
-              className="w-full"
-            />
-          </div>
+    const hasNoLocation = !selectedCityName
+    const hasNoProductsOrVitrines = selectedCityName && displayProducts.length === 0 && vitrines.length === 0
 
-          {addressError && (
-            <p className="text-red-500 text-sm font-semibold">{addressError}</p>
-          )}
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              onClick={handleSaveAddress}
-              disabled={isSavingAddress}
-              className="bg-brand-green text-white hover:bg-[#047857]"
-            >
-              {isSavingAddress ? "Salvando..." : "Salvar Endereço"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsAddressModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      </DefaultModal>
-    )
-  }
-
-  const renderVisitorModal = () => {
-    return (
-      <DefaultModal
-        isOpen={isVisitorModalOpen}
-        onClose={() => setIsVisitorModalOpen(false)}
-        maxWidth="md"
-        hideHeader={true}
-      >
-        <div className="flex flex-col relative text-[#003d32]">
-          <button
-            onClick={() => setIsVisitorModalOpen(false)}
-            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-            title="Fechar"
-          >
-            <XIcon size={16} />
-          </button>
-          
-          {/* Header with gradient and mascot */}
-          <div
-            className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
-            style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
-          >
-            <img
-              src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-              alt="Onde você está?"
-              className="w-48 h-auto object-contain transform translate-y-4"
-            />
-          </div>
-
-          <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde você está?</h4>
-          <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
-            Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
-          </p>
-
-          <div className="space-y-4">
-            <div className="relative">
-              <Input
-                label="Digite sua cidade"
-                id="visitorCitySearchHome"
-                name="visitorCitySearchHome"
-                placeholder="Ex: São Paulo, Rio de Janeiro..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {filteredCities.length > 0 && (
-                <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100">
-                  {filteredCities.map((slug) => (
+    const renderMarketingSection = () => (
+        <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto">
+            <div className="mx-auto max-w-[1300px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
+                <div className="flex-1 md:max-w-[500px]">
+                    <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight">
+                        Pare de trabalhar para pagar comissão. Fique com o lucro.
+                    </h1>
+                    <p className="font-bold text-gray-800 text-lg mb-4">
+                        Chega de dar 20% da sua venda pros aplicativos e depender de algoritmos.
+                    </p>
+                    <p className="text-gray-600 text-base md:text-lg mb-8 leading-relaxed">
+                        Monte sua vitrine, organize seus clientes e venda direto, de graça. <br /><br />
+                        Não somos um marketplace mercenário. Aqui não tem taxa e o cliente é seu do começo ao fim.
+                    </p>
                     <button
-                      key={slug}
-                      onClick={() => handleSelectCitySlug(slug)}
-                      className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2"
+                        onClick={() => router.push(user ? "/erp/switch" : "/auth/login?mode=partner")}
+                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors"
                     >
-                      <MapPinIcon size={14} className="text-brand-green shrink-0" />
-                      {formatCitySlugForDisplay(slug)}
+                        Criar Conta Grátis e Vender Mais
                     </button>
-                  ))}
                 </div>
-              )}
+
+                <div className="flex-1 relative h-[300px] md:h-[400px] w-full mt-8 md:mt-0">
+                    <div className="absolute top-0 left-0 w-[55%] md:w-[280px] aspect-[4/3] z-10 shadow-lg rounded-[16px] overflow-hidden border-4 border-white transform -rotate-2">
+                        <img src="https://img.elo7.com.br/elo7-assets/Jaque.DbUaCvDP.webp" className="w-full h-full object-cover" alt="Vitrine Local 1" loading="lazy" />
+                    </div>
+                    <div className="absolute top-[10%] right-0 w-[50%] md:w-[260px] aspect-[3/4] z-20 shadow-xl rounded-[16px] overflow-hidden border-4 border-white transform rotate-3">
+                        <img src="https://img.elo7.com.br/elo7-assets/Bolo_2.DbQJb_rC.webp" className="w-full h-full object-cover" alt="Vitrine Local 2" loading="lazy" />
+                    </div>
+                    <div className="absolute bottom-[-10%] left-[20%] w-[45%] md:w-[240px] aspect-square z-30 shadow-2xl rounded-[16px] overflow-hidden border-4 border-white transform -rotate-6">
+                        <img src="https://img.elo7.com.br/elo7-assets/Copo.Ch2n71m8.webp" className="w-full h-full object-cover" alt="Vitrine Local 3" loading="lazy" />
+                    </div>
+                </div>
             </div>
-
-            <button
-              onClick={handleIpLocation}
-              disabled={isIpLoading || isLocationLoading}
-              className="w-full flex items-center justify-center gap-2 border-2 border-brand-green text-brand-green font-bold py-3 px-4 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 text-sm shadow-sm"
-            >
-              {isIpLoading || isLocationLoading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                  Detectando...
-                </>
-              ) : (
-                <>
-                  <MapPinIcon size={16} className="shrink-0" />
-                  Usar minha localização
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="text-center mt-8 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-400">
-              Já tem uma conta cadastrada com endereço salvo?
-            </p>
-            <button
-              onClick={() => {
-                setIsVisitorModalOpen(false)
-                router.push("/auth/login")
-              }}
-              className="text-brand-green font-bold text-sm hover:underline mt-1 inline-block"
-            >
-              Entrar na minha conta
-            </button>
-          </div>
-        </div>
-      </DefaultModal>
+        </section>
     )
-  }
 
-  let content;
+    const renderAddressModal = () => {
+        if (!user) return null
 
-  if (hasNoLocation) {
-    content = (
-      <div className="w-full bg-white flex-grow flex flex-col">
-        <HeroBanner />
+        return (
+            <DefaultModal
+                isOpen={isAddressModalOpen}
+                onClose={() => setIsAddressModalOpen(false)}
+                title="Cadastrar endereço"
+                maxWidth="md"
+            >
+                <div className="space-y-4 py-2">
+                    <div className="flex items-center gap-3 mb-2">
+                        {[
+                            { value: "casa", label: "Casa" },
+                            { value: "trabalho", label: "Trabalho" },
+                            { value: "outro", label: "Outro" },
+                        ].map(opt => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setForm(f => ({ ...f, addressType: opt.value }))}
+                                className={`px-4 py-1.5 rounded-full text-[13px] font-medium border transition-all ${form.addressType === opt.value
+                                    ? "bg-brand-green text-white border-brand-green"
+                                    : "bg-white text-brand-inactive-text border-gray-200 hover:border-gray-300"
+                                    }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
 
-        <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
-          <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
-            <div className="flex-grow text-center md:text-left md:max-w-[65%]">
-              <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
-              <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-                Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                {user ? (
-                  <button
-                    onClick={() => setIsAddressModalOpen(true)}
-                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
-                  >
-                    Adicionar Endereço
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setIsVisitorModalOpen(true)}
-                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
-                  >
-                    Escolher Cidade
-                  </button>
+                    <CepInput
+                        id="zipCode"
+                        name="zipCode"
+                        value={form.zipCode}
+                        onChange={val => setForm(f => ({ ...f, zipCode: val }))}
+                        onAddressFetched={handleAddressFetched}
+                    />
+
+                    <Input
+                        label="Rua/Avenida"
+                        id="street"
+                        name="street"
+                        placeholder="Rua, Avenida, etc."
+                        value={form.street}
+                        onChange={e => setForm(f => ({ ...f, street: e.target.value }))}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <NumberInputWithCheckbox
+                            label="Número"
+                            number={form.number}
+                            noNumber={form.noNumber}
+                            onNumberChange={val => setForm(f => ({ ...f, number: val }))}
+                            onNoNumberChange={checked => setForm(f => ({ ...f, noNumber: checked, number: checked ? "S/N" : "" }))}
+                            placeholder="123"
+                        />
+                        <Input
+                            label="Complemento"
+                            id="complement"
+                            name="complement"
+                            placeholder="Apto, Bloco, etc."
+                            value={form.complement}
+                            onChange={e => setForm(f => ({ ...f, complement: e.target.value }))}
+                        />
+                    </div>
+
+                    <Input
+                        label="Bairro"
+                        id="neighborhood"
+                        name="neighborhood"
+                        placeholder="Nome do bairro"
+                        value={form.neighborhood}
+                        onChange={e => setForm(f => ({ ...f, neighborhood: e.target.value }))}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input
+                            label="Cidade"
+                            id="city"
+                            name="city"
+                            placeholder="Nome da cidade"
+                            value={form.city}
+                            onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                        />
+                        <StateComboBox
+                            value={form.state}
+                            onChange={v => setForm(f => ({ ...f, state: v }))}
+                            className="w-full"
+                        />
+                    </div>
+
+                    {addressError && (
+                        <p className="text-red-500 text-sm font-semibold">{addressError}</p>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                        <Button
+                            type="button"
+                            onClick={handleSaveAddress}
+                            disabled={isSavingAddress}
+                            className="bg-brand-green text-white hover:bg-[#047857]"
+                        >
+                            {isSavingAddress ? "Salvando..." : "Salvar Endereço"}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsAddressModalOpen(false)}
+                        >
+                            Cancelar
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
+        )
+    }
+
+    const renderVisitorModal = () => {
+        return (
+            <DefaultModal
+                isOpen={isVisitorModalOpen}
+                onClose={() => setIsVisitorModalOpen(false)}
+                maxWidth="md"
+                hideHeader={true}
+            >
+                <div className="flex flex-col relative text-[#003d32]">
+                    <button
+                        onClick={() => setIsVisitorModalOpen(false)}
+                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <XIcon size={16} />
+                    </button>
+
+                    {/* Header with gradient and mascot */}
+                    <div
+                        className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
+                        style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
+                    >
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                            alt="Onde você está?"
+                            className="w-48 h-auto object-contain transform translate-y-4"
+                        />
+                    </div>
+
+                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde você está?</h4>
+                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+                        Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
+                    </p>
+
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <Input
+                                label="Digite sua cidade"
+                                id="visitorCitySearchHome"
+                                name="visitorCitySearchHome"
+                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            {filteredCities.length > 0 && (
+                                <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100">
+                                    {filteredCities.map((slug) => (
+                                        <button
+                                            key={slug}
+                                            onClick={() => handleSelectCitySlug(slug)}
+                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2"
+                                        >
+                                            <MapPinIcon size={14} className="text-brand-green shrink-0" />
+                                            {formatCitySlugForDisplay(slug)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleIpLocation}
+                            disabled={isIpLoading || isLocationLoading}
+                            className="w-full flex items-center justify-center gap-2 border-2 border-brand-green text-brand-green font-bold py-3 px-4 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 text-sm shadow-sm"
+                        >
+                            {isIpLoading || isLocationLoading ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
+                                    Detectando...
+                                </>
+                            ) : (
+                                <>
+                                    <MapPinIcon size={16} className="shrink-0" />
+                                    Usar minha localização
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    <div className="text-center mt-8 pt-5 border-t border-gray-100">
+                        <p className="text-xs text-gray-400">
+                            Já tem uma conta cadastrada com endereço salvo?
+                        </p>
+                        <button
+                            onClick={() => {
+                                setIsVisitorModalOpen(false)
+                                router.push("/auth/login")
+                            }}
+                            className="text-brand-green font-bold text-sm hover:underline mt-1 inline-block"
+                        >
+                            Entrar na minha conta
+                        </button>
+                    </div>
+                </div>
+            </DefaultModal>
+        )
+    }
+
+    let content;
+
+    if (hasNoLocation) {
+        content = (
+            <div className="w-full bg-white flex-grow flex flex-col">
+                <HeroBanner />
+
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
+                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
+                        <div className="flex-grow text-center md:text-left md:max-w-[65%]">
+                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
+                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+                                Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
+                            </p>
+                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                                {user ? (
+                                    <button
+                                        onClick={() => setIsAddressModalOpen(true)}
+                                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
+                                    >
+                                        Adicionar Endereço
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => setIsVisitorModalOpen(true)}
+                                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
+                                    >
+                                        Escolher Cidade
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={requestLocation}
+                                    disabled={isLocationLoading}
+                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isLocationLoading ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
+                                            Localizando...
+                                        </>
+                                    ) : (
+                                        "Usar localização atual"
+                                    )}
+                                </button>
+                            </div>
+                            {locationError && (
+                                <p className="text-red-500 text-sm mt-3 font-semibold">{locationError}</p>
+                            )}
+                        </div>
+                        <div className="w-[180px] md:w-[240px] shrink-0 transform hover:scale-105 transition-transform duration-300">
+                            <img src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png" alt="Onde você está?" className="w-full h-auto object-contain" />
+                        </div>
+                    </div>
+                </div>
+
+                {renderAddressModal()}
+                {renderVisitorModal()}
+                {renderMarketingSection()}
+            </div>
+        )
+    } else if (hasNoProductsOrVitrines) {
+        content = (
+            <div className="w-full bg-white flex-grow flex flex-col">
+                <HeroBanner />
+
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
+                    <div className="flex justify-center">
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                            imageAlt="Estamos Chegando!"
+                            title="Estamos Chegando!"
+                            subtitle={`Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${selectedCityName}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
+                            itemButton={{
+                                text: "Começar a vender na Dudit",
+                                action: () => {
+                                    router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                },
+                                variant: "default"
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {renderAddressModal()}
+                {renderVisitorModal()}
+                {renderMarketingSection()}
+            </div>
+        )
+    } else {
+        content = (
+            <div className="w-full bg-white flex-grow">
+                <HeroBanner />
+
+                {recentProducts.length > 0 && (
+                    <ProductCarousel
+                        title="Seus queridinhos estão aqui"
+                        products={recentProducts}
+                        seeMoreLink="/explorar"
+                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                    />
                 )}
 
-                <button
-                  onClick={requestLocation}
-                  disabled={isLocationLoading}
-                  className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLocationLoading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                      Localizando...
-                    </>
-                  ) : (
-                    "Usar localização atual"
-                  )}
-                </button>
-              </div>
-              {locationError && (
-                <p className="text-red-500 text-sm mt-3 font-semibold">{locationError}</p>
-              )}
+                {alsoLikeProducts.length > 0 && (
+                    <ProductCarousel
+                        title="Viu e ainda não levou?"
+                        products={alsoLikeProducts}
+                        seeMoreLink="/explorar"
+                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                    />
+                )}
+
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] mb-16">
+                    <div className="bg-[#dfff00] rounded-[20px] p-6 md:px-12 md:py-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                        <div className="text-center md:text-left">
+                            <h2 className="text-[#335a03] font-black text-3xl md:text-[40px] mb-1 tracking-tight leading-none">BLACK FRIDAY</h2>
+                            <p className="text-[#335a03] font-bold text-lg">Os melhores descontos do ano!</p>
+                        </div>
+                        <button
+                            className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors text-base shadow-sm"
+                        >
+                            Conferir ofertas
+                        </button>
+                    </div>
+                </div>
+
+                <CategoryList vitrines={vitrines} />
+
+                <InfoSection />
+
+                <section className="mx-auto mb-16 max-w-[1300px] px-4 lg:px-0">
+                    <h2 className="text-2xl md:text-[32px] font-bold text-gray-900 mb-6">Siga as tendências</h2>
+                    <div className="flex flex-wrap gap-3">
+                        {TRENDS.map((trend) => (
+                            <button
+                                key={trend}
+                                onClick={() => setActiveTrend(trend)}
+                                className={`px-6 py-2.5 border rounded-full font-semibold text-sm transition-colors ${activeTrend === trend
+                                    ? "bg-brand-green text-white border-brand-green"
+                                    : "border-gray-200 text-gray-600 hover:bg-brand-gray hover:border-gray-300"
+                                    }`}
+                            >
+                                {trend}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {renderAddressModal()}
+                {renderVisitorModal()}
+                {renderMarketingSection()}
             </div>
-            <div className="w-[180px] md:w-[240px] shrink-0 transform hover:scale-105 transition-transform duration-300">
-              <img src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png" alt="Onde você está?" className="w-full h-auto object-contain" />
-            </div>
-          </div>
+        )
+    }
+    if (hideHeaderAndFooter) {
+        return content
+    }
+
+    return (
+        <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
+            {/* Header com setView opcional para evitar erros */}
+            <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
+
+            {/* Espaçador para o Header Fixo */}
+            <div className="pt-[50px]" />
+
+            {content}
+
+            <MarketplaceFooter />
         </div>
-
-        {renderAddressModal()}
-        {renderVisitorModal()}
-        {renderMarketingSection()}
-      </div>
     )
-  } else if (hasNoProductsOrVitrines) {
-    content = (
-      <div className="w-full bg-white flex-grow flex flex-col">
-        <HeroBanner />
-
-        <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
-          <div className="bg-[#f0f9ff] rounded-[24px] border border-[#e0f2fe] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
-            <div className="flex-grow text-center md:text-left md:max-w-[65%]">
-              <h2 className="text-3xl font-black text-[#0369a1] mb-4 leading-tight">Estamos Chegando!</h2>
-              <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-                Ainda não temos vendedores ou produtos cadastrados em <strong className="text-brand-dark">{selectedCityName}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                <button
-                  onClick={() => router.push(user ? "/erp/switch" : "/auth/login?mode=partner")}
-                  className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
-                >
-                  Começar a vender na Dudit
-                </button>
-              </div>
-            </div>
-            <div className="w-[180px] md:w-[240px] shrink-0 transform hover:scale-105 transition-transform duration-300">
-              <img src="https://img.dudit.com.br/static/mascots/EstamosChegando.png" alt="Estamos Chegando!" className="w-full h-auto object-contain" />
-            </div>
-          </div>
-        </div>
-
-        {renderAddressModal()}
-        {renderVisitorModal()}
-        {renderMarketingSection()}
-      </div>
-    )
-  } else {
-    content = (
-      <div className="w-full bg-white flex-grow">
-        <HeroBanner />
-
-        {recentProducts.length > 0 && (
-          <ProductCarousel
-            title="Seus queridinhos estão aqui"
-            products={recentProducts}
-            seeMoreLink="/explorar"
-            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-          />
-        )}
-
-        {alsoLikeProducts.length > 0 && (
-          <ProductCarousel
-            title="Viu e ainda não levou?"
-            products={alsoLikeProducts}
-            seeMoreLink="/explorar"
-            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-          />
-        )}
-
-        <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] mb-16">
-          <div className="bg-[#dfff00] rounded-[20px] p-6 md:px-12 md:py-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-            <div className="text-center md:text-left">
-              <h2 className="text-[#335a03] font-black text-3xl md:text-[40px] mb-1 tracking-tight leading-none">BLACK FRIDAY</h2>
-              <p className="text-[#335a03] font-bold text-lg">Os melhores descontos do ano!</p>
-            </div>
-            <button
-              className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors text-base shadow-sm"
-            >
-              Conferir ofertas
-            </button>
-          </div>
-        </div>
-
-        <CategoryList vitrines={vitrines} />
-
-        <InfoSection />
-
-        <section className="mx-auto mb-16 max-w-[1300px] px-4 lg:px-0">
-          <h2 className="text-2xl md:text-[32px] font-bold text-gray-900 mb-6">Siga as tendências</h2>
-          <div className="flex flex-wrap gap-3">
-            {TRENDS.map((trend) => (
-              <button
-                key={trend}
-                onClick={() => setActiveTrend(trend)}
-                className={`px-6 py-2.5 border rounded-full font-semibold text-sm transition-colors ${activeTrend === trend
-                  ? "bg-brand-green text-white border-brand-green"
-                  : "border-gray-200 text-gray-600 hover:bg-brand-gray hover:border-gray-300"
-                  }`}
-              >
-                {trend}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {renderAddressModal()}
-        {renderVisitorModal()}
-        {renderMarketingSection()}
-      </div>
-    )
-  }
-  if (hideHeaderAndFooter) {
-    return content
-  }
-
-  return (
-    <div className="bg-white min-h-screen font-sans text-[#003d32] flex flex-col pt-[110px] lg:pt-[108px]">
-      {/* Header com setView opcional para evitar erros */}
-      <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
-
-      {/* Espaçador para o Header Fixo */}
-      <div className="pt-[50px]" />
-
-      {content}
-
-      <MarketplaceFooter />
-    </div>
-  )
 }

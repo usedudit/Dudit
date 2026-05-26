@@ -352,7 +352,7 @@ export function ExplorarPageClient({
 
         const pathCategorySlug = slug[1] || null
         const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
-        
+
         let nextCats: string[] = []
         if (pathCategory) {
             nextCats = [pathCategory]
@@ -540,15 +540,24 @@ export function ExplorarPageClient({
         return normItem.includes(normTarget) || normTarget.includes(normItem)
     }
 
-    const activeCategoriesList = useMemo(() => {
-        return categoriesList.filter(cat => {
-            return dataToFilter.some(p => matchCategory(p.category, cat.name))
-        })
-    }, [categoriesList, dataToFilter])
-
     const isStandardCategory = (catName: string) => {
         return categoriesList.some(cat => matchCategory(catName, cat.name))
     }
+
+    const activeCategoriesList = useMemo(() => {
+        const active = categoriesList.filter(cat => {
+            return dataToFilter.some(p => matchCategory(p.category, cat.name))
+        })
+        const hasOutros = dataToFilter.some(p => {
+            if (p.itemType === 'loja') return false
+            const itemCat = p.category
+            return !itemCat || !isStandardCategory(itemCat)
+        })
+        if (hasOutros) {
+            active.push({ name: "Outros", icon_url: null })
+        }
+        return active
+    }, [categoriesList, dataToFilter])
 
     const outrosItems = useMemo(() => {
         return dataToFilter.filter(p => {
@@ -713,11 +722,12 @@ export function ExplorarPageClient({
     const pageTitle = useMemo(() => {
         const citySuffix = selectedCitySlug ? ` em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}` : ""
         if (query) return `Resultados para "${query}"${citySuffix}`
+        if (selectedCategories.length > 0) return `${selectedCategories[0]}${citySuffix}`
         if (currentType === "produtos") return `Produtos${citySuffix}`
         if (currentType === "servicos") return `Serviços${citySuffix}`
         if (currentType === "vitrines") return `Lojas e Vitrines${citySuffix}`
         return `Explorar`
-    }, [query, currentType, selectedCitySlug])
+    }, [query, currentType, selectedCategories, selectedCitySlug])
 
     return (
         <>
@@ -760,7 +770,7 @@ export function ExplorarPageClient({
                                             >
                                                 {/* Background Circle Watermark - Positioned lower/bottom right */}
                                                 <div className={`absolute -bottom-6 -right-6 w-16 h-16 sm:w-20 sm:h-20 rounded-full opacity-60 ${colors.circle}`} />
-                                                
+
                                                 {cat.icon_url ? (
                                                     <img
                                                         src={cat.icon_url}
@@ -896,112 +906,70 @@ export function ExplorarPageClient({
                             {isLoading || (isFetching && !isFetchingNextPage) ? (
                                 <ExploreContentSkeleton type={currentType} />
                             ) : !selectedCitySlug ? (
-                                <div className="py-12 flex justify-center">
-                                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm max-w-[1000px]">
-                                        <div className="flex-grow text-center md:text-left md:max-w-[65%] text-brand-dark">
-                                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
-                                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-                                                Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
-                                            </p>
-                                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                                                <button
-                                                    onClick={() => setIsCityModalOpen(true)}
-                                                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors duration-200 shadow-md flex items-center gap-2"
-                                                >
-                                                    Escolher Cidade
-                                                </button>
-                                                <button
-                                                    onClick={requestLocation}
-                                                    disabled={isLocationLoading}
-                                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
-                                                >
-                                                    {isLocationLoading ? (
-                                                        <>
-                                                            <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                                                            Localizando...
-                                                        </>
-                                                    ) : (
-                                                        "Usar localização atual"
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="w-[180px] md:w-[240px] shrink-0">
-                                            <img src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png" alt="Onde você está?" className="w-full h-auto object-contain" />
-                                        </div>
-                                    </div>
+                                <div className="flex justify-center">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                        imageAlt="Onde você está?"
+                                        title="Onde você está?"
+                                        subtitle="Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."
+                                        itemButton={{
+                                            text: "Escolher Cidade",
+                                            action: () => {
+                                                setIsCityModalOpen(true)
+                                            },
+                                            variant: "default"
+                                        }}
+                                    />
                                 </div>
                             ) : rawItems.length === 0 ? (
-                                <div className="py-12 flex justify-center">
-                                    <div className="bg-[#f0f9ff] rounded-[24px] border border-[#e0f2fe] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm max-w-[1000px]">
-                                        <div className="flex-grow text-center md:text-left md:max-w-[65%]">
-                                            <h2 className="text-3xl font-black text-[#0369a1] mb-4 leading-tight">Estamos Chegando!</h2>
-                                            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-                                                Ainda não temos vendedores ou produtos cadastrados em <strong className="text-brand-dark">{formatCitySlug(selectedCitySlug).split(" - ")[0]}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?
-                                            </p>
-                                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                                                <button
-                                                    onClick={() => router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")}
-                                                    className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors duration-200 shadow-md flex items-center gap-2"
-                                                >
-                                                    Começar a vender na Dudit
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="w-[180px] md:w-[240px] shrink-0">
-                                            <img src="https://img.dudit.com.br/static/mascots/EstamosChegando.png" alt="Estamos Chegando!" className="w-full h-auto object-contain" />
-                                        </div>
-                                    </div>
+                                <div className="flex justify-center">
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                                        imageAlt="Estamos Chegando!"
+                                        title="Estamos Chegando!"
+                                        subtitle={`Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${formatCitySlug(selectedCitySlug).split(" - ")[0]}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
+                                        itemButton={{
+                                            text: "Começar a vender na Dudit",
+                                            action: () => {
+                                                router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                            },
+                                            variant: "default"
+                                        }}
+                                    />
                                 </div>
                             ) : isLandingPage ? (
                                 <div className="space-y-12">
                                     <div>
-                                        <h2 className="text-[24px] md:text-[32px] font-black text-brand-dark tracking-tight mb-8">
+                                        <h2 className="text-lg lg:text-xl font-semibold text-brand-dark mb-8">
                                             Descubra o que tem em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
                                         </h2>
-                                        
+
                                         {/* Premium iFood-style Banners */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             {/* Banner 1: Produtos */}
                                             <div
                                                 onClick={() => handleTypeChange("produtos")}
-                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#FF7A00] to-[#FF9E44] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
-                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
-                                                    <div>
-                                                        <h3 className="text-2xl font-black mb-1">Produtos</h3>
-                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
-                                                            Roupas, eletrônicos, utilidades e mais com entrega rápida.
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
-                                                        Ver produtos
-                                                    </span>
-                                                </div>
-                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
-                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🛍️</span>
-                                                </div>
+                                                <img
+                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    alt="Produtos"
+                                                    className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                />
                                             </div>
 
                                             {/* Banner 2: Serviços */}
                                             <div
                                                 onClick={() => handleTypeChange("servicos")}
-                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#0052FF] to-[#4D82FF] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
-                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
-                                                    <div>
-                                                        <h3 className="text-2xl font-black mb-1">Serviços</h3>
-                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
-                                                            Contrate reparos, beleza, aulas e consultorias locais.
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
-                                                        Contratar
-                                                    </span>
-                                                </div>
-                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
-                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🛠️</span>
-                                                </div>
+                                                <img
+                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    alt="Serviços"
+                                                    className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                />
                                             </div>
 
                                             {/* Banner 3: Alimentação */}
@@ -1011,22 +979,13 @@ export function ExplorarPageClient({
                                                     setSelectedCategories(["Alimentação"])
                                                     updateUrl(selectedCitySlug, ["Alimentação"], query, "tudo")
                                                 }}
-                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#EA1D2C] to-[#FF4D5A] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
-                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
-                                                    <div>
-                                                        <h3 className="text-2xl font-black mb-1">Alimentação</h3>
-                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
-                                                            Bateu a fome? Pratos, lanches, pizzas e doces pertinho de você.
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
-                                                        Pedir agora
-                                                    </span>
-                                                </div>
-                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
-                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🍔</span>
-                                                </div>
+                                                <img
+                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    alt="Alimentação"
+                                                    className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -1036,12 +995,12 @@ export function ExplorarPageClient({
                                         <h3 className="text-[18px] lg:text-[22px] font-bold text-brand-dark mb-6 tracking-wide">
                                             Lojas e Profissionais em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
                                         </h3>
-                                        
+
                                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                                             {normalizedInitialResults.map((item) => (
                                                 <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} />
                                             ))}
-                                            
+
                                             {/* INFINITE SCROLL OBSERVER */}
                                             {hasNextPage && (
                                                 <div
@@ -1177,55 +1136,88 @@ export function ExplorarPageClient({
                                     {/* D. CATEGORY-SPECIFIC LAYOUT */}
                                     {selectedCategories.length > 0 && (
                                         <div className="space-y-8">
-                                            {/* Vendedores da Categoria */}
-                                            {categoryShowcases.length > 0 && (
-                                                <HorizontalCarousel
-                                                    title="Lojas e Vendedores"
-                                                    items={categoryShowcases}
-                                                    renderItem={(item) => <VitrineCard vitrine={item} />}
-                                                />
-                                            )}
-
-                                            {/* Ofertas da Categoria */}
-                                            {categoryOffers.length > 0 && (
-                                                <HorizontalCarousel
-                                                    title="Ofertas da Categoria"
-                                                    items={categoryOffers}
-                                                    renderItem={(item) => {
-                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
-                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
-                                                            : null
-                                                        return <ItemCard product={item} userCoords={userCoords} />
-                                                    }}
-                                                />
-                                            )}
-
-                                            {/* Seções por Subcategoria */}
-                                            {subcategoryGroups.map((group) => (
-                                                <HorizontalCarousel
-                                                    key={group.name}
-                                                    title={group.name}
-                                                    items={group.list}
-                                                    renderItem={(item) => {
-                                                        const userCoords = userProfile?.latitude && userProfile?.longitude
-                                                            ? { lat: userProfile.latitude, lng: userProfile.longitude }
-                                                            : null
-                                                        return <ItemCard product={item} userCoords={userCoords} />
-                                                    }}
-                                                />
-                                            ))}
-
-                                            {/* Nenhuma correspondência nos filtros da categoria */}
-                                            {categoryShowcases.length === 0 && categoryOffers.length === 0 && subcategoryGroups.length === 0 && (
-                                                <div className="py-12 flex flex-col items-center">
-                                                    <IconPlaceholder
-                                                        placeholderType="image"
-                                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                        imageAlt="Nenhum item encontrado nesta categoria"
-                                                        title="Nenhum item encontrado nesta categoria"
-                                                        subtitle="Ainda não temos parceiros ativos nessa cidade para esta categoria."
-                                                    />
+                                            {selectedCategories[0] === "Outros" ? (
+                                                <div>
+                                                    <h3 className="text-[18px] lg:text-[22px] font-bold text-brand-dark mb-6 tracking-wide">
+                                                        Itens Diversos
+                                                    </h3>
+                                                    {filteredResults.length === 0 ? (
+                                                        <div className="py-12 flex flex-col items-center">
+                                                            <IconPlaceholder
+                                                                placeholderType="image"
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                                imageAlt="Nenhum item encontrado nesta categoria"
+                                                                title="Nenhum item encontrado"
+                                                                subtitle="Ainda não temos parceiros ativos nessa cidade com produtos não categorizados."
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                                            {filteredResults.map((item) => {
+                                                                if (item.itemType === 'loja') {
+                                                                    return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
+                                                                }
+                                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                                    : null
+                                                                return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    {/* Vendedores da Categoria */}
+                                                    {categoryShowcases.length > 0 && (
+                                                        <HorizontalCarousel
+                                                            title="Lojas e Vendedores"
+                                                            items={categoryShowcases}
+                                                            renderItem={(item) => <VitrineCard vitrine={item} />}
+                                                        />
+                                                    )}
+
+                                                    {/* Ofertas da Categoria */}
+                                                    {categoryOffers.length > 0 && (
+                                                        <HorizontalCarousel
+                                                            title="Ofertas da Categoria"
+                                                            items={categoryOffers}
+                                                            renderItem={(item) => {
+                                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                                    : null
+                                                                return <ItemCard product={item} userCoords={userCoords} />
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {/* Seções por Subcategoria */}
+                                                    {subcategoryGroups.map((group) => (
+                                                        <HorizontalCarousel
+                                                            key={group.name}
+                                                            title={group.name}
+                                                            items={group.list}
+                                                            renderItem={(item) => {
+                                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                                    : null
+                                                                return <ItemCard product={item} userCoords={userCoords} />
+                                                            }}
+                                                        />
+                                                    ))}
+
+                                                    {/* Nenhuma correspondência nos filtros da categoria */}
+                                                    {categoryShowcases.length === 0 && categoryOffers.length === 0 && subcategoryGroups.length === 0 && (
+                                                        <div className="py-12 flex flex-col items-center">
+                                                            <IconPlaceholder
+                                                                placeholderType="image"
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                                                                imageAlt="Nenhum item encontrado nesta categoria"
+                                                                title="Nenhum item encontrado nesta categoria"
+                                                                subtitle="Ainda não temos parceiros ativos nessa cidade para esta categoria."
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     )}
@@ -1235,7 +1227,7 @@ export function ExplorarPageClient({
                     </AnimatePresence>
                 </div>
                 {!hideHeaderAndFooter && <MarketplaceFooter />}
-            </div>
+            </div >
 
             {/* ========================================================
                 PREMIUM REUSABLE MODALS (REPLACING OLD INLINE POPOVERS)

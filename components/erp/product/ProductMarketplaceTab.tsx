@@ -102,7 +102,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
         {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
         <div className="mt-8">
           <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-          <Accordion title="Ficha técnica" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
+          <Accordion title="Especificações" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
             <div className="pt-2">
               {attributes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-8">
