@@ -54,7 +54,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
                                         </td>
                                         <td className="p-3">
                                             {returns.length > 0 ? (
-                                                <span title="Contains return/exchange history">↩ {returns.length}</span>
+                                                <span title="Possui histórico de trocas/devoluções">↩{returns.length > 1 ? ` ${returns.length}` : ""}</span>
                                             ) : (
                                                 <span className="text-brand-inactive-text">Sem solicitacoes</span>
                                             )}

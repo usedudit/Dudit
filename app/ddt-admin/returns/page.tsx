@@ -3,9 +3,9 @@ import { getAdminReturnRequests } from "@/app/actions/admin/marketplace-ops"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getReturnStatusLabel, getReturnResolutionLabel } from "@/lib/returns/types"
 
-export default async function AdminReturnsPage({ searchParams }: { searchParams?: Promise<{ status?: string; type?: string }> }) {
+export default async function AdminReturnsPage({ searchParams }: { searchParams?: Promise<{ status?: string; type?: string; source?: string }> }) {
     const params = await searchParams
-    const requests = await getAdminReturnRequests({ status: params?.status, type: params?.type, limit: 75 })
+    const requests = await getAdminReturnRequests({ status: params?.status, type: params?.type, source: params?.source, limit: 75 })
 
     return (
         <>
@@ -14,6 +14,9 @@ export default async function AdminReturnsPage({ searchParams }: { searchParams?
                 <div className="rounded-xl border border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                     <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         Fila administrativa com cliente, seller, origem, valores, evidencias, linha do tempo e acoes financeiras geradas.
+                    </p>
+                    <p className="mt-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                        Dica: use query params como <span className="font-mono">?status=APPROVED</span>, <span className="font-mono">?type=exchange</span> ou <span className="font-mono">?source=marketplace</span>.
                     </p>
                 </div>
 

@@ -100,7 +100,7 @@ export function getReturnStatusLabel(status: string) {
     case "APPROVED": return "Aprovada"
     case "REJECTED": return "Recusada"
     case "WAITING_CUSTOMER": return "Aguardando cliente"
-    case "WAITING_ITEM_RETURN": return "Aprovada"
+    case "WAITING_ITEM_RETURN": return "Aguardando cliente"
     case "PROCESSING": return "Aprovada"
     case "RESOLVED": return "Concluida"
     case "EXPIRED": return "Concluida"

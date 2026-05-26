@@ -155,7 +155,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                             {returnHistoryCount > 0 && (
                                                                 <span
                                                                     className="inline-flex items-center rounded-full border border-brand-border bg-white px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading"
-                                                                    title="Contains return/exchange history"
+                                                                    title="Possui histórico de trocas/devoluções"
                                                                 >
                                                                     ↩{returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
                                                                 </span>

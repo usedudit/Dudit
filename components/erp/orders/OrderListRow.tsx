@@ -89,7 +89,7 @@ const OrderListItem = React.memo(
                                     {Number(order.returnCount || 0) > 0 && (
                                         <span
                                             className="inline-flex shrink-0 items-center rounded-full border border-brand-border px-2 py-0.5 text-xs font-bold text-brand-dark dark:border-dark-border dark:text-dark-heading"
-                                            title="Contains return/exchange history"
+                                            title="Possui histórico de trocas/devoluções"
                                         >
                                             ↩{Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
                                         </span>

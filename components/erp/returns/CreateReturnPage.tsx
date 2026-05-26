@@ -1462,10 +1462,10 @@ export default function CreateReturnPage({
 
             <AlertModal
                 isOpen={isInventoryRestoreModalOpen}
-                title="Restore returned items to inventory?"
+                title="Restaurar itens ao estoque?"
                 description="Escolha se os itens desta solicitacao devem voltar ao estoque. A movimentacao sera registrada como RETURN_IN."
-                confirmText="Restore inventory"
-                cancelText="Do not restore"
+                confirmText="Restaurar estoque"
+                cancelText="Nao restaurar"
                 variant="info"
                 onConfirm={() => completeSave(true)}
                 onClose={() => completeSave(false)}

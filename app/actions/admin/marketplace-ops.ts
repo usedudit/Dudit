@@ -50,7 +50,7 @@ export async function getAdminMarketplaceOrders(params?: { status?: string; limi
     return data || []
 }
 
-export async function getAdminReturnRequests(params?: { status?: string; type?: string; limit?: number }) {
+export async function getAdminReturnRequests(params?: { status?: string; type?: string; source?: string; limit?: number }) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     await requireAdmin()
 
@@ -96,6 +96,9 @@ export async function getAdminReturnRequests(params?: { status?: string; type?: 
     }
     if (params?.type) {
         query = query.eq("request_type", params.type)
+    }
+    if (params?.source) {
+        query = query.eq("source", params.source)
     }
 
     const { data, error } = await query
