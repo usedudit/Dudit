@@ -606,7 +606,6 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="py-2">
                         {[
                             { label: "Seu perfil", href: "/perfil" },
-                            { label: "Seus pedidos", href: "/pedidos" },
                             { label: "Lojas favoritas", action: () => setView?.("vendor") },
                             { label: "Central do Parceiro", href: "/erp/switch" },
                         ].map((item, idx) => {
@@ -796,7 +795,6 @@ const Header: React.FC<HeaderProps> = ({
                                     <div className="py-2">
                                         {[
                                             { label: "Seu perfil", href: "/perfil" },
-                                            { label: "Seus pedidos", href: "/pedidos" },
                                             { label: "Lojas favoritas", action: () => setView?.("vendor") },
                                             { label: "Central do Parceiro", href: "/erp/switch" },
                                         ].map((item, idx) => {

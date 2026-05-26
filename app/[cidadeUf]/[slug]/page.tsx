@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
 import { redirect, permanentRedirect } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
-import ExplorarPage from '@/app/explorar/page'
+import ExplorarPage from '@/app/explorar/[[...slug]]/page'
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
   "casa-e-utilidades": "Casa & Utilidades",
@@ -16,7 +16,7 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
   "infantil-e-brinquedos": "Infantil & Brinquedos"
 }
 
-export const revalidate = 86400 // Cache 24h
+const revalidate = 86400 // Cache 24h
 
 type Props = {
   params: Promise<{ cidadeUf: string; slug: string }>
@@ -76,10 +76,13 @@ export default async function CityTermPage({ params }: Props) {
   const categoryName = CATEGORY_SLUG_MAP[slug]
 
   const overrideParams = {
-    cidade: cidadeUf,
-    ...(categoryName ? { categoria: slug } : { q: slug.replace(/-/g, ' ') }),
+    slug: [cidadeUf, categoryName ? slug : ""].filter(Boolean)
+  }
+
+  const overrideSearchParams = {
+    ...(categoryName ? {} : { q: slug.replace(/-/g, ' ') }),
     type: "tudo" as const
   }
 
-  return <ExplorarPage searchParams={Promise.resolve(overrideParams)} />
+  return <ExplorarPage params={Promise.resolve(overrideParams)} searchParams={Promise.resolve(overrideSearchParams)} />
 }

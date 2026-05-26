@@ -6,7 +6,7 @@ import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard } from "./shared-components"
 import { IconPlaceholder, Button, DefaultModal, RadioButton } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import {
@@ -50,7 +50,9 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "pets": "Pets",
     "construcao-e-ferramentas": "Construção & Ferramentas",
     "agro-e-jardim": "Agro & Jardim",
-    "infantil-e-brinquedos": "Infantil & Brinquedos"
+    "infantil-e-brinquedos": "Infantil & Brinquedos",
+    "alimentacao": "Alimentação",
+    "outros": "Outros"
 }
 
 const CATEGORY_COLORS = [
@@ -252,11 +254,17 @@ export function ExplorarPageClient({
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const params = useParams()
     const { requestLocation, loading: isLocationLoading } = useLocationRedirect()
+
+    const slug = (params?.slug as string[]) || []
+    const pathCity = slug[0] || ""
+    const pathCategorySlug = slug[1] || ""
+    const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : ""
 
     const [currentType, setCurrentType] = useState(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
-    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || null)
+    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(pathCity || cidade || null)
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
 
     const categoriesList = useMemo(() => {
@@ -284,6 +292,7 @@ export function ExplorarPageClient({
     // Filters state
     const [promoOn, setPromoOn] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
+        if (pathCategory) return [pathCategory]
         if (categoria) {
             return categoria.split(",").map(c => CATEGORY_SLUG_MAP[c.toLowerCase()] || c)
         }
@@ -295,6 +304,12 @@ export function ExplorarPageClient({
     const observerTarget = useRef<HTMLDivElement>(null)
     const MAX_ITEMS = 300 // Memory cap
 
+    const isLandingPage = useMemo(() => {
+        return currentType === 'tudo' && selectedCategories.length === 0 && !query
+    }, [currentType, selectedCategories, query])
+
+    const fetchType = isLandingPage ? 'vitrines' : currentType
+
     // Unified URL synchronization helper
     const updateUrl = (
         city: string | null,
@@ -302,48 +317,63 @@ export function ExplorarPageClient({
         searchQ: string,
         typeStr: string
     ) => {
-        const params = new URLSearchParams()
-        if (city) params.set("cidade", city)
-        if (categories.length > 0) {
-            const slugs = categories.map(cat => {
-                const slug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === cat)
-                return slug || cat
-            })
-            params.set("categoria", slugs.join(","))
-        }
-        if (searchQ) params.set("q", searchQ)
-        if (typeStr !== "tudo") params.set("type", typeStr)
+        const queryParams = new URLSearchParams()
+        if (searchQ) queryParams.set("q", searchQ)
+        if (typeStr !== "tudo") queryParams.set("type", typeStr)
 
-        const queryStr = params.toString()
-        router.push(`/explorar${queryStr ? `?${queryStr}` : ""}`)
+        const queryStr = queryParams.toString()
+        const queryPart = queryStr ? `?${queryStr}` : ""
+
+        if (city) {
+            if (categories.length > 0) {
+                const catName = categories[0]
+                const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === catName) || catName
+                router.push(`/explorar/${city}/${catSlug}${queryPart}`)
+            } else {
+                router.push(`/explorar/${city}${queryPart}`)
+            }
+        } else {
+            router.push(`/explorar${queryPart}`)
+        }
     }
 
-    // Handles browser Back/Forward navigation syncing searchParams back to component state
+    // Handles browser Back/Forward navigation syncing path params and searchParams back to component state
     useEffect(() => {
         const urlType = searchParams.get("type") || "tudo"
         if (urlType !== currentType) {
             setCurrentType(urlType as any)
         }
 
-        const urlCity = searchParams.get("cidade") || null
+        const pathCity = slug[0] || null
+        const urlCity = pathCity || searchParams.get("cidade") || null
         if (urlCity !== selectedCitySlug) {
             setSelectedCitySlug(urlCity)
         }
 
-        const urlCat = searchParams.get("categoria")
-        const nextCats = urlCat
-            ? urlCat.split(",").map(c => CATEGORY_SLUG_MAP[c.toLowerCase()] || c)
-            : []
+        const pathCategorySlug = slug[1] || null
+        const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : null
+        
+        let nextCats: string[] = []
+        if (pathCategory) {
+            nextCats = [pathCategory]
+        } else {
+            const urlCat = searchParams.get("categoria")
+            if (urlCat) {
+                nextCats = urlCat.split(",").map(c => CATEGORY_SLUG_MAP[c.toLowerCase()] || c)
+            }
+        }
+
         const isCatsEqual = selectedCategories.length === nextCats.length &&
             selectedCategories.every((val, index) => val === nextCats[index])
         if (!isCatsEqual) {
             setSelectedCategories(nextCats)
         }
-    }, [searchParams])
+    }, [searchParams, params])
 
     // Handle city synchronization from URL/cookies/localProfile on mount
     useEffect(() => {
-        const urlCity = searchParams.get("cidade")
+        const pathCity = slug[0] || null
+        const urlCity = pathCity || searchParams.get("cidade")
         if (urlCity) {
             document.cookie = `dudit_city=${urlCity}; path=/; max-age=${60 * 60 * 24 * 30}`
             localStorage.setItem("dudit_city", urlCity)
@@ -394,24 +424,24 @@ export function ExplorarPageClient({
     }, [searchParams, userProfile])
 
     const limitConfig = useMemo(() => {
-        if (currentType === "produtos") return { produtos: 40 } as const
-        if (currentType === "servicos") return { servicos: 40 } as const
-        if (currentType === "vitrines") return { vitrines: 40 } as const
+        if (fetchType === "produtos") return { produtos: 40 } as const
+        if (fetchType === "servicos") return { servicos: 40 } as const
+        if (fetchType === "vitrines") return { vitrines: 40 } as const
         return { geral: 40 } as const
-    }, [currentType])
+    }, [fetchType])
 
     // Query fetch
     const { items: rawItemsUncapped, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isFetching } = useInfiniteList<
         any,
         MarketplaceListCursor
     >({
-        queryKey: ["explore", query, currentType, selectedCitySlug],
+        queryKey: ["explore", query, fetchType, selectedCitySlug],
         initialPage:
-            currentType === type && selectedCitySlug === cidade
+            fetchType === type && selectedCitySlug === cidade
                 ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= (type === 'tudo' ? 10 : 40) }
                 : undefined,
         fetchFn: async ({ cursor }) => {
-            const res = await searchMarketplace(query, currentType as any, {
+            const res = await searchMarketplace(query, fetchType as any, {
                 ...limitConfig,
                 cursor,
                 cidade: selectedCitySlug || undefined
@@ -503,32 +533,46 @@ export function ExplorarPageClient({
         return { vitrinesDestaque: [], dataToFilter: list }
     }, [normalizedInitialResults, currentType])
 
+    const matchCategory = (itemCategory: string | null, catName: string) => {
+        if (!itemCategory) return false
+        const normItem = itemCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        const normTarget = catName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        return normItem.includes(normTarget) || normTarget.includes(normItem)
+    }
+
     const activeCategoriesList = useMemo(() => {
-        if (currentType !== 'produtos') {
-            return categoriesList
-        }
         return categoriesList.filter(cat => {
-            return dataToFilter.some(p => {
-                const itemCat = p.category || ""
-                const normItem = itemCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                const normTarget = cat.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                return normItem.includes(normTarget) || normTarget.includes(normItem)
-            })
+            return dataToFilter.some(p => matchCategory(p.category, cat.name))
         })
-    }, [categoriesList, currentType, dataToFilter])
+    }, [categoriesList, dataToFilter])
+
+    const isStandardCategory = (catName: string) => {
+        return categoriesList.some(cat => matchCategory(catName, cat.name))
+    }
+
+    const outrosItems = useMemo(() => {
+        return dataToFilter.filter(p => {
+            if (p.itemType === 'loja') return false
+            const itemCat = p.category
+            return !itemCat || !isStandardCategory(itemCat)
+        }).slice(0, 20)
+    }, [dataToFilter, categoriesList])
 
     // In-memory filters for advanced filters
     const filteredResults = useMemo(() => {
         let filtered = [...dataToFilter]
         if (selectedCategories.length > 0) {
-            filtered = filtered.filter((p) => {
-                const itemCat = p.category || ""
-                return selectedCategories.some(cat => {
-                    const normItem = itemCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                    const normTarget = cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                    return normItem.includes(normTarget) || normTarget.includes(normItem)
+            const activeCat = selectedCategories[0]
+            if (activeCat === "Outros") {
+                filtered = filtered.filter((p) => {
+                    if (p.itemType === 'loja') return false
+                    return !p.category || !isStandardCategory(p.category)
                 })
-            })
+            } else {
+                filtered = filtered.filter((p) => {
+                    return matchCategory(p.category, activeCat)
+                })
+            }
         }
         if (minPrice) filtered = filtered.filter((p) => p.price && p.price >= Number(minPrice))
         if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number(maxPrice))
@@ -552,7 +596,7 @@ export function ExplorarPageClient({
             })
         }
         return filtered
-    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy])
+    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, categoriesList])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
@@ -566,13 +610,10 @@ export function ExplorarPageClient({
 
     const categoryShowcases = useMemo(() => {
         if (selectedCategories.length === 0) return []
+        const activeCat = selectedCategories[0]
+        if (activeCat === "Outros") return []
         return normalizedInitialResults.filter(
-            r => r.itemType === 'loja' && 
-            selectedCategories.some(cat => {
-                const normItem = (r.category || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                const normTarget = cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                return normItem.includes(normTarget) || normTarget.includes(normItem)
-            })
+            r => r.itemType === 'loja' && matchCategory(r.category, activeCat)
         )
     }, [normalizedInitialResults, selectedCategories])
 
@@ -608,7 +649,7 @@ export function ExplorarPageClient({
 
     const toggleCategory = (catName: string) => {
         setSelectedCategories((prev) => {
-            const next = prev.includes(catName) ? prev.filter((c) => c !== catName) : [...prev, catName]
+            const next = prev.includes(catName) ? [] : [catName]
             updateUrl(selectedCitySlug, next, query, currentType)
             return next
         })
@@ -659,12 +700,15 @@ export function ExplorarPageClient({
 
     // Get products not in top category carousels
     const remainingResults = useMemo(() => {
+        if (query) {
+            return filteredResults
+        }
         if (currentType !== 'tudo' || selectedCategories.length > 0 || categoriesWithProducts.length === 0) {
             return filteredResults
         }
         const topCategoriesNames = categoriesWithProducts.map(c => c.name)
         return filteredResults.filter(item => !topCategoriesNames.includes(item.category || "Outros"))
-    }, [filteredResults, categoriesWithProducts, currentType, selectedCategories])
+    }, [filteredResults, categoriesWithProducts, currentType, selectedCategories, query])
 
     const pageTitle = useMemo(() => {
         const citySuffix = selectedCitySlug ? ` em ${formatCitySlug(selectedCitySlug).split(" - ")[0]}` : ""
@@ -686,14 +730,16 @@ export function ExplorarPageClient({
                 `}</style>
 
                 {/* 1. TITLE SECTION */}
-                <div className="container mx-auto px-4 max-w-[1300px] mt-6">
-                    <h1 className="text-[28px] lg:text-[36px] font-bold text-brand-dark tracking-tight leading-tight">
-                        {pageTitle}
-                    </h1>
-                </div>
+                {!isLandingPage && (
+                    <div className="container mx-auto px-4 max-w-[1300px] mt-6">
+                        <h1 className="text-[28px] lg:text-[36px] font-bold text-brand-dark tracking-tight leading-tight">
+                            {pageTitle}
+                        </h1>
+                    </div>
+                )}
 
-                {/* 2. CATEGORIES CIRCULAR SLIDER */}
-                {(currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
+                {/* 2. CATEGORIES RECTANGULAR SLIDER */}
+                {!isLandingPage && (currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
                     <div className="bg-white py-6">
                         <div className="container mx-auto px-4 max-w-[1300px]">
                             <div className="flex gap-6 overflow-x-auto scrollbar-none py-2 px-1">
@@ -704,29 +750,29 @@ export function ExplorarPageClient({
                                         <div
                                             key={cat.name}
                                             onClick={() => toggleCategory(cat.name)}
-                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 group w-[90px] sm:w-[110px]"
+                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 w-[90px] sm:w-[110px]"
                                         >
                                             <div
-                                                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-[24px] overflow-hidden flex items-center justify-center border border-transparent select-none transition-all duration-300 ${colors.bg} ${isSelected
-                                                    ? "ring-2 ring-brand-green ring-offset-2 scale-105"
-                                                    : "hover:scale-102 hover:shadow-sm"
+                                                className={`relative w-[85px] h-[105px] sm:w-[100px] sm:h-[120px] rounded-[20px] overflow-hidden border border-transparent select-none ${colors.bg} ${isSelected
+                                                    ? "ring-2 ring-brand-green ring-offset-2"
+                                                    : ""
                                                     }`}
                                             >
-                                                {/* Background Circle Watermark */}
-                                                <div className={`absolute -top-3 -left-3 w-14 h-14 sm:w-16 sm:h-16 rounded-full opacity-50 transition-transform duration-500 group-hover:scale-110 ${colors.circle}`} />
+                                                {/* Background Circle Watermark - Positioned lower/bottom right */}
+                                                <div className={`absolute -bottom-6 -right-6 w-16 h-16 sm:w-20 sm:h-20 rounded-full opacity-60 ${colors.circle}`} />
                                                 
                                                 {cat.icon_url ? (
                                                     <img
                                                         src={cat.icon_url}
                                                         alt={cat.name}
-                                                        className="w-12 h-12 sm:w-16 sm:h-16 object-contain z-10 select-none transition-transform duration-300 group-hover:scale-105"
+                                                        className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-14 h-14 sm:w-18 sm:h-18 object-contain z-10 select-none"
                                                     />
                                                 ) : (
-                                                    <span className="text-3xl sm:text-4xl filter drop-shadow-sm select-none z-10 transition-transform duration-300 group-hover:scale-105">📦</span>
+                                                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl filter drop-shadow-sm select-none z-10">📦</span>
                                                 )}
                                             </div>
                                             <span
-                                                className={`text-[12px] sm:text-[13px] font-bold text-center mt-2.5 leading-tight truncate w-full select-none transition-colors ${isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
+                                                className={`text-[12px] sm:text-[13px] font-bold text-center mt-2 leading-tight truncate w-full select-none ${isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
                                                     }`}
                                             >
                                                 {cat.name}
@@ -740,105 +786,102 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 3. FILTERS BAR (NOT STICKY - SCROLLS ALONG WITH THE PAGE) */}
-                <div className="bg-white py-4">
-                    <div className="container mx-auto px-4 max-w-[1300px] flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 flex-1">
+                {!isLandingPage && (
+                    <div className="bg-white py-4">
+                        <div className="container mx-auto px-4 max-w-[1300px] flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 flex-1">
 
-                            {/* CITY FILTER CHIP */}
-                            <button
-                                onClick={() => setIsCityModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCitySlug
-                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
-                                    : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
-                            >
-                                <span>{selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecione a Cidade"}</span>
-                                <span className="text-[9px] opacity-60">▼</span>
-                            </button>
-
-                            {/* SORT FILTER CHIP */}
-                            <button
-                                onClick={() => setIsSortModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${sortBy !== "relevancia"
-                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
-                                    : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
-                            >
-                                <span>Ordenar por: {sortBy === 'relevancia' ? 'Relevância' : sortBy === 'preco_menor' ? 'Menor Preço' : sortBy === 'preco_maior' ? 'Maior Preço' : 'Mais Recentes'}</span>
-                                <span className="text-[9px] opacity-60">▼</span>
-                            </button>
-
-                            {/* TYPE FILTER CHIP */}
-                            <button
-                                onClick={() => setIsTypeModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${currentType !== "tudo"
-                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
-                                    : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
-                            >
-                                <span>Ver: {currentType === 'tudo' ? 'Tudo' : currentType === 'produtos' ? 'Produtos' : currentType === 'servicos' ? 'Serviços' : 'Lojas'}</span>
-                                <span className="text-[9px] opacity-60">▼</span>
-                            </button>
-
-                            {/* CATEGORY FILTER CHIP (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
-                            {currentType === 'servicos' && (
+                                {/* CITY FILTER CHIP */}
                                 <button
-                                    onClick={() => setIsCategoryModalOpen(true)}
-                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCategories.length > 0
+                                    onClick={() => setIsCityModalOpen(true)}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCitySlug
                                         ? "bg-[#ecfdf5] border-brand-green text-brand-green"
                                         : "bg-white border-gray-200 text-brand-dark"
                                         }`}
                                 >
-                                    <span>Categoria</span>
-                                    {selectedCategories.length > 0 && <span className="text-[10px] font-extrabold">({selectedCategories.length})</span>}
-                                    <span className="text-[9px] opacity-60">▼</span>
+                                    <span>{selectedCitySlug ? formatCitySlug(selectedCitySlug) : "Selecione a Cidade"}</span>
                                 </button>
-                            )}
 
-                            {/* PROMOTION FILTER CHIP */}
-                            <button
-                                onClick={() => setPromoOn(!promoOn)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${promoOn
-                                    ? "bg-brand-green text-white border-brand-green"
-                                    : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
-                            >
-                                <span>Em Promoção</span>
-                            </button>
-
-                            {/* PRICE FILTER CHIP */}
-                            <button
-                                onClick={() => setIsPriceModalOpen(true)}
-                                className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${minPrice || maxPrice
-                                    ? "bg-[#ecfdf5] border-brand-green text-brand-green"
-                                    : "bg-white border-gray-200 text-brand-dark"
-                                    }`}
-                            >
-                                <span>Preço</span>
-                                {(minPrice || maxPrice) && <span className="font-extrabold text-[10px]">({minPrice ? `≥R$${minPrice}` : ""} {maxPrice ? `≤R$${maxPrice}` : ""})</span>}
-                                <span className="text-[9px] opacity-60">▼</span>
-                            </button>
-
-                            {/* CLEAR ALL FILTERS */}
-                            {activeFiltersCount > 0 && (
+                                {/* SORT FILTER CHIP */}
                                 <button
-                                    onClick={() => {
-                                        setSelectedCategories([])
-                                        setMinPrice("")
-                                        setMaxPrice("")
-                                        setPromoOn(false)
-                                        setSortBy("relevancia")
-                                        setCurrentType("tudo")
-                                        updateUrl(selectedCitySlug, [], query, "tudo")
-                                    }}
-                                    className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-full text-xs font-bold flex items-center gap-1 transition-all duration-200 select-none cursor-pointer"
+                                    onClick={() => setIsSortModalOpen(true)}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${sortBy !== "relevancia"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                        : "bg-white border-gray-200 text-brand-dark"
+                                        }`}
                                 >
-                                    <span>Limpar Filtros</span>
+                                    <span>Ordenar por: {sortBy === 'relevancia' ? 'Relevância' : sortBy === 'preco_menor' ? 'Menor Preço' : sortBy === 'preco_maior' ? 'Maior Preço' : 'Mais Recentes'}</span>
                                 </button>
-                            )}
+
+                                {/* TYPE FILTER CHIP */}
+                                <button
+                                    onClick={() => setIsTypeModalOpen(true)}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${currentType !== "tudo"
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                        : "bg-white border-gray-200 text-brand-dark"
+                                        }`}
+                                >
+                                    <span>Ver: {currentType === 'tudo' ? 'Tudo' : currentType === 'produtos' ? 'Produtos' : currentType === 'servicos' ? 'Serviços' : 'Lojas'}</span>
+                                </button>
+
+                                {/* CATEGORY FILTER CHIP (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
+                                {currentType === 'servicos' && (
+                                    <button
+                                        onClick={() => setIsCategoryModalOpen(true)}
+                                        className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${selectedCategories.length > 0
+                                            ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                            : "bg-white border-gray-200 text-brand-dark"
+                                            }`}
+                                    >
+                                        <span>Categoria</span>
+                                        {selectedCategories.length > 0 && <span className="text-[10px] font-extrabold">({selectedCategories.length})</span>}
+                                    </button>
+                                )}
+
+                                {/* PROMOTION FILTER CHIP */}
+                                <button
+                                    onClick={() => setPromoOn(!promoOn)}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${promoOn
+                                        ? "bg-brand-green text-white border-brand-green"
+                                        : "bg-white border-gray-200 text-brand-dark"
+                                        }`}
+                                >
+                                    <span>Em Promoção</span>
+                                </button>
+
+                                {/* PRICE FILTER CHIP */}
+                                <button
+                                    onClick={() => setIsPriceModalOpen(true)}
+                                    className={`px-4 py-2 border rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer ${minPrice || maxPrice
+                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green"
+                                        : "bg-white border-gray-200 text-brand-dark"
+                                        }`}
+                                >
+                                    <span>Preço</span>
+                                    {(minPrice || maxPrice) && <span className="font-extrabold text-[10px]">({minPrice ? `≥R$${minPrice}` : ""} {maxPrice ? `≤R$${maxPrice}` : ""})</span>}
+                                </button>
+
+                                {/* CLEAR ALL FILTERS */}
+                                {activeFiltersCount > 0 && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCategories([])
+                                            setMinPrice("")
+                                            setMaxPrice("")
+                                            setPromoOn(false)
+                                            setSortBy("relevancia")
+                                            setCurrentType("tudo")
+                                            updateUrl(selectedCitySlug, [], query, "tudo")
+                                        }}
+                                        className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-full text-xs font-bold flex items-center gap-1 transition-all duration-200 select-none cursor-pointer"
+                                    >
+                                        <span>Limpar Filtros</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* 4. MAIN PRODUCT & LOJA CONTENT SECTION */}
                 <div className="container mx-auto px-4 max-w-[1300px] flex-grow pb-24 lg:pb-12 mt-8">
@@ -910,10 +953,116 @@ export function ExplorarPageClient({
                                         </div>
                                     </div>
                                 </div>
+                            ) : isLandingPage ? (
+                                <div className="space-y-12">
+                                    <div>
+                                        <h2 className="text-[24px] md:text-[32px] font-black text-brand-dark tracking-tight mb-8">
+                                            Descubra o que tem em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
+                                        </h2>
+                                        
+                                        {/* Premium iFood-style Banners */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            {/* Banner 1: Produtos */}
+                                            <div
+                                                onClick={() => handleTypeChange("produtos")}
+                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#FF7A00] to-[#FF9E44] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                            >
+                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
+                                                    <div>
+                                                        <h3 className="text-2xl font-black mb-1">Produtos</h3>
+                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
+                                                            Roupas, eletrônicos, utilidades e mais com entrega rápida.
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
+                                                        Ver produtos
+                                                    </span>
+                                                </div>
+                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
+                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🛍️</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Banner 2: Serviços */}
+                                            <div
+                                                onClick={() => handleTypeChange("servicos")}
+                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#0052FF] to-[#4D82FF] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                            >
+                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
+                                                    <div>
+                                                        <h3 className="text-2xl font-black mb-1">Serviços</h3>
+                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
+                                                            Contrate reparos, beleza, aulas e consultorias locais.
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
+                                                        Contratar
+                                                    </span>
+                                                </div>
+                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
+                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🛠️</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Banner 3: Alimentação */}
+                                            <div
+                                                onClick={() => {
+                                                    setCurrentType("tudo")
+                                                    setSelectedCategories(["Alimentação"])
+                                                    updateUrl(selectedCitySlug, ["Alimentação"], query, "tudo")
+                                                }}
+                                                className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#EA1D2C] to-[#FF4D5A] p-6 h-[160px] md:h-[180px] text-white cursor-pointer select-none shadow-md hover:-translate-y-1 hover:shadow-lg hover:brightness-105 active:scale-[0.98] transition-all duration-300 group"
+                                            >
+                                                <div className="relative z-10 max-w-[65%] flex flex-col h-full justify-between">
+                                                    <div>
+                                                        <h3 className="text-2xl font-black mb-1">Alimentação</h3>
+                                                        <p className="text-[11px] md:text-xs text-white/90 leading-tight">
+                                                            Bateu a fome? Pratos, lanches, pizzas e doces pertinho de você.
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs font-extrabold uppercase tracking-wider bg-white/25 w-max px-3 py-1 rounded-full">
+                                                        Pedir agora
+                                                    </span>
+                                                </div>
+                                                <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-36 md:h-36 opacity-95 group-hover:scale-105 transition-transform duration-300 select-none">
+                                                    <span className="text-[80px] md:text-[90px] filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.15)]">🍔</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Infinite Scrolled Grid of Vitrines */}
+                                    <div>
+                                        <h3 className="text-[18px] lg:text-[22px] font-bold text-brand-dark mb-6 tracking-wide">
+                                            Lojas e Profissionais em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
+                                        </h3>
+                                        
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                            {normalizedInitialResults.map((item) => (
+                                                <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} />
+                                            ))}
+                                            
+                                            {/* INFINITE SCROLL OBSERVER */}
+                                            {hasNextPage && (
+                                                <div
+                                                    ref={observerTarget}
+                                                    className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
+                                                >
+                                                    {isFetchingNextPage ? (
+                                                        <div className="flex flex-col items-center gap-2 animate-pulse">
+                                                            <SkeletonLoader height={24} width={180} />
+                                                            <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
                                 <>
                                     {/* A. VITRINES (LOJAS) RELACIONADAS CAROUSEL (DOORDASH STYLE) */}
-                                    {selectedCategories.length === 0 && vitrinesDestaque.length > 0 && (
+                                    {selectedCategories.length === 0 && !query && vitrinesDestaque.length > 0 && (
                                         <HorizontalCarousel
                                             title="Lojas e Profissionais Recomendados"
                                             items={vitrinesDestaque}
@@ -923,7 +1072,7 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* B. FEED MODE: SHOW CAROUSELS BY CATEGORY FIRST */}
-                                    {selectedCategories.length === 0 && currentType === 'tudo' && categoriesWithProducts.length > 0 && (
+                                    {selectedCategories.length === 0 && !query && currentType === 'tudo' && categoriesWithProducts.length > 0 && (
                                         <div className="space-y-4">
                                             {categoriesWithProducts.map((catGroup) => (
                                                 <HorizontalCarousel
@@ -941,10 +1090,28 @@ export function ExplorarPageClient({
                                         </div>
                                     )}
 
+                                    {/* NEW: B.2 OUTROS ITENS CAROUSEL */}
+                                    {selectedCategories.length === 0 && !query && outrosItems.length > 0 && (
+                                        <HorizontalCarousel
+                                            title="Outros Itens"
+                                            items={outrosItems}
+                                            onSeeAll={() => {
+                                                setSelectedCategories(["Outros"])
+                                                updateUrl(selectedCitySlug, ["Outros"], query, currentType)
+                                            }}
+                                            renderItem={(item) => {
+                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                    : null
+                                                return <ItemCard product={item} userCoords={userCoords} />
+                                            }}
+                                        />
+                                    )}
+
                                     {/* C. MAIN LISTINGS (GRID OR CAROUSEL FALLBACK) */}
                                     {selectedCategories.length === 0 && (
                                         <div className="mt-8">
-                                            {currentType === 'tudo' && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
+                                            {currentType === 'tudo' && !query && categoriesWithProducts.length > 0 && remainingResults.length > 0 && (
                                                 <h3 className="text-[16px] lg:text-[20px] font-bold text-brand-dark mb-6 opacity-90 tracking-wide border-t border-gray-100 pt-8">
                                                     Outras ofertas incríveis
                                                 </h3>

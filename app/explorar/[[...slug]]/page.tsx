@@ -8,15 +8,29 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 
-export async function generateMetadata({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }): Promise<Metadata> {
-    const resolvedParams = await searchParams
-    const hasParams = Object.keys(resolvedParams).length > 0
+const CATEGORY_SLUG_MAP: { [key: string]: string } = {
+    "casa-e-utilidades": "Casa & Utilidades",
+    "moda-e-beleza": "Moda & Beleza",
+    "saude-e-bem-estar": "Saúde & Bem-estar",
+    "tecnologia-e-eletronicos": "Tecnologia & Eletrônicos",
+    "auto-e-moto": "Auto & Moto",
+    "pets": "Pets",
+    "construcao-e-ferramentas": "Construção & Ferramentas",
+    "agro-e-jardim": "Agro & Jardim",
+    "infantil-e-brinquedos": "Infantil & Brinquedos",
+    "alimentacao": "Alimentação"
+}
 
+export async function generateMetadata({ 
+    params 
+}: { 
+    params: Promise<{ slug?: string[] }> 
+}): Promise<Metadata> {
     return {
         title: "Explorar Produtos e Serviços Perto de Você | Dudit",
         description: "Chega de esperar dias pela entrega. Encontre os melhores produtos, serviços e negócios locais na sua cidade e compre sem pagar taxas extras.",
         robots: {
-            index: !hasParams,
+            index: true,
             follow: true
         },
         alternates: {
@@ -26,16 +40,22 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 }
 
 export default async function ExplorarPage({
+    params,
     searchParams,
 }: {
+    params: Promise<{ slug?: string[] }>
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+    const resolvedParams = await params
     const resolvedSearchParams = await searchParams
+
+    const slug = resolvedParams.slug || []
+    const cidade = slug[0] || ""
+    const categorySlug = slug[1] || ""
+    const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
 
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
-    const cidade = typeof resolvedSearchParams.cidade === "string" ? resolvedSearchParams.cidade : ""
-    const categoria = typeof resolvedSearchParams.categoria === "string" ? resolvedSearchParams.categoria : ""
 
     // Fetch user and products in parallel
     const [user, products] = await Promise.all([

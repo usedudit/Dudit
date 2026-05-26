@@ -489,7 +489,7 @@ async function searchMarketplacePostgresFTS(
                     return {
                         ...rest,
                         category: item.marketplace_category?.name || item.category?.name || null,
-                        subcategoryName: item.category?.name || null,
+                        subcategoryName: item.subcategory?.name || null,
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
