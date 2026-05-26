@@ -636,7 +636,6 @@ export const BusinessDataSubPage = ({
                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Horários de Funcionamento</h3>
                                         <BusinessHoursSelector value={hours as any} onChange={setHours} />
                                     </motion.div>
-/motion.div>
                                 </TabsContent>
 
                             </AnimatePresence>
