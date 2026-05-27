@@ -1,0 +1,128 @@
+import { getAdminClient } from "@/lib/supabase/admin"
+import { getOrderDetailsAction } from "@/app/actions/erp/orders"
+import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
+import { getCurrentUser } from "@/lib/auth/server-user"
+import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
+import SaleReceiptA4Preview from "@/components/erp/orders/receipt/SaleReceiptA4Preview"
+import SaleReceiptThermalPreview from "@/components/erp/orders/receipt/SaleReceiptThermalPreview"
+import PrintLayout from "@/components/erp/shared/PrintLayout"
+import { notFound, redirect } from "next/navigation"
+
+interface PageProps {
+    params: Promise<{ id: string }>
+    searchParams: Promise<{
+        format?: string
+        footerMessage?: string
+        showAcknowledgment?: string
+    }>
+}
+
+export default async function PrintReciboPage({ params, searchParams }: PageProps) {
+    const { id } = await params
+    const resolvedSearchParams = await searchParams
+    
+    const user = await getCurrentUser()
+    if (!user) {
+        redirect("/auth/login")
+    }
+
+    const supabase = getAdminClient()
+    let partnerId = ""
+
+    // Check orders table
+    const { data: orderData } = await supabase
+        .from("orders")
+        .select("partner_id")
+        .eq("id", id)
+        .maybeSingle()
+
+    if (orderData?.partner_id) {
+        partnerId = orderData.partner_id
+    } else {
+        // Fallback check sales table
+        const { data: saleData } = await supabase
+            .from("sales")
+            .select("partner_id")
+            .eq("id", id)
+            .maybeSingle()
+
+        if (saleData?.partner_id) {
+            partnerId = saleData.partner_id
+        }
+    }
+
+    if (!partnerId) {
+        notFound()
+    }
+
+    // Verify authorized access to view order details
+    try {
+        await requirePartnerAccessWithPermission(partnerId, "orders", "view", user)
+    } catch {
+        return (
+            <div className="p-8 text-center text-brand-red font-bold font-sans">
+                Acesso negado. Você não possui permissão para visualizar este recibo.
+            </div>
+        )
+    }
+
+    // Fetch order details
+    const orderRes = await getOrderDetailsAction(id, partnerId)
+    if (!orderRes.success || !orderRes.data) {
+        return (
+            <div className="p-8 text-center text-brand-red font-bold font-sans">
+                Recibo não encontrado.
+            </div>
+        )
+    }
+    const order = orderRes.data
+
+    // Fetch partner header and logo details
+    const [headerRes, partnerRes] = await Promise.all([
+        getPartnerReceiptHeaderAction(partnerId),
+        supabase.from("partners").select("image_url").eq("id", partnerId).maybeSingle()
+    ])
+
+    const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
+        fantasyName: "",
+        legalName: "",
+        addressLine: "",
+        taxIdLine: "",
+    }
+    const partnerAvatar = partnerRes.data?.image_url || undefined
+
+    // Build receipt payload
+    const receiptData = buildSaleReceiptFromOrder(order, partnerHeader, {
+        partnerAvatar,
+        sellerName: order.seller_name || undefined,
+        primaryColor: order.primary_color || undefined,
+        secondaryColor: order.secondary_color || undefined,
+    })
+
+    const format = resolvedSearchParams.format === "thermal" ? "thermal" : "a4"
+    const footerMessage = resolvedSearchParams.footerMessage || "Obrigado pela preferência!"
+    const showAcknowledgment = resolvedSearchParams.showAcknowledgment !== "false"
+
+    return (
+        <PrintLayout>
+            {format === "thermal" ? (
+                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm]">
+                    <SaleReceiptThermalPreview
+                        data={receiptData}
+                        footerMessage={footerMessage}
+                        showAcknowledgment={showAcknowledgment}
+                        printMode={true}
+                    />
+                </div>
+            ) : (
+                <SaleReceiptA4Preview
+                    data={receiptData}
+                    footerMessage={footerMessage}
+                    showAcknowledgment={showAcknowledgment}
+                    printMode={true}
+                />
+            )}
+        </PrintLayout>
+    )
+}

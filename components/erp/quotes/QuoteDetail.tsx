@@ -12,9 +12,11 @@ import {
     ThreeDotsIcon,
     TelegramIcon,
     ClockIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    DownloadIcon
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard, DefaultModal, DropdownItem } from '@/components/reusable';
+import { downloadPdf } from '@/lib/pdf/download';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
@@ -95,6 +97,26 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
     const router = useRouter();
     const debouncedRefresh = useDebouncedRefresh();
     const { setHeaderOverride } = useSidebar();
+
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        if (isGeneratingPdf || !quote) return;
+        setIsGeneratingPdf(true);
+        notifySuccess("PDF", "Gerando arquivo PDF. O download começará automaticamente em alguns instantes...");
+        try {
+            await downloadPdf(
+                `/api/pdf/orcamento/${quoteId}`,
+                `orcamento-${quote.quote_number || quoteId}.pdf`
+            );
+            notifySuccess("Sucesso", "O PDF foi baixado com sucesso!");
+        } catch (err: any) {
+            console.error(err);
+            notifyError("Erro ao gerar PDF", err.message || "Tente novamente mais tarde.");
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
 
     const handleBack = useCallback(() => onBack(), [onBack]);
 
@@ -340,9 +362,23 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3 pb-4">
                                     <ActionsDropdown
-                                        onPrint={() => { }}
-                                        onEmail={() => { }}
-                                        onShare={() => { }}
+                                        onPrint={() => window.open(`/print/orcamento/${quoteId}`, "_blank")}
+                                        onEmail={() => {
+                                            notifySuccess("E-mail", "O envio do PDF por e-mail estará disponível em breve.");
+                                        }}
+                                        onShare={() => {
+                                            const shareUrl = `${window.location.origin}/print/orcamento/${quoteId}`;
+                                            if (navigator.share) {
+                                                navigator.share({
+                                                    title: `Orçamento ${quote.quote_number || quoteId}`,
+                                                    text: `Confira a proposta comercial de ${quote.partnerName || 'Parceiro'}`,
+                                                    url: shareUrl
+                                                }).catch(console.error);
+                                            } else {
+                                                navigator.clipboard.writeText(shareUrl);
+                                                notifySuccess("Link copiado", "Link do orçamento copiado para a área de transferência.");
+                                            }
+                                        }}
                                         onDelete={() => setShowDeleteModal(true)}
                                         onDuplicate={() => { }}
                                     >
@@ -351,6 +387,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                                 <CheckCircleIcon className="w-4 h-4" /> Alterar status
                                             </DropdownItem>
                                         )}
+                                        <DropdownItem onClick={handleDownloadPdf}>
+                                            <DownloadIcon className="w-4 h-4" /> {isGeneratingPdf ? "Gerando..." : "Baixar PDF"}
+                                        </DropdownItem>
                                     </ActionsDropdown>
 
                                     <Button onClick={() => onEditQuote && onEditQuote(quote)} className="whitespace-nowrap">
@@ -541,9 +580,23 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-lg">
                     <ActionsDropdown
-                        onPrint={() => { }}
-                        onEmail={() => { }}
-                        onShare={() => { }}
+                        onPrint={() => window.open(`/print/orcamento/${quoteId}`, "_blank")}
+                        onEmail={() => {
+                            notifySuccess("E-mail", "O envio do PDF por e-mail estará disponível em breve.");
+                        }}
+                        onShare={() => {
+                            const shareUrl = `${window.location.origin}/print/orcamento/${quoteId}`;
+                            if (navigator.share) {
+                                navigator.share({
+                                    title: `Orçamento ${quote.quote_number || quoteId}`,
+                                    text: `Confira a proposta comercial de ${quote.partnerName || 'Parceiro'}`,
+                                    url: shareUrl
+                                }).catch(console.error);
+                            } else {
+                                navigator.clipboard.writeText(shareUrl);
+                                notifySuccess("Link copiado", "Link do orçamento copiado para a área de transferência.");
+                            }
+                        }}
                         onDelete={() => setShowDeleteModal(true)}
                         onDuplicate={() => { }}
                         trigger={
@@ -557,6 +610,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, initialQuote }: 
                                 <CheckCircleIcon className="w-4 h-4" /> Alterar status
                             </DropdownItem>
                         )}
+                        <DropdownItem onClick={handleDownloadPdf}>
+                            <DownloadIcon className="w-4 h-4" /> {isGeneratingPdf ? "Gerando..." : "Baixar PDF"}
+                        </DropdownItem>
                     </ActionsDropdown>
                     {canConvertToOrder && (
                         <Button

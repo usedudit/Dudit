@@ -16,6 +16,7 @@ import {
 import { applyQuotePreviewTheme } from "@/lib/quotes/quote-preview-theme"
 import SaleReceiptThermalPreview from "./SaleReceiptThermalPreview"
 import SaleReceiptA4Preview from "./SaleReceiptA4Preview"
+import { downloadPdf } from "@/lib/pdf/download"
 
 export type SaleReceiptPrintModalProps = {
     isOpen: boolean
@@ -93,21 +94,34 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
         window.print()
     }, [data])
 
-    const handleDownloadPdf = useCallback(() => {
-        if (format === "a4") {
-            notifyInfo(
-                "Salvar como PDF",
-                "Na janela de impressão, escolha 'Salvar como PDF' como destino da impressora.",
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+
+    const handleDownloadPdf = useCallback(async () => {
+        if (!receiptData) return
+        if (isGeneratingPdf) return
+
+        setIsGeneratingPdf(true)
+        notifyInfo("Gerando PDF", "Aguarde enquanto geramos o documento...")
+
+        try {
+            const queryParams = new URLSearchParams({
+                format,
+                footerMessage,
+                showAcknowledgment: String(showAcknowledgment)
+            })
+
+            await downloadPdf(
+                `/api/pdf/recibo/${receiptData.orderNumber}?${queryParams.toString()}`,
+                `recibo-${receiptData.orderNumber}.pdf`
             )
-            window.print()
-            return
+            notifyInfo("Sucesso", "O PDF foi baixado com sucesso!")
+        } catch (error: any) {
+            console.error(error)
+            notifyInfo("Erro", error.message || "Não foi possível gerar o PDF. Tente novamente.")
+        } finally {
+            setIsGeneratingPdf(false)
         }
-        notifyInfo(
-            "Impressora térmica",
-            "Use o botão Imprimir e selecione sua impressora térmica. Para PDF, altere o formato para A4.",
-        )
-        window.print()
-    }, [format, notifyInfo])
+    }, [receiptData, format, footerMessage, showAcknowledgment, notifyInfo, isGeneratingPdf])
 
     const formatOptions = useMemo(
         () => [
@@ -228,11 +242,11 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                                     />
 
                                     <div className="hidden lg:flex gap-3 pt-2">
-                                        <Button className="flex-1 h-12" onClick={handlePrint}>
+                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf}>
                                             <PrinterIcon className="w-5 h-5 mr-2" />
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf}>
+                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf}>
                                             <DownloadIcon className="w-5 h-5 mr-2" />
                                             {format === "a4" ? "Salvar PDF" : "Imprimir"}
                                         </Button>
@@ -241,11 +255,11 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
                                 {/* Mobile footer actions */}
                                 <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                    <Button className="flex-1 h-12" onClick={handlePrint}>
+                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf}>
                                         <PrinterIcon className="w-5 h-5 mr-2" />
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf}>
+                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf}>
                                         <DownloadIcon className="w-5 h-5 mr-2" />
                                         PDF
                                     </Button>

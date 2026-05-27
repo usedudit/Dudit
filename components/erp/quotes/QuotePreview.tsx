@@ -24,6 +24,7 @@ interface QuotePreviewProps {
     partnerName?: string;
     partnerAddress?: string;
     partnerAvatar?: string;
+    printMode?: boolean;
 }
 
 const QuotePreview = ({
@@ -44,7 +45,8 @@ const QuotePreview = ({
     quoteSubtitle,
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
-    partnerAvatar
+    partnerAvatar,
+    printMode = false
 }: QuotePreviewProps) => {
 
     // Advanced Pagination Logic
@@ -101,13 +103,20 @@ const QuotePreview = ({
     }, [quoteItems, note]);
 
     return (
-        <div className="flex flex-col w-full h-full bg-white dark:bg-dark-surface relative border-l border-brand-border dark:border-dark-border overflow-hidden">
-            <div className="absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm">
+        <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
+            printMode ? "quote-a4-print" : "border-l border-brand-border dark:border-dark-border"
+        }`}>
+            <div className={printMode ? "w-full p-0" : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm"}>
 
-                <div className="flex-1 overflow-auto custom-scrollbar p-12 flex flex-col items-center pt-12 space-y-8">
+                <div className={printMode ? "w-full flex flex-col items-center p-0" : "flex-1 overflow-auto custom-scrollbar p-12 flex flex-col items-center pt-12 space-y-8"}>
 
                     {pages.map((page, pageIndex) => (
-                        <div key={pageIndex} className="w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[1050px] flex flex-col">
+                        <div
+                            key={pageIndex}
+                            className={`w-[650px] min-w-[650px] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[1050px] flex flex-col ${
+                                printMode ? "pdf-print-page" : "shadow-md rounded-sm"
+                            }`}
+                        >
 
                             <div
                                 className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
