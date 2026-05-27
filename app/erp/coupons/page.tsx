@@ -1,5 +1,6 @@
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { listCouponsAction } from "@/app/actions/shared/coupons"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import CouponsPage from "@/components/erp/coupons/CouponsPage"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth/authorization"
@@ -21,9 +22,10 @@ export default async function CouponsRoute() {
   }
   const partnerId = context.partnerId
 
-  const [result, plan] = await Promise.all([
+  const [result, plan, partner] = await Promise.all([
     listCouponsAction(partnerId, { page: 1, limit: 100 }),
-    getPartnerPlan(partnerId)
+    getPartnerPlan(partnerId),
+    getPartnerProfile(partnerId)
   ])
 
   if (!result.success) {
@@ -42,6 +44,7 @@ export default async function CouponsRoute() {
       <FadeIn className="p-4">
         <CouponsPage
           partnerId={partnerId}
+          partner={partner}
           initialCoupons={isFreePlan ? [] : (result.data || [])}
           initialTotal={isFreePlan ? 0 : (result.total || 0)}
           planGate={planGate}

@@ -2145,7 +2145,7 @@ const PaymentModal = ({
                                         <SuccessActionCard
                                             icon={PrinterIcon}
                                             label="Imprimir NFC-e"
-                                            onClick={() => { }}
+                                            onClick={() => setIsSaleReceiptPrintOpen(true)}
                                         />
                                     </div>
                                 </motion.div>

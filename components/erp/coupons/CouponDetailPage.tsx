@@ -47,6 +47,7 @@ export default function CouponDetailPage({
     onEdit,
     onDelete,
     onToggleStatus,
+    onShare,
     isLoadingRelations,
 }: {
     coupon: CouponRow
@@ -55,6 +56,7 @@ export default function CouponDetailPage({
     onEdit: (coupon: CouponRow) => void
     onDelete: (coupon: CouponRow) => void
     onToggleStatus: (coupon: CouponRow) => void
+    onShare?: (coupon: CouponRow) => void
     isLoadingRelations: boolean
 }) {
     const [activeTab, setActiveTab] = useState("summary")
@@ -91,6 +93,7 @@ export default function CouponDetailPage({
                                         onCancel={() => onToggleStatus(coupon)}
                                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                                         onDelete={() => onDelete(coupon)}
+                                        onShare={onShare ? () => onShare(coupon) : undefined}
                                     />
                                     <Button onClick={() => onEdit(coupon)} className="whitespace-nowrap">
                                         <EditIcon className="w-[18px] h-[18px] mr-2" />
@@ -249,6 +252,7 @@ export default function CouponDetailPage({
                         onCancel={() => onToggleStatus(coupon)}
                         cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                         onDelete={() => onDelete(coupon)}
+                        onShare={onShare ? () => onShare(coupon) : undefined}
                         trigger={
                             <Button variant="outline" className="flex-1">
                                 Opcoes

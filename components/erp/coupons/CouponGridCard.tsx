@@ -22,10 +22,11 @@ interface CouponGridCardProps {
     onEdit?: (coupon: CouponRow) => void
     onToggleStatus?: (coupon: CouponRow) => void
     onDelete?: (coupon: CouponRow) => void
+    onShare?: (coupon: CouponRow) => void
 }
 
 const CouponGridCard = React.memo(
-    ({ coupon, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete }: CouponGridCardProps) => {
+    ({ coupon, selected, onSelect, onDetails, onEdit, onToggleStatus, onDelete, onShare }: CouponGridCardProps) => {
         return (
             <FadeIn
                 onClick={() => onDetails(coupon)}
@@ -97,6 +98,7 @@ const CouponGridCard = React.memo(
                                 onCancel={onToggleStatus ? () => onToggleStatus(coupon) : undefined}
                                 cancelLabel={coupon.is_active ? "Desativar" : "Ativar"}
                                 onDelete={onDelete ? () => onDelete(coupon) : undefined}
+                                onShare={onShare ? () => onShare(coupon) : undefined}
                             />
                         </div>
                     </div>

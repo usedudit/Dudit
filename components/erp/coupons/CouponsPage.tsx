@@ -38,9 +38,13 @@ import {
     getCouponStatusVariant,
     getCouponUsageCount,
     getCouponUsageSummary,
+    getCouponValueLabel,
     mapCouponToForm,
 } from "@/lib/types/coupon"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
@@ -75,11 +79,13 @@ const COLUMNS: { id: SortKey | "actions"; label: string; align: "left" | "center
 ]
 export default function CouponsPage({
     partnerId,
+    partner,
     initialCoupons,
     initialTotal,
     planGate,
 }: {
     partnerId: string
+    partner?: any
     initialCoupons: CouponRow[]
     initialTotal: number
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
@@ -118,6 +124,16 @@ export default function CouponsPage({
     const [isDeleting, setIsDeleting] = useState(false)
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
+    const [sharingCoupon, setSharingCoupon] = useState<CouponRow | null>(null)
+    const [localPartner, setLocalPartner] = useState<any>(partner || null)
+
+    useEffect(() => {
+        if (partner) {
+            setLocalPartner(partner)
+        } else if (partnerId) {
+            getPartnerProfile(partnerId).then(setLocalPartner).catch(console.error)
+        }
+    }, [partner, partnerId])
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -699,6 +715,7 @@ export default function CouponsPage({
                         onEdit={openEdit}
                         onDelete={handleDelete}
                         onToggleStatus={handleToggleStatus}
+                        onShare={setSharingCoupon}
                         isLoadingRelations={isLoadingRelations}
                     />
                 ) : (
@@ -856,6 +873,7 @@ export default function CouponsPage({
                                                                         onEdit={canEditCoupons ? openEdit : undefined}
                                                                         onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
                                                                         onDelete={canDeleteCoupons ? handleDelete : undefined}
+                                                                        onShare={setSharingCoupon}
                                                                     />
                                                                 ))}
                                                             </AnimatePresence>
@@ -934,6 +952,7 @@ export default function CouponsPage({
                                                                                 onEdit={canEditCoupons ? openEdit : undefined}
                                                                                 onToggleStatus={canEditCoupons ? handleToggleStatus : undefined}
                                                                                 onDelete={canDeleteCoupons ? handleDelete : undefined}
+                                                                                onShare={setSharingCoupon}
                                                                             />
                                                                         ))}
                                                                     </tbody>
@@ -975,6 +994,17 @@ export default function CouponsPage({
             />
 
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text} />
+
+            {sharingCoupon && (
+                <ShareModal
+                    isOpen={!!sharingCoupon}
+                    onClose={() => setSharingCoupon(null)}
+                    url={typeof window !== 'undefined' ? `${window.location.origin}${getPartnerUrl(localPartner)}?cupom=${sharingCoupon.code}` : ""}
+                    title={`Cupom ${sharingCoupon.code}`}
+                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Frete gratis" ? "frete grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
+                    label="Link com cupom"
+                />
+            )}
         </>
     )
 }
