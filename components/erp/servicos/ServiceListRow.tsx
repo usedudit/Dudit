@@ -21,6 +21,7 @@ interface ServiceListItemProps {
     onDuplicate: (service: any) => void
     onDelete: (service: any) => void
     onDetails: (service: any) => void
+    onShare: (service: any) => void
     /** Prefetch handlers for hover/touch-based entity preloading */
     onPrefetchMouseEnter?: () => void
     onPrefetchMouseLeave?: () => void
@@ -37,6 +38,7 @@ const ServiceListItem = React.memo(
         onDuplicate,
         onDelete,
         onDetails,
+        onShare,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
@@ -111,6 +113,7 @@ const ServiceListItem = React.memo(
                                 onEdit={() => onEdit(service)}
                                 onDuplicate={() => onDuplicate(service)}
                                 onDelete={() => onDelete(service)}
+                                onShare={() => onShare(service)}
                             />
                         </div>
                     )

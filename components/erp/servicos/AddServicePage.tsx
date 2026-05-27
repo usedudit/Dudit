@@ -15,6 +15,8 @@ import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getServiceUrl } from "@/lib/utils/url-generator"
 
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -59,6 +61,7 @@ interface AddServicePageProps {
     storeId?: string
     isLoadingDetails?: boolean
     onSave?: (data: any, isDraft?: boolean) => Promise<void>
+    partner?: any
 }
 
 export const AddServicePage: FC<AddServicePageProps> = ({
@@ -66,6 +69,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     isSaving = false, serviceId, initialData, onClose,
     partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
     onSave,
+    partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
     useEffect(() => { setInternalMode(initialModeProp) }, [initialModeProp])
@@ -415,6 +419,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         setServiceData((prev: any) => ({ ...prev, sku: randomCode }))
     }, [serviceData.name])
 
+    const [showShareModal, setShowShareModal] = useState(false)
+
     const handleDuplicateService = useCallback(() => {
         setOriginalNameForDuplicate(serviceData.name)
         setServiceData({ ...serviceData, id: crypto.randomUUID(), sku: "", name: `${serviceData.name} (Cópia)`, images: [...(serviceData.images || [])] })
@@ -482,6 +488,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             <>
                                                 <ActionsDropdown
                                                     onDuplicate={handleDuplicateService}
+                                                    onShare={() => setShowShareModal(true)}
                                                     onDelete={() => setShowDeleteModal(true)}
                                                 />
                                                 <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails}>
@@ -596,6 +603,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                             <>
                                 <ActionsDropdown
                                     onDuplicate={handleDuplicateService}
+                                    onShare={() => setShowShareModal(true)}
                                     onDelete={() => setShowDeleteModal(true)}
                                     trigger={
                                         <Button
@@ -641,6 +649,17 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                     description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso."
                     confirmText="Sair sem salvar"
                     variant="warning"
+                />
+            )}
+
+            {showShareModal && (
+                <ShareModal
+                    isOpen={showShareModal}
+                    onClose={() => setShowShareModal(false)}
+                    url={typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(serviceData, partner)}` : ""}
+                    title={serviceData.name}
+                    shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${serviceData.name}*\nConfere aqui os detalhes:`}
+                    label="Link do serviço"
                 />
             )}
 

@@ -23,8 +23,10 @@ import {
 } from "@/app/actions/erp/servicos"
 
 // Components
-import { Button, IconPlaceholder, Checkbox } from "@/components/reusable"
+import { Button, IconPlaceholder, Checkbox, SelectionBanner } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getServiceUrl } from "@/lib/utils/url-generator"
 
 // New Component Imports
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -142,7 +144,8 @@ export default function ServicesPage({
     initialNextCursor,
     initialHasMore,
     partnerId,
-}: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; }) {
+    partner,
+}: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
     const { toast } = useToast()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -240,6 +243,7 @@ export default function ServicesPage({
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as any })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
+    const [sharingService, setSharingService] = useState<any>(null)
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
@@ -473,6 +477,7 @@ export default function ServicesPage({
                         service={formService}
                         onBack={closeEntity}
                         partnerId={partnerId}
+                        partner={partner}
                         storeId={selectedStore?.id}
                         isLoadingDetails={isLoadingDetail}
                         onClose={handleFormClose}
@@ -555,6 +560,14 @@ export default function ServicesPage({
                                     ) : (
                                         <AnimatePresence mode="wait">
                                             <FadeIn key={effectiveViewMode} className="w-full">
+                                                <SelectionBanner
+                                                    selectedCount={selection.ids.size}
+                                                    totalCount={sortedServices.length}
+                                                    onSelectAll={() => setSelection(p => ({ ...p, ids: new Set(sortedServices.map(s => s.id)) }))}
+                                                    onClearSelection={() => setSelection(p => ({ ...p, ids: new Set() }))}
+                                                    itemName="serviços"
+                                                    singularItemName="serviço"
+                                                />
                                                 {effectiveViewMode === "grid" ? (
                                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((service) => {
@@ -569,6 +582,7 @@ export default function ServicesPage({
                                                                     onDuplicate={() => handleDuplicateService(service)}
                                                                     onDelete={() => handleDeleteService(service)}
                                                                     onDetails={() => handleDetailsService(service)}
+                                                                    onShare={() => setSharingService(service)}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                     onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                     onPrefetchTouchStart={prefetch.onTouchStart}
@@ -661,6 +675,7 @@ export default function ServicesPage({
                                                                                 onDuplicate={handleDuplicateService}
                                                                                 onDelete={handleDeleteService}
                                                                                 onDetails={handleDetailsService}
+                                                                                onShare={(srv) => setSharingService(srv)}
                                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                                 onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                                 onPrefetchTouchStart={prefetch.onTouchStart}
@@ -741,6 +756,17 @@ export default function ServicesPage({
                 confirmText="Confirmar"
                 cancelText="Cancelar"
             />
+
+            {sharingService && (
+                <ShareModal
+                    isOpen={!!sharingService}
+                    onClose={() => setSharingService(null)}
+                    url={typeof window !== 'undefined' ? `${window.location.origin}${getServiceUrl(sharingService, partner)}` : ""}
+                    title={sharingService.name}
+                    shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${sharingService.name}*\nConfere aqui os detalhes:`}
+                    label="Link do serviço"
+                />
+            )}
 
             {actionModal.open && (
                 <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">

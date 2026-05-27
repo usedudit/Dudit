@@ -23,6 +23,8 @@ import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Spinner } from "@/components/reusable/Spinner"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getProductUrl } from "@/lib/utils/url-generator"
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -83,6 +85,7 @@ interface AddProductPageProps {
     onSave?: (data: any, isDraft?: boolean) => Promise<{ success: boolean; error?: string } | void>
     onDuplicate?: (product: Product) => void
     onDelete?: () => void
+    partner?: any
 }
 
 const AddProductPage: FC<AddProductPageProps> = ({
@@ -90,6 +93,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     isSaving = false, productId, initialData, onClose, unidadesMedida = [],
     partnerId: propPartnerId, storeId: propStoreId, isLoadingDetails = false,
     onSave,
+    partner,
 }) => {
     const [internalMode, setInternalMode] = useState(initialModeProp)
     useEffect(() => { setInternalMode(initialModeProp) }, [initialModeProp])
@@ -644,10 +648,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
         notifyInfo("Duplicando produto", "Edite e salve o novo produto.")
     }, [productData, setMode, notifyInfo])
 
+    const [showShareModal, setShowShareModal] = useState(false)
+
     const handleShareProduct = useCallback(() => {
-        navigator.clipboard.writeText(`${window.location.origin}/produto/${productData.sku || initialProduct?.sku || ""}`)
-        notifySuccess("Link copiado!")
-    }, [productData.sku, initialProduct?.sku, notifySuccess])
+        setShowShareModal(true)
+    }, [])
     const dateCreated = productData.created_at
         ? new Date(productData.created_at).toLocaleDateString("pt-BR")
         : "N/A"
@@ -992,6 +997,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         </div>
                     </div>
                 </DefaultModal>
+
+                {showShareModal && (
+                    <ShareModal
+                        isOpen={showShareModal}
+                        onClose={() => setShowShareModal(false)}
+                        url={typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(productData, partner)}` : ""}
+                        title={productData.name}
+                        shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${productData.name}*\nConfere aqui os detalhes:`}
+                        label="Link do produto"
+                    />
+                )}
 
                 <SavingStatusModal
                     isOpen={isSavingProduct}

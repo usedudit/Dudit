@@ -10,7 +10,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard, Tooltip } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard, Tooltip, SelectionBanner } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -797,6 +797,14 @@ export default function OrdersPage({
                                                 key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
                                                 className="w-full"
                                             >
+                                                <SelectionBanner
+                                                    selectedCount={selection.ids.size}
+                                                    totalCount={filteredOrders.length}
+                                                    onSelectAll={() => setSelection({ ids: new Set(filteredOrders.map(o => o.originalId)) })}
+                                                    onClearSelection={() => setSelection({ ids: new Set() })}
+                                                    itemName="pedidos"
+                                                    singularItemName="pedido"
+                                                />
                                                 {isMobile ? (
                                                     <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
                                                         {paginated.map((o: Order) => (

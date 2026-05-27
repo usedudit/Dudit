@@ -33,7 +33,7 @@ import {
 } from "@/app/actions/erp/products"
 
 // Components
-import { Button, Checkbox, IconPlaceholder } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, SelectionBanner } from "@/components/reusable"
 import Dropdown from "../../reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import AlertModal from "../../reusable/AlertModal"
@@ -43,6 +43,8 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getProductUrl } from "@/lib/utils/url-generator"
 
 // New Component Imports
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -182,8 +184,9 @@ export default function ProductsPage({
     initialNextCursor,
     initialHasMore,
     partnerId,
+    partner,
     suppliers,
-}: { products: Product[]; initialNextCursor: ERPProductListCursor | null; initialHasMore: boolean; partnerId: string; suppliers: any[] }) {
+}: { products: Product[]; initialNextCursor: ERPProductListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; suppliers: any[] }) {
     const router = useRouter()
     const { error: notifyError, success: notifySuccess } = useNotification()
     const { selectedStore } = useStore()
@@ -258,6 +261,7 @@ export default function ProductsPage({
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as Product | null })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
+    const [sharingProduct, setSharingProduct] = useState<Product | null>(null)
     const [viewMode, setViewModeState] = useState<"list" | "grid">("list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>({
@@ -679,6 +683,7 @@ export default function ProductsPage({
                         suppliers={suppliers}
                         unidadesMedida={UNIDADES_MEDIDA}
                         partnerId={partnerId}
+                        partner={partner}
                         storeId={selectedStore?.id || ""}
                         isLoadingDetails={isLoadingDetail}
                     />
@@ -780,6 +785,14 @@ export default function ProductsPage({
                                     ) : (
                                         <AnimatePresence mode="wait">
                                             <FadeIn key={effectiveViewMode} className="w-full">
+                                                <SelectionBanner
+                                                    selectedCount={selection.ids.size}
+                                                    totalCount={sortedProducts.length}
+                                                    onSelectAll={() => setSelection(p => ({ ...p, ids: new Set(sortedProducts.map(prod => prod.id)) }))}
+                                                    onClearSelection={() => setSelection(p => ({ ...p, ids: new Set() }))}
+                                                    itemName="produtos"
+                                                    singularItemName="produto"
+                                                />
                                                 {effectiveViewMode === "grid" ? (
                                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((product) => {
@@ -794,6 +807,7 @@ export default function ProductsPage({
                                                                     onDetails={() => handleDetailsProduct(product)}
                                                                     onDelete={() => handleDeleteProduct(product)}
                                                                     onDuplicate={() => handleDuplicateProduct(product)}
+                                                                    onShare={() => setSharingProduct(product)}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                     onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                     onPrefetchTouchStart={prefetch.onTouchStart}
@@ -868,6 +882,7 @@ export default function ProductsPage({
                                                                                 onDetails={handleDetailsProduct}
                                                                                 onDelete={handleDeleteProduct}
                                                                                 onDuplicate={handleDuplicateProduct}
+                                                                                onShare={(prod) => setSharingProduct(prod)}
                                                                                 suppliers={[]}
                                                                                 onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                                 onPrefetchMouseLeave={prefetch.onMouseLeave}
@@ -987,6 +1002,17 @@ export default function ProductsPage({
             >
                 <div className="p-8 text-center text-gray-500">Funcionalidade de exportação em breve.</div>
             </DefaultModal>
+
+            {sharingProduct && (
+                <ShareModal
+                    isOpen={!!sharingProduct}
+                    onClose={() => setSharingProduct(null)}
+                    url={typeof window !== 'undefined' ? `${window.location.origin}${getProductUrl(sharingProduct, partner)}` : ""}
+                    title={sharingProduct.name}
+                    shareMessage={`🔥 Olha esse achado na Dudit!\n\n*${sharingProduct.name}*\nConfere aqui os detalhes:`}
+                    label="Link do produto"
+                />
+            )}
 
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
         </>

@@ -10,7 +10,7 @@ import {
     RotateIcon,
     Package
 } from '@/lib/icons';
-import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal, SelectionBanner } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
@@ -456,6 +456,14 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                             key={activeTab + viewMode}
                                             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
                                         >
+                                            <SelectionBanner
+                                                selectedCount={selection.ids.size}
+                                                totalCount={filteredMovements.length}
+                                                onSelectAll={() => setSelection({ ids: new Set(filteredMovements.map(m => m.id)) })}
+                                                onClearSelection={() => setSelection({ ids: new Set() })}
+                                                itemName="movimentações"
+                                                singularItemName="movimentação"
+                                            />
                                             {isMobile ? (
                                                 <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
                                                     {paginatedMovements.map((mov) => {

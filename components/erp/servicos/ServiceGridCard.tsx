@@ -14,6 +14,7 @@ interface ServiceGridCardProps {
     onDelete: () => void
     onDuplicate: () => void
     onDetails: () => void
+    onShare: () => void
     /** Prefetch handlers for hover/touch-based entity preloading */
     onPrefetchMouseEnter?: () => void
     onPrefetchMouseLeave?: () => void
@@ -29,6 +30,7 @@ const ServiceGridCard = React.memo(
         onDelete,
         onDuplicate,
         onDetails,
+        onShare,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
@@ -143,6 +145,7 @@ const ServiceGridCard = React.memo(
                                 onEdit={onEdit}
                                 onDuplicate={onDuplicate}
                                 onDelete={onDelete}
+                                onShare={onShare}
                             />
                         </div>
                     </div>

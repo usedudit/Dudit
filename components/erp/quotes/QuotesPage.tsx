@@ -6,7 +6,7 @@ import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant, SelectionBanner } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
@@ -588,6 +588,14 @@ export default function QuotesPage({
                                                 key={activeTab + viewMode}
                                                 className="w-full"
                                             >
+                                                <SelectionBanner
+                                                    selectedCount={selection.ids.size}
+                                                    totalCount={filteredQuotes.length}
+                                                    onSelectAll={() => setSelection({ ids: new Set(filteredQuotes.map(q => q.originalId)) })}
+                                                    onClearSelection={() => setSelection({ ids: new Set() })}
+                                                    itemName="orçamentos"
+                                                    singularItemName="orçamento"
+                                                />
                                                 {isTablet ? (
                                                     <div className="flex flex-col w-full">
                                                         {paginated.map((q: Quote, idx) => (

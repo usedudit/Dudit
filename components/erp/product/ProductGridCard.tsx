@@ -16,6 +16,7 @@ interface ProductGridCardProps {
     onDelete: () => void
     onDuplicate: () => void
     onDetails: () => void
+    onShare: () => void
     /** Prefetch handlers for hover/touch-based entity preloading */
     onPrefetchMouseEnter?: () => void
     onPrefetchMouseLeave?: () => void
@@ -31,6 +32,7 @@ const ProductGridCard = React.memo(
         onDelete,
         onDuplicate,
         onDetails,
+        onShare,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
@@ -173,6 +175,7 @@ const ProductGridCard = React.memo(
                                 onEdit={onEdit}
                                 onDuplicate={onDuplicate}
                                 onDelete={onDelete}
+                                onShare={onShare}
                             />
                         </div>
                     </div>

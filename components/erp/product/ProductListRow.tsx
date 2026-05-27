@@ -23,6 +23,7 @@ interface ProductListItemProps {
     onDuplicate: (product: Product) => void
     onDelete: (product: Product) => void
     onDetails: (product: Product) => void
+    onShare: (product: Product) => void
     suppliers: any[]
     /** Prefetch handlers for hover/touch-based entity preloading */
     onPrefetchMouseEnter?: () => void
@@ -40,6 +41,7 @@ const ProductListItem = React.memo(
         onDuplicate,
         onDelete,
         onDetails,
+        onShare,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
@@ -151,6 +153,7 @@ const ProductListItem = React.memo(
                                 onEdit={() => onEdit(product)}
                                 onDuplicate={() => onDuplicate(product)}
                                 onDelete={() => onDelete(product)}
+                                onShare={() => onShare(product)}
                             />
                         </div>
                     )

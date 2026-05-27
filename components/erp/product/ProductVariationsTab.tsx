@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Checkbox, Button, IconPlaceholder, Input, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Button, IconPlaceholder, Input, ActionsDropdown, SelectionBanner } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { Spinner } from "@/components/reusable/Spinner"
 import Pagination from "@/components/reusable/Pagination"
@@ -786,6 +786,14 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                     </div>
 
                     {/* Table/Grid Container */}
+                    <SelectionBanner
+                        selectedCount={selectedIds.size}
+                        totalCount={filteredVariations.length}
+                        onSelectAll={() => setSelectedIds(new Set(filteredVariations.map(v => v.id)))}
+                        onClearSelection={() => setSelectedIds(new Set())}
+                        itemName="variantes"
+                        singularItemName="variante"
+                    />
                     <div className="w-full bg-white dark:bg-dark-surface rounded-xl relative border border-transparent dark:border-dark-border/20">
 
                         {/* Mobile Grid/List View */}

@@ -10,7 +10,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 
 // Components
-import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -476,6 +476,14 @@ export default function CustomersPage({
                                             key={activeTab + viewMode}
                                             className="w-full"
                                         >
+                                            <SelectionBanner
+                                                selectedCount={selection.ids.size}
+                                                totalCount={filteredCustomers.length}
+                                                onSelectAll={() => setSelection({ ids: new Set(filteredCustomers.map(c => c.originalId)) })}
+                                                onClearSelection={() => setSelection({ ids: new Set() })}
+                                                itemName="clientes"
+                                                singularItemName="cliente"
+                                            />
                                             {isMobile ? (
                                                 <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
                                                     {paginated.map((c: Customer) => {
