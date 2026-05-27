@@ -992,7 +992,7 @@ export function ProductDetailsPageClient({
                     document.body
                 )}
 
-                <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
                         <Link href="/" prefetch={true} className="hover:text-brand-dark transition-colors">Início</Link>

@@ -80,6 +80,7 @@ async function seedRedis() {
         .select(`
             id, name, description, price, promotional_price, images, rating,
             category_id, category:product_categories!category_id(name), created_at,
+            marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
         `)
@@ -98,8 +99,10 @@ async function seedRedis() {
             const variantFallback = extractFirstVariantFallback((item as any).product_variants)
             const { product_variants, ...rest } = item
             
-            const categoryName = (item.category as any)?.name || null
-            const produtoNormalizado = { ...rest, category: categoryName, itemType: 'produto', partners: partner, ...variantFallback }
+            const mCat = item.marketplace_category as any
+            const categoryName = mCat?.parent?.name || mCat?.name || (item.category as any)?.name || null
+            const subcategoryName = mCat?.parent ? mCat.name : null
+            const produtoNormalizado = { ...rest, category: categoryName, subcategoryName, itemType: 'produto', partners: partner, ...variantFallback }
             const score = new Date(item.created_at).getTime()
             const globalId = `produto:${item.id}`
 
@@ -154,15 +157,25 @@ async function seedRedis() {
     console.log("Buscando Vitrines...")
     const { data: vitrines } = await supabase
         .from("partners")
-        .select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, addresses(city, state)`)
+        .select(`
+            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at,
+            category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
+            addresses(city, state),
+            reviews(count)
+        `)
         .eq("is_active", true)
 
     if (vitrines) {
         for (const item of vitrines) {
+            const city = item.addresses?.[0]?.city || null
+            const state = item.addresses?.[0]?.state || null
+            const reviewsCount = item.reviews?.[0]?.count || 0
+            const cat = item.category as any
+            const categoryName = cat?.parent?.name || cat?.name || 'Loja Parceira'
             const vitrineNormalizada = {
                 id: item.id, name: item.store_name, description: item.store_description,
                 images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                rating: item.rating, itemType: 'loja', category: 'Loja Parceira',
+                rating: item.rating, itemType: 'loja', category: categoryName,
                 partners: {
                     id: item.id, store_name: item.store_name,
                     store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
@@ -170,7 +183,7 @@ async function seedRedis() {
                     logo_moderation_status: item.logo_moderation_status || "approved",
                     banner_moderation_status: item.banner_moderation_status || "approved",
                     latitude: item.latitude, longitude: item.longitude,
-                    city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
+                    city, state, reviewsCount
                 }
             }
             const score = new Date(item.created_at).getTime()

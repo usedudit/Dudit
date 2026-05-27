@@ -692,7 +692,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                     {/* Collapsible Order Summary Bottom Sheet - Tablet/Mobile only */}
                     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border shadow-[0_-4px_12px_rgba(0,0,0,0.08)] block lg:hidden pb-safe">
-                        <div className="max-w-[1300px] mx-auto px-6 py-4">
+                        <div className="max-w-[1400px] mx-auto px-6 py-4">
                             <AnimatePresence>
                                 {isBottomSummaryOpen && (
                                     <motion.div

@@ -247,6 +247,10 @@ async function syncAppointmentReceivable(params: {
   const ref = `appointment:${params.appointment.id}:receivable`
   const status = String(params.appointment.status || "")
   const totalAmount = Number(params.appointment.price || 0)
+
+  // Guard: não criar receivable para agendamentos sem valor (R$0)
+  if (totalAmount <= 0.009) return params.currentReceivableId || null
+
   const paidAmount = Number(params.appointment.paid_amount || 0)
   const remaining = Math.max(0, totalAmount - paidAmount)
   const shouldBePending = !isPaidStatus(status) && remaining > 0.009
@@ -311,8 +315,8 @@ async function syncAppointmentReceivable(params: {
     await params.supabase
       .from("transactions")
       .update({
-        amount: 0,
-        original_amount: 0,
+        amount: totalAmount,
+        original_amount: totalAmount,
         status: "paid",
         payment_date: new Date().toISOString(),
       })

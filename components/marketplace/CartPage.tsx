@@ -10,7 +10,7 @@ import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction } from "@/app/actions/marketplace/cart"
+import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
 import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
@@ -66,9 +66,27 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             ? `${item.products.name} - ${item.product_variants.variant_name}`
             : item.products.name
 
+    const isItemOutOfStock = (item: any): boolean => {
+        if (item.variant_id && item.product_variants) {
+            const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
+            return stock <= 0
+        }
+        return false
+    }
+
+    const getAlternativePrice = (alt: any, product: any) => {
+        const variantPrice = Number(alt.price_adjustment)
+        if (variantPrice > 0) return variantPrice
+        const basePrice = Number(product.price)
+        const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
+        return promoPrice > 0 && promoPrice < basePrice ? promoPrice : basePrice
+    }
+
     // Resolve optimistic overrides per item
-    const getItemSelected = (item: any): boolean =>
-        optimisticItems[item.id]?.selected ?? (item.selected !== false)
+    const getItemSelected = (item: any): boolean => {
+        if (isItemOutOfStock(item)) return false
+        return optimisticItems[item.id]?.selected ?? (item.selected !== false)
+    }
 
     const getItemQuantity = (item: any): number =>
         optimisticItems[item.id]?.quantity ?? item.quantity
@@ -90,6 +108,27 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             // Removed router.refresh() - optimistic state update handles UI
         } catch {
             setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
+        } finally {
+            setLoading(null)
+            isActionInProgress.current = false
+        }
+    }
+
+    const switchVariant = async (cartItemId: string, newVariantId: string) => {
+        if (loading || isActionInProgress.current) return
+        isActionInProgress.current = true
+        setLoading(cartItemId)
+        try {
+            const token = await getCsrfToken()
+            const res = await switchCartItemVariantAction(cartItemId, newVariantId, token)
+            if (res?.error) {
+                notifyError(res.error)
+            } else {
+                notifySuccess("Variante alterada com sucesso!")
+                invalidateCartCache()
+            }
+        } catch (err: any) {
+            notifyError("Erro ao alterar variante.")
         } finally {
             setLoading(null)
             isActionInProgress.current = false
@@ -136,9 +175,12 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         const newState = !currentAllSelected
         setLoading(partnerId)
 
-        // Optimistically update all items
+        // Filter to only items that are in stock
+        const targetItems = items.filter(item => !isItemOutOfStock(item))
+
+        // Optimistically update target items
         const updates: Record<string, { selected: boolean }> = {}
-        items.forEach(item => {
+        targetItems.forEach(item => {
             updates[item.id] = { ...optimisticItems[item.id], selected: newState }
         })
         setOptimisticItems(prev => ({ ...prev, ...updates }))
@@ -248,7 +290,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
             <MarketplaceHeader />
 
-            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
                 <div className="flex items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Minha sacola</h1>
@@ -278,7 +320,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const partnerDeliveryFee = getPartnerDeliveryFee(data)
                                 const partnerTotalWithDelivery = partnerItemsTotal > 0 ? partnerItemsTotal + partnerDeliveryFee : 0
                                 const expanded = isExpanded(partnerId)
-                                const allSelected = data.items.every((item: any) => getItemSelected(item))
+                                const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
+                                const allSelected = inStockItems.length > 0 && inStockItems.every((item: any) => getItemSelected(item))
                                 const sellerImage = data.partner?.store_image_url
 
                                 return (
@@ -339,107 +382,183 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         <div key={item.id} className={`pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"}`}>
 
                                                                             {/* Mobile/Tablet Layout (< md) */}
-                                                                            <div className="flex md:hidden gap-3">
-                                                                                <div className="flex items-start pt-1 shrink-0">
-                                                                                    <Checkbox
-                                                                                        id={`cart-item-mob-${item.id}`}
-                                                                                        checked={itemSelected}
-                                                                                        onChange={() => toggleItemSelection(item.id, itemSelected)}
-                                                                                        disabled={loading === item.id}
-                                                                                    />
-                                                                                </div>
+                                                                            {(() => {
+                                                                                const isOutOfStock = isItemOutOfStock(item);
+                                                                                return (
+                                                                                    <div className="flex flex-col">
+                                                                                        <div className={`flex md:hidden gap-3 ${isOutOfStock ? "opacity-75" : ""}`}>
+                                                                                            <div className="flex items-start pt-1 shrink-0">
+                                                                                                <Checkbox
+                                                                                                    id={`cart-item-mob-${item.id}`}
+                                                                                                    checked={isOutOfStock ? false : itemSelected}
+                                                                                                    onChange={() => !isOutOfStock && toggleItemSelection(item.id, itemSelected)}
+                                                                                                    disabled={loading === item.id || isOutOfStock}
+                                                                                                />
+                                                                                            </div>
 
-                                                                                <Link
-                                                                                    href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                    prefetch={false}
-                                                                                    className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
-                                                                                >
-                                                                                    <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                                                                </Link>
+                                                                                            <Link
+                                                                                                href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                prefetch={false}
+                                                                                                className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
+                                                                                            >
+                                                                                                <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                            </Link>
 
-                                                                                <div className="flex-1 min-w-0">
-                                                                                    <div className="flex items-start justify-between gap-2">
-                                                                                        <Link
-                                                                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                            prefetch={false}
-                                                                                            className="text-[14px] font-medium text-brand-dark dark:text-dark-heading line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
-                                                                                        >
-                                                                                            {item.products.name}
-                                                                                        </Link>
-                                                                                        <button
-                                                                                            onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                            className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
-                                                                                            disabled={loading === item.id}
-                                                                                        >
-                                                                                            <TrashIcon size={16} />
-                                                                                        </button>
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="flex items-start justify-between gap-2">
+                                                                                                    <Link
+                                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                        prefetch={false}
+                                                                                                        className="text-[14px] font-medium text-brand-dark dark:text-dark-heading line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
+                                                                                                    >
+                                                                                                        {item.products.name}
+                                                                                                    </Link>
+                                                                                                    <button
+                                                                                                        onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                                        className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
+                                                                                                        disabled={loading === item.id}
+                                                                                                    >
+                                                                                                        <TrashIcon size={16} />
+                                                                                                    </button>
+                                                                                                </div>
+
+                                                                                                {item.variant_id && item.product_variants && (
+                                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">
+                                                                                                        {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
+                                                                                                    </p>
+                                                                                                )}
+
+                                                                                                <div className="flex items-center justify-between mt-2">
+                                                                                                    {isOutOfStock ? (
+                                                                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50">
+                                                                                                            Esgotado
+                                                                                                        </span>
+                                                                                                    ) : (
+                                                                                                        <QuantitySelector
+                                                                                                            value={itemQty}
+                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                                            disabled={loading === item.id}
+                                                                                                            size="sm"
+                                                                                                        />
+                                                                                                    )}
+                                                                                                    <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemPrice(item)) : formatCurrency(getItemPrice(item) * itemQty)}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
+                                                                                            <div className="mt-3 pl-8 md:hidden">
+                                                                                                <div className="bg-brand-gray/30 dark:bg-zinc-800/40 p-3 rounded-xl border border-brand-border dark:border-dark-border text-xs">
+                                                                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-1.5">
+                                                                                                        <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                                                                                                        Disponível em outra(s) variante(s):
+                                                                                                    </p>
+                                                                                                    <div className="flex flex-wrap gap-2">
+                                                                                                        {item.available_alternatives.map((alt: any) => (
+                                                                                                            <button
+                                                                                                                key={alt.id}
+                                                                                                                onClick={() => switchVariant(item.id, alt.id)}
+                                                                                                                disabled={loading === item.id}
+                                                                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                                                                                                            >
+                                                                                                                <span>{alt.variant_name}</span>
+                                                                                                                <span className="text-brand-inactive-text">•</span>
+                                                                                                                <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
+                                                                                                            </button>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
-
-                                                                                    {item.variant_id && item.product_variants && (
-                                                                                        <p className="text-[12px] text-brand-inactive-text mt-0.5">
-                                                                                            {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
-                                                                                        </p>
-                                                                                    )}
-
-                                                                                    <div className="flex items-center justify-between mt-2">
-                                                                                        <QuantitySelector
-                                                                                            value={itemQty}
-                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
-                                                                                            disabled={loading === item.id}
-                                                                                            size="sm"
-                                                                                        />
-                                                                                        <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item) * itemQty)}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
+                                                                                );
+                                                                            })()}
 
                                                                             {/* Desktop Layout (>= md) */}
-                                                                            <div className="hidden md:flex gap-4">
-                                                                                <div className="flex items-center shrink-0">
-                                                                                    <Checkbox
-                                                                                        id={`cart-item-${item.id}`}
-                                                                                        checked={itemSelected}
-                                                                                        onChange={() => toggleItemSelection(item.id, itemSelected)}
-                                                                                        disabled={loading === item.id}
-                                                                                    />
-                                                                                </div>
+                                                                            {(() => {
+                                                                                const isOutOfStock = isItemOutOfStock(item);
+                                                                                return (
+                                                                                    <div className="hidden md:block">
+                                                                                        <div className="flex gap-4">
+                                                                                            <div className="flex items-center shrink-0">
+                                                                                                <Checkbox
+                                                                                                    id={`cart-item-${item.id}`}
+                                                                                                    checked={isOutOfStock ? false : itemSelected}
+                                                                                                    onChange={() => !isOutOfStock && toggleItemSelection(item.id, itemSelected)}
+                                                                                                    disabled={loading === item.id || isOutOfStock}
+                                                                                                />
+                                                                                            </div>
 
-                                                                                <div className="flex-1 flex md:justify-between md:items-center gap-4">
-                                                                                    <Link
-                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                        prefetch={false}
-                                                                                        className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
-                                                                                    >
-                                                                                        <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
-                                                                                    </Link>
+                                                                                            <div className={`flex-1 flex md:justify-between md:items-center gap-4 ${isOutOfStock ? "opacity-75" : ""}`}>
+                                                                                                <Link
+                                                                                                    href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                    prefetch={false}
+                                                                                                    className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
+                                                                                                >
+                                                                                                    <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                                </Link>
 
-                                                                                    <div className="flex-1">
-                                                                                        <Link
-                                                                                            href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
-                                                                                            prefetch={false}
-                                                                                            className="text-[16px] font-medium text-brand-dark dark:text-dark-heading mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
-                                                                                        >
-                                                                                            {item.products.name}
-                                                                                        </Link>
-                                                                                        {item.variant_id && item.product_variants && (
-                                                                                            <p className="text-[13px] text-brand-inactive-text mb-1">
-                                                                                                {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
-                                                                                            </p>
+                                                                                                <div className="flex-1">
+                                                                                                    <Link
+                                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                        prefetch={false}
+                                                                                                        className="text-[16px] font-medium text-brand-dark dark:text-dark-heading mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
+                                                                                                    >
+                                                                                                        {item.products.name}
+                                                                                                    </Link>
+                                                                                                    {item.variant_id && item.product_variants && (
+                                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">
+                                                                                                            {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
+                                                                                                        </p>
+                                                                                                    )}
+                                                                                                    <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item))}</p>
+                                                                                                </div>
+
+                                                                                                <div className="flex items-center justify-end gap-4">
+                                                                                                    {isOutOfStock ? (
+                                                                                                        <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-semibold bg-red-150 text-red-700 border border-red-255 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50">
+                                                                                                            Esgotado
+                                                                                                        </span>
+                                                                                                    ) : (
+                                                                                                        <QuantitySelector
+                                                                                                            value={itemQty}
+                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                                            disabled={loading === item.id}
+                                                                                                        />
+                                                                                                    )}
+                                                                                                    <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemPrice(item)) : formatCurrency(getItemPrice(item) * itemQty)}</div>
+                                                                                                    <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
+                                                                                            <div className="mt-3 ml-10">
+                                                                                                <div className="bg-brand-gray/30 dark:bg-zinc-800/40 p-3.5 rounded-xl border border-brand-border dark:border-dark-border text-sm max-w-xl animate-fade-in">
+                                                                                                    <p className="font-semibold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-1.5">
+                                                                                                        <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                                                                                                        Disponível em outra(s) variante(s):
+                                                                                                    </p>
+                                                                                                    <div className="flex flex-wrap gap-2">
+                                                                                                        {item.available_alternatives.map((alt: any) => (
+                                                                                                            <button
+                                                                                                                key={alt.id}
+                                                                                                                onClick={() => switchVariant(item.id, alt.id)}
+                                                                                                                disabled={loading === item.id}
+                                                                                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white hover:bg-brand-gray dark:bg-dark-surface dark:hover:bg-zinc-800 border border-brand-border dark:border-dark-border hover:border-brand-green dark:hover:border-brand-green font-medium text-brand-dark dark:text-dark-heading transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                                                                                                            >
+                                                                                                                <span>{alt.variant_name}</span>
+                                                                                                                <span className="text-brand-inactive-text">•</span>
+                                                                                                                <span className="font-semibold text-brand-green">{formatCurrency(getAlternativePrice(alt, item.products))}</span>
+                                                                                                            </button>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
                                                                                         )}
-                                                                                        <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item))}</p>
                                                                                     </div>
-
-                                                                                    <div className="flex items-center justify-end gap-4">
-                                                                                        <QuantitySelector
-                                                                                            value={itemQty}
-                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
-                                                                                            disabled={loading === item.id}
-                                                                                        />
-                                                                                        <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item) * itemQty)}</div>
-                                                                                        <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
+                                                                                );
+                                                                            })()}
                                                                         </div>
                                                                     )
                                                                 })}
@@ -535,7 +654,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         {index !== array.length - 1 && (
                                             <div className="w-full h-[1px] bg-brand-border dark:bg-dark-border my-12" />
                                         )}
-                                    </Fragment>          )
+                                    </Fragment>)
                             })}
 
                             {/* Mobile: "Voltar para as compras" abaixo de tudo */}

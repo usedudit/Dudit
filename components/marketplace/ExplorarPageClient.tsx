@@ -142,12 +142,14 @@ const HorizontalCarousel = ({
     title,
     items,
     renderItem,
-    onSeeAll
+    onSeeAll,
+    itemWidthClass = "w-[230px]"
 }: {
     title: string
     items: any[]
     renderItem: (item: any) => React.ReactNode
     onSeeAll?: () => void
+    itemWidthClass?: string
 }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [showLeftArrow, setShowLeftArrow] = useState(false)
@@ -195,7 +197,7 @@ const HorizontalCarousel = ({
     return (
         <div className="mb-10 w-full animate-fade-in">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[18px] lg:text-[22px] font-bold text-brand-dark tracking-wide">{title}</h2>
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
                 <div className="flex items-center gap-3">
                     {onSeeAll && (
                         <button
@@ -232,7 +234,7 @@ const HorizontalCarousel = ({
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 {items.map((item, idx) => (
-                    <div key={idx} className="snap-start shrink-0 w-[270px] sm:w-[320px]">
+                    <div key={idx} className={`snap-start shrink-0 ${itemWidthClass}`}>
                         {renderItem(item)}
                     </div>
                 ))}
@@ -264,7 +266,17 @@ export function ExplorarPageClient({
 
     const [currentType, setCurrentType] = useState(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
-    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(pathCity || cidade || null)
+    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(() => {
+        if (pathCity) return pathCity
+        if (cidade) return cidade
+        if (typeof window !== "undefined") {
+            const savedCity = localStorage.getItem("dudit_city")
+            if (savedCity) return savedCity
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match) return match[1]
+        }
+        return null
+    })
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
 
     const categoriesList = useMemo(() => {
@@ -437,8 +449,9 @@ export function ExplorarPageClient({
     >({
         queryKey: ["explore", query, fetchType, selectedCitySlug],
         initialPage:
-            fetchType === type && selectedCitySlug === cidade
-                ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= (type === 'tudo' ? 10 : 40) }
+            (fetchType === type && selectedCitySlug === cidade) ||
+                (isLandingPage && type === 'tudo' && selectedCitySlug === cidade)
+                ? { items: initialResults, nextCursor: null, hasMore: initialResults.length >= (isLandingPage ? 40 : (type === 'tudo' ? 10 : 40)) }
                 : undefined,
         fetchFn: async ({ cursor }) => {
             const res = await searchMarketplace(query, fetchType as any, {
@@ -535,9 +548,9 @@ export function ExplorarPageClient({
 
     const matchCategory = (itemCategory: string | null, catName: string) => {
         if (!itemCategory) return false
-        const normItem = itemCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        const normTarget = catName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        return normItem.includes(normTarget) || normTarget.includes(normItem)
+        const normItem = itemCategory.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        const normTarget = catName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        return normItem === normTarget
     }
 
     const isStandardCategory = (catName: string) => {
@@ -631,6 +644,11 @@ export function ExplorarPageClient({
         return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price)
     }, [filteredResults, selectedCategories])
 
+    const promoProducts = useMemo(() => {
+        if (currentType !== 'produtos') return []
+        return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price).slice(0, 20)
+    }, [filteredResults, currentType])
+
     const subcategoryGroups = useMemo(() => {
         if (selectedCategories.length === 0) return []
         const groups: { [key: string]: any[] } = {}
@@ -665,6 +683,13 @@ export function ExplorarPageClient({
     }
 
     const handleSelectCity = (citySlug: string | null) => {
+        if (citySlug) {
+            document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            localStorage.setItem("dudit_city", citySlug)
+        } else {
+            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+            localStorage.removeItem("dudit_city")
+        }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
         updateUrl(citySlug, selectedCategories, query, currentType)
@@ -741,8 +766,8 @@ export function ExplorarPageClient({
 
                 {/* 1. TITLE SECTION */}
                 {!isLandingPage && (
-                    <div className="container mx-auto px-4 max-w-[1300px] mt-6">
-                        <h1 className="text-[28px] lg:text-[36px] font-bold text-brand-dark tracking-tight leading-tight">
+                    <div className="container mx-auto px-4 max-w-[1400px] mt-6">
+                        <h1 className="text-lg lg:text-3xl font-medium text-brand-dark mb-6">
                             {pageTitle}
                         </h1>
                     </div>
@@ -751,7 +776,7 @@ export function ExplorarPageClient({
                 {/* 2. CATEGORIES RECTANGULAR SLIDER */}
                 {!isLandingPage && (currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
                     <div className="bg-white py-6">
-                        <div className="container mx-auto px-4 max-w-[1300px]">
+                        <div className="container mx-auto px-4 max-w-[1400px]">
                             <div className="flex gap-6 overflow-x-auto scrollbar-none py-2 px-1">
                                 {activeCategoriesList.map((cat, idx) => {
                                     const isSelected = selectedCategories.includes(cat.name)
@@ -798,7 +823,7 @@ export function ExplorarPageClient({
                 {/* 3. FILTERS BAR (NOT STICKY - SCROLLS ALONG WITH THE PAGE) */}
                 {!isLandingPage && (
                     <div className="bg-white py-4">
-                        <div className="container mx-auto px-4 max-w-[1300px] flex items-center justify-between gap-4">
+                        <div className="container mx-auto px-4 max-w-[1400px] flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 flex-1">
 
                                 {/* CITY FILTER CHIP */}
@@ -894,7 +919,7 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 4. MAIN PRODUCT & LOJA CONTENT SECTION */}
-                <div className="container mx-auto px-4 max-w-[1300px] flex-grow pb-24 lg:pb-12 mt-8">
+                <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-8">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
@@ -942,12 +967,12 @@ export function ExplorarPageClient({
                             ) : isLandingPage ? (
                                 <div className="space-y-12">
                                     <div>
-                                        <h2 className="text-lg lg:text-xl font-semibold text-brand-dark mb-8">
+                                        <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">
                                             Descubra o que tem em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
                                         </h2>
 
                                         {/* Premium iFood-style Banners */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {/* Banner 1: Produtos */}
                                             <div
                                                 onClick={() => handleTypeChange("produtos")}
@@ -992,13 +1017,13 @@ export function ExplorarPageClient({
 
                                     {/* Infinite Scrolled Grid of Vitrines */}
                                     <div>
-                                        <h3 className="text-[18px] lg:text-[22px] font-bold text-brand-dark mb-6 tracking-wide">
+                                        <h3 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">
                                             Lojas e Profissionais em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
                                         </h3>
 
-                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                                             {normalizedInitialResults.map((item) => (
-                                                <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} />
+                                                <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
                                             ))}
 
                                             {/* INFINITE SCROLL OBSERVER */}
@@ -1026,7 +1051,8 @@ export function ExplorarPageClient({
                                             title="Lojas e Profissionais Recomendados"
                                             items={vitrinesDestaque}
                                             onSeeAll={() => handleTypeChange('vitrines')}
-                                            renderItem={(item) => <VitrineCard vitrine={item} />}
+                                            itemWidthClass="w-[280px] md:w-[320px]"
+                                            renderItem={(item) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />}
                                         />
                                     )}
 
@@ -1038,11 +1064,12 @@ export function ExplorarPageClient({
                                                     key={catGroup.name}
                                                     title={`${catGroup.name} em destaque`}
                                                     items={catGroup.list}
+                                                    itemWidthClass="w-[200px] md:w-[230px]"
                                                     renderItem={(item) => {
                                                         const userCoords = userProfile?.latitude && userProfile?.longitude
                                                             ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                             : null
-                                                        return <ItemCard product={item} userCoords={userCoords} />
+                                                        return <ItemCard product={item} userCoords={userCoords} className="w-full" />
                                                     }}
                                                 />
                                             ))}
@@ -1050,7 +1077,7 @@ export function ExplorarPageClient({
                                     )}
 
                                     {/* NEW: B.2 OUTROS ITENS CAROUSEL */}
-                                    {selectedCategories.length === 0 && !query && outrosItems.length > 0 && (
+                                    {selectedCategories.length === 0 && !query && currentType === 'tudo' && outrosItems.length > 0 && (
                                         <HorizontalCarousel
                                             title="Outros Itens"
                                             items={outrosItems}
@@ -1058,11 +1085,27 @@ export function ExplorarPageClient({
                                                 setSelectedCategories(["Outros"])
                                                 updateUrl(selectedCitySlug, ["Outros"], query, currentType)
                                             }}
+                                            itemWidthClass="w-[200px] md:w-[230px]"
                                             renderItem={(item) => {
                                                 const userCoords = userProfile?.latitude && userProfile?.longitude
                                                     ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                     : null
-                                                return <ItemCard product={item} userCoords={userCoords} />
+                                                return <ItemCard product={item} userCoords={userCoords} className="w-full" />
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* C. PRODUTOS EM PROMOÇÃO CAROUSEL */}
+                                    {selectedCategories.length === 0 && !query && currentType === 'produtos' && promoProducts.length > 0 && (
+                                        <HorizontalCarousel
+                                            title="Produtos em Promoção"
+                                            items={promoProducts}
+                                            itemWidthClass="w-[200px] md:w-[230px]"
+                                            renderItem={(item) => {
+                                                const userCoords = userProfile?.latitude && userProfile?.longitude
+                                                    ? { lat: userProfile.latitude, lng: userProfile.longitude }
+                                                    : null
+                                                return <ItemCard product={item} userCoords={userCoords} className="w-full" />
                                             }}
                                         />
                                     )}
@@ -1103,15 +1146,15 @@ export function ExplorarPageClient({
                                                     )}
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                                <div className={`grid ${currentType === 'vitrines' ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6`}>
                                                     {remainingResults.map((item) => {
                                                         if (item.itemType === 'loja') {
-                                                            return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
+                                                            return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
                                                         }
                                                         const userCoords = userProfile?.latitude && userProfile?.longitude
                                                             ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                             : null
-                                                        return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
+                                                        return <ItemCard key={item.id} product={item as any} userCoords={userCoords} className="w-full" />
                                                     })}
 
                                                     {/* INFINITE SCROLL OBSERVER */}
@@ -1138,7 +1181,7 @@ export function ExplorarPageClient({
                                         <div className="space-y-8">
                                             {selectedCategories[0] === "Outros" ? (
                                                 <div>
-                                                    <h3 className="text-[18px] lg:text-[22px] font-bold text-brand-dark mb-6 tracking-wide">
+                                                    <h3 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">
                                                         Itens Diversos
                                                     </h3>
                                                     {filteredResults.length === 0 ? (
@@ -1152,15 +1195,15 @@ export function ExplorarPageClient({
                                                             />
                                                         </div>
                                                     ) : (
-                                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
                                                             {filteredResults.map((item) => {
                                                                 if (item.itemType === 'loja') {
-                                                                    return <VitrineCard key={`loja-${item.id}`} vitrine={item} />
+                                                                    return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
                                                                 }
                                                                 const userCoords = userProfile?.latitude && userProfile?.longitude
                                                                     ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                                     : null
-                                                                return <ItemCard key={item.id} product={item as any} userCoords={userCoords} />
+                                                                return <ItemCard key={item.id} product={item as any} userCoords={userCoords} className="w-full" />
                                                             })}
                                                         </div>
                                                     )}
@@ -1172,7 +1215,8 @@ export function ExplorarPageClient({
                                                         <HorizontalCarousel
                                                             title="Lojas e Vendedores"
                                                             items={categoryShowcases}
-                                                            renderItem={(item) => <VitrineCard vitrine={item} />}
+                                                            itemWidthClass="w-[280px] md:w-[320px]"
+                                                            renderItem={(item) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />}
                                                         />
                                                     )}
 
@@ -1181,11 +1225,12 @@ export function ExplorarPageClient({
                                                         <HorizontalCarousel
                                                             title="Ofertas da Categoria"
                                                             items={categoryOffers}
+                                                            itemWidthClass="w-[200px] md:w-[230px]"
                                                             renderItem={(item) => {
                                                                 const userCoords = userProfile?.latitude && userProfile?.longitude
                                                                     ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                                     : null
-                                                                return <ItemCard product={item} userCoords={userCoords} />
+                                                                return <ItemCard product={item} userCoords={userCoords} className="w-full" />
                                                             }}
                                                         />
                                                     )}
@@ -1196,11 +1241,12 @@ export function ExplorarPageClient({
                                                             key={group.name}
                                                             title={group.name}
                                                             items={group.list}
+                                                            itemWidthClass="w-[200px] md:w-[230px]"
                                                             renderItem={(item) => {
                                                                 const userCoords = userProfile?.latitude && userProfile?.longitude
                                                                     ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                                     : null
-                                                                return <ItemCard product={item} userCoords={userCoords} />
+                                                                return <ItemCard product={item} userCoords={userCoords} className="w-full" />
                                                             }}
                                                         />
                                                     ))}

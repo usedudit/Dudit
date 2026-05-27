@@ -86,7 +86,7 @@ export function PaymentWrapper({
     const [isProcessingBrick, setIsProcessingBrick] = useState(false)
     const mpInstanceRef = useRef<any>(null)
     const bricksBuilderRef = useRef<any>(null)
-    const brickIdRef = useRef<string | null>(null)
+    const brickIdRef = useRef<any>(null)
     const brickInitializedRef = useRef(false)
 
     const handleClose = () => {
@@ -108,8 +108,8 @@ export function PaymentWrapper({
     const handleFatalError = (message: string) => {
         setFatalError(message)
         // Destroy the Brick so it can't be reused
-        if (brickIdRef.current && bricksBuilderRef.current) {
-            try { bricksBuilderRef.current.unmount(brickIdRef.current) } catch { }
+        if (brickIdRef.current) {
+            try { brickIdRef.current.unmount() } catch { }
             brickIdRef.current = null
         }
         setBrickReady(false)
@@ -151,9 +151,9 @@ export function PaymentWrapper({
         initializePaymentBrick()
 
         return () => {
-            if (brickIdRef.current && bricksBuilderRef.current) {
+            if (brickIdRef.current) {
                 try {
-                    bricksBuilderRef.current.unmount(brickIdRef.current)
+                    brickIdRef.current.unmount()
                 } catch { }
 
                 brickIdRef.current = null

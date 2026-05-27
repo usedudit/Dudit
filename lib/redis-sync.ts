@@ -78,6 +78,7 @@ export async function syncToExploreRedis({
           .select(`
             id, name, description, price, promotional_price, images, video_thumbnail, rating,
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
+            marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             product_variants(variant_options, price_adjustment, is_active)
           `)
@@ -111,11 +112,13 @@ export async function syncToExploreRedis({
 
         const variantFallback = extractFirstVariantFallback(dbData.product_variants, Number(dbData.price))
 
-        const categoryName = (dbData.category as any)?.name || null
+        const categoryName = dbData.marketplace_category?.parent?.name || dbData.marketplace_category?.name || (dbData.category as any)?.name || null
+        const subcategoryName = dbData.marketplace_category?.parent ? dbData.marketplace_category.name : null
 
         finalData = {
           ...dbData,
           category: categoryName,
+          subcategoryName,
           partners: partner,
           ...variantFallback
         }
@@ -154,8 +157,10 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("partners")
           .select(`
-            id, store_name, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, updated_at,
-            addresses(city, state)
+            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, updated_at,
+            category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
+            addresses(city, state),
+            reviews(count)
           `)
           .eq("id", id)
           .single()
@@ -163,11 +168,22 @@ export async function syncToExploreRedis({
         if (dbData) {
           const city = dbData.addresses?.[0]?.city || null
           const state = dbData.addresses?.[0]?.state || null
+          const reviewsCount = dbData.reviews?.[0]?.count || 0
+          const categoryName = dbData.category?.parent?.name || dbData.category?.name || 'Loja Parceira'
           finalData = {
             id: dbData.id,
             name: dbData.store_name,
-            images: [dbData.banner_url || dbData.store_image_url],
-            partners: { ...dbData, city, state },
+            description: dbData.store_description,
+            images: [dbData.banner_url || dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+            rating: dbData.rating,
+            category: categoryName,
+            partners: {
+              ...dbData,
+              city,
+              state,
+              reviewsCount,
+              store_avatar: dbData.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+            },
             created_at: dbData.created_at,
             updated_at: dbData.updated_at
           }

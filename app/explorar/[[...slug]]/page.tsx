@@ -7,6 +7,8 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "casa-e-utilidades": "Casa & Utilidades",
@@ -52,18 +54,8 @@ export default async function ExplorarPage({
 
     const slug = resolvedParams.slug || []
     const cidade = slug[0] || ""
-    const categorySlug = slug[1] || ""
-    const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
 
-    const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
-    const type = parseMarketplaceType(resolvedSearchParams.type)
-
-    // Fetch user and products in parallel
-    const [user, products] = await Promise.all([
-        getCurrentUser(),
-        getCachedExploreProducts(query, type, cidade),
-    ])
-
+    const user = await getCurrentUser()
     const sessionData = user
         ? await getUserSessionData(user.id)
         : null
@@ -80,6 +72,42 @@ export default async function ExplorarPage({
             state: sessionData.profile.state || null,
         }
         : null
+
+    if (!cidade) {
+        const cookieStore = await cookies()
+        let savedCity = cookieStore.get("dudit_city")?.value
+
+        if (!savedCity && userProfile?.city && userProfile?.state) {
+            const normCity = userProfile.city
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "")
+            savedCity = `${normCity}-${userProfile.state.toLowerCase()}`
+        }
+
+        if (savedCity) {
+            const queryParams = new URLSearchParams()
+            const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
+            const type = parseMarketplaceType(resolvedSearchParams.type)
+            if (query) queryParams.set("q", query)
+            if (type !== "tudo") queryParams.set("type", type)
+            const queryStr = queryParams.toString()
+            const queryPart = queryStr ? `?${queryStr}` : ""
+            redirect(`/explorar/${savedCity}${queryPart}`)
+        }
+    }
+    const categorySlug = slug[1] || ""
+    const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
+
+    const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
+    const type = parseMarketplaceType(resolvedSearchParams.type)
+
+    const isLandingPage = type === 'tudo' && !categoria && !query
+    const serverFetchType = isLandingPage ? 'vitrines' : type
+
+    const products = await getCachedExploreProducts(query, serverFetchType, cidade)
 
     const cartCount = sessionData?.cartCount || 0
 

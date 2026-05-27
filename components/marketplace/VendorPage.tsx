@@ -274,7 +274,7 @@ const InfoTab = ({ partner, stats }: any) => {
             {partner.storeDescription && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Sobre {partner.storeName}</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Sobre {partner.storeName}</h3>
                         <p className="text-[15px] text-brand-inactive-text leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
                     </div>
                     <div className="h-[1px] bg-brand-border w-full" />
@@ -284,7 +284,7 @@ const InfoTab = ({ partner, stats }: any) => {
             {hasPaymentSections && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Formas de pagamento</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Formas de pagamento</h3>
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div className="flex flex-wrap gap-2">
@@ -314,7 +314,7 @@ const InfoTab = ({ partner, stats }: any) => {
             {hoursList.length > 0 && (
                 <>
                     <div>
-                        <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Horário de Funcionamento</h3>
+                        <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Horário de Funcionamento</h3>
                         <div className="space-y-3">
                             {hoursList.map((item: any) => (
                                 <div key={item.dayName} className="flex justify-between items-center text-[14px]">
@@ -329,7 +329,7 @@ const InfoTab = ({ partner, stats }: any) => {
             )}
 
             <div>
-                <h3 className="text-md lg:text-lg font-semibold text-brand-dark mb-4">Endereço</h3>
+                <h3 className="text-md lg:text-lg font-medium text-brand-dark mb-4">Endereço</h3>
                 <div className="flex items-start gap-3 mb-5">
                     <MapPinIcon size={20} className="text-brand-inactive-text mt-1 shrink-0" />
                     <div>
@@ -467,7 +467,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     return (
         <section id="coupons" className="mb-10 lg:mb-12 scroll-mt-[150px]">
             <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">Cupons do vendedor</h2>
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">Cupons do vendedor</h2>
                 <CarouselNav targetRef={ref} />
             </div>
             <div ref={ref} className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
@@ -687,7 +687,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto px-0 lg:px-4 max-w-[1300px] animate-fade-in lg:mt-6">
+        <div className="container mx-auto px-0 lg:px-4 max-w-[1400px] animate-fade-in lg:mt-6">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -708,7 +708,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
             />
 
             <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
-                <div className="max-w-[1300px] mx-auto px-4 h-[76px] flex items-center gap-4">
+                <div className="max-w-[1400px] mx-auto px-4 h-[76px] flex items-center gap-4">
                     <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
                     <div className="min-w-0">
                         <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.storeName}</h2>
@@ -725,8 +725,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
             </div>
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
-                <div className="w-full h-[180px] lg:h-[220px] lg:rounded-2xl lg:mb-4 overflow-hidden relative">
-                    <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
+                <div className="w-full lg:rounded-2xl lg:mb-4 overflow-hidden relative select-none active:scale-[0.995] transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-md">
+                    <img src={bannerImage} alt="Banner" className="w-full h-auto block object-cover object-center group-hover:scale-[1.02] transition-transform duration-500" />
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
@@ -870,8 +870,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                                             <h2 className="text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-10">
-                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} />)}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 md:gap-x-5 md:gap-y-10">
+                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" />)}
                                     </div>
                                 </section>
                             ) : (

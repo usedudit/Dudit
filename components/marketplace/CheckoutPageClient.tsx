@@ -1089,7 +1089,7 @@ export function CheckoutPageClient() {
         <>
             <div className="min-h-screen flex flex-col bg-white dark:bg-dark-surface">
                 <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
-                    <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
+                    <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
                         <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
@@ -1105,7 +1105,7 @@ export function CheckoutPageClient() {
                     </div>
                 </header>
 
-                <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-32 md:pb-20">
+                <div className="container mx-auto px-4 lg:px-6 max-w-[1400px] w-full pt-6 md:pt-10 pb-32 md:pb-20">
                     <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                         <div className="hidden md:flex">
                             <Button variant="filled" onClick={() => router.back()} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
@@ -1267,10 +1267,10 @@ export function CheckoutPageClient() {
                                                         onClick={() => setPaymentOption("traditional")}
                                                         right={
                                                             <RadioButton
-                                                                    name="paymentOption"
-                                                                    value="traditional"
-                                                                    checked={paymentOption === "traditional"}
-                                                                    onChange={() => setPaymentOption("traditional")}
+                                                                name="paymentOption"
+                                                                value="traditional"
+                                                                checked={paymentOption === "traditional"}
+                                                                onChange={() => setPaymentOption("traditional")}
                                                             />
                                                         }
                                                     />

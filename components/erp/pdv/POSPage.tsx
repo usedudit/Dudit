@@ -1403,7 +1403,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 isOpen={isPaymentModalOpen}
                                 onClose={closePaymentModal}
                                 cart={paymentModalCart}
-                                customer={selectedCustomer}
+                                customer={shippingCustomerDetails || selectedCustomer}
                                 partnerId={partnerId}
                                 shippingFee={shippingFee}
                                 otherCosts={otherCosts}

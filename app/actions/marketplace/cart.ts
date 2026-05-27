@@ -148,6 +148,46 @@ export const getCachedCart = async (userId: string) => {
     return acc
   }, {})
 
+  // 4. Busca variantes alternativas para itens com variante esgotada
+  const outOfStockVariantProductIds: string[] = []
+  const outOfStockVariantIds: string[] = []
+
+  for (const partnerId of Object.keys(itemsByPartner)) {
+    for (const item of (itemsByPartner as any)[partnerId].items) {
+      if (item.variant_id && item.product_variants) {
+        const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
+        if (stock <= 0) {
+          outOfStockVariantProductIds.push(item.product_id)
+          outOfStockVariantIds.push(item.variant_id)
+        }
+      }
+    }
+  }
+
+  if (outOfStockVariantProductIds.length > 0) {
+    const uniqueProductIds = [...new Set(outOfStockVariantProductIds)]
+    const { data: alternativeVariants } = await supabase
+      .from("product_variants")
+      .select("id, product_id, variant_name, variant_type, price_adjustment, stock_available, stock_quantity, variant_options, is_active")
+      .in("product_id", uniqueProductIds)
+      .eq("is_active", true)
+
+    if (alternativeVariants) {
+      const availableAlts = alternativeVariants.filter(
+        (v: any) => (v.stock_available ?? v.stock_quantity ?? 0) > 0
+      )
+
+      for (const partnerId of Object.keys(itemsByPartner)) {
+        for (const item of (itemsByPartner as any)[partnerId].items) {
+          if (item.variant_id && outOfStockVariantIds.includes(item.variant_id)) {
+            item.available_alternatives = availableAlts
+              .filter((v: any) => v.product_id === item.product_id && v.id !== item.variant_id)
+          }
+        }
+      }
+    }
+  }
+
   return itemsByPartner
 }
 
@@ -420,6 +460,88 @@ export async function toggleCartSelectionAction(cartItemId: string, csrf_token?:
     .eq("user_id", user.id)
 
   if (error) return { error: error.message }
+
+  await revalidateCart(user.id)
+  return { success: true }
+}
+
+export async function switchCartItemVariantAction(cartItemId: string, newVariantId: string, csrf_token?: string) {
+  await requireRateLimit(RateLimitCategory.CART)
+
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) return { error: csrfValidation.error }
+
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  // Find the current cart item to get the product_id and quantity
+  const { data: currentItem, error: fetchError } = await supabase
+    .from("cart_items")
+    .select("product_id, quantity")
+    .eq("id", cartItemId)
+    .eq("user_id", user.id)
+    .single()
+
+  if (fetchError || !currentItem) {
+    return { error: "Item não encontrado no carrinho." }
+  }
+
+  // Check if an item with the new variant already exists in the cart
+  const { data: existingItem } = await supabase
+    .from("cart_items")
+    .select("id, quantity")
+    .eq("user_id", user.id)
+    .eq("product_id", currentItem.product_id)
+    .eq("variant_id", newVariantId)
+    .maybeSingle()
+
+  if (existingItem) {
+    // If it already exists, merge/update quantity of the existing one and delete the old one
+    const newQty = existingItem.quantity + currentItem.quantity
+    
+    // We should also check the stock limit for the new variant
+    const { data: variantData } = await supabase
+      .from("product_variants")
+      .select("stock_available, stock_quantity")
+      .eq("id", newVariantId)
+      .single()
+      
+    const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
+    const finalQty = Math.min(newQty, stock)
+
+    const { error: updateError } = await supabase
+      .from("cart_items")
+      .update({ quantity: finalQty, selected: true, updated_at: new Date().toISOString() })
+      .eq("id", existingItem.id)
+
+    if (updateError) return { error: updateError.message }
+
+    const { error: deleteError } = await supabase
+      .from("cart_items")
+      .delete()
+      .eq("id", cartItemId)
+
+    if (deleteError) return { error: deleteError.message }
+  } else {
+    // Just update the variant ID on the current item
+    // Verify stock of new variant
+    const { data: variantData } = await supabase
+      .from("product_variants")
+      .select("stock_available, stock_quantity")
+      .eq("id", newVariantId)
+      .single()
+      
+    const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
+    const finalQty = Math.min(currentItem.quantity, stock)
+
+    const { error: updateError } = await supabase
+      .from("cart_items")
+      .update({ variant_id: newVariantId, quantity: finalQty, selected: true, updated_at: new Date().toISOString() })
+      .eq("id", cartItemId)
+
+    if (updateError) return { error: updateError.message }
+  }
 
   await revalidateCart(user.id)
   return { success: true }

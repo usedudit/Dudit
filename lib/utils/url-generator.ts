@@ -56,3 +56,23 @@ export function getPartnerUrl(partner: any): string {
     return `/${cityStateSlug}/${partnerSlug}/v/${partnerId}`
 }
 
+/**
+ * Gera a URL canonica do serviço utilizando o novo formato com cidade e estado
+ * /[cidade-uf]/[slug-do-servico]/s/[id]
+ */
+export function getServiceUrl(service: any, partner?: any): string {
+    if (!service) return "/"
+
+    const serviceSlug = createSlug(service.name || "")
+    const serviceId = service.id || ""
+
+    const p = partner || (Array.isArray(service.partners) ? service.partners[0] : service.partners) || {}
+    const address = p.addresses?.[0] || p.address || p
+    const city = p.city || address?.city
+    const state = p.state || address?.state
+
+    const cityStateSlug = formatCityStateSlug(city, state)
+
+    return `/${cityStateSlug}/${serviceSlug}/s/${serviceId}`
+}
+

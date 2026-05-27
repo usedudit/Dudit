@@ -345,7 +345,7 @@ const PaymentModal = ({
     const [mpIsCheckingStatus, setMpIsCheckingStatus] = useState(false);
     const mpInstanceRef = useRef<any>(null);
     const mpBricksBuilderRef = useRef<any>(null);
-    const mpBrickIdRef = useRef<string | null>(null);
+    const mpBrickIdRef = useRef<any>(null);
     const mpBrickInitializedRef = useRef(false);
 
 
@@ -522,8 +522,8 @@ const PaymentModal = ({
             setMpCopied(false);
             setMpIsCheckingStatus(false);
             mpBrickInitializedRef.current = false;
-            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
-                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+            if (mpBrickIdRef.current) {
+                try { mpBrickIdRef.current.unmount(); } catch { }
                 mpBrickIdRef.current = null;
             }
         }
@@ -568,8 +568,8 @@ const PaymentModal = ({
         initializeMpBrick();
 
         return () => {
-            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
-                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+            if (mpBrickIdRef.current) {
+                try { mpBrickIdRef.current.unmount(); } catch { }
                 mpBrickIdRef.current = null;
                 setMpBrickReady(false);
                 mpBrickInitializedRef.current = false;
@@ -615,10 +615,31 @@ const PaymentModal = ({
                 return;
             }
 
+            const nameParts = (customer?.name || "").trim().split(/\s+/);
+            const firstName = nameParts[0] || "Cliente";
+            const lastName = nameParts.slice(1).join(" ") || "ERP";
+            const email = customer?.email || "";
+
+            const rawAddress = customer?.address || customer?.addresses?.[0] || null;
+            const address = rawAddress ? {
+                zipCode: rawAddress.zipCode || rawAddress.zip_code || "",
+                streetName: rawAddress.street || rawAddress.street_name || "",
+                streetNumber: rawAddress.number || rawAddress.street_number || "",
+                neighborhood: rawAddress.neighborhood || "",
+                city: rawAddress.city || "",
+                federalUnit: rawAddress.state || rawAddress.federal_unit || "",
+            } : undefined;
+
             const brickController = await bricksBuilder.create("payment", "erpPaymentBrick_container", {
                 initialization: {
                     amount: chargeTarget,
                     preferenceId: preferenceData.preference_id,
+                    payer: {
+                        firstName,
+                        lastName,
+                        email,
+                        ...(address ? { address } : {}),
+                    },
                 },
                 customization: {
                     visual: {
@@ -1119,8 +1140,8 @@ const PaymentModal = ({
     const handleGoBack = () => {
         if (view === 'mercadopago') {
             // Clean up brick when going back
-            if (mpBrickIdRef.current && mpBricksBuilderRef.current) {
-                try { mpBricksBuilderRef.current.unmount(mpBrickIdRef.current) } catch { }
+            if (mpBrickIdRef.current) {
+                try { mpBrickIdRef.current.unmount(); } catch { }
                 mpBrickIdRef.current = null;
             }
             mpBrickInitializedRef.current = false;

@@ -85,7 +85,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     return (
-        <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1300px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+        <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
             <AnimatePresence mode="wait">
                 {activeOrderId && activeOrder ? (
                     <MyOrderDetailPage key="details" order={activeOrder} onBack={handleCloseDetails} />
@@ -120,8 +120,8 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
                                     return (
-                                        <div 
-                                            key={order.id} 
+                                        <div
+                                            key={order.id}
                                             onClick={(e) => handleCardClick(e, order.id, order.order_number)}
                                             className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors cursor-pointer md:cursor-default"
                                         >

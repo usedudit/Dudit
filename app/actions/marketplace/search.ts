@@ -11,6 +11,7 @@ import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getUserSessionData } from "@/lib/data/user"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { resolveCityAndStateFromSlug } from "./products"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -286,7 +287,7 @@ async function _searchMarketplaceInternal(
                     supabase.from("products").select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, video_thumbnail, rating,
                         category_id, category:product_categories!category_id(name), created_at,
-                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
+                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         product_variants(variant_options, price_adjustment, is_active)
                     `)
@@ -308,7 +309,7 @@ async function _searchMarketplaceInternal(
             if (lojasIds.length > 0) {
                 promises.push(
                     supabase.from("partners").select(`
-                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug), addresses(city, state)
+                        id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
                     `).in("id", lojasIds)
                 )
             }
@@ -325,7 +326,7 @@ async function _searchMarketplaceInternal(
                     return {
                         id: item.id, name: item.store_name, description: item.store_description,
                         images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                        rating: item.rating, itemType: 'loja', category: item.category?.name || 'Loja Parceira',
+                        rating: item.rating, itemType: 'loja', category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
                         partners: {
                             id: item.id, store_name: item.store_name,
                             store_avatar: item.store_image_url || item.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
@@ -333,7 +334,8 @@ async function _searchMarketplaceInternal(
                             logo_moderation_status: item.logo_moderation_status || "approved",
                             banner_moderation_status: item.banner_moderation_status || "approved",
                             latitude: item.latitude, longitude: item.longitude,
-                            city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
+                            city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
+                            reviewsCount: item.reviews?.[0]?.count || 0
                         }, created_at: item.created_at
                     }
                 }
@@ -351,8 +353,8 @@ async function _searchMarketplaceInternal(
                     const { product_variants, ...rest } = item
                     return {
                         ...rest,
-                        category: item.marketplace_category?.name || item.category?.name || null,
-                        subcategoryName: item.subcategory?.name || null,
+                        category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
+                        subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
@@ -426,7 +428,7 @@ async function searchMarketplacePostgresFTS(
 
     try {
         if (type === 'tudo' || type === 'vitrines') {
-            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug), addresses(city, state)`).eq("is_active", true)
+            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)`).eq("is_active", true)
             let reqJoined = req
             if (qRaw) {
                 let orFilter = `store_name.ilike.%${qRaw}%,store_description.ilike.%${qRaw}%,store_name.ilike.%${qClean}%`
@@ -445,7 +447,7 @@ async function searchMarketplacePostgresFTS(
                 results.push(...partData.map((item: any) => ({
                     id: item.id, name: item.store_name, description: item.store_description,
                     images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                    rating: item.rating, itemType: 'loja', category: item.category?.name || 'Loja Parceira',
+                    rating: item.rating, itemType: 'loja', category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
                     partners: {
                         id: item.id, store_name: item.store_name,
                         store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
@@ -453,7 +455,8 @@ async function searchMarketplacePostgresFTS(
                         logo_moderation_status: item.logo_moderation_status || "approved",
                         banner_moderation_status: item.banner_moderation_status || "approved",
                         latitude: item.latitude, longitude: item.longitude,
-                        city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null
+                        city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
+                        reviewsCount: item.reviews?.[0]?.count || 0
                     }
                 })))
             }
@@ -463,7 +466,7 @@ async function searchMarketplacePostgresFTS(
             let req = supabase.from("products").select(`
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
-                marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
+                marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active)
@@ -488,8 +491,8 @@ async function searchMarketplacePostgresFTS(
                     const { product_variants, ...rest } = item
                     return {
                         ...rest,
-                        category: item.marketplace_category?.name || item.category?.name || null,
-                        subcategoryName: item.subcategory?.name || null,
+                        category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
+                        subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
                         itemType: 'produto',
                         partners: partner,
                         ...variantFallback
@@ -543,34 +546,34 @@ async function searchMarketplaceByCity(
     const state = parts.pop()?.toUpperCase() || ""
     const targetCitySlug = parts.join("-")
 
-    // Fetch all active partners in this state
-    const partnersRes = await supabase
+    // Resolve target city to official DB city/state to search directly in Postgres SQL index
+    const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
+    const dbCity = resolved?.city
+    const dbState = resolved?.state || state
+
+    // Fetch active partners in this city (optimized SQL direct filter)
+    let partnersQuery = supabase
         .from("partners")
         .select(`
             id, store_name, store_description, store_image_url, banner_url,
             logo_moderation_status, banner_moderation_status, rating, latitude, longitude,
             created_at,
             category_id,
-            category:marketplace_partner_categories!category_id(name, slug),
-            addresses!inner(city, state)
+            category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
+            addresses!inner(city, state),
+            reviews(count)
         `)
         .eq("is_active", true)
-        .ilike("addresses.state", state)
+        .eq("addresses.state", dbState)
 
-    const rawPartners = partnersRes.data || []
+    if (dbCity) {
+        partnersQuery = partnersQuery.eq("addresses.city", dbCity)
+    } else {
+        partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
+    }
 
-    // Filter partners in memory by normalized city slug
-    const filteredPartners = rawPartners.filter((item: any) => {
-        const addr = item.addresses?.[0] || item.addresses
-        if (!addr || !addr.city) return false
-        const itemCitySlug = addr.city
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "")
-        return itemCitySlug === targetCitySlug
-    })
+    const partnersRes = await partnersQuery
+    const filteredPartners = partnersRes.data || []
 
     const partnerIds = filteredPartners.map((p: any) => p.id)
 
@@ -587,7 +590,7 @@ async function searchMarketplaceByCity(
                     .select(`
                         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                         category_id, category:product_categories!category_id(name), created_at,
-                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name),
+                        marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         subcategory_id, subcategory:product_categories!subcategory_id(name),
                         partners!inner(
                             id, store_name, store_image_url, latitude, longitude,
@@ -635,7 +638,7 @@ async function searchMarketplaceByCity(
             images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
             rating: item.rating,
             itemType: 'loja',
-            category: item.category?.name || 'Loja Parceira',
+            category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
             partners: {
                 id: item.id,
                 store_name: item.store_name,
@@ -646,7 +649,8 @@ async function searchMarketplaceByCity(
                 latitude: item.latitude,
                 longitude: item.longitude,
                 city: item.addresses?.[0]?.city || null,
-                state: item.addresses?.[0]?.state || null
+                state: item.addresses?.[0]?.state || null,
+                reviewsCount: item.reviews?.[0]?.count || 0
             },
             created_at: item.created_at
         }
@@ -666,8 +670,8 @@ async function searchMarketplaceByCity(
         const { product_variants, ...rest } = item
         return {
             ...rest,
-            category: item.marketplace_category?.name || item.category?.name || null,
-            subcategoryName: item.subcategory?.name || null,
+            category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
+            subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
             itemType: 'produto',
             partners: partner,
             ...variantFallback

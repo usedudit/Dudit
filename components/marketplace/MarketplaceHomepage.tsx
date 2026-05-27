@@ -224,7 +224,7 @@ export default function MarketplaceHome({
 
     const renderMarketingSection = () => (
         <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto">
-            <div className="mx-auto max-w-[1300px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
+            <div className="mx-auto max-w-[1400px] px-4 flex flex-col md:flex-row items-center gap-12 md:gap-24">
                 <div className="flex-1 md:max-w-[500px]">
                     <h1 className="text-4xl md:text-[3.5rem] font-black text-brand-dark mb-6 leading-[1.1] tracking-tight">
                         Pare de trabalhar para pagar comissão. Fique com o lucro.
@@ -482,7 +482,7 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow flex flex-col">
                 <HeroBanner />
 
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
                     <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm">
                         <div className="flex-grow text-center md:text-left md:max-w-[65%]">
                             <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight">Onde você está?</h2>
@@ -541,7 +541,7 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow flex flex-col">
                 <HeroBanner />
 
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] my-12 flex-grow flex items-center justify-center">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
                     <div className="flex justify-center">
                         <IconPlaceholder
                             placeholderType="image"
@@ -588,7 +588,7 @@ export default function MarketplaceHome({
                     />
                 )}
 
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1300px] mb-16">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] mb-16">
                     <div className="bg-[#dfff00] rounded-[20px] p-6 md:px-12 md:py-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                         <div className="text-center md:text-left">
                             <h2 className="text-[#335a03] font-black text-3xl md:text-[40px] mb-1 tracking-tight leading-none">BLACK FRIDAY</h2>
@@ -606,7 +606,7 @@ export default function MarketplaceHome({
 
                 <InfoSection />
 
-                <section className="mx-auto mb-16 max-w-[1300px] px-4 lg:px-0">
+                <section className="mx-auto mb-16 max-w-[1400px] px-4 lg:px-0">
                     <h2 className="text-2xl md:text-[32px] font-bold text-gray-900 mb-6">Siga as tendências</h2>
                     <div className="flex flex-wrap gap-3">
                         {TRENDS.map((trend) => (

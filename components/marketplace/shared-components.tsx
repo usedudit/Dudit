@@ -29,94 +29,15 @@ function getProductImageUrl(images: string[] | null | undefined): string {
 const DURATION = 5000;
 
 export const HeroBanner: React.FC = () => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [progress, setProgress] = useState(0);
-    const rafRef = useRef<number | null>(null);
-    const startTimeRef = useRef<number | null>(null);
-
-    const resetAndGo = (index: number) => {
-        setCurrentIndex(index);
-        setProgress(0);
-        startTimeRef.current = null;
-    };
-
-    const goToSlide = (index: number) => resetAndGo(index);
-    const prevSlide = () => resetAndGo((currentIndex - 1 + HOME_BANNERS.length) % HOME_BANNERS.length);
-    const nextSlide = () => resetAndGo((currentIndex + 1) % HOME_BANNERS.length);
-
-    useEffect(() => {
-        const animate = (ts: number) => {
-            if (!startTimeRef.current) startTimeRef.current = ts;
-            const elapsed = ts - startTimeRef.current;
-            const pct = Math.min(elapsed / DURATION, 1);
-            setProgress(pct);
-            if (pct < 1) {
-                rafRef.current = requestAnimationFrame(animate);
-            } else {
-                setCurrentIndex((prev) => (prev + 1) % HOME_BANNERS.length);
-                setProgress(0);
-                startTimeRef.current = null;
-                rafRef.current = requestAnimationFrame(animate);
-            }
-        };
-        rafRef.current = requestAnimationFrame(animate);
-        return () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        };
-    }, [currentIndex]);
-
     return (
         <section className="mt-6 mb-12 px-4 lg:px-0 group">
-            <div className="mx-auto max-w-[1300px] w-full relative rounded-[20px] overflow-hidden">
-                <div
-                    className="flex transition-transform duration-500 ease-out"
-                    style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-                >
-                    {HOME_BANNERS.map((banner) => (
-                        <div key={banner.id} className="w-full shrink-0 relative aspect-[1300/300] bg-gray-100">
-                            <img
-                                src={banner.src || "https://img.dudit.com.br/static/Placeholder.png"}
-                                alt={banner.alt}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                            />
-                        </div>
-                    ))}
-                </div>
-
-                <button
-                    onClick={prevSlide}
-                    className="hidden md:flex absolute top-1/2 left-4 -translate-y-1/2 bg-white/80 hover:bg-white text-[#003d32] p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
-                >
-                    <ChevronLeftIcon size={24} />
-                </button>
-                <button
-                    onClick={nextSlide}
-                    className="hidden md:flex absolute top-1/2 right-4 -translate-y-1/2 bg-white/80 hover:bg-white text-[#003d32] p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
-                >
-                    <ChevronRightIcon size={24} />
-                </button>
-
-                {/* Dots estilo OLX com progresso */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                    {HOME_BANNERS.map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => goToSlide(index)}
-                            className={`h-1 rounded-full transition-all duration-300 overflow-hidden relative ${currentIndex === index
-                                ? 'w-10 bg-brand-gray/40'
-                                : 'w-5 bg-white/30 hover:bg-white/50'
-                                }`}
-                        >
-                            {currentIndex === index && (
-                                <span
-                                    className="absolute inset-y-0 left-0 bg-white rounded-full"
-                                    style={{ width: `${progress * 100}%` }}
-                                />
-                            )}
-                        </button>
-                    ))}
-                </div>
+            <div className="mx-auto max-w-[1400px] w-full relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300">
+                <img
+                    src="https://img.dudit.com.br/static/banners/Banner-1.png"
+                    alt="Dudit Marketplace"
+                    className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                    loading="lazy"
+                />
             </div>
         </section>
     );
@@ -124,9 +45,11 @@ export const HeroBanner: React.FC = () => {
 
 interface VitrineCardProps {
     vitrine: any
+    hideCity?: boolean
+    className?: string
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]" }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -148,47 +71,60 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine }) => {
     const distance = partner.distance_km_formatted || null
     const city = partner.city || ""
     const state = partner.state || ""
+    const category = vitrine.category || partner.category || null
+    const reviewsCount = partner.reviewsCount ?? vitrine.reviewsCount ?? 0
+    const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0 && reviewsCount >= 3
 
     return (
         <Link
             href={getPartnerUrl(partner)}
             prefetch={false}
-            className="flex flex-col w-[280px] md:w-[320px] group cursor-pointer"
+            className={`flex flex-col group cursor-pointer hover:-translate-y-1 active:scale-[0.98] transition-all duration-300 ${className}`}
         >
-            <div className="relative w-full aspect-[21/9] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0">
+            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 shadow-sm group-hover:shadow-md transition-all duration-300">
                 <img
                     src={bannerImage}
                     alt={vitrine.name}
-                    className="w-full h-full object-cover transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                     loading="lazy"
                 />
                 <div className="absolute inset-0" />
             </div>
 
-            <div className="flex items-start gap-3 px-1">
+            <div className="flex items-center gap-3 px-1">
                 <UserProfileImage
                     fullName={storeName}
                     imageUrl={storeAvatar && !storeAvatar.includes("Placeholder.png") ? storeAvatar : null}
                     className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50"
                 />
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
                         <h3 className="font-bold text-brand-dark text-base truncate">
                             {storeName}
                         </h3>
-                        {(vitrine.rating ?? 0) > 0 && (
-                            <div className="flex items-center gap-1 shrink-0">
+                        {showRating && (
+                            <div className="flex items-center gap-0.5 shrink-0 ml-0.5">
                                 <StarIcon size={12} className="text-brand-green fill-brand-green" />
-                                <span className="text-xs font-bold text-brand-dark">{vitrine.rating}</span>
+                                <span className="text-xs font-bold text-brand-dark">{Number(vitrine.rating ?? partner.rating).toFixed(1)}</span>
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                        <span className="truncate">{city}{city && state ? " - " : ""}{state}</span>
+                    <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5">
+                        {!hideCity && (
+                            <span className="truncate">{city}{city && state ? " - " : ""}{state}</span>
+                        )}
+                        {!hideCity && distance && (
+                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
+                        )}
                         {distance && (
+                            <span className="font-medium">{distance}</span>
+                        )}
+                        {category && category !== "Loja Parceira" && (
                             <>
-                                <span className="w-1 h-1 rounded-full bg-gray-300" />
-                                <span className="font-medium text-brand-dark/70">{distance}</span>
+                                {(distance || !hideCity) && (
+                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text" />
+                                )}
+                                <span className="font-medium truncate">{category}</span>
                             </>
                         )}
                     </div>
@@ -204,7 +140,7 @@ interface CategoryListProps {
 
 export const CategoryList: React.FC<CategoryListProps> = ({ vitrines = [] }) => {
     return (
-        <section className="mx-auto mb-16 max-w-[1300px]">
+        <section className="mx-auto mb-16 max-w-[1400px]">
             <div className="px-4 lg:px-0 mb-8 flex items-end justify-between">
                 <div>
                     <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-1 leading-tight">Vitrines Populares</h2>
@@ -255,7 +191,7 @@ export const InfoSection: React.FC = () => {
 
     return (
         <section className="mb-16">
-            <div className="mx-auto max-w-[1300px]">
+            <div className="mx-auto max-w-[1400px]">
                 <h2 className="text-2xl md:text-[32px] font-bold text-brand-dark mb-8 px-4 lg:px-0">Vender online nunca foi tão simples</h2>
                 <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x">
                     {items.map((item, idx) => (
@@ -300,9 +236,10 @@ interface ItemCardProps {
     }
     userCoords?: { lat: number; lng: number } | null
     showSeller?: boolean
+    className?: string
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]" }) => {
     const imageUrl = getPrimaryProductDisplayImage(product)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
@@ -310,7 +247,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
 
     return (
-        <div className="w-[200px] md:w-[196px] relative group/card h-full shrink-0">
+        <div className={`relative group/card h-full shrink-0 ${className}`}>
             <Link
                 href={getProductUrl(product, product.partners)}
                 prefetch={false}
@@ -401,10 +338,10 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
     userCoords
 }) => {
     return (
-        <section className="mx-auto mb-12 md:mb-16 max-w-[1300px] overflow-hidden">
+        <section className="mx-auto mb-12 md:mb-16 max-w-[1400px] overflow-hidden">
             <div className="flex items-end justify-between px-4 lg:px-0 mb-6 md:mb-8">
                 <div>
-                    <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">{title}</h2>
+                    <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
                     {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}
                 </div>
                 <Link
