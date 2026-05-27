@@ -979,7 +979,7 @@ export function ExplorarPageClient({
                                                 className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
-                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    src="https://img.dudit.com.br/static/banners/BannerProdutos.png"
                                                     alt="Produtos"
                                                     className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
                                                 />
@@ -991,7 +991,7 @@ export function ExplorarPageClient({
                                                 className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
-                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    src="https://img.dudit.com.br/static/banners/BannerServicos.png"
                                                     alt="Serviços"
                                                     className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
                                                 />
@@ -1007,7 +1007,7 @@ export function ExplorarPageClient({
                                                 className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
-                                                    src="https://img.dudit.com.br/static/banners/ProductsBanner.png"
+                                                    src="https://img.dudit.com.br/static/banners/BannerAlimentacao.png"
                                                     alt="Alimentação"
                                                     className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-300"
                                                 />

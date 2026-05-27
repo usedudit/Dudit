@@ -1,12 +1,18 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { Button, Badge, InfoCard, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon } from "@/lib/icons"
-import { getERPDeliveryDetailsAction } from "@/app/actions/erp/deliveries"
+import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction } from "@/app/actions/erp/deliveries"
 import { formatDateTime } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
+
+const DeliveryRouteMap = dynamic(
+  () => import("./DeliveryRouteMap").then((m) => m.DeliveryRouteMap),
+  { ssr: false },
+)
 
 export default function DeliveryDetailPage({
   deliveryId,
@@ -19,6 +25,8 @@ export default function DeliveryDetailPage({
 }) {
   const [delivery, setDelivery] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [route, setRoute] = useState<any | null>(null)
+  const [routeLoading, setRouteLoading] = useState(false)
   const mounted = useRef(true)
 
   const handleBack = useCallback(() => onBack(), [onBack])
@@ -39,6 +47,19 @@ export default function DeliveryDetailPage({
     }
   }, [deliveryId, partnerId])
 
+  useEffect(() => {
+    let alive = true
+    const run = async () => {
+      setRouteLoading(true)
+      const res = await getDeliveryRoutePointsAction({ partnerId, deliveryId })
+      if (!alive) return
+      setRoute(res.success ? res.data : null)
+      setRouteLoading(false)
+    }
+    run()
+    return () => { alive = false }
+  }, [deliveryId, partnerId])
+
   if (loading) return <div className="h-full flex items-center justify-center"><ThreeDotsLoader /></div>
   if (!delivery) return null
 
@@ -56,7 +77,9 @@ export default function DeliveryDetailPage({
           <div className="flex items-center gap-3">
             <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0"><ChevronLeftIcon className="w-5 h-5" /></Button>
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">Entrega {order?.order_number || ""}</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
+                Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : (order?.order_number || "")}
+              </h1>
               <p className="text-brand-inactive-text dark:text-dark-body text-sm">Detalhes da entrega e do pedido vinculado</p>
             </div>
           </div>
@@ -70,10 +93,31 @@ export default function DeliveryDetailPage({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InfoCard title="Distância" message={`${Number(delivery.distance_km || 0).toFixed(2)} km`} color="blue" />
             <InfoCard title="Duração Estimada" message={`${delivery.estimated_duration_minutes || 0} min`} color="purple" />
-            <InfoCard title="Saída" message={delivery.started_at ? formatDateTime(delivery.started_at) : "-"} color="orange" />
-            <InfoCard title="Entregue em" message={delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-"} color="green" />
+            <InfoCard title="Saída" message={delivery.departure_time ? formatDateTime(delivery.departure_time) : (delivery.started_at ? formatDateTime(delivery.started_at) : "-")} color="orange" />
+            <InfoCard title="Conclusão" message={delivery.completed_at ? formatDateTime(delivery.completed_at) : (delivery.delivered_at ? formatDateTime(delivery.delivered_at) : "-")} color="green" />
           </div>
           <InfoCard title="Observações" message={delivery.notes || "Sem observações"} color="gray" />
+
+          <div className="mt-2">
+            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-3">Mapa da rota</h3>
+            <div className="h-[320px]">
+              {routeLoading ? (
+                <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border">
+                  <span className="text-sm text-brand-inactive-text">Carregando mapa...</span>
+                </div>
+              ) : route?.points?.length ? (
+                <DeliveryRouteMap
+                  points={route.points}
+                  initialLat={route.origin?.lat ?? null}
+                  initialLng={route.origin?.lng ?? null}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center rounded-2xl border border-brand-border dark:border-dark-border">
+                  <span className="text-sm text-brand-inactive-text">Sem dados de rota para exibir.</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         <div className="col-span-12 lg:col-span-4 space-y-4">
           <InfoCard title="Cliente" message={customer?.name || order?.customer_name || "Cliente"} color="gray" />

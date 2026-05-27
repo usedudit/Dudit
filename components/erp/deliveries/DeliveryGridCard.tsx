@@ -56,10 +56,11 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onQuickStatusChange 
         </div>
         <div onClick={(e) => e.stopPropagation()}>
           <ActionsDropdown onEdit={onDetails}>
-            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Status: Preparando</DropdownItem>
-            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Status: Enviado</DropdownItem>
-            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Status: Entregue</DropdownItem>
-            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivery_failed")}>Status: Entrega não realizada</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "pending")}>Status: Pendente</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "preparing")}>Status: Em preparação</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "sent")}>Status: Saiu para entrega</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "delivered")}>Status: Concluída</DropdownItem>
+            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, "cancelled")}>Status: Cancelada</DropdownItem>
           </ActionsDropdown>
         </div>
       </div>

@@ -21,6 +21,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { usePermissions } from "@/lib/permission-context"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
+import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -54,6 +55,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
+    const [deliverySummary, setDeliverySummary] = useState<any | null>(null)
     const [isReceiptPrintOpen, setIsReceiptPrintOpen] = useState(false)
     const { error: notifyError } = useNotification()
 
@@ -86,6 +88,22 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         }
 
         load()
+        return () => { mounted = false }
+    }, [orderId, partnerId])
+
+    useEffect(() => {
+        let mounted = true
+        async function loadDelivery() {
+            if (!orderId || !partnerId) return
+            const res = await getOrderDeliverySummaryAction({ partnerId, orderId })
+            if (!mounted) return
+            if (res.success) {
+                setDeliverySummary(res.data)
+            } else {
+                setDeliverySummary(null)
+            }
+        }
+        loadDelivery()
         return () => { mounted = false }
     }, [orderId, partnerId])
 
@@ -451,6 +469,27 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
                                                     address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
                                                     billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")} />
+                                                {deliverySummary && (
+                                                    <InfoCard
+                                                        title="Entrega vinculada"
+                                                        color="blue"
+                                                        message={
+                                                            [
+                                                                deliverySummary.deliveryNumber
+                                                                    ? `Entrega #${deliverySummary.deliveryNumber}`
+                                                                    : `Entrega`,
+                                                                deliverySummary.driverName
+                                                                    ? `Entregador: ${deliverySummary.driverName}`
+                                                                    : null,
+                                                                deliverySummary.routeStep && deliverySummary.orderCount
+                                                                    ? `Rota: ${deliverySummary.routeStep}/${deliverySummary.orderCount}`
+                                                                    : null,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join("\n")
+                                                        }
+                                                    />
+                                                )}
                                             </div>
                                         </div>
                                     </FadeIn>

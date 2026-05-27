@@ -6,10 +6,10 @@ import { Button, IconPlaceholder } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import Pagination from "@/components/reusable/Pagination"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { ExportFileIcon, PlusIcon, ArrowUpDownIcon } from "@/lib/icons"
+import { ExportFileIcon, PlusIcon, ArrowUpDownIcon, SparklesIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
+import { getERPDeliveriesPageAction, type ERPDeliveryListCursor, updateERPDeliveryStatusAction, getERPDeliveryPlanAccessAction, getSmartDeliverySuggestionsAction } from "@/app/actions/erp/deliveries"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryListItem from "./DeliveryListRow"
@@ -17,6 +17,8 @@ import DeliveryGridCard from "./DeliveryGridCard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import DefaultModal from "@/components/reusable/DefaultModal"
+import { formatDistance } from "@/lib/services/location.service"
 
 type SortKey = "order_id" | "delivery_fee" | "status" | "delivery_person" | "estimated_time" | "dates" | "delivered_at"
 type SortDirection = "asc" | "desc"
@@ -61,6 +63,11 @@ export default function DeliveriesPage({
     const observerTarget = useRef<HTMLDivElement>(null)
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
+    const [planSlug, setPlanSlug] = useState<string>("free")
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+    const [suggestions, setSuggestions] = useState<any[]>([])
+    const [createPrefillOrderIds, setCreatePrefillOrderIds] = useState<string[] | null>(null)
 
     const queryKey = useMemo(() => ["erp", "deliveries", partnerId] as const, [partnerId])
     const { items, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteList<any, ERPDeliveryListCursor>({
@@ -98,6 +105,35 @@ export default function DeliveriesPage({
         const timer = setTimeout(() => setDebouncedSearch(search), 300)
         return () => clearTimeout(timer)
     }, [search])
+
+    useEffect(() => {
+        let mounted = true
+        const run = async () => {
+            const res = await getERPDeliveryPlanAccessAction(partnerId)
+            if (!mounted) return
+            if (res.success) setPlanSlug(String(res.planSlug || "free"))
+        }
+        run()
+        return () => { mounted = false }
+    }, [partnerId])
+
+    const canSmartSuggest = planSlug === "escalar"
+
+    const loadSuggestions = async () => {
+        if (!canSmartSuggest) {
+            openPlanUpgrade("escalar")
+            return
+        }
+        setSuggestionsOpen(true)
+        setSuggestionsLoading(true)
+        try {
+            const res = await getSmartDeliverySuggestionsAction({ partnerId, maxOrdersPerDelivery: 5 })
+            if (res.success) setSuggestions(res.items || [])
+            else setSuggestions([])
+        } finally {
+            setSuggestionsLoading(false)
+        }
+    }
 
     useEffect(() => {
         checkScroll()
@@ -186,13 +222,18 @@ export default function DeliveriesPage({
     const totalPages = Math.max(1, Math.ceil(mapped.length / ITEMS_PER_PAGE))
     const paginated = mapped.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
-    const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Não enviado", "Preparando", "Enviado", "Entregue", "Disponível para retirada", "Entrega não realizada", "Cancelado"] }]
+    const filterSections: FilterSectionConfig[] = [{ id: "status", title: "Status", type: "checkbox-list", options: ["Pendente", "Em preparação", "Saiu para entrega", "Concluída", "Cancelada"] }]
 
     return (
         <AnimatePresence mode="wait">
             {wrapper === "create" ? (
                 <FadeIn key="create" className="w-full h-full">
-                    <CreateDeliveryPage partnerId={partnerId} onBack={() => setWrapper("list")} onSuccess={() => setWrapper("list")} />
+                    <CreateDeliveryPage
+                        partnerId={partnerId}
+                        onBack={() => { setCreatePrefillOrderIds(null); setWrapper("list") }}
+                        onSuccess={() => { setCreatePrefillOrderIds(null); setWrapper("list") }}
+                        initialOrderIds={createPrefillOrderIds || undefined}
+                    />
                 </FadeIn>
             ) : wrapper === "detail" && selectedDeliveryId ? (
                 <FadeIn key="detail" className="w-full h-full">
@@ -209,6 +250,14 @@ export default function DeliveriesPage({
                             <div className="flex items-center gap-3">
                                 <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
                                     Exportar
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={loadSuggestions}
+                                    disabled={!!planGate}
+                                    leftIcon={<SparklesIcon size={18} />}
+                                >
+                                    Gerar sugestões
                                 </Button>
                                 <Button onClick={() => setWrapper("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                     Nova entrega
@@ -324,6 +373,70 @@ export default function DeliveriesPage({
                     </div>
                 </FadeIn>
             )}
+
+            <DefaultModal
+                isOpen={suggestionsOpen}
+                onClose={() => setSuggestionsOpen(false)}
+                title="Sugestões de entregas"
+                maxWidth="3xl"
+                footer={
+                    <Button variant="outline" onClick={() => setSuggestionsOpen(false)}>
+                        Fechar
+                    </Button>
+                }
+            >
+                <div className="space-y-4">
+                    {suggestionsLoading ? (
+                        <div className="text-sm text-brand-inactive-text">Gerando sugestões...</div>
+                    ) : suggestions.length === 0 ? (
+                        <div className="text-sm text-brand-inactive-text">Nenhuma sugestão encontrada para os pedidos atuais.</div>
+                    ) : (
+                        suggestions.map((sug, idx) => (
+                            <div key={`${sug.groupKey}-${idx}`} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                            {sug.groupLabel}
+                                        </div>
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            {sug.orders?.length || 0} pedido(s)
+                                            {sug.totalDistanceKm != null ? ` • ${formatDistance(Number(sug.totalDistanceKm))}` : ""}
+                                            {sug.estimatedDurationMinutes != null ? ` • ${sug.estimatedDurationMinutes} min` : ""}
+                                        </div>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
+                                            setSuggestionsOpen(false)
+                                            setCreatePrefillOrderIds(ids)
+                                            setWrapper("create")
+                                        }}
+                                    >
+                                        Criar entrega
+                                    </Button>
+                                </div>
+
+                                <div className="mt-3 space-y-2">
+                                    {(sug.orders || []).map((o: any) => (
+                                        <div key={o.id} className="flex items-start justify-between gap-3 text-sm">
+                                            <div className="min-w-0">
+                                                <div className="font-bold text-brand-dark dark:text-dark-heading truncate">{o.displayId}</div>
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                    {o.customerName}
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body shrink-0">
+                                                {o.distanceKm == null ? "-" : `${Number(o.distanceKm).toFixed(1)} km`}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </DefaultModal>
         </AnimatePresence>
     )
 }

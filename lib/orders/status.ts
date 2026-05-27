@@ -9,6 +9,7 @@ export type PaymentStatusValue =
   | "delivered"
 
 export type DeliveryStatusValue =
+  | "pending"
   | "not_sent"
   | "preparing"
   | "sent"
@@ -31,13 +32,17 @@ const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant
 }
 
 const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
-  not_sent: { label: "Não enviado", variant: "gray" },
-  preparing: { label: "Preparando", variant: "orange" },
-  sent: { label: "Enviado", variant: "blue" },
-  delivered: { label: "Entregue", variant: "green" },
+  // Basic delivery (new canonical set)
+  pending: { label: "Pendente", variant: "gray" },
+  preparing: { label: "Em preparação", variant: "orange" },
+  sent: { label: "Saiu para entrega", variant: "blue" },
+  delivered: { label: "Concluída", variant: "green" },
+  cancelled: { label: "Cancelada", variant: "red" },
+
+  // Backward compatibility (older status values still exist in DB/UI)
+  not_sent: { label: "Pendente", variant: "gray" },
   pickup_available: { label: "Pronto retirada", variant: "cyan" },
   delivery_failed: { label: "Falha na entrega", variant: "red" },
-  cancelled: { label: "Cancelado", variant: "red" },
 }
 
 export function getPaymentStatusMeta(status?: string | null) {
