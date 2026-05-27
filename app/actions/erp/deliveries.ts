@@ -481,9 +481,9 @@ export async function getERPDeliveryAnalyticsAction(params: { partnerId: string;
 
   const totalDistanceKm = rows.reduce((sum: number, d: any) => sum + Number(d.distance_km || 0), 0)
   const avgOrdersPerDelivery = (() => {
-    const counts = rows.map((d: any) => orderCountByDeliveryId.get(String(d.id)) || 0).filter((n) => n > 0)
+    const counts = rows.map((d: any) => orderCountByDeliveryId.get(String(d.id)) || 0).filter((n: number) => n > 0)
     if (counts.length === 0) return 0
-    return Math.round((counts.reduce((a, b) => a + b, 0) / counts.length) * 10) / 10
+    return Math.round((counts.reduce((a: number, b: number) => a + b, 0) / counts.length) * 10) / 10
   })()
 
   const completionRate = rows.length ? Math.round((completed.length / rows.length) * 100) : 0
@@ -821,7 +821,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
 
   const groupsByKey = new Map<string, { label: string; orders: SmartDeliverySuggestionOrder[] }>()
   for (const o of enriched) {
-    const existing = groupsByKey.get(o.groupKey) || { label: o.groupLabel, orders: [] }
+    const existing = groupsByKey.get(o.groupKey) || { label: o.groupLabel, orders: [] as SmartDeliverySuggestionOrder[] }
     existing.orders.push({
       id: o.id,
       orderNumber: o.orderNumber,

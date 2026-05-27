@@ -146,6 +146,7 @@ export default function DriversPage({ partnerId }: { partnerId: string }) {
             />
             <FormTextarea
               label="Observações"
+              name="notes"
               value={selected.notes}
               onChange={(e) => setSelected((prev) => (prev ? { ...prev, notes: e.target.value } : prev))}
               placeholder="Ex.: veículo, horários, preferências..."
