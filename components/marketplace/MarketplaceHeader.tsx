@@ -46,6 +46,7 @@ interface HeaderProps {
     onShare?: () => void
     onFavorite?: () => void
     isFavorite?: boolean
+    favoriteButton?: React.ReactNode
     simpleTitle?: string
     storeSearchPlaceholder?: string
     storeSearchValue?: string
@@ -67,6 +68,7 @@ const Header: React.FC<HeaderProps> = ({
     onShare,
     onFavorite,
     isFavorite,
+    favoriteButton,
     simpleTitle,
     storeSearchPlaceholder,
     storeSearchValue,
@@ -540,14 +542,16 @@ const Header: React.FC<HeaderProps> = ({
                                             <ShareIcon size={20} />
                                         </button>
                                     )}
-                                    {onFavorite && (
+                                    {favoriteButton ? (
+                                        favoriteButton
+                                    ) : onFavorite ? (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
                                             className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark"}`}
                                         >
                                             <HeartIcon size={20} className={isFavorite ? "fill-current" : ""} />
                                         </button>
-                                    )}
+                                    ) : null}
                                 </>
                             ) : (
                                 <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
@@ -606,6 +610,7 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="py-2">
                         {[
                             { label: "Seu perfil", href: "/perfil" },
+                            { label: "Meus Favoritos", href: "/favoritos" },
                             { label: "Lojas favoritas", action: () => setView?.("vendor") },
                             { label: "Central do Parceiro", href: "/erp/switch" },
                         ].map((item, idx) => {
@@ -795,6 +800,7 @@ const Header: React.FC<HeaderProps> = ({
                                     <div className="py-2">
                                         {[
                                             { label: "Seu perfil", href: "/perfil" },
+                                            { label: "Meus Favoritos", href: "/favoritos" },
                                             { label: "Lojas favoritas", action: () => setView?.("vendor") },
                                             { label: "Central do Parceiro", href: "/erp/switch" },
                                         ].map((item, idx) => {

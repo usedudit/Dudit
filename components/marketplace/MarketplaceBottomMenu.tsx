@@ -212,7 +212,7 @@ export function MarketplaceBottomMenu() {
                             <MenuItem label="Central de Ajuda" href="/ajuda" icon={HelpCircleIcon} />
                             <MenuItem
                                 label="Favoritos"
-                                href={user ? "/perfil?tab=enderecos" : "/auth/login"}
+                                href={user ? "/favoritos" : "/auth/login?next=/favoritos"}
                                 icon={HeartIcon}
                             />
                             <MenuItem

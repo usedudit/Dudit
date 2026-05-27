@@ -18,6 +18,7 @@ import {
   MapPinIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
+import { FavoriteButton } from "./FavoriteButton"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, IconPlaceholder } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
@@ -107,7 +108,6 @@ export function ServiceDetailsPageClient({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [isBooking, setIsBooking] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
-  const [isFavorite, setIsFavorite] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
@@ -500,8 +500,14 @@ export function ServiceDetailsPageClient({
         cartCount={cartCount}
         productName={service.name}
         onShare={() => setShowShareModal(true)}
-        onFavorite={() => setIsFavorite(!isFavorite)}
-        isFavorite={isFavorite}
+        favoriteButton={
+          <FavoriteButton
+            itemId={service.id}
+            itemType="servico"
+            size="md"
+            variant="icon-only"
+          />
+        }
       />
 
       <motion.div
@@ -541,12 +547,12 @@ export function ServiceDetailsPageClient({
 
                 {/* Desktop action buttons */}
                 <div className="hidden lg:flex absolute top-4 right-4 gap-2">
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"
-                  >
-                    <HeartIcon className={`w-4 h-4 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
-                  </button>
+                  <FavoriteButton
+                    itemId={service.id}
+                    itemType="servico"
+                    size="lg"
+                    variant="overlay"
+                  />
                   <button
                     onClick={() => setShowShareModal(true)}
                     className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"

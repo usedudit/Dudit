@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
+import { FavoriteButton } from "./FavoriteButton"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
@@ -260,9 +261,13 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         className="w-full h-full object-cover transition-transform duration-500"
                         loading="lazy"
                     />
-                    <button className="absolute top-2 right-2 p-1.5 bg-white rounded-full text-gray-400 hover:text-brand-green opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
-                        <HeartIcon size={18} />
-                    </button>
+                    <FavoriteButton
+                        itemId={product.id}
+                        itemType={(product as any).itemType === "servico" ? "servico" : "produto"}
+                        size="sm"
+                        variant="overlay"
+                        className="absolute top-2 right-2 z-10 opacity-0 group-hover/card:opacity-100 transition-opacity"
+                    />
                 </div>
 
                 <div className="px-1">

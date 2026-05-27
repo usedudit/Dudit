@@ -21,6 +21,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
+import { FavoriteButton } from "./FavoriteButton"
 
 interface ProductDetailsPageClientProps {
     product: any
@@ -69,16 +70,15 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
     )
 }
 
-function ActionButtons({ isFavorite, onFavorite, onShareClick, className = "" }: { isFavorite: boolean, onFavorite: () => void, onShareClick: () => void, className?: string }) {
+function ActionButtons({ productId, onShareClick, className = "" }: { productId: string, onShareClick: () => void, className?: string }) {
     return (
         <div className={`flex flex-col gap-3 ${className}`}>
-            <Button
-                variant="filled"
-                onClick={(e) => { e.stopPropagation(); onFavorite(); }}
-                className="w-9 h-9 flex items-center justify-center"
-            >
-                <HeartIcon className={`w-4 h-4 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
-            </Button>
+            <FavoriteButton
+                itemId={productId}
+                itemType="produto"
+                size="lg"
+                variant="inline"
+            />
             <Button
                 variant="filled"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
@@ -118,7 +118,7 @@ export function ProductDetailsPageClient({
     const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
     const [showShareModal, setShowShareModal] = useState(false)
     const [showReportModal, setShowReportModal] = useState(false)
-    const [isFavorite, setIsFavorite] = useState(false)
+    // isFavorite state is now managed by FavoritesProvider
     const [isMounted, setIsMounted] = useState(false)
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [customQuantity, setCustomQuantity] = useState("")
@@ -896,8 +896,14 @@ export function ProductDetailsPageClient({
                     cartCount={cartCount}
                     productName={product.name}
                     onShare={() => setShowShareModal(true)}
-                    onFavorite={() => setIsFavorite(!isFavorite)}
-                    isFavorite={isFavorite}
+                    favoriteButton={
+                        <FavoriteButton
+                            itemId={product.id}
+                            itemType="produto"
+                            size="md"
+                            variant="icon-only"
+                        />
+                    }
                 />
             )}
             <motion.div
@@ -1068,9 +1074,12 @@ export function ProductDetailsPageClient({
 
                                     {/* Desktop Right Column (Actions + Next) */}
                                     <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
-                                        <Button variant="filled" onClick={() => setIsFavorite(!isFavorite)} className="w-10 h-10 flex items-center justify-center" title="Favoritar">
-                                            <HeartIcon className={`w-5 h-5 ${isFavorite ? "text-brand-green fill-brand-green" : "text-brand-inactive-text"}`} />
-                                        </Button>
+                                        <FavoriteButton
+                                            itemId={product.id}
+                                            itemType="produto"
+                                            size="lg"
+                                            variant="inline"
+                                        />
 
                                         <Button variant="filled" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
