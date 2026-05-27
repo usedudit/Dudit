@@ -25,6 +25,8 @@ import { Spinner } from "@/components/reusable/Spinner"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { generateEAN13 } from "@/lib/utils/barcode"
+
 
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -637,6 +639,24 @@ const AddProductPage: FC<AddProductPageProps> = ({
         setProductData((prev: any) => ({ ...prev, sku: randomCode }))
     }, [productData.name])
 
+    const handleGenerateBarcode = useCallback(() => {
+        if (!productData.gtin) {
+            if (productData.sku) {
+                setProductData((prev: any) => ({ ...prev, gtin: prev.sku }))
+                notifySuccess("Código de barras gerado a partir do SKU.")
+            } else {
+                const randomGtin = generateEAN13()
+                setProductData((prev: any) => ({ ...prev, gtin: randomGtin }))
+                notifySuccess("Código de barras EAN-13 interno gerado automaticamente.")
+            }
+        } else {
+            const randomGtin = generateEAN13()
+            setProductData((prev: any) => ({ ...prev, gtin: randomGtin }))
+            notifySuccess("Novo código de barras EAN-13 gerado automaticamente.")
+        }
+    }, [productData.sku, productData.gtin, notifySuccess])
+
+
     const handleSavePendingVariants = useCallback((variantsToSave: any[]) => {
         setProductData((prev: any) => ({ ...prev, pending_variants: variantsToSave }))
     }, [])
@@ -792,7 +812,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
                                             isQuickMode={isQuick}
                                             generateRandomCode={handleGenerateRandomCode}
+                                            onGenerateBarcode={handleGenerateBarcode}
                                             openAddItemModal={handleOpenMetadataModal}
+
                                         />
                                     </FadeIn>
                                 )}

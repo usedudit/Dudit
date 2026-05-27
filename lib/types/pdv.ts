@@ -3,6 +3,7 @@ export type PDVProduct = {
   name: string
   category?: string | null
   sku?: string | null
+  gtin?: string | null
   price: number
   stock_available: number
   allow_sell_without_stock?: boolean

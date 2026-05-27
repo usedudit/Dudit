@@ -93,7 +93,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
         const pdfBuffer = await generatePdf(printUrl, allCookies)
         
-        return new Response(pdfBuffer, {
+        return new Response(new Uint8Array(pdfBuffer), {
             headers: {
                 "Content-Type": "application/pdf",
                 "Content-Disposition": `attachment; filename="${type}-${id}.pdf"`,

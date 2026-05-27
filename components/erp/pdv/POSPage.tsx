@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, BarcodeScannerInput } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -416,6 +416,84 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
         })
     }, [notifyError])
+
+    const handleScanBarcode = useCallback(async (code: string) => {
+        const cleanCode = code.trim()
+        if (!cleanCode) return
+
+        // 1. Search in local products state first
+        let matchedProduct = products.find(p => p.gtin === cleanCode || p.sku === cleanCode)
+        let matchedVariantId: string | null = null
+
+        if (!matchedProduct) {
+            // Check variant SKUs locally
+            for (const p of products) {
+                const v = p.product_variants?.find(v => v.sku === cleanCode)
+                if (v) {
+                    matchedProduct = p
+                    matchedVariantId = v.id
+                    break
+                }
+            }
+        }
+
+        if (matchedProduct) {
+            // Found locally!
+            if (matchedProduct.product_variants && matchedProduct.product_variants.length > 0 && !matchedVariantId) {
+                // Open variant picker
+                setVariantPickerProduct(matchedProduct)
+            } else {
+                addToCart(matchedProduct, matchedVariantId)
+                notifySuccess(`Produto "${matchedProduct.name}" adicionado.`)
+            }
+            return
+        }
+
+        // 2. Not found locally, call server action to find it in DB (handles overflow products)
+        try {
+            const { searchProductByBarcodeAction } = await import("@/app/actions/erp/products")
+            const result = await searchProductByBarcodeAction(partnerId, cleanCode)
+            if (result.success) {
+                if (result.data) {
+                    const serverProduct = result.data
+                    const dbProduct: Product = {
+                        id: String(serverProduct.id),
+                        name: String(serverProduct.name),
+                        category: serverProduct.category ?? null,
+                        sku: serverProduct.sku ?? null,
+                        price: Number(serverProduct.price) || 0,
+                        stock_available: Number(serverProduct.stock_available ?? serverProduct.stock_quantity ?? 0),
+                        allow_sell_without_stock: Boolean(serverProduct.allow_sell_without_stock),
+                        images: Array.isArray(serverProduct.images) ? serverProduct.images : null,
+                        product_variants: Array.isArray(serverProduct.product_variants) ? serverProduct.product_variants : [],
+                    }
+
+                    // Add to local products state so it's visible in PDV
+                    setProducts(prev => {
+                        if (prev.some(p => p.id === dbProduct.id)) return prev
+                        return [dbProduct, ...prev]
+                    })
+
+                    const finalVariantId = serverProduct.matchedVariantId || null
+
+                    if (dbProduct.product_variants && dbProduct.product_variants.length > 0 && !finalVariantId) {
+                        setVariantPickerProduct(dbProduct)
+                    } else {
+                        addToCart(dbProduct, finalVariantId)
+                        notifySuccess(`Produto "${dbProduct.name}" adicionado.`)
+                    }
+                } else {
+                    notifyError("Produto não encontrado.")
+                }
+            } else {
+                notifyError(result.error || "Produto não encontrado.")
+            }
+        } catch (e: any) {
+            console.error("Barcode scan search error:", e)
+            notifyError("Erro ao buscar produto pelo código de barras.")
+        }
+    }, [products, partnerId, addToCart, notifySuccess, notifyError])
+
 
     const handleCreateQuickProduct = useCallback(async (payload: {
         name: string
@@ -1124,6 +1202,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 teamMembers={teamMembers}
                                 onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
                             />
+
+                            <div className="mb-4 mt-2 px-1">
+                                <BarcodeScannerInput
+                                    onScan={handleScanBarcode}
+                                    placeholder="Escaneie o código de barras ou SKU..."
+                                />
+                            </div>
+
 
                             <AnimatePresence mode="wait">
                                 <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>

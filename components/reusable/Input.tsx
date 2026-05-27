@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type React from "react"
+import React, { forwardRef } from "react"
 
 interface FormInputProps {
   label?: string
@@ -43,43 +43,47 @@ interface FormInputProps {
   showCharacterCount?: boolean
 }
 
-export const Input: React.FC<FormInputProps> = ({
-  label,
-  placeholder,
-  type = "text",
-  value,
-  prefix,
-  suffix,
-  onChange,
-  onBlur,
-  onFocus,
-  name,
-  disabled = false,
-  readOnly = false,
-  labelAddon,
-  required,
-  min,
-  max,
-  maxLength,
-  step,
-  id,
-  className,
-  multiline = false,
-  rows = 4,
-  pattern,
-  title,
-  error = false,
-  errorMessage,
-  variant = "default",
-  inputMode,
-  onKeyDown,
-  autoFocus,
-  autoComplete,
-  spellCheck,
-  autoCorrect,
-  autoCapitalize,
-  showCharacterCount = false,
-}) => {
+export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInputProps>(
+  (
+    {
+      label,
+      placeholder,
+      type = "text",
+      value,
+      prefix,
+      suffix,
+      onChange,
+      onBlur,
+      onFocus,
+      name,
+      disabled = false,
+      readOnly = false,
+      labelAddon,
+      required,
+      min,
+      max,
+      maxLength,
+      step,
+      id,
+      className,
+      multiline = false,
+      rows = 4,
+      pattern,
+      title,
+      error = false,
+      errorMessage,
+      variant = "default",
+      inputMode,
+      onKeyDown,
+      autoFocus,
+      autoComplete,
+      spellCheck,
+      autoCorrect,
+      autoCapitalize,
+      showCharacterCount = false,
+    },
+    ref
+  ) => {
   const inputId = id || name || Math.random().toString(36).substring(7)
 
   const isLocked = disabled || readOnly
@@ -140,6 +144,7 @@ export const Input: React.FC<FormInputProps> = ({
 
         {multiline ? (
           <textarea
+            ref={ref as React.Ref<HTMLTextAreaElement>}
             id={inputId}
             name={name}
             value={value}
@@ -163,6 +168,7 @@ export const Input: React.FC<FormInputProps> = ({
           />
         ) : (
           <input
+            ref={ref as React.Ref<HTMLInputElement>}
             id={inputId}
             type={type}
             name={name}
@@ -213,6 +219,8 @@ export const Input: React.FC<FormInputProps> = ({
       </div>
     </div>
   )
-}
+})
+
+Input.displayName = "Input"
 
 export default Input

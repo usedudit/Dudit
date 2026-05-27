@@ -1598,3 +1598,98 @@ export async function getERPProductsPageAction(
         return { success: false, error: e?.message || "Erro ao carregar produtos" }
     }
 }
+
+export async function searchProductByBarcodeAction(
+    partnerId: string | undefined | null,
+    code: string
+): Promise<ActionResponse<any>> {
+    try {
+        await requireUser()
+        
+        let resolvedPartnerId = partnerId
+        if (!resolvedPartnerId) {
+            const context = await getCurrentPartnerContext()
+            if (!context) return { success: false, error: "Contexto do parceiro não encontrado" }
+            resolvedPartnerId = context.partnerId
+        }
+
+        await requirePartnerAccessWithPermission(resolvedPartnerId, "products", "view")
+        const supabase = getAdminClient()
+        
+        const cleanCode = code.trim()
+        if (!cleanCode) return { success: false, error: "Código inválido" }
+
+        // 1. GTIN exact match on products
+        const { data: gtinMatch } = await supabase
+            .from("products")
+            .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .eq("partner_id", resolvedPartnerId)
+            .eq("gtin", cleanCode)
+            .eq("is_active", true)
+            .maybeSingle()
+
+        if (gtinMatch) {
+            return { success: true, data: gtinMatch }
+        }
+
+        // 2. SKU exact match on products
+        const { data: skuMatch } = await supabase
+            .from("products")
+            .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .eq("partner_id", resolvedPartnerId)
+            .eq("sku", cleanCode)
+            .eq("is_active", true)
+            .maybeSingle()
+
+        if (skuMatch) {
+            return { success: true, data: skuMatch }
+        }
+
+        // 3. SKU exact match on product variants
+        const { data: variantMatch } = await supabase
+            .from("product_variants")
+            .select("*, products(*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options))")
+            .eq("sku", cleanCode)
+            .eq("is_active", true)
+            .maybeSingle()
+
+        if (variantMatch && variantMatch.products && variantMatch.products.partner_id === resolvedPartnerId) {
+            const product = {
+                ...variantMatch.products,
+                matchedVariantId: variantMatch.id
+            }
+            return { success: true, data: product }
+        }
+
+        // 4. Partial SKU fallback
+        const { data: partialSkuMatch } = await supabase
+            .from("products")
+            .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .eq("partner_id", resolvedPartnerId)
+            .eq("is_active", true)
+            .ilike("sku", `%${cleanCode}%`)
+            .limit(1)
+
+        if (partialSkuMatch && partialSkuMatch.length > 0) {
+            return { success: true, data: partialSkuMatch[0] }
+        }
+
+        // 5. Product name fallback
+        const { data: nameMatch } = await supabase
+            .from("products")
+            .select("*, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .eq("partner_id", resolvedPartnerId)
+            .eq("is_active", true)
+            .ilike("name", `%${cleanCode}%`)
+            .limit(1)
+
+        if (nameMatch && nameMatch.length > 0) {
+            return { success: true, data: nameMatch[0] }
+        }
+
+        return { success: false, error: "Produto não encontrado" }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+

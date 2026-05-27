@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import JsBarcode from "jsbarcode"
 import { PrinterIcon, DownloadIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { detectBarcodeFormat } from "@/lib/utils/barcode"
 
 interface Product {
   id: string
@@ -58,7 +59,7 @@ export function LabelPreview({ products, layout, onClose }: LabelPreviewProps) {
         if (element && !element.querySelector("svg")) {
           try {
             JsBarcode(`#${elementId}`, label.barcodeValue, {
-              format: "CODE128",
+              format: detectBarcodeFormat(label.barcodeValue),
               width: 1.5,
               height: 40,
               fontSize: 12,

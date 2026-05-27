@@ -93,6 +93,7 @@ export interface ProductBucketItem {
   id: string
   name: string
   sku: string
+  gtin: string | null
   price: number
   stock: number
   allow_sell_without_stock?: boolean
@@ -141,7 +142,8 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
       .filter(
         (item) =>
           item.name.toLowerCase().includes(search) ||
-          item.sku.toLowerCase().includes(search)
+          item.sku.toLowerCase().includes(search) ||
+          (item.gtin && item.gtin.toLowerCase().includes(search))
       )
       .slice(0, 12)
   }, [bucket, searchQuery])
@@ -153,6 +155,7 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
     isLoading: isLoading && !isLoaded,
     isLoaded,
     loadBucket,
+    bucket,
   }
 }
 

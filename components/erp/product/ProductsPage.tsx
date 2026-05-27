@@ -30,10 +30,12 @@ import {
     toggleProductsStatusAction,
     getProductWithDetailsAction,
     batchUpdateProductsAction,
+    searchProductByBarcodeAction,
 } from "@/app/actions/erp/products"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, SelectionBanner } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, SelectionBanner, BarcodeScannerInput } from "@/components/reusable"
+import { playBeepSound, vibrateMobile } from "@/lib/utils/barcode"
 import Dropdown from "../../reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import AlertModal from "../../reusable/AlertModal"
@@ -646,6 +648,45 @@ export default function ProductsPage({
         }
     }
 
+    const handleScanBarcode = useCallback(async (code: string) => {
+        const cleanCode = code.trim();
+        if (!cleanCode) return;
+
+        // 1. Search locally in the loaded products
+        const localMatch = products.find(p => 
+            (p.gtin && p.gtin.toLowerCase() === cleanCode.toLowerCase()) ||
+            (p.sku && p.sku.toLowerCase() === cleanCode.toLowerCase())
+        );
+
+        if (localMatch) {
+            playBeepSound();
+            vibrateMobile();
+            openEntity('view', localMatch.id);
+            return;
+        }
+
+        // 2. Search server-side
+        try {
+            const res = await searchProductByBarcodeAction(partnerId, cleanCode);
+            if (res && res.success) {
+                if (res.data) {
+                    playBeepSound();
+                    vibrateMobile();
+                    openEntity('view', res.data.id);
+                } else {
+                    setSearch(cleanCode);
+                    notifyError("Produto não encontrado. Filtrando lista por código...");
+                }
+            } else {
+                setSearch(cleanCode);
+                notifyError("Produto não encontrado. Filtrando lista por código...");
+            }
+        } catch (err: any) {
+            setSearch(cleanCode);
+            notifyError("Erro ao buscar produto. Filtrando lista por código...");
+        }
+    }, [products, partnerId, openEntity, setSearch, notifyError]);
+
     const handleAddFirstProduct = useCallback(() => {
         openEntity('create')
     }, [openEntity])
@@ -743,6 +784,17 @@ export default function ProductsPage({
                                     </Button>
                                 </div>
                             </div>
+
+                        {hasProducts && (
+                            <div className="px-4 md:px-8 mb-4">
+                                <BarcodeScannerInput
+                                    onScan={handleScanBarcode}
+                                    placeholder="Escaneie o código de barras ou SKU para buscar/abrir..."
+                                    autoFocus={false}
+                                    showCameraOption={true}
+                                />
+                            </div>
+                        )}
 
                             {hasProducts && (
                                 <ProductPageControls

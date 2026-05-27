@@ -25,6 +25,9 @@ import {
     IconPlaceholder,
     ThreeDotsLoader
 } from '@/components/reusable';
+import { BarcodeScannerInput } from '@/components/reusable';
+import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
+import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -117,14 +120,27 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [nextAction])
 
 
-    const addProduct = useCallback((product: ProductBucketItem) => {
-        // Check if product is already in the list
-        const exists = items.find(item => item.product.id === product.id);
-        if (exists) {
-            notifyError("Este produto já foi adicionado.");
-            return;
-        }
-        setItems(prev => [...prev, { product, quantity: 1 }]);
+    const addProduct = useCallback((product: ProductBucketItem, quantity = 1) => {
+        setItems(prev => {
+            const existsIndex = prev.findIndex(item => item.product.id === product.id);
+            if (existsIndex > -1) {
+                const next = [...prev];
+                const item = next[existsIndex];
+                const nextQty = item.quantity + quantity;
+                if (type === 'out' && nextQty > Number(item.product.stock || 0)) {
+                    notifyError(`A quantidade de "${item.product.name}" excede o estoque disponível.`);
+                    return prev;
+                }
+                next[existsIndex] = { ...item, quantity: nextQty };
+                return next;
+            }
+            // Add new item
+            if (type === 'out' && quantity > Number(product.stock || 0)) {
+                notifyError(`A quantidade de "${product.name}" excede o estoque disponível.`);
+                return prev;
+            }
+            return [...prev, { product, quantity }];
+        });
         productBucket.setSearchQuery('');
         setIsProductSearchOpen(false);
         setFieldErrors(prev => {
@@ -132,7 +148,83 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             next.delete('items');
             return next;
         });
-    }, [items, productBucket, notifyError]);
+    }, [productBucket, notifyError, type]);
+
+    const handleScanBarcode = useCallback(async (code: string) => {
+        const cleanCode = code.trim();
+        if (!cleanCode) return;
+
+        // Force load the bucket if not already loaded
+        let currentBucket = productBucket.bucket;
+        if (!productBucket.isLoaded || currentBucket.length === 0) {
+            try {
+                currentBucket = await fetchPartnerProductsBucket();
+            } catch (e) {
+                console.error("Erro ao carregar bucket de produtos:", e);
+            }
+        }
+
+        // 1. Search locally in the bucket (GTIN or SKU)
+        const localMatch = currentBucket.find(item => 
+            (item.gtin && item.gtin.toLowerCase() === cleanCode.toLowerCase()) ||
+            (item.sku && item.sku.toLowerCase() === cleanCode.toLowerCase())
+        );
+
+        if (localMatch) {
+            addProduct(localMatch);
+            playBeepSound();
+            vibrateMobile();
+            return;
+        }
+
+        // 2. Search locally in the bucket (Variant SKU)
+        const localVariantMatch = currentBucket.find(item => 
+            item.variants?.some(v => v.sku && v.sku.toLowerCase() === cleanCode.toLowerCase())
+        );
+        if (localVariantMatch) {
+            addProduct(localVariantMatch);
+            playBeepSound();
+            vibrateMobile();
+            return;
+        }
+
+        // 3. Fallback: Search server-side
+        try {
+            const res = await searchProductByBarcodeAction(null, cleanCode);
+            if (res && res.success) {
+                if (res.data) {
+                    const fetchedProduct = res.data;
+                    const bucketItem: ProductBucketItem = {
+                        id: fetchedProduct.id,
+                        name: fetchedProduct.name,
+                        sku: fetchedProduct.sku || "",
+                        gtin: fetchedProduct.gtin || null,
+                        price: fetchedProduct.price || 0,
+                        stock: fetchedProduct.stock_quantity || 0,
+                        image: fetchedProduct.images?.[0] || null,
+                        has_variants: !!(fetchedProduct.product_variants && fetchedProduct.product_variants.length > 0),
+                        variants: fetchedProduct.product_variants?.map((v: any) => ({
+                            id: v.id,
+                            name: v.variant_name,
+                            sku: v.sku,
+                            price: fetchedProduct.price + (v.price_adjustment || 0),
+                            stock: v.stock_available || 0,
+                            image: null
+                        }))
+                    };
+                    addProduct(bucketItem);
+                    playBeepSound();
+                    vibrateMobile();
+                } else {
+                    notifyError("Produto não encontrado.");
+                }
+            } else {
+                notifyError(res?.error || "Produto não encontrado.");
+            }
+        } catch (err: any) {
+            notifyError("Erro ao buscar produto no servidor.");
+        }
+    }, [productBucket, addProduct, notifyError]);
 
     const updateItemQty = useCallback((index: number, qty: number) => {
         setItems(prev => prev.map((item, i) => {
@@ -346,6 +438,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                 <section>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Itens da Movimentação</h3>
                                                     <div className="space-y-6">
+
+                                                        {/* Barcode Scanner Input */}
+                                                        <BarcodeScannerInput
+                                                            onScan={handleScanBarcode}
+                                                            placeholder="Escaneie o código de barras ou SKU do produto..."
+                                                            autoFocus={false}
+                                                            showCameraOption={true}
+                                                        />
 
                                                         {/* Product Search */}
                                                         <div ref={searchRef} className="relative">

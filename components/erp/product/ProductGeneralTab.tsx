@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, Barcode } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
@@ -79,11 +79,14 @@ interface ProductGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
     isQuickMode?: boolean
+    onGenerateBarcode?: () => void
 }
 
+
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode
 }) => {
+
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
     const { salesPrice, profit, margin } = useMemo(() => {
         const p = Number(productData.price || 0), c = Number(productData.costPrice || 0)
@@ -362,7 +365,30 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                         {!isQuickMode && (
                             <>
-                                <Input label="Código de Barras (EAN/GTIN)" name="gtin" value={productData.gtin} onChange={handleFieldChange} disabled={!isEditing} />
+                                <div className="space-y-1.5 w-full">
+                                    <Input
+                                        label="Código de Barras (EAN/GTIN)"
+                                        name="gtin"
+                                        value={productData.gtin || ""}
+                                        onChange={handleFieldChange}
+                                        disabled={!isEditing}
+                                    />
+                                    {isEditing && onGenerateBarcode && (
+                                        <button
+                                            type="button"
+                                            onClick={onGenerateBarcode}
+                                            className="text-xs font-bold text-brand-primary hover:underline"
+                                        >
+                                            Gerar código automaticamente
+                                        </button>
+                                    )}
+                                    {productData.gtin && (
+                                        <div className="mt-3 flex justify-start">
+                                            <Barcode value={productData.gtin} className="max-w-[200px]" />
+                                        </div>
+                                    )}
+                                </div>
+
 
                                 <FormCombobox
                                     label="Categoria"
