@@ -18,6 +18,7 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 export async function getCartItemCountAction() {
   try {
@@ -718,19 +719,84 @@ export async function checkoutCartAction(
     }
   }
 
+  // Fetch active promotions
+  const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId, user.id)
+
   const pricingResult = calculateOrderPricing({
-    items: orderItems.map((item: any) => ({
-      productId: item.product_id,
-      serviceId: null,
-      unitPrice: Number(item.product_price || 0),
-      quantity: Number(item.quantity || 0),
-    })),
+    items: orderItems.map((item: any) => {
+      const product = products.find((p: any) => p.id === item.product_id)
+      return {
+        productId: item.product_id,
+        serviceId: null,
+        unitPrice: Number(item.product_price || 0),
+        quantity: Number(item.quantity || 0),
+        categoryId: product?.category_id || null,
+      }
+    }),
     shippingCost: deliveryFee,
     coupon: couponPricingData,
+    promotions: promotionsData,
   })
 
   totalAmount = pricingResult.finalTotal
   couponDiscountAmount = pricingResult.couponDiscountAmount
+
+  // Handle gift items insertion
+  const giftProductIds = pricingResult.appliedGiftProductIds || []
+  let giftProducts: any[] = []
+  if (giftProductIds.length > 0) {
+    const { data: giftData } = await adminClient
+      .from("products")
+      .select("id, name, price, stock_available, category_id, is_active")
+      .in("id", giftProductIds)
+    giftProducts = giftData || []
+  }
+
+  for (const giftId of giftProductIds) {
+    const giftProd = giftProducts.find(p => p.id === giftId)
+    if (!giftProd || !giftProd.is_active || (giftProd.stock_available ?? 0) <= 0) {
+      await adminClient.from("promotion_audit_logs").insert({
+        partner_id: partnerId,
+        customer_id: user.id,
+        action: "gift_out_of_stock",
+        details: { gift_product_id: giftId },
+      })
+      continue
+    }
+
+    const promo = promotionsData.find(p => p.giftProductId === giftId)
+    orderItems.push({
+      product_id: giftProd.id,
+      variant_id: null,
+      product_name: `[BRINDE] ${giftProd.name}`,
+      product_price: 0,
+      quantity: 1,
+      subtotal: 0,
+      is_promotional: true,
+      promotion_id: promo?.id || null,
+    })
+  }
+
+  // Create audit logs for applied promotions
+  if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
+    await adminClient.from("promotion_audit_logs").insert({
+      partner_id: partnerId,
+      customer_id: user.id,
+      action: "applied",
+      details: { promotion_ids: pricingResult.appliedPromotionIds },
+    })
+  }
+
+  // Snapshot structure for promotions_applied field in orders
+  const promotionsAppliedSnapshot = (pricingResult.appliedPromotionIds || []).map(id => {
+    const p = promotionsData.find(promo => promo.id === id)
+    return {
+      id,
+      name: p?.name || "Promoção",
+      type: p?.promotionType,
+      discount_amount: p?.promotionType === "discount" || p?.promotionType === "buy_x_pay_y" ? pricingResult.promotionDiscountAmount : 0,
+    }
+  })
 
   let bestMethod: any = null
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
@@ -836,6 +902,7 @@ export async function checkoutCartAction(
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
       discount_amount: couponDiscountAmount,
+      promotions_applied: promotionsAppliedSnapshot,
       ...preparationPayload,
     })
     .select()
@@ -849,6 +916,8 @@ export async function checkoutCartAction(
   const itemsToInsert = orderItems.map((item: any) => ({
     ...item,
     order_id: order.id,
+    is_promotional: item.is_promotional ?? false,
+    promotion_id: item.promotion_id ?? null,
   }))
 
   const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
@@ -875,15 +944,26 @@ export async function checkoutCartAction(
     })
   )
 
-  const reserveResult = await reserveOrderInventory({
-    client: adminClient,
-    partnerId,
-    orderId: order.id,
-    items: partnerItems.map((item) => ({
+  const reserveItems = [
+    ...partnerItems.map((item) => ({
       product_id: item.productId,
       variant_id: item.variantId || null,
       quantity: item.quantity,
     })),
+    ...orderItems
+      .filter((item: any) => item.is_promotional)
+      .map((item: any) => ({
+        product_id: item.product_id,
+        variant_id: null,
+        quantity: 1,
+      })),
+  ]
+
+  const reserveResult = await reserveOrderInventory({
+    client: adminClient,
+    partnerId,
+    orderId: order.id,
+    items: reserveItems,
   })
 
   if ("error" in reserveResult) {
@@ -905,6 +985,28 @@ export async function checkoutCartAction(
       },
       { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
     )
+  }
+
+  if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
+    for (const promoId of pricingResult.appliedPromotionIds) {
+      await adminClient.from("promotion_usages").insert({
+        promotion_id: promoId,
+        customer_id: user.id,
+        order_id: order.id,
+      })
+      // Increment usage count of promotion
+      const { data: promoObj } = await adminClient
+        .from("promotions")
+        .select("usage_count")
+        .eq("id", promoId)
+        .single()
+      if (promoObj) {
+        await adminClient
+          .from("promotions")
+          .update({ usage_count: (promoObj.usage_count || 0) + 1 })
+          .eq("id", promoId)
+      }
+    }
   }
 
   // Limpa Cache

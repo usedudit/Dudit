@@ -116,6 +116,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
 
     // ── Marketing
     marketing_coupons: { key: "marketing_coupons", path: "/erp/coupons", label: "Cupons de Desconto", category: "Marketing" },
+    marketing_promotions: { key: "marketing_promotions", path: "/erp/promotions", label: "Campanhas e Promoções", category: "Marketing" },
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
 
     // ── Configurações
@@ -220,6 +221,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     store_reviews: withSpecific(full, { can_respond_reviews: true }),
     // Marketing
     marketing_coupons: full,
+    marketing_promotions: full,
     cadastros_marketing: full,
     // Configurações
     settings: full,
@@ -285,6 +287,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     store_reviews: withSpecific(viewOnly, { can_respond_reviews: true }),
     // Marketing
     marketing_coupons: full,
+    marketing_promotions: full,
     cadastros_marketing: full,
     // Configurações (limitado): pode visualizar; sem assinatura/integrações
     settings: viewOnly,
@@ -336,6 +339,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     store_reviews: noAccess,
     // Marketing - no access
     marketing_coupons: noAccess,
+    marketing_promotions: noAccess,
     cadastros_marketing: noAccess,
     // Config - no access
     settings: noAccess,
@@ -386,6 +390,7 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     store_reviews: noAccess,
     // Marketing - no access
     marketing_coupons: noAccess,
+    marketing_promotions: noAccess,
     cadastros_marketing: noAccess,
     // Config - no access
     settings: noAccess,
@@ -528,7 +533,7 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         },
         financial: { view: financial.view, create: financial.create, edit: financial.edit, cancel: hasSpecificPermission(routePerms, "financial_transactions", "can_cancel") },
         categories: mapRoute("cadastros_produtos"),
-        coupons: mapRoute("marketing_coupons"),
+        coupons: mapRoute("marketing_coupons"), // both coupons and promotions map to legacy coupons for compatibility
         goals: mapRoute("goals"),
         reports: {
             view_basic: mapRoute("financial_dashboard").view,
@@ -684,7 +689,10 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
         })
     }
 
-    if (legacy.coupons) apply("marketing_coupons", mapLegacy(legacy.coupons))
+    if (legacy.coupons) {
+        apply("marketing_coupons", mapLegacy(legacy.coupons))
+        apply("marketing_promotions", mapLegacy(legacy.coupons))
+    }
     if (legacy.categories) apply("cadastros_produtos", mapLegacy(legacy.categories))
     if (legacy.cadastros_categories) apply("cadastros_produtos", mapLegacy(legacy.cadastros_categories))
 

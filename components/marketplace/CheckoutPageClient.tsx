@@ -27,6 +27,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
+import { getPartnerProducts } from "@/app/actions/marketplace/partners"
 
 interface ProductItem {
     id: string
@@ -228,6 +229,83 @@ export function CheckoutPageClient() {
     const [deliverySettings, setDeliverySettings] = useState<any>(null)
     const [storefrontMethods, setStorefrontMethods] = useState<StorefrontPaymentMethod[]>([])
     const [storefrontMethodsLoading, setStorefrontMethodsLoading] = useState(true)
+
+    const [partnerProducts, setPartnerProducts] = useState<any[]>([])
+    const [loadingBumps, setLoadingBumps] = useState(false)
+
+    useEffect(() => {
+        if (!partnerId) return
+        let active = true
+        setLoadingBumps(true)
+        getPartnerProducts(partnerId)
+            .then((res) => {
+                if (!active) return
+                if (res) {
+                    setPartnerProducts(res)
+                }
+            })
+            .catch((err) => {
+                console.error("Error fetching order bump products:", err)
+            })
+            .finally(() => {
+                if (active) setLoadingBumps(false)
+            })
+        return () => {
+            active = false
+        }
+    }, [partnerId])
+
+    const bumpCandidates = useMemo(() => {
+        const checkoutIds = new Set(products.map(p => p.id))
+        return partnerProducts.filter((p: any) => {
+            const isStock = (p.stock_available ?? p.stock_quantity ?? 0) > 0
+            return isStock && !checkoutIds.has(p.id)
+        })
+    }, [partnerProducts, products])
+
+    const handleAddBumpProduct = (p: any) => {
+        if (!sessionData) return
+
+        const newProductItem: ProductItem = {
+            id: p.id,
+            name: p.name,
+            price: Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price),
+            quantity: 1,
+            image: p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png",
+            availabilityValue: p.availability_value,
+            availabilityUnit: p.availability_unit
+        }
+
+        const updatedProducts = [...products, newProductItem]
+        
+        const updatedCartItems = sessionData.source === "cart"
+            ? [...(sessionData.cartItems || [])]
+            : products.map((item) => ({
+                cartItemId: "bump-" + item.id,
+                productId: item.id,
+                variantId: item.variant || undefined,
+                quantity: item.quantity
+            }))
+        
+        updatedCartItems.push({
+            cartItemId: "bump-" + p.id,
+            productId: p.id,
+            variantId: undefined,
+            quantity: 1
+        })
+
+        const newSessionData: CheckoutSessionData = {
+            ...sessionData,
+            source: "cart",
+            products: updatedProducts,
+            cartItems: updatedCartItems
+        }
+
+        setSessionData(newSessionData)
+        sessionStorage.setItem("checkout_session", JSON.stringify(newSessionData))
+        notifySuccess("Produto adicionado", `${p.name} foi adicionado ao seu pedido!`)
+    }
+
 
     useEffect(() => {
         if (storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
@@ -1236,6 +1314,67 @@ export function CheckoutPageClient() {
                                     )}
                                 </div>
                             </FormSection>
+
+                            {/* ORDER BUMP SECTION */}
+                            {bumpCandidates.length > 0 && (
+                                <div className="border border-indigo-200/60 dark:border-indigo-900/40 rounded-xl bg-gradient-to-r from-indigo-50/50 via-purple-50/30 to-indigo-50/50 dark:from-indigo-950/20 dark:via-purple-950/15 dark:to-indigo-950/20 p-5 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-xs">
+                                            ✨
+                                        </span>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                Adicionar Oferta Especial
+                                            </h3>
+                                            <p className="text-[11px] text-brand-inactive-text">
+                                                Aproveite e leve também estes produtos da loja com frete único!
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {bumpCandidates.slice(0, 2).map((p: any) => {
+                                            const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
+                                            const basePrice = Number(p.price)
+                                            const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
+                                            const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    className="flex items-center gap-3 p-3 bg-white/70 dark:bg-dark-surface/60 backdrop-blur-sm border border-brand-border/50 dark:border-dark-border/50 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-800 transition-all shadow-sm"
+                                                >
+                                                    <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                                                        <img src={img} alt={p.name} className="w-full h-full object-contain" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-xs truncate">
+                                                            {p.name}
+                                                        </h4>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            {promoPrice > 0 && promoPrice < basePrice && (
+                                                                <span className="text-[10px] line-through text-brand-inactive-text">
+                                                                    {formatCurrency(basePrice)}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-xs font-bold text-brand-green">
+                                                                {formatCurrency(price)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => handleAddBumpProduct(p)}
+                                                        className="h-7 text-[11px] font-bold px-2.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50"
+                                                    >
+                                                        Adicionar
+                                                    </Button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">

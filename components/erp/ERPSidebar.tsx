@@ -106,8 +106,8 @@ const navItems: NavItem[] = [
         icon: MegaphoneIcon,
         label: "Marketing",
         submenu: [
-            { label: "Cupons de Desconto", href: "/" },
-            { label: "Campanhas e Promoções", href: "/" },
+            { label: "Cupons de Desconto", href: "/erp/coupons" },
+            { label: "Campanhas e Promoções", href: "/erp/promotions" },
         ],
     },
     {

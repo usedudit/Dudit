@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
@@ -35,6 +36,68 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
+
+    const [partnerPromotions, setPartnerPromotions] = useState<Record<string, any[]>>({})
+
+    useEffect(() => {
+        async function loadPromos() {
+            const partnerIds = Object.keys(itemsByPartner)
+            const promosMap: Record<string, any[]> = {}
+            await Promise.all(
+                partnerIds.map(async (pId) => {
+                    try {
+                        const activePromos = await listActivePromotionsForMarketplaceAction(pId, userId)
+                        promosMap[pId] = activePromos || []
+                    } catch (err) {
+                        console.error(`Failed to load promos for partner ${pId}:`, err)
+                    }
+                })
+            )
+            setPartnerPromotions(promosMap)
+        }
+        if (Object.keys(itemsByPartner).length > 0) {
+            loadPromos()
+        }
+    }, [itemsByPartner, userId])
+
+    const renderPromoBanners = (partnerId: string, partnerItemsTotal: number) => {
+        const promos = partnerPromotions[partnerId] || []
+        const pendingPromos = promos.filter(p => 
+            p.minSpendAmount && 
+            p.minSpendAmount > partnerItemsTotal && 
+            (p.promotionType === "gift" || p.promotionType === "free_shipping")
+        )
+
+        if (pendingPromos.length === 0) return null
+
+        return (
+            <div className="mt-4 space-y-3">
+                {pendingPromos.map((promo) => {
+                    const diff = promo.minSpendAmount - partnerItemsTotal
+                    const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
+                    const isFreeShipping = promo.promotionType === "free_shipping"
+                    const label = isFreeShipping 
+                        ? `Falta ${formatCurrency(diff)} para você ganhar Frete Grátis nesta loja!` 
+                        : `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
+
+                    return (
+                        <div key={promo.id} className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 dark:from-emerald-950/10 dark:to-emerald-900/10 p-4 rounded-xl border border-emerald-500/15 dark:border-emerald-500/20 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                <span>{label}</span>
+                                <span className="text-brand-green">{pct.toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-brand-gray dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                                <div 
+                                    className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out" 
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
 
     const getImageUrl = (path: string) => getR2ImageUrl(path)
     const isExpanded = (partnerId: string) => isVendorExpanded[partnerId] !== false
@@ -565,6 +628,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                                                 {/* Mobile/Tablet: resumo inline + botão */}
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
+                                                                    {renderPromoBanners(partnerId, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm">
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -624,6 +688,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 className="overflow-hidden"
                                                             >
                                                                 <div className="p-6 space-y-4">
+                                                                    {renderPromoBanners(partnerId, partnerItemsTotal)}
                                                                     <div className="flex justify-between items-center text-sm font-medium">
                                                                         <span className="text-brand-inactive-text">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>

@@ -630,6 +630,7 @@ function routeKeyToPermissionKey(routeKey: string): string | null {
     case "logistics": return "delivery.view"
     case "goals": return "goals.view"
     case "marketing_coupons": return "coupons.view"
+    case "marketing_promotions": return "coupons.view"
     case "cadastros_produtos": return "categories.view"
     case "cadastros_financeiro": return "financial.view"
     case "services": return "services.view"

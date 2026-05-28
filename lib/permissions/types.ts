@@ -184,6 +184,7 @@ export type RouteKey =
     | "store_reviews"
     // Marketing
     | "marketing_coupons"
+    | "marketing_promotions"
     | "cadastros_marketing"
     // Configurações
     | "settings"
