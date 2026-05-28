@@ -13,6 +13,7 @@ import { Drawer } from "vaul"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { isSystemResourceActive } from "@/lib/system-resources"
 
 interface SubMenuItem {
     label: string
@@ -127,6 +128,13 @@ const navItems: NavItem[] = [
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/logistics": "crescer",
+    "/erp/logistics/dashboard": "crescer",
+    "/erp/logistics/drivers": "crescer",
+    "/erp/resumo-financeiro": "crescer",
+    "/erp/transactions": "crescer",
+    "/erp/contas-a-pagar": "crescer",
+    "/erp/contas-a-receber": "crescer",
+    "/erp/cash-register": "crescer",
     "/erp/products/cadastros": "crescer",
     "/erp/servicos/cadastros": "crescer",
     "/erp/transactions/cadastros-financeiro": "crescer",
@@ -204,6 +212,16 @@ export function ERPSidebar() {
     const sellsProducts = businessInfo.sells?.includes("products") ?? true
     const sellsServices = businessInfo.sells?.includes("services") ?? false
     const isQuick = businessInfo.mode === "quick"
+    const ordersResourceActive = isSystemResourceActive(businessInfo, "orders")
+    const productsResourceActive = isSystemResourceActive(businessInfo, "products")
+    const servicesResourceActive = isSystemResourceActive(businessInfo, "services")
+    const quotesResourceActive = isSystemResourceActive(businessInfo, "quotes")
+    const posResourceActive = isSystemResourceActive(businessInfo, "pos")
+    const deliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
+    const financialResourceActive = isSystemResourceActive(businessInfo, "financial")
+    const appointmentsResourceActive = isSystemResourceActive(businessInfo, "appointments")
+    const salesGroupActive = ordersResourceActive || quotesResourceActive || posResourceActive || deliveriesResourceActive
+    const servicesGroupActive = servicesResourceActive || appointmentsResourceActive
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
@@ -232,6 +250,10 @@ export function ERPSidebar() {
         return navItems
             .map((item) => {
                 // Business Rules Filtering
+                if (item.href === "/erp/orders" && !salesGroupActive) return null;
+                if (item.href === "/erp/products" && !productsResourceActive) return null;
+                if (item.href === "/erp/servicos" && !servicesGroupActive) return null;
+                if (item.href === "/erp/resumo-financeiro" && !financialResourceActive) return null;
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
@@ -252,6 +274,23 @@ export function ERPSidebar() {
 
                 // Clone item to avoid mutating the original navItems
                 const newItem = { ...item };
+                if (newItem.submenu) {
+                    newItem.submenu = newItem.submenu.filter((sub) => {
+                        if (item.href === "/erp/orders") {
+                            if (sub.href === "/erp/orders" || sub.href === "/erp/goals" || sub.href === "/erp/returns") return ordersResourceActive
+                            if (sub.href === "/erp/quotes") return quotesResourceActive
+                            if (sub.href === "/erp/pdv") return posResourceActive
+                            if (sub.href.startsWith("/erp/logistics")) return deliveriesResourceActive
+                        }
+                        if (item.href === "/erp/products") return productsResourceActive
+                        if (item.href === "/erp/servicos") {
+                            if (sub.href === "/erp/agendamentos") return appointmentsResourceActive
+                            return servicesResourceActive
+                        }
+                        if (item.href === "/erp/resumo-financeiro") return financialResourceActive
+                        return true
+                    })
+                }
 
                 // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
@@ -261,18 +300,21 @@ export function ERPSidebar() {
                 // Submenu item - filter sub-items and hide if none remain
                 if (newItem.submenu) {
                     const filteredSub = newItem.submenu.filter((sub) => sub.comingSoon || canAccess(sub.href) || Boolean(PLAN_GATED_MINIMUM[sub.href]))
+                    const directMinimumPlan = newItem.href ? PLAN_GATED_MINIMUM[newItem.href] : undefined
                     if (filteredSub.length === 0) return null
                     return {
                         ...newItem,
                         submenu: filteredSub,
-                        directAccess: newItem.href ? canAccess(newItem.href) : false,
+                        directAccess: newItem.href
+                            ? canAccess(newItem.href) && (!directMinimumPlan || hasMinimumPlan(planSlug, directMinimumPlan))
+                            : false,
                     }
                 }
 
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, sellsProducts, sellsServices, isQuick])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

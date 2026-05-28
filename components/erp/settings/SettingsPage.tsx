@@ -14,6 +14,7 @@ import {
   PackageReceiveIcon,
   WrenchIcon,
   MailIcon,
+  CadastrosIcon,
 } from "@/lib/icons"
 
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
@@ -26,10 +27,15 @@ import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
+import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { useSidebar } from "@/lib/sidebar-context"
+import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { isSystemResourceActive } from "@/lib/system-resources"
 
 interface SettingsTabsProps {
   partner: any
@@ -51,6 +57,7 @@ type ActivePage =
   | "os"
   | "mensagens"
   | "delivery"
+  | "resources"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
   const searchParams = useSearchParams()
@@ -58,6 +65,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const [activeTab, setActiveTab] = useState("empresa")
   const [mpConnected] = useState(!!partner.mp_user_id)
   const { setHeaderOverride } = useSidebar()
+  const { planSlug } = usePermissions()
+  const { openPlanUpgrade } = usePlanUpgrade()
 
   const PAGE_TO_SLUG: Record<string, string> = {
     "business-data": "dados-do-negocio",
@@ -72,6 +81,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "mensagens": "modelos-de-mensagens",
     "delivery": "entrega",
     "integrations": "integracoes",
+    "resources": "gerenciar-recursos",
   }
 
   const SLUG_TO_PAGE: Record<string, ActivePage> = Object.entries(PAGE_TO_SLUG).reduce(
@@ -120,7 +130,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
   React.useEffect(() => {
     if (activePage !== "home") {
-      const titles: Record<ActivePage, string> = {
+      const titles: Partial<Record<ActivePage, string>> = {
         "business-data": "Dados do Negócio",
         "integrations": "Integrações",
         "team": "Equipe e Acessos",
@@ -161,6 +171,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const showOS = canAccessOS
   const showVitrine = isOwnerOrAdmin
   const isQuick = businessInfo.mode === "quick"
+  const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
+  const isTeamResourceActive = isSystemResourceActive(businessInfo, "team")
   const canAccessSubscription = isOwner
   const canAccessIntegrations = isOwner
   const canAccessCommissions = isOwnerOrAdmin
@@ -170,6 +182,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessMessages = isOwnerAdminOrManager
   const canAccessDelivery = isOwnerOrAdmin
   const canAccessBusinessData = isOwnerAdminOrManager
+  const canAccessResources = isOwnerOrAdmin
+  const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
   React.useEffect(() => {
     if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
@@ -181,7 +195,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "os" && !canAccessOS) setActivePage("home")
     if (activePage === "mensagens" && !canAccessMessages) setActivePage("home")
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, showOS, canAccessMessages, canAccessBusinessData])
+    if (activePage === "resources" && !canAccessResources) setActivePage("home")
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, showOS, canAccessMessages, canAccessBusinessData, canAccessResources])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -203,7 +218,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full px-4 md:px-8">
                 <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
                   <TabsTrigger value="empresa">
-                    Configurações da empresa
+                    Configurações do negócio
                   </TabsTrigger>
                   {!isQuick && (
                     <TabsTrigger value="vendas">
@@ -242,12 +257,17 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               className="px-4 py-3 gap-4"
                             />
                           )}
-                          {!isQuick && canAccessTeam && (
+                          {!isQuick && canAccessTeam && isTeamResourceActive && (
                             <ListItem
                               icon={Users}
-                              title="Equipe e Acessos"
+                              title={teamPlanBlocked ? (
+                                <span className="inline-flex items-center gap-2">
+                                  Equipe e Acessos
+                                  <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                </span>
+                              ) : "Equipe e Acessos"}
                               description="Convide membros, defina funções e gerencie permissões de acesso."
-                              onClick={() => setActivePage("team")}
+                              onClick={() => teamPlanBlocked ? openPlanUpgrade("crescer") : setActivePage("team")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />
@@ -327,6 +347,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
+                            {canAccessResources && (
+                              <ListItem
+                                icon={CadastrosIcon}
+                                title="Gerenciar recursos"
+                                description="Ative ou desative modulos do sistema para limpar o menu."
+                                onClick={() => setActivePage("resources")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                             {canAccessMessages && (
                               <ListItem
                                 icon={MailIcon}
@@ -337,7 +367,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
-                            {canAccessDelivery && (
+                            {canAccessDelivery && isDeliveriesResourceActive && (
                               <ListItem
                                 icon={PackageReceiveIcon}
                                 title="Logística e Entrega"
@@ -403,6 +433,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
           {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
         </AnimatePresence>
       </div>
     </FadeIn>

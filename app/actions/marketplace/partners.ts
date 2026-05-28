@@ -489,6 +489,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
     const newInfo = normalizeBusinessInfo(data.businessInfo)
     updateData.business_info = {
       ...newInfo,
+      activeResources: existingInfo.activeResources,
       mode: existingInfo.mode // Never trust the frontend for mode changes on update
     }
   }
