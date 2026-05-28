@@ -39,7 +39,8 @@ import {
     EditIcon,
     FileIcon,
     TelegramIcon,
-    ClockIcon
+    ClockIcon,
+    CheckCircleIcon
 } from "@/lib/icons"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -220,9 +221,13 @@ export default function QuotesPage({
                 const statusMap: Record<string, { label: string; color: BadgeVariant; icon?: React.ReactElement | null }> = {
                     draft: { label: "Rascunho", color: "gray", icon: <FileIcon size={12} /> },
                     sent: { label: "Enviado", color: "blue", icon: <TelegramIcon size={12} /> },
+                    pending_client: { label: "Pendente", color: "purple", icon: <ClockIcon size={12} /> },
+                    viewed: { label: "Visualizado", color: "teal", icon: <CheckCircleIcon size={12} /> },
                     approved: { label: "Aprovado", color: "green", icon: null },
                     rejected: { label: "Rejeitado", color: "red", icon: null },
                     expired: { label: "Expirado", color: "orange", icon: <ClockIcon size={12} /> },
+                    cancelled: { label: "Cancelado", color: "gray", icon: <FileIcon size={12} /> },
+                    converted_to_order: { label: "Convertido", color: "gray", icon: null }
                 }
                 const statusInfo = statusMap[q.status] || { label: q.status, color: "gray", icon: null }
 
@@ -270,7 +275,7 @@ export default function QuotesPage({
             })
             .filter((q: Quote) => {
                 let tabMatch = true
-                if (activeTab === "Enviados") tabMatch = q.status === "sent"
+                if (activeTab === "Enviados") tabMatch = q.status === "sent" || q.status === "pending_client" || q.status === "viewed"
                 else if (activeTab === "Aprovados") tabMatch = q.status === "approved"
                 else if (activeTab === "Rejeitados") tabMatch = q.status === "rejected"
                 else if (activeTab === "Expirados") tabMatch = q.status === "expired"

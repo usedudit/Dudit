@@ -17,7 +17,7 @@ import {
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, Tooltip, AlertModal, InfoCard, DefaultModal, DropdownItem, FormSection, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
 import { downloadPdf } from '@/lib/pdf/download';
-import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction } from '@/app/actions/erp/quotes';
+import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction, submitSellerCommentAction, getQuoteInteractionsAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
 import { type HistoryEntry as QuoteHistoryEntryRow } from "@/components/erp/shared/HistoryTimeline"
@@ -48,9 +48,12 @@ interface QuoteDetailProps {
 const getStatusInfo = (s: string) => {
     switch (s) {
         case 'sent': return { label: 'Enviado', variant: 'blue' as const, icon: <TelegramIcon size={12} />, color: 'bg-blue-500' };
+        case 'pending_client': return { label: 'Pendente', variant: 'purple' as const, icon: <ClockIcon size={12} />, color: 'bg-purple-500' };
+        case 'viewed': return { label: 'Visualizado', variant: 'teal' as const, icon: <CheckCircleIcon size={12} />, color: 'bg-teal-500' };
         case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: undefined, color: 'bg-green-500' };
         case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: undefined, color: 'bg-red-500' };
         case 'expired': return { label: 'Expirado', variant: 'orange' as const, icon: <ClockIcon size={12} />, color: 'bg-orange-500' };
+        case 'cancelled': return { label: 'Cancelado', variant: 'gray' as const, icon: <CancelCircleIcon size={12} />, color: 'bg-gray-400' };
         case 'draft': return { label: 'Rascunho', variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };
         default: return { label: s, variant: 'gray' as const, icon: <FileIcon size={12} />, color: 'bg-gray-400' };
     }
@@ -86,6 +89,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [loading, setLoading] = useState(!initialQuote);
     const [isLoadingQuoteItems, setIsLoadingQuoteItems] = useState(Boolean(initialQuote));
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [interactions, setInteractions] = useState<any[]>([]);
+    const [newComment, setNewComment] = useState("");
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const [isRegeneratingCode, setIsRegeneratingCode] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
     const lastLoadedQuoteId = useRef<string | null>(null);
     const lastLoadedHistoryQuoteId = useRef<string | null>(null);
     const [showStatusModal, setShowStatusModal] = useState(false);
@@ -162,15 +170,25 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         async function load() {
             setIsLoadingQuoteItems(true);
             if (!quote) setLoading(true);
-            const res = await getQuoteDetailsAction(quoteId, partnerId);
-            if (res.success) {
-                setQuote(res.data);
-                setPendingStatus(res.data.status || 'draft');
+            
+            const [detailsRes, interactionsRes] = await Promise.all([
+                getQuoteDetailsAction(quoteId, partnerId),
+                getQuoteInteractionsAction(quoteId, partnerId)
+            ]);
+
+            if (detailsRes.success) {
+                setQuote(detailsRes.data);
+                setPendingStatus(detailsRes.data.status || 'draft');
                 lastLoadedQuoteId.current = quoteId;
             } else if (!initialQuote) {
-                notifyError("Erro", res.error);
+                notifyError("Erro", detailsRes.error);
                 onBack();
             }
+
+            if (interactionsRes.success) {
+                setInteractions(interactionsRes.data);
+            }
+            
             setLoading(false);
             setIsLoadingQuoteItems(false);
         }
@@ -276,6 +294,60 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             notifyError("Erro", res.error);
         }
         setIsUpdatingStatus(false);
+    };
+
+    const handleRegenerateCode = async () => {
+        if (isRegeneratingCode || !quote) return;
+        setIsRegeneratingCode(true);
+        try {
+            const res = await regenerateQuoteApprovalCodeAction(quoteId, partnerId);
+            if (res.success && res.data) {
+                setQuote((prev: any) => ({
+                    ...prev,
+                    metadata: {
+                        ...(prev.metadata || {}),
+                        plain_code: res.data.code
+                    }
+                }));
+                notifySuccess("Código Atualizado", `Novo código de aprovação gerado: ${res.data.code}`);
+                lastLoadedHistoryQuoteId.current = null;
+                debouncedRefresh();
+            } else {
+                notifyError("Erro", res.error || "Não foi possível regenerar o código.");
+            }
+        } catch {
+            notifyError("Erro", "Erro ao conectar ao servidor.");
+        } finally {
+            setIsRegeneratingCode(false);
+        }
+    };
+
+    const handleSendComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newComment.trim() || isSubmittingComment || !quote) return;
+        setIsSubmittingComment(true);
+        try {
+            const res = await submitSellerCommentAction(quoteId, partnerId, newComment);
+            if (res.success) {
+                setNewComment("");
+                notifySuccess("Mensagem enviada", "Mensagem adicionada com sucesso.");
+                
+                // Reload interactions
+                const intRes = await getQuoteInteractionsAction(quoteId, partnerId);
+                if (intRes.success) {
+                    setInteractions(intRes.data);
+                }
+                
+                lastLoadedHistoryQuoteId.current = null;
+                debouncedRefresh();
+            } else {
+                notifyError("Erro", res.error || "Não foi possível enviar a mensagem.");
+            }
+        } catch {
+            notifyError("Erro", "Erro ao conectar ao servidor.");
+        } finally {
+            setIsSubmittingComment(false);
+        }
     };
 
     const handleDelete = async () => {
@@ -602,6 +674,179 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             customer={quote.customers}
                                         />
                                     )}
+
+                                    {/* Link de Aprovação do Cliente */}
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
+                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            Link de Aprovação Online
+                                        </h3>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    type="text" 
+                                                    readOnly 
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/quote/${quote.public_token}`}
+                                                    className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
+                                                />
+                                                <Button 
+                                                    variant="outline" 
+                                                    className="p-2.5 h-auto text-xs shrink-0 rounded-xl"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(`${window.location.origin}/quote/${quote.public_token}`);
+                                                        setCopiedLink(true);
+                                                        notifySuccess("Link copiado", "Link do orçamento copiado para a área de transferência.");
+                                                        setTimeout(() => setCopiedLink(false), 2000);
+                                                    }}
+                                                >
+                                                    {copiedLink ? "Copiado!" : "Copiar"}
+                                                </Button>
+                                            </div>
+
+                                            <Button 
+                                                variant="outline"
+                                                className="w-full text-xs font-semibold justify-center py-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30"
+                                                onClick={() => {
+                                                    const text = `Olá! Segue o link para visualizar e aprovar a proposta comercial *${quote.quote_number}*:\n\n${window.location.origin}/quote/${quote.public_token}\n\n*Código de Aprovação:* ${quote.metadata?.plain_code || "Enviado por aqui"}`;
+                                                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                                                }}
+                                            >
+                                                Compartilhar no WhatsApp
+                                            </Button>
+
+                                            <div className="border-t border-brand-border dark:border-dark-border pt-3 mt-1 flex justify-between items-center">
+                                                <div>
+                                                    <span className="text-xs text-brand-inactive-text block">Código de Aprovação</span>
+                                                    <span className="text-lg font-bold text-emerald-500 tracking-wider">
+                                                        {quote.metadata?.plain_code || "---"}
+                                                    </span>
+                                                </div>
+                                                
+                                                {quote.status !== "approved" && quote.status !== "rejected" && !quote.converted && (
+                                                    <Button 
+                                                        variant="outline" 
+                                                        className="text-xs py-1 h-[32px] rounded-lg border-brand-border dark:border-dark-border"
+                                                        onClick={handleRegenerateCode}
+                                                        disabled={isRegeneratingCode}
+                                                    >
+                                                        {isRegeneratingCode ? "Gerando..." : "Novo Código"}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Painel de Auditoria e Visualização */}
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
+                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
+                                            Logs e Estatísticas
+                                        </h3>
+                                        
+                                        <div className="space-y-3 text-xs text-brand-dark dark:text-dark-body">
+                                            <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                                <span className="text-brand-inactive-text">Visualizações:</span>
+                                                <span className="font-semibold">{quote.total_views || 0}</span>
+                                            </div>
+                                            {quote.first_viewed_at && (
+                                                <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                                    <span className="text-brand-inactive-text">Primeira Visualização:</span>
+                                                    <span className="font-semibold">{formatDate(quote.first_viewed_at)} às {formatTime(new Date(quote.first_viewed_at))}</span>
+                                                </div>
+                                            )}
+                                            {quote.last_viewed_at && (
+                                                <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                                    <span className="text-brand-inactive-text">Última Visualização:</span>
+                                                    <span className="font-semibold">{formatDate(quote.last_viewed_at)} às {formatTime(new Date(quote.last_viewed_at))}</span>
+                                                </div>
+                                            )}
+                                            {quote.viewer_ip && (
+                                                <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
+                                                    <span className="text-brand-inactive-text">IP do Visitante:</span>
+                                                    <span className="font-semibold font-mono">{quote.viewer_ip}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Approval Details */}
+                                            {quote.status === "approved" && (
+                                                <div className="mt-3 bg-emerald-50 dark:bg-emerald-950/10 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/20 space-y-2">
+                                                    <div className="font-bold text-emerald-800 dark:text-emerald-300">Detalhes da Aprovação:</div>
+                                                    <div>Aprovador: <span className="font-semibold">{quote.approver_name || "Cliente"}</span></div>
+                                                    <div>Data: <span className="font-semibold">{quote.approved_at ? formatDate(quote.approved_at) : "-"}</span></div>
+                                                    <div>Método: <span className="font-semibold">{quote.approval_method === "code" ? "Código 4-dígitos" : "Cliente Autenticado"}</span></div>
+                                                    {quote.approver_ip && <div>IP: <span className="font-semibold font-mono">{quote.approver_ip}</span></div>}
+                                                </div>
+                                            )}
+
+                                            {/* Rejection Details */}
+                                            {quote.status === "rejected" && (
+                                                <div className="mt-3 bg-red-50 dark:bg-red-950/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20 space-y-2">
+                                                    <div className="font-bold text-red-800 dark:text-red-300">Detalhes da Recusa:</div>
+                                                    <div>Recusado por: <span className="font-semibold">{quote.approver_name || "Cliente"}</span></div>
+                                                    <div>Data: <span className="font-semibold">{quote.rejected_at ? formatDate(quote.rejected_at) : "-"}</span></div>
+                                                    {quote.rejection_reason && (
+                                                        <div>Motivo: <span className="font-semibold text-red-600 dark:text-red-400 italic">"{quote.rejection_reason}"</span></div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Canal de Negociação */}
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-4">
+                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading flex justify-between items-center">
+                                            <span>Canal de Negociação</span>
+                                            <Badge variant="gray">{interactions.length}</Badge>
+                                        </h3>
+                                        
+                                        <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2">
+                                            {interactions.length === 0 ? (
+                                                <div className="text-center py-6 text-xs text-brand-inactive-text">
+                                                    Nenhuma mensagem trocada ainda.
+                                                </div>
+                                            ) : (
+                                                interactions.map((msg: any) => (
+                                                    <div 
+                                                        key={msg.id} 
+                                                        className={`p-3 rounded-2xl text-xs max-w-[85%] ${
+                                                            msg.author_role === "seller" 
+                                                                ? "bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-body align-self-start self-start" 
+                                                                : "bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/20 text-emerald-900 dark:text-emerald-300 align-self-end self-end text-right ml-auto"
+                                                        }`}
+                                                    >
+                                                        <div className="font-bold mb-1">
+                                                            {msg.author_role === "seller" ? "Você (Vendedor)" : msg.author_name}
+                                                        </div>
+                                                        <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                                                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body/50 block mt-1">
+                                                            {formatDate(msg.created_at)} {formatTime(new Date(msg.created_at))}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {quote.status !== "expired" && quote.status !== "cancelled" && !quote.converted && (
+                                            <form onSubmit={handleSendComment} className="flex gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
+                                                <input 
+                                                    type="text" 
+                                                    value={newComment}
+                                                    onChange={(e) => setNewComment(e.target.value)}
+                                                    placeholder="Envie uma mensagem..."
+                                                    className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-dark dark:text-dark-body"
+                                                    disabled={isSubmittingComment}
+                                                />
+                                                <Button 
+                                                    type="submit" 
+                                                    disabled={!newComment.trim() || isSubmittingComment}
+                                                    className="px-3 py-2 text-xs shrink-0 rounded-xl"
+                                                >
+                                                    {isSubmittingComment ? "..." : "Enviar"}
+                                                </Button>
+                                            </form>
+                                        )}
+                                    </div>
+
                                     <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6">
                                         <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading mb-4">Informações Adicionais</h3>
                                         <div className="space-y-4">
@@ -734,8 +979,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             options={[
                                 { value: 'draft', label: 'Rascunho' },
                                 { value: 'sent', label: 'Enviado' },
+                                { value: 'pending_client', label: 'Pendente do Cliente' },
+                                { value: 'viewed', label: 'Visualizado' },
                                 { value: 'approved', label: 'Aprovado' },
-                                { value: 'rejected', label: 'Rejeitado' }
+                                { value: 'rejected', label: 'Rejeitado' },
+                                { value: 'expired', label: 'Expirado' },
+                                { value: 'cancelled', label: 'Cancelado' }
                             ]}
                         />
                     </div>

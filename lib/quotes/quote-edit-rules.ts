@@ -6,9 +6,9 @@
 /** Nome exibido quando não há cliente vinculado ao orçamento. */
 export const QUOTE_DEFAULT_CUSTOMER_LABEL = "Consumidor final"
 
-export type QuoteStatusLower = "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled"
+export type QuoteStatusLower = "draft" | "sent" | "pending_client" | "viewed" | "approved" | "rejected" | "expired" | "cancelled" | "converted_to_order"
 
-const VALID: QuoteStatusLower[] = ["draft", "sent", "approved", "rejected", "expired", "cancelled"]
+const VALID: QuoteStatusLower[] = ["draft", "sent", "pending_client", "viewed", "approved", "rejected", "expired", "cancelled", "converted_to_order"]
 
 export function normalizeQuoteStatus(status: string | null | undefined): QuoteStatusLower | "unknown" {
     const s = String(status || "").toLowerCase().trim()
@@ -23,7 +23,7 @@ export function canEditFinancialFields(status: string): boolean {
 /** Campos “leves”: observações ao cliente, validade, observações internas (não itens/preços/cliente). */
 export function canEditLightFields(status: string): boolean {
     const s = normalizeQuoteStatus(status)
-    return s === "draft" || s === "sent"
+    return s === "draft" || s === "sent" || s === "pending_client" || s === "viewed"
 }
 
 export function canEditAnything(status: string): boolean {
@@ -33,7 +33,7 @@ export function canEditAnything(status: string): boolean {
 /** Apenas observações internas (e metadados futuros). */
 export function canEditInternalNotesOnly(status: string): boolean {
     const s = normalizeQuoteStatus(status)
-    return s === "approved" || s === "rejected" || s === "expired" || s === "cancelled"
+    return s === "approved" || s === "rejected" || s === "expired" || s === "cancelled" || s === "converted_to_order"
 }
 
 export const MSG_LOCKED = "Este orçamento não pode ser alterado no status atual."
@@ -64,7 +64,9 @@ export interface QuoteEditCaps {
 }
 
 export function getQuoteEditCaps(status: string, converted: boolean): QuoteEditCaps {
-    if (converted) {
+    const s = normalizeQuoteStatus(status)
+
+    if (converted || s === "converted_to_order") {
         return {
             canEditItems: false,
             canEditCustomer: false,
@@ -76,12 +78,10 @@ export function getQuoteEditCaps(status: string, converted: boolean): QuoteEditC
             canEditLightFields: false,
             canChangeStatus: false,
             showReopenCta: false,
-            showDuplicateCta: false,
+            showDuplicateCta: true,
             bannerMessage: "Este orçamento já foi convertido em pedido e não pode ser editado.",
         }
     }
-
-    const s = normalizeQuoteStatus(status)
 
     if (s === "draft") {
         return {
@@ -100,7 +100,7 @@ export function getQuoteEditCaps(status: string, converted: boolean): QuoteEditC
         }
     }
 
-    if (s === "sent") {
+    if (s === "sent" || s === "pending_client" || s === "viewed") {
         return {
             canEditItems: false,
             canEditCustomer: false,

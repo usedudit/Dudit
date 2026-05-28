@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   "/services",
   "/payment",
   "/api",
+  "/quote",
 ]
 
 // Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout

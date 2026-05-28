@@ -2,6 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { getCurrentUser } from "@/lib/auth/server-user"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -24,6 +25,7 @@ import {
 } from "@/lib/quotes/quote-edit-rules"
 import { checkLimit, increment_usage_counter, decrement_usage_counter } from "@/lib/services/subscription.service"
 import { withTelemetry } from "@/lib/utils/action-logger"
+import { notifyQuoteEvent } from "@/lib/services/quote-notifications.service"
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
 
@@ -584,12 +586,138 @@ export async function updateQuoteAction(data: {
     });
 }
 
+async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: string) {
+    // 1. Fetch quote
+    const { data: quote, error: quoteErr } = await supabase
+        .from("quotes")
+        .select("*")
+        .eq("id", quoteId)
+        .eq("partner_id", partnerId)
+        .single()
+    if (quoteErr || !quote) return
+
+    // 2. Fetch partner and default address
+    const { data: partner } = await supabase
+        .from("partners")
+        .select("store_name, image_url, email, phone")
+        .eq("id", partnerId)
+        .maybeSingle()
+
+    const { data: partnerAddr } = await supabase
+        .from("addresses")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .eq("is_default", true)
+        .maybeSingle()
+
+    let partnerAddressFormatted = "Endereço não cadastrado"
+    if (partnerAddr) {
+        partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
+    }
+
+    // 3. Fetch seller profile
+    let sellerInfo = null
+    if (quote.user_id) {
+        const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("full_name, email")
+            .eq("user_id", quote.user_id)
+            .maybeSingle()
+        if (profile) {
+            sellerInfo = {
+                name: profile.full_name,
+                email: profile.email
+            }
+        }
+    }
+
+    // 4. Fetch customer and address
+    let customerInfo = null
+    if (quote.customer_id) {
+        const { data: customer } = await supabase
+            .from("customers")
+            .select("id, name, email, phone")
+            .eq("id", quote.customer_id)
+            .maybeSingle()
+
+        if (customer) {
+            const { data: customerAddrs } = await supabase
+                .from("addresses")
+                .select("*")
+                .eq("customer_id", quote.customer_id)
+
+            customerInfo = {
+                ...customer,
+                addresses: customerAddrs || []
+            }
+        }
+    }
+
+    // 5. Fetch items
+    const { data: items } = await supabase
+        .from("quote_items")
+        .select("*, products(name, sku, images, unit)")
+        .eq("quote_id", quoteId)
+        .order("sort_order", { ascending: true })
+
+    const formattedItems = (items || []).map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
+        sku: item.product_sku_snapshot || item.products?.sku || "",
+        quantity: Number(item.quantity || 0),
+        unit_price: Number(item.unit_price || 0),
+        total_price: Number(item.total_price || 0),
+        description: item.description || "",
+        image: item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png",
+        unit: item.products?.unit || "un"
+    }))
+
+    // 6. Build snapshot object
+    const snapshotData = {
+        quote_number: quote.quote_number,
+        issue_date: quote.issue_date,
+        expiration_date: quote.expiration_date,
+        notes: quote.notes,
+        subtotal: Number(quote.subtotal || 0),
+        discount_type: quote.discount_type,
+        discount_value: Number(quote.discount_value || 0),
+        shipping_cost: Number(quote.shipping_cost || 0),
+        additional_costs: Number(quote.additional_costs || 0),
+        total: Number(quote.total || 0),
+        partner: {
+            name: partner?.store_name || "Parceiro",
+            image_url: partner?.image_url || null,
+            email: partner?.email || null,
+            phone: partner?.phone || null,
+            address: partnerAddressFormatted
+        },
+        seller: sellerInfo,
+        customer: customerInfo,
+        items: formattedItems,
+        payment_terms: quote.metadata?.payment_terms || null,
+        coupon_data: quote.metadata?.coupon_data || null,
+        metadata: quote.metadata || {}
+    }
+
+    // 7. Update DB with snapshot
+    await supabase
+        .from("quotes")
+        .update({
+            snapshot: snapshotData,
+            snapshot_version: 1,
+            snapshot_generated_at: new Date().toISOString()
+        })
+        .eq("id", quoteId)
+        .eq("partner_id", partnerId)
+}
+
 // ─── UPDATE QUOTE STATUS ────────────────────────────────────────────────────
 
 export async function updateQuoteStatusAction(data: {
     quoteId: string
     partnerId: string
-    status: "draft" | "sent" | "approved" | "rejected" | "expired" | "cancelled"
+    status: "draft" | "sent" | "pending_client" | "viewed" | "approved" | "rejected" | "expired" | "cancelled" | "converted_to_order"
 }) {
     return withTelemetry("updateQuoteStatusAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -618,9 +746,11 @@ export async function updateQuoteStatusAction(data: {
 
             // Define allowed transitions
             const allowedTransitions: Record<string, string[]> = {
-                draft: ["sent", "approved", "rejected", "cancelled"],
-                sent: ["approved", "rejected", "draft", "cancelled", "expired"],
-                approved: ["expired", "cancelled"],
+                draft: ["sent", "pending_client", "approved", "rejected", "cancelled"],
+                sent: ["pending_client", "viewed", "approved", "rejected", "draft", "cancelled", "expired"],
+                pending_client: ["viewed", "approved", "rejected", "draft", "cancelled", "expired"],
+                viewed: ["approved", "rejected", "draft", "cancelled", "expired"],
+                approved: ["expired", "cancelled", "converted_to_order"],
                 rejected: ["draft"],
                 expired: ["draft"],
                 cancelled: ["draft"],
@@ -646,7 +776,28 @@ export async function updateQuoteStatusAction(data: {
             if (error) {
                 // If updated_at changed between read and write, the row won't match and no update happens
                 console.error("[updateQuoteStatusAction] Error:", error)
-                return errorResponse(error.message || "O or\u00e7amento foi modificado por outro usu\u00e1rio. Atualize a p\u00e1gina.")
+                return errorResponse(error.message || "O orçamento foi modificado por outro usuário. Atualize a página.")
+            }
+
+            // Generate snapshot if transitioning out of draft
+            if (current.status === "draft" && data.status !== "draft" && data.status !== "cancelled") {
+                await saveQuoteSnapshot(supabase, data.quoteId, data.partnerId)
+            }
+
+            // Fetch fully updated quote for notifications and RLS / details
+            const { data: updatedQuote } = await supabase
+                .from("quotes")
+                .select("*, customers(*)")
+                .eq("id", data.quoteId)
+                .single()
+
+            // Trigger notification for customer if transitioned from draft to sent/pending_client
+            if (current.status === "draft" && (data.status === "sent" || data.status === "pending_client")) {
+                await notifyQuoteEvent({
+                    event: "shared",
+                    quote: updatedQuote,
+                    actorUserId: user.id
+                }).catch(console.error)
             }
 
             await revalidateQuotes(data.partnerId, data.quoteId)
@@ -654,10 +805,13 @@ export async function updateQuoteStatusAction(data: {
             const statusLabels: Record<string, string> = {
                 draft: "Rascunho",
                 sent: "Enviado",
+                pending_client: "Pendente do Cliente",
+                viewed: "Visualizado",
                 approved: "Aprovado",
                 rejected: "Rejeitado",
                 expired: "Expirado",
                 cancelled: "Cancelado",
+                converted_to_order: "Convertido em Pedido"
             }
             await logAuditEvent({
                 partnerId: data.partnerId,
@@ -680,7 +834,7 @@ export async function updateQuoteStatusAction(data: {
             console.error("[updateQuoteStatusAction] Error:", err)
             return errorResponse(err.message || "Erro interno ao atualizar status")
         }
-    });
+    })
 }
 
 // ─── DELETE QUOTE ───────────────────────────────────────────────────────────
@@ -1263,11 +1417,13 @@ export async function convertQuoteToOrderAction(data: {
                 return errorResponse("Não é possível converter um orçamento expirado.")
             }
 
-            if (quote.status !== "sent" && quote.status !== "approved") {
-                return errorResponse("Só é possível converter orçamentos com status Enviado ou Aprovado.")
+            const allowedStatuses = ["sent", "pending_client", "viewed", "approved"]
+            if (!allowedStatuses.includes(quote.status)) {
+                return errorResponse("Só é possível converter orçamentos com status Enviado, Pendente do Cliente, Visualizado ou Aprovado.")
             }
 
-            if (quote.status === "sent" && !data.acknowledgeUnapprovedConversion) {
+            const isUnapproved = quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed"
+            if (isUnapproved && !data.acknowledgeUnapprovedConversion) {
                 return errorResponse(
                     "Para converter um orçamento enviado sem aprovação formal, confirme a ação no diálogo.",
                 )
@@ -1275,7 +1431,7 @@ export async function convertQuoteToOrderAction(data: {
 
             const { data: rawItems, error: itemsError } = await supabase
                 .from("quote_items")
-                .select("product_id, custom_name, quantity, unit_price, sort_order, product_name_snapshot, products(name)")
+                .select("product_id, custom_name, quantity, unit_price, sort_order, product_name_snapshot, products(name, sku, is_active, stock_available, allow_sell_without_stock)")
                 .eq("quote_id", data.quoteId)
                 .eq("partner_id", data.partnerId)
                 .order("sort_order", { ascending: true })
@@ -1288,6 +1444,41 @@ export async function convertQuoteToOrderAction(data: {
             const quoteItems = rawItems || []
             if (quoteItems.length === 0) {
                 return errorResponse("Este orçamento não possui itens para gerar um pedido.")
+            }
+
+            // Perform stock, variant availability, active status, and deleted products checks
+            let calculatedSubtotal = 0
+            for (const row of quoteItems) {
+                calculatedSubtotal += Number(row.quantity || 0) * Number(row.unit_price || 0)
+
+                if (row.product_id) {
+                    const prod = row.products
+                    if (!prod) {
+                        return errorResponse(`O produto do item "${row.custom_name || 'Item'}" foi removido do sistema.`)
+                    }
+                    if (prod.is_active === false) {
+                        return errorResponse(`O produto "${prod.name}" está inativo. Não é possível converter o orçamento.`)
+                    }
+                    if (prod.allow_sell_without_stock === false && Number(row.quantity || 0) > Number(prod.stock_available || 0)) {
+                        return errorResponse(`A quantidade do item "${prod.name}" (${row.quantity}) é maior do que o estoque disponível (${prod.stock_available || 0}).`)
+                    }
+                }
+            }
+
+            // Pricing integrity check
+            let discountAmount = 0
+            if (quote.discount_type === "percentage") {
+                discountAmount = Number((calculatedSubtotal * Number(quote.discount_value || 0) / 100).toFixed(2))
+            } else {
+                discountAmount = Number(quote.discount_value || 0)
+            }
+            if (discountAmount > calculatedSubtotal) {
+                discountAmount = calculatedSubtotal
+            }
+            const calculatedTotal = Math.max(0, calculatedSubtotal - discountAmount + Number(quote.shipping_cost || 0) + Number(quote.additional_costs || 0))
+
+            if (Math.abs(calculatedTotal - Number(quote.total || 0)) > 0.05) {
+                return errorResponse(`Falha na integridade de preços: o total calculado (${calculatedTotal}) não coincide com o total do orçamento (${quote.total}).`)
             }
 
             const erpItems = quoteItems.map((row: any, idx: number) => ({
@@ -1365,7 +1556,7 @@ export async function convertQuoteToOrderAction(data: {
             }
 
             const newOrderId = orderResult.orderId as string
-            const withoutApproval = quote.status === "sent"
+            const withoutApproval = quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed"
 
             const { error: quoteUpdateError } = await supabase
                 .from("quotes")
@@ -1630,5 +1821,566 @@ export async function getSalespeopleAction(partnerId: string): Promise<{ success
     } catch (err: any) {
         console.error("[getSalespeopleAction] Error:", err)
         return { success: false, error: err.message || "Erro ao carregar vendedores" }
+    }
+}
+
+// ─── PUBLIC QUOTE ACTIONS ───────────────────────────────────────────────────
+
+export async function regenerateQuoteApprovalCodeAction(quoteId: string, partnerId: string) {
+    return withTelemetry("regenerateQuoteApprovalCodeAction", async () => {
+        try {
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
+
+            const supabase = await getSupabaseServerClient()
+
+            // 1. Check quote status is not finalized
+            const { data: quote, error: quoteErr } = await supabase
+                .from("quotes")
+                .select("status, converted, metadata")
+                .eq("id", quoteId)
+                .eq("partner_id", partnerId)
+                .single()
+
+            if (quoteErr || !quote) {
+                return errorResponse("Orçamento não encontrado")
+            }
+
+            if (quote.converted || quote.status === "approved" || quote.status === "rejected" || quote.status === "converted_to_order") {
+                return errorResponse("Não é possível alterar o código de um orçamento aprovado, rejeitado ou convertido.")
+            }
+
+            // 2. Generate new code and salt
+            const plainCode = Math.floor(1000 + Math.random() * 9000).toString() // 4-digit code
+            const salt = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+
+            const { data: hashData, error: hashErr } = await supabase
+                .rpc("compute_approval_hash", { salt: salt, code: plainCode })
+
+            if (hashErr || !hashData) {
+                console.error("[regenerateQuoteApprovalCodeAction] hash computation error:", hashErr)
+                return errorResponse("Erro ao gerar hash do código de aprovação.")
+            }
+
+            const hash = hashData as string
+
+            // 3. Update quote
+            const { error: updateErr } = await supabase
+                .from("quotes")
+                .update({
+                    approval_code_salt: salt,
+                    approval_code_hash: hash,
+                    failed_attempts: 0,
+                    lockout_until: null,
+                    lockout_count: 0,
+                    metadata: {
+                        ...(quote.metadata || {}),
+                        plain_code: plainCode
+                    }
+                })
+                .eq("id", quoteId)
+                .eq("partner_id", partnerId)
+
+            if (updateErr) {
+                console.error("[regenerateQuoteApprovalCodeAction] update error:", updateErr)
+                return errorResponse("Erro ao salvar novo código.")
+            }
+
+            // Revalidate
+            await revalidateQuotes(partnerId, quoteId)
+
+            // Log audit
+            await logAuditEvent({
+                partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: quoteId,
+                actionType: "quote_code_regenerated",
+                changeLines: ["Regenerou o código de aprovação do orçamento comercial."],
+                source: "manual",
+            })
+
+            return successResponse({ code: plainCode })
+        } catch (err: any) {
+            console.error("[regenerateQuoteApprovalCodeAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao regenerar código")
+        }
+    })
+}
+
+export async function getPublicQuoteAction(publicToken: string, ip?: string, userAgent?: string) {
+    return withTelemetry("getPublicQuoteAction", async () => {
+        try {
+            const supabase = await getSupabaseServerClient()
+
+            // 1. Fetch quote by public_token
+            const { data: quote, error: quoteErr } = await supabase
+                .from("quotes")
+                .select("*, customers(*)")
+                .eq("public_token", publicToken)
+                .maybeSingle()
+
+            if (quoteErr || !quote) {
+                return errorResponse("Link inválido ou orçamento não encontrado")
+            }
+
+            const now = new Date()
+
+            // 2. Check lazy expiration
+            if (
+                quote.expiration_date &&
+                new Date(`${quote.expiration_date}T23:59:59`) < now &&
+                (quote.status === "draft" || quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed")
+            ) {
+                // Transition to expired
+                const { error: expireErr } = await supabase
+                    .from("quotes")
+                    .update({
+                        status: "expired",
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", quote.id)
+
+                if (!expireErr) {
+                    quote.status = "expired"
+                    await notifyQuoteEvent({
+                        event: "expired",
+                        quote: quote,
+                        ipAddress: ip,
+                        userAgent: userAgent
+                    })
+                    await revalidateQuotes(quote.partner_id, quote.id)
+                }
+            }
+
+            // 3. Debounced view updates
+            let statusChangedToViewed = false
+            if (quote.status === "sent" || quote.status === "pending_client") {
+                const { error: viewStatusErr } = await supabase
+                    .from("quotes")
+                    .update({
+                        status: "viewed",
+                        first_viewed_at: quote.first_viewed_at || new Date().toISOString(),
+                        last_viewed_at: new Date().toISOString(),
+                        total_views: (quote.total_views || 0) + 1,
+                        viewer_ip: ip || quote.viewer_ip,
+                        user_agent: userAgent || quote.user_agent,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", quote.id)
+
+                if (!viewStatusErr) {
+                    quote.status = "viewed"
+                    quote.total_views = (quote.total_views || 0) + 1
+                    quote.last_viewed_at = new Date().toISOString()
+                    quote.first_viewed_at = quote.first_viewed_at || new Date().toISOString()
+                    statusChangedToViewed = true
+                }
+            } else {
+                // If it is already viewed or another status, check view debounce of 5 minutes
+                const lastViewed = quote.last_viewed_at ? new Date(quote.last_viewed_at) : null
+                const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
+
+                if (!lastViewed || lastViewed < fiveMinutesAgo) {
+                    await supabase
+                        .from("quotes")
+                        .update({
+                            last_viewed_at: new Date().toISOString(),
+                            total_views: (quote.total_views || 0) + 1,
+                            viewer_ip: ip || quote.viewer_ip,
+                            user_agent: userAgent || quote.user_agent,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq("id", quote.id)
+
+                    quote.total_views = (quote.total_views || 0) + 1
+                    quote.last_viewed_at = new Date().toISOString()
+                }
+            }
+
+            // If status changed to viewed, notify seller
+            if (statusChangedToViewed) {
+                await notifyQuoteEvent({
+                    event: "viewed",
+                    quote: quote,
+                    ipAddress: ip,
+                    userAgent: userAgent
+                })
+                await revalidateQuotes(quote.partner_id, quote.id)
+            }
+
+            // 4. Fetch interactions using admin client to bypass RLS for public guests
+            const admin = getAdminClient()
+            const { data: interactions } = await admin
+                .from("quote_interactions")
+                .select("*")
+                .eq("quote_id", quote.id)
+                .order("created_at", { ascending: true })
+
+            return successResponse({
+                quote: {
+                    id: quote.id,
+                    quote_number: quote.quote_number,
+                    status: quote.status,
+                    issue_date: quote.issue_date,
+                    expiration_date: quote.expiration_date,
+                    notes: quote.notes,
+                    subtotal: quote.subtotal,
+                    discount_type: quote.discount_type,
+                    discount_value: quote.discount_value,
+                    shipping_cost: quote.shipping_cost,
+                    additional_costs: quote.additional_costs,
+                    total: quote.total,
+                    public_token: quote.public_token,
+                    converted: quote.converted,
+                    converted_order_id: quote.converted_order_id,
+                    approved_at: quote.approved_at,
+                    rejected_at: quote.rejected_at,
+                    approver_name: quote.approver_name,
+                    rejection_reason: quote.rejection_reason,
+                    lockout_until: quote.lockout_until,
+                    partner_id: quote.partner_id
+                },
+                snapshot: quote.snapshot || null,
+                interactions: interactions || []
+            })
+        } catch (err: any) {
+            console.error("[getPublicQuoteAction] Error:", err)
+            return errorResponse("Erro ao carregar orçamento público")
+        }
+    })
+}
+
+export async function submitPublicCommentAction(publicToken: string, authorName: string, message: string, ip?: string) {
+    return withTelemetry("submitPublicCommentAction", async () => {
+        try {
+            // 1. Basic sanitization
+            const cleanAuthorName = String(authorName || "").replace(/<[^>]*>/g, "").trim().substring(0, 100)
+            const cleanMessage = String(message || "").replace(/<[^>]*>/g, "").trim().substring(0, 1000)
+
+            if (!cleanAuthorName) return errorResponse("Nome do autor é obrigatório")
+            if (!cleanMessage) return errorResponse("Mensagem não pode estar vazia")
+
+            const supabase = await getSupabaseServerClient()
+
+            // 2. Fetch quote to check it exists and status
+            const { data: quote, error: quoteErr } = await supabase
+                .from("quotes")
+                .select("id, partner_id, status")
+                .eq("public_token", publicToken)
+                .maybeSingle()
+
+            if (quoteErr || !quote) {
+                return errorResponse("Orçamento não encontrado")
+            }
+
+            if (quote.status === "expired" || quote.status === "cancelled" || quote.status === "converted_to_order") {
+                return errorResponse("Não é possível enviar mensagens para um orçamento finalizado ou expirado.")
+            }
+
+            // 3. Enforce rate limit (max 5 comments per 5 minutes per quote/IP)
+            const admin = getAdminClient()
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+            const { count, error: countErr } = await admin
+                .from("quote_interactions")
+                .select("id", { count: "exact", head: true })
+                .eq("quote_id", quote.id)
+                .eq("author_name", cleanAuthorName)
+                .gte("created_at", fiveMinutesAgo)
+
+            if (countErr) {
+                console.error("[submitPublicCommentAction] count check error:", countErr)
+            } else if (count && count >= 5) {
+                return errorResponse("Limite de envio de mensagens excedido. Tente novamente em alguns minutos.")
+            }
+
+            // 4. Insert message
+            const { error: insertErr } = await admin
+                .from("quote_interactions")
+                .insert({
+                    quote_id: quote.id,
+                    partner_id: quote.partner_id,
+                    author_name: cleanAuthorName,
+                    author_role: "customer",
+                    message: cleanMessage
+                })
+
+            if (insertErr) {
+                console.error("[submitPublicCommentAction] insert error:", insertErr)
+                return errorResponse("Erro ao enviar mensagem.")
+            }
+
+            // 5. Audit log
+            await logAuditEvent({
+                partnerId: quote.partner_id,
+                actorUserId: null,
+                entityType: "quote",
+                entityId: quote.id,
+                actionType: "quote_comment_added",
+                changeLines: [`Cliente (${cleanAuthorName}) enviou uma mensagem: "${cleanMessage.substring(0, 60)}${cleanMessage.length > 60 ? "..." : ""}"`],
+                source: "system",
+                metadata: {
+                    ipAddress: ip,
+                    authorName: cleanAuthorName,
+                    timestamp: new Date().toISOString()
+                }
+            })
+
+            // Revalidate
+            await revalidateQuotes(quote.partner_id, quote.id)
+
+            return successResponse({ success: true })
+        } catch (err: any) {
+            console.error("[submitPublicCommentAction] Error:", err)
+            return errorResponse("Erro ao enviar comentário")
+        }
+    })
+}
+
+export async function approvePublicQuoteAction(
+    publicToken: string,
+    approverName: string,
+    approvalCode: string,
+    ip?: string,
+    userAgent?: string
+) {
+    return withTelemetry("approvePublicQuoteAction", async () => {
+        try {
+            const supabase = await getSupabaseServerClient()
+
+            // 1. Fetch quote by public_token
+            const { data: quote, error: quoteErr } = await supabase
+                .from("quotes")
+                .select("id, partner_id, status, quote_number, expiration_date")
+                .eq("public_token", publicToken)
+                .maybeSingle()
+
+            if (quoteErr || !quote) {
+                return errorResponse("Link ou código de aprovação inválido")
+            }
+
+            // 2. Determine auth method
+            const currentUser = await getCurrentUser().catch(() => null)
+            const method = currentUser ? "auth" : "code"
+
+            if (method === "code") {
+                if (!approverName || !approverName.trim()) {
+                    return errorResponse("Nome do aprovador é obrigatório.")
+                }
+                if (!approvalCode || !approvalCode.trim()) {
+                    return errorResponse("Código de aprovação é obrigatório.")
+                }
+            }
+
+            // 3. Call RPC to approve public quote
+            const { data: rpcRes, error: rpcErr } = await supabase.rpc("approve_public_quote", {
+                p_quote_id: quote.id,
+                p_name: currentUser ? (currentUser.email || "Cliente Autenticado") : approverName.trim().substring(0, 100),
+                p_code: method === "code" ? approvalCode.trim() : "",
+                p_ip: ip || null,
+                p_ua: userAgent || null,
+                p_method: method
+            })
+
+            if (rpcErr) {
+                console.error("[approvePublicQuoteAction] RPC Error:", rpcErr)
+                return errorResponse(rpcErr.message || "Erro ao processar aprovação.")
+            }
+
+            const result = rpcRes as { success: boolean; error?: string }
+
+            if (!result.success) {
+                return errorResponse(result.error || "Link ou código de aprovação inválido")
+            }
+
+            // 4. Fetch updated quote with customer info to notify
+            const { data: updatedQuote } = await supabase
+                .from("quotes")
+                .select("*, customers(*)")
+                .eq("id", quote.id)
+                .single()
+
+            // 5. Send email notification
+            await notifyQuoteEvent({
+                event: "approved",
+                quote: updatedQuote,
+                actorName: currentUser ? (currentUser.email || "Cliente Autenticado") : approverName.trim(),
+                approvalMethod: method,
+                ipAddress: ip,
+                userAgent: userAgent
+            })
+
+            await revalidateQuotes(quote.partner_id, quote.id)
+
+            return successResponse({ success: true })
+        } catch (err: any) {
+            console.error("[approvePublicQuoteAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao aprovar orçamento")
+        }
+    })
+}
+
+export async function rejectPublicQuoteAction(
+    publicToken: string,
+    rejectorName: string,
+    approvalCode: string,
+    reason: string,
+    ip?: string,
+    userAgent?: string
+) {
+    return withTelemetry("rejectPublicQuoteAction", async () => {
+        try {
+            const supabase = await getSupabaseServerClient()
+
+            // 1. Fetch quote by public_token
+            const { data: quote, error: quoteErr } = await supabase
+                .from("quotes")
+                .select("id, partner_id, status, quote_number, expiration_date")
+                .eq("public_token", publicToken)
+                .maybeSingle()
+
+            if (quoteErr || !quote) {
+                return errorResponse("Link ou código de aprovação inválido")
+            }
+
+            if (!reason || !reason.trim()) {
+                return errorResponse("O motivo da recusa é obrigatório.")
+            }
+
+            // 2. Determine auth method
+            const currentUser = await getCurrentUser().catch(() => null)
+            const method = currentUser ? "auth" : "code"
+
+            if (method === "code") {
+                if (!rejectorName || !rejectorName.trim()) {
+                    return errorResponse("Nome do cliente é obrigatório.")
+                }
+                if (!approvalCode || !approvalCode.trim()) {
+                    return errorResponse("Código de aprovação é obrigatório.")
+                }
+            }
+
+            // 3. Call RPC to reject public quote
+            const { data: rpcRes, error: rpcErr } = await supabase.rpc("reject_public_quote", {
+                p_quote_id: quote.id,
+                p_name: currentUser ? (currentUser.email || "Cliente Autenticado") : rejectorName.trim().substring(0, 100),
+                p_code: method === "code" ? approvalCode.trim() : "",
+                p_reason: reason.trim().substring(0, 500),
+                p_ip: ip || null,
+                p_ua: userAgent || null,
+                p_method: method
+            })
+
+            if (rpcErr) {
+                console.error("[rejectPublicQuoteAction] RPC Error:", rpcErr)
+                return errorResponse(rpcErr.message || "Erro ao processar recusa.")
+            }
+
+            const result = rpcRes as { success: boolean; error?: string }
+
+            if (!result.success) {
+                return errorResponse(result.error || "Link ou código de aprovação inválido")
+            }
+
+            // 4. Fetch updated quote with customer info to notify
+            const { data: updatedQuote } = await supabase
+                .from("quotes")
+                .select("*, customers(*)")
+                .eq("id", quote.id)
+                .single()
+
+            // 5. Send email notification
+            await notifyQuoteEvent({
+                event: "rejected",
+                quote: updatedQuote,
+                actorName: currentUser ? (currentUser.email || "Cliente Autenticado") : rejectorName.trim(),
+                rejectionReason: reason.trim(),
+                approvalMethod: method,
+                ipAddress: ip,
+                userAgent: userAgent
+            })
+
+            await revalidateQuotes(quote.partner_id, quote.id)
+
+            return successResponse({ success: true })
+        } catch (err: any) {
+            console.error("[rejectPublicQuoteAction] Error:", err)
+            return errorResponse(err.message || "Erro interno ao recusar orçamento")
+        }
+    })
+}
+
+export async function submitSellerCommentAction(quoteId: string, partnerId: string, message: string) {
+    return withTelemetry("submitSellerCommentAction", async () => {
+        try {
+            const user = await requireUser()
+            await requirePartnerAccessWithPermission(partnerId, "quotes", "edit", user)
+
+            const cleanMessage = String(message || "").replace(/<[^>]*>/g, "").trim().substring(0, 1000)
+            if (!cleanMessage) return errorResponse("Mensagem não pode estar vazia")
+
+            const supabase = await getSupabaseServerClient()
+
+            const { data: profile } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", user.id)
+                .maybeSingle()
+
+            const authorName = profile?.full_name || "Vendedor"
+
+            const { error: insertErr } = await supabase
+                .from("quote_interactions")
+                .insert({
+                    quote_id: quoteId,
+                    partner_id: partnerId,
+                    author_name: authorName,
+                    author_role: "seller",
+                    user_id: user.id,
+                    message: cleanMessage
+                })
+
+            if (insertErr) {
+                console.error("[submitSellerCommentAction] insert error:", insertErr)
+                return errorResponse("Erro ao enviar mensagem.")
+            }
+
+            await logAuditEvent({
+                partnerId,
+                actorUserId: user.id,
+                entityType: "quote",
+                entityId: quoteId,
+                actionType: "quote_comment_added",
+                changeLines: [`Vendedor (${authorName}) enviou uma mensagem: "${cleanMessage.substring(0, 60)}${cleanMessage.length > 60 ? "..." : ""}"`],
+                source: "manual"
+            })
+
+            await revalidateQuotes(partnerId, quoteId)
+
+            return successResponse({ success: true })
+        } catch (err: any) {
+            console.error("[submitSellerCommentAction] Error:", err)
+            return errorResponse("Erro ao enviar comentário")
+        }
+    })
+}
+
+export async function getQuoteInteractionsAction(quoteId: string, partnerId: string) {
+    try {
+        const user = await requireUser()
+        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+        const supabase = await getSupabaseServerClient()
+        const { data, error } = await supabase
+            .from("quote_interactions")
+            .select("*")
+            .eq("quote_id", quoteId)
+            .order("created_at", { ascending: true })
+
+        if (error) throw error
+        return successResponse(data || [])
+    } catch (err: any) {
+        console.error("[getQuoteInteractionsAction] Error:", err)
+        return errorResponse(err.message || "Erro ao carregar mensagens")
     }
 }
