@@ -86,7 +86,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
     // Search States
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
-    const productBucket = useProductBucket(fetchPartnerProductsBucket);
+    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 });
 
     // Sheet States
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
@@ -903,7 +903,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                         )}
                                                     </h1>
 
-                                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
+                                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                                         {mode === 'create' && "Crie uma proposta comercial para seu cliente"}
                                                         {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
                                                         {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}
@@ -959,6 +959,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             filteredProducts={productBucket.filteredResults}
                                             isSearching={productBucket.isLoading}
                                             onSearchFocus={productBucket.loadBucket}
+                                            loadMoreProducts={productBucket.loadMore}
+                                            hasMoreProducts={productBucket.hasMore}
                                             handleProductClick={handleProductClick}
                                             addBlankItem={addBlankItem}
                                             quoteItems={quoteItems}

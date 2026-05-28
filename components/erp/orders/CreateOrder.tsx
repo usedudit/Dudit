@@ -173,7 +173,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [items, setItems] = useState<any[]>([])
 
     // Instant product search (client-side bucket)
-    const productBucket = useProductBucket(fetchPartnerProductsBucket)
+    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 })
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
 
     // Financial
@@ -1258,6 +1258,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         isProductSearchOpen={isProductSearchOpen}
                                         isSearching={productBucket.isLoading}
                                         searchResults={productBucket.filteredResults}
+                                        loadMoreProducts={productBucket.loadMore}
+                                        hasMoreProducts={productBucket.hasMore}
                                         subtotal={subtotal}
                                         discountAmount={discountAmount}
                                         discountValue={discountValue}

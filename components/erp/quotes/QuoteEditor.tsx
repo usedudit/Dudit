@@ -82,6 +82,8 @@ interface QuoteEditorProps {
     manualItemNameErrors?: Set<number>;
     manualItemPriceErrors?: Set<number>;
     isLoadingItems?: boolean;
+    loadMoreProducts?: () => void;
+    hasMoreProducts?: boolean;
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -190,7 +192,13 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 5 }}
-                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto"
+                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar"
+                                        onScroll={(e) => {
+                                            const target = e.currentTarget;
+                                            if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                props.loadMoreProducts?.();
+                                            }
+                                        }}
                                     >
                                         {props.isSearching ? (
                                             <ThreeDotsLoader />

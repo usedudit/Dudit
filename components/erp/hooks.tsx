@@ -115,11 +115,13 @@ export interface ProductBucketItem {
  * 
  * Pattern: loads bucket on first focus → filters with useMemo → instant results
  */
-export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
+export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>, options?: { pageSize?: number }) {
+  const pageSize = options?.pageSize ?? 10
   const [bucket, setBucket] = useState<ProductBucketItem[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [visibleCount, setVisibleCount] = useState(pageSize)
 
   const loadBucket = useCallback(async () => {
     if (isLoaded || isLoading) return
@@ -135,18 +137,26 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
     }
   }, [loadFn, isLoaded, isLoading])
 
-  const filteredResults = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!searchQuery.trim()) return []
     const search = searchQuery.toLowerCase().trim()
-    return bucket
-      .filter(
-        (item) =>
-          item.name.toLowerCase().includes(search) ||
-          item.sku.toLowerCase().includes(search) ||
-          (item.gtin && item.gtin.toLowerCase().includes(search))
-      )
-      .slice(0, 12)
+    return bucket.filter(
+      (item) =>
+        item.name.toLowerCase().includes(search) ||
+        item.sku.toLowerCase().includes(search) ||
+        (item.gtin && item.gtin.toLowerCase().includes(search))
+    )
   }, [bucket, searchQuery])
+
+  useEffect(() => {
+    setVisibleCount(pageSize)
+  }, [searchQuery, pageSize])
+
+  const filteredResults = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
+  const hasMore = filtered.length > visibleCount
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + pageSize)
+  }, [pageSize])
 
   return {
     searchQuery,
@@ -156,6 +166,8 @@ export function useProductBucket(loadFn: () => Promise<ProductBucketItem[]>) {
     isLoaded,
     loadBucket,
     bucket,
+    hasMore,
+    loadMore,
   }
 }
 
@@ -226,7 +238,7 @@ export function usePickerBucket<T extends { id: string }>(
   matchesSearch: (item: T, searchLower: string) => boolean,
   options?: PickerBucketOptions<T>
 ) {
-  const pageSize = options?.pageSize ?? 8
+  const pageSize = options?.pageSize ?? 10
   const postFilter = options?.postFilter
   const resetPagingKey = options?.resetPagingKey
 

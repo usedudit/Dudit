@@ -913,12 +913,9 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
 
   return (data || [])
     .filter((order: any) => {
-      if (activeOrderIds.has(order.id)) return false
       // Step 1 eligibility rules (basic, safe defaults)
       const situation = String(order.situation || "").toLowerCase()
       if (situation === "cancelled") return false
-      // Avoid showing already delivered orders
-      if (String(order.delivery_status || "") === "delivered") return false
       // If system uses a refunded situation, exclude it as well
       if (situation === "refunded") return false
       return true
@@ -943,6 +940,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       },
       address: formatAddress(order) || "",
       items: order.order_items || [],
+      alreadyInActiveDelivery: activeOrderIds.has(order.id),
     }))
 }
 

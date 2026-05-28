@@ -1522,8 +1522,9 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
     await requirePartnerAccessWithPermission(partnerId, "orders", "view")
     const supabase = createAdminClient()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
 
-    const { data, error } = await supabase
+    const orderQuery = supabase
         .from("orders")
         .select(`
             *,
@@ -1531,9 +1532,15 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             stores(name),
             coupons(*)
         `)
-        .eq("id", orderId)
         .eq("partner_id", partnerId)
-        .maybeSingle()
+
+    if (isUuid) {
+        orderQuery.eq("id", orderId)
+    } else {
+        orderQuery.eq("order_number", orderId)
+    }
+
+    const { data, error } = await orderQuery.maybeSingle()
 
     if (error) return { error: error.message }
     if (data) {
@@ -1583,12 +1590,18 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         }
     }
 
-    const { data: sale, error: saleError } = await supabase
+    const saleQuery = supabase
         .from("sales")
         .select("*, sale_items(*)")
-        .eq("id", orderId)
         .eq("partner_id", partnerId)
-        .maybeSingle()
+
+    if (isUuid) {
+        saleQuery.eq("id", orderId)
+    } else {
+        saleQuery.eq("sale_number", orderId)
+    }
+
+    const { data: sale, error: saleError } = await saleQuery.maybeSingle()
 
     if (saleError || !sale) return { error: "Pedido não encontrado" }
 

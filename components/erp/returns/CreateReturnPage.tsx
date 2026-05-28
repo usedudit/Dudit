@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
+import { motion } from "framer-motion"
 import {
     Button,
     DatePicker,
@@ -133,7 +134,7 @@ export default function CreateReturnPage({
             String(order.displayId || "").toLowerCase().includes(q) ||
             String(order.order_number || "").toLowerCase().includes(q) ||
             String(order.customer_name || "").toLowerCase().includes(q),
-        { pageSize: 8 }
+        { pageSize: 10 }
     )
     const productBucket = useProductBucket(fetchPartnerProductsBucket)
 
@@ -526,7 +527,7 @@ export default function CreateReturnPage({
                                                 </Badge>
                                             )}
                                         </h1>
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             {mode === "create"
                                                 ? "Crie uma nova solicitação de devolução vinculada a um pedido."
                                                 : "Gerencie e atualize a solicitação de devolução de produtos."}
@@ -583,7 +584,18 @@ export default function CreateReturnPage({
                                                             />
 
                                                             {isOrderSearchOpen && orderPicker.searchQuery.trim() && (
-                                                                <FadeIn className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto overflow-hidden rounded-2xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface">
+                                                                <motion.div
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    exit={{ opacity: 0 }}
+                                                                    className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto overflow-hidden rounded-2xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface custom-scrollbar"
+                                                                    onScroll={(e: React.UIEvent<HTMLDivElement>) => {
+                                                                        const target = e.currentTarget
+                                                                        if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                                            orderPicker.loadMore()
+                                                                        }
+                                                                    }}
+                                                                >
                                                                     {orderPicker.displayed.map((order) => {
                                                                         const searchPaymentMeta = getPaymentStatusMeta(order.status)
                                                                         const searchDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
@@ -655,7 +667,7 @@ export default function CreateReturnPage({
                                                                             </button>
                                                                         )
                                                                     })}
-                                                                </FadeIn>
+                                                                </motion.div>
                                                             )}
                                                         </div>
                                                     ) : null}

@@ -728,7 +728,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             )}
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-0.5"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             {internalMode === "add" && "Preencha as informações do novo produto"}
                                             {internalMode === "duplicate" && <>Original: <span className="font-medium">{originalNameForDuplicate}</span></>}
                                             {(internalMode === "details" || internalMode === "edit") && <>SKU {productData.sku || "N/A"} • Criado em {dateCreated}</>}
@@ -886,8 +886,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     onClick={handleSaveProduct}
                                     disabled={isSavingProduct || isLoadingDetails}
                                     className="flex-1"
+                                    leftIcon={<SaveIcon size={18} />}
                                 >
-                                    <SaveIcon className="w-4 h-4 mr-2" />
                                     {isSavingProduct ? "Salvando..." : "Salvar"}
                                 </Button>
                             </>
@@ -902,8 +902,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             variant="outline"
                                             className="flex-1"
                                             disabled={isLoadingDetails}
+                                            leftIcon={<ThreeDotsIcon size={18} />}
                                         >
-                                            <ThreeDotsIcon className="w-4 h-4 mr-2" />
                                             Opções
                                         </Button>
                                     }
@@ -912,8 +912,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     onClick={enterEditMode}
                                     className="flex-1 whitespace-nowrap"
                                     disabled={isLoadingDetails}
+                                    leftIcon={<EditIcon size={18} />}
                                 >
-                                    <EditIcon className="w-4 h-4 mr-2" />
                                     Editar produto
                                 </Button>
                             </>

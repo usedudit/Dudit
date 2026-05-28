@@ -29,23 +29,36 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
 
     const supabase = getAdminClient()
     let partnerId = ""
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
     // Check orders table
-    const { data: orderData } = await supabase
+    const orderQuery = supabase
         .from("orders")
         .select("partner_id")
-        .eq("id", id)
-        .maybeSingle()
+    
+    if (isUuid) {
+        orderQuery.eq("id", id)
+    } else {
+        orderQuery.eq("order_number", id)
+    }
+
+    const { data: orderData } = await orderQuery.maybeSingle()
 
     if (orderData?.partner_id) {
         partnerId = orderData.partner_id
     } else {
         // Fallback check sales table
-        const { data: saleData } = await supabase
+        const saleQuery = supabase
             .from("sales")
             .select("partner_id")
-            .eq("id", id)
-            .maybeSingle()
+        
+        if (isUuid) {
+            saleQuery.eq("id", id)
+        } else {
+            saleQuery.eq("sale_number", id)
+        }
+
+        const { data: saleData } = await saleQuery.maybeSingle()
 
         if (saleData?.partner_id) {
             partnerId = saleData.partner_id

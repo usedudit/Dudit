@@ -28,31 +28,50 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const supabase = getAdminClient()
     let partnerId: string | null = null
     let resource = ""
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
     if (type === "orcamento") {
         resource = "quotes"
-        const { data: quote } = await supabase
+        const query = supabase
             .from("quotes")
             .select("partner_id")
-            .eq("id", id)
-            .maybeSingle()
+        
+        if (isUuid) {
+            query.eq("id", id)
+        } else {
+            query.eq("quote_number", id)
+        }
+        
+        const { data: quote } = await query.maybeSingle()
         partnerId = quote?.partner_id || null
     } else if (type === "recibo") {
         resource = "orders"
-        const { data: order } = await supabase
+        const orderQuery = supabase
             .from("orders")
             .select("partner_id")
-            .eq("id", id)
-            .maybeSingle()
+        
+        if (isUuid) {
+            orderQuery.eq("id", id)
+        } else {
+            orderQuery.eq("order_number", id)
+        }
+        
+        const { data: order } = await orderQuery.maybeSingle()
         
         if (order?.partner_id) {
             partnerId = order.partner_id
         } else {
-            const { data: sale } = await supabase
+            const saleQuery = supabase
                 .from("sales")
                 .select("partner_id")
-                .eq("id", id)
-                .maybeSingle()
+            
+            if (isUuid) {
+                saleQuery.eq("id", id)
+            } else {
+                saleQuery.eq("sale_number", id)
+            }
+            
+            const { data: sale } = await saleQuery.maybeSingle()
             partnerId = sale?.partner_id || null
         }
     } else {

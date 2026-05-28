@@ -102,13 +102,34 @@ export function DashboardBarChart({ data }: { data: ChartPoint[] }) {
   )
 }
 
-export function DashboardPieChart({ data, totalValue, totalLabel, half }: { data: ChartPoint[], totalValue?: string, totalLabel?: string, half?: boolean }) {
+export function DashboardPieChart({
+  data,
+  totalValue,
+  totalLabel,
+  half,
+  innerRadius = 50,
+  outerRadius = 70,
+  className
+}: {
+  data: ChartPoint[],
+  totalValue?: string,
+  totalLabel?: string,
+  half?: boolean,
+  innerRadius?: number,
+  outerRadius?: number,
+  className?: string
+}) {
+  const isLarge = outerRadius > 75;
   return (
-    <div className={cn("w-full relative flex items-center justify-center", half ? "h-[140px]" : "h-[180px]")}>
+    <div className={cn("w-full relative flex items-center justify-center", half ? "h-[140px]" : "h-[180px]", className)}>
       {totalValue && (
         <div className={cn("absolute flex flex-col items-center justify-center pointer-events-none mt-1", half ? "bottom-0" : "inset-0")}>
-          <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">{totalLabel || "Total"}</span>
-          <span className="text-[17px] font-bold text-brand-dark dark:text-dark-heading tracking-tight">{totalValue}</span>
+          <span className={cn("font-medium text-brand-inactive-text dark:text-dark-body", isLarge ? "text-[12px] mb-0.5" : "text-[11px]")}>
+            {totalLabel || "Total"}
+          </span>
+          <span className={cn("font-bold text-brand-dark dark:text-dark-heading tracking-tight", isLarge ? "text-[21px]" : "text-[17px]")}>
+            {totalValue}
+          </span>
         </div>
       )}
       <ChartContainer config={config} className="h-full w-full">
@@ -118,8 +139,8 @@ export function DashboardPieChart({ data, totalValue, totalLabel, half }: { data
             data={data}
             dataKey="value"
             nameKey="label"
-            innerRadius={50}
-            outerRadius={70}
+            innerRadius={innerRadius}
+            outerRadius={outerRadius}
             paddingAngle={2}
             cx="50%"
             cy={half ? "100%" : "50%"}

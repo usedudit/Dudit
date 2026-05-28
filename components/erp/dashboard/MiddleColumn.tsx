@@ -28,33 +28,22 @@ export function ExpenseBreakdown({ originData, revenueChartTrend }: { originData
                 </Dropdown>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 flex-1">
+            <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 sm:gap-12 flex-1">
                 {/* Full Donut Chart */}
-                <div className="w-full max-w-[260px] mx-auto shrink-0 flex items-center justify-center">
+                <div className="w-full max-w-[300px] mx-auto shrink-0 flex items-center justify-center">
                     <DashboardPieChart
                         data={(originData || []).map(o => ({ label: o.label, value: Number(o.value) }))}
                         totalValue={brl(totalRevenue)}
                         totalLabel="Receita Total"
+                        innerRadius={68}
+                        outerRadius={92}
+                        className="h-[220px]"
                     />
                 </div>
 
                 <div className="flex flex-col flex-1 w-full justify-center">
-                    {/* Expense Summary Header */}
-                    <div className="mb-6">
-                        <div className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body mb-1">Total de Vendas</div>
-                        <div className="flex items-baseline space-x-3">
-                            <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{brl(totalRevenue)}</span>
-                            {revenueChartTrend && (
-                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-[6px] flex items-center space-x-1 ${trendPositive ? "bg-brand-green-secondary text-brand-green" : "bg-[#fce6e5] text-[#cc4745]"
-                                    }`}>
-                                    <span>{trendPositive ? "↑" : "↓"}</span><span>{revenueChartTrend.replace(/[+-]/g, "")}</span>
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Legend / List */}
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                         {(originData || []).map((item, index) => {
                             const percent = totalRevenue > 0 ? Math.round((Number(item.value) / totalRevenue) * 100) : 0;
                             const color = CHART_COLORS[index % CHART_COLORS.length];

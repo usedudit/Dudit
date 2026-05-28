@@ -8,6 +8,7 @@ export type PDVProduct = {
   stock_available: number
   allow_sell_without_stock?: boolean
   images?: string[] | null
+  product_type?: string | null
   product_variants?: Array<{
     id: string
     variant_name: string
@@ -42,6 +43,7 @@ export type PDVCustomer = {
   email?: string | null
   phone?: string | null
   cpf?: string | null
+  avatar_url?: string | null
 }
 
 export type PDVFinanceAccount = {

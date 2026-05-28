@@ -5,6 +5,7 @@ import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs" // Importando o componente Tabs atualizado
+import { Lock, Unlock } from "lucide-react"
 
 import {
     SearchIcon,
@@ -23,6 +24,7 @@ import {
     InfoIcon,
     TagIcon,
     BoxIcon,
+    CameraIcon,
 } from "@/lib/icons"
 
 // Tipos necessários
@@ -49,6 +51,8 @@ interface ProductPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
+    onScanBarcode?: (code: string) => void
+    onOpenCamera?: () => void
 }
 
 const ProductPageControls: React.FC<ProductPageControlsProps> = ({
@@ -65,10 +69,61 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     viewMode,
     onViewModeChange,
     hasActiveFilters,
+    onScanBarcode,
+    onOpenCamera,
 }) => {
     // Estado local para o scroll dos filtros (badges)
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
+
+    // Estado local para foco travado
+    const [focusLock, setFocusLock] = useState(false)
+    const desktopInputRef = useRef<HTMLInputElement>(null)
+    const mobileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        if (focusLock) {
+            const interval = setInterval(() => {
+                const activeRef = window.innerWidth >= 768 ? desktopInputRef : mobileInputRef
+                if (activeRef.current && document.activeElement !== activeRef.current) {
+                    activeRef.current.focus()
+                }
+            }, 500)
+            return () => clearInterval(interval)
+        }
+    }, [focusLock])
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") {
+            e.preventDefault()
+            const scannedValue = search.trim()
+            if (scannedValue && onScanBarcode) {
+                onScanBarcode(scannedValue)
+            }
+        }
+    }
+
+    const focusLockSuffix = (
+        <button
+            type="button"
+            onClick={(e) => {
+                e.stopPropagation()
+                setFocusLock(!focusLock)
+                setTimeout(() => {
+                    const activeRef = window.innerWidth >= 768 ? desktopInputRef : mobileInputRef
+                    activeRef.current?.focus()
+                }, 50)
+            }}
+            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${
+                focusLock
+                    ? "text-brand-primary bg-brand-primary/15"
+                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+            }`}
+            title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
+        >
+            {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
+        </button>
+    )
 
     // Lógica de Scroll dos Badges
     const checkFilterScroll = useCallback(() => {
@@ -163,10 +218,12 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                 <div className="md:hidden flex items-center gap-2 w-full">
                     <div className="flex-1 min-w-0">
                         <Input
+                            ref={mobileInputRef}
                             name="search"
                             placeholder="Buscar..."
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             className="h-[42px] w-full"
                             variant="full-rounded"
                             prefix={
@@ -175,6 +232,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                                     className="text-brand-inactive-text shrink-0"
                                 />
                             }
+                            suffix={focusLockSuffix}
                             label=""
                         />
                     </div>
@@ -195,6 +253,9 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                             align="right"
                             showChevron={false}
                         >
+                            <DropdownItem onClick={onOpenCamera}>
+                                <CameraIcon size={14} /> Escanear Câmera
+                            </DropdownItem>
                             <DropdownItem onClick={onOpenImport}>
                                 <UploadIcon size={14} /> Importar XML
                             </DropdownItem>
@@ -218,10 +279,12 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                     <div className="flex items-center gap-3 shrink-0">
                         <div className="w-80">
                             <Input
+                                ref={desktopInputRef}
                                 name="search"
                                 placeholder="Buscar..."
                                 value={search}
                                 onChange={(e) => onSearchChange(e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="h-[42px]"
                                 variant="full-rounded"
                                 prefix={
@@ -230,6 +293,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                                         className="text-brand-inactive-text shrink-0"
                                     />
                                 }
+                                suffix={focusLockSuffix}
                                 label=""
                             />
                         </div>

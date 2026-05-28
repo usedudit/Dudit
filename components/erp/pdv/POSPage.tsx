@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, BarcodeScannerInput } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -52,6 +52,7 @@ import type {
 } from "@/lib/types/pdv"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizePDVSearchTerm } from "@/lib/utils/pdv"
+import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
 
 interface Props {
     partnerId: string
@@ -122,6 +123,22 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [preSales, setPreSales] = useState<PreSale[]>(initialData.preSales || [])
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
     const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
+
+    // New states and computations
+    const [isCameraOpen, setIsCameraOpen] = useState(false)
+    const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
+
+    const hasProductsInCatalog = useMemo(() => {
+        return products.some(p => p.product_type !== "Serviço" && p.product_type !== "service")
+    }, [products])
+
+    const hasServicesInCatalog = useMemo(() => {
+        return products.some(p => p.product_type === "Serviço" || p.product_type === "service")
+    }, [products])
+
+    const hasBothProductsAndServices = useMemo(() => {
+        return hasProductsInCatalog && hasServicesInCatalog
+    }, [hasProductsInCatalog, hasServicesInCatalog])
 
     const isCashierOpen = !!activeCashSession?.id
     const [selectedCategory, setSelectedCategory] = useState("Todos")
@@ -213,10 +230,19 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const categories = useMemo(() => {
         const cats = new Set<string>()
         products.forEach((product) => {
-            if (product.category) cats.add(product.category)
+            const isService = product.product_type === "Serviço" || product.product_type === "service"
+            if (hasBothProductsAndServices) {
+                if (itemTypeTab === "product" && !isService && product.category) {
+                    cats.add(product.category)
+                } else if (itemTypeTab === "service" && isService && product.category) {
+                    cats.add(product.category)
+                }
+            } else {
+                if (product.category) cats.add(product.category)
+            }
         })
         return ["Todos", ...Array.from(cats)]
-    }, [products])
+    }, [products, hasBothProductsAndServices, itemTypeTab])
 
     useEffect(() => {
         async function loadTeam() {
@@ -227,6 +253,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     id: member.id,
                     fullName: member.fullName,
                     userId: member.userId,
+                    avatarUrl: member.avatarUrl,
                 }))
             )
             if (res.currentUserId) {
@@ -248,6 +275,10 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const bypassBeforeUnloadRef = useRef(false)
     const desktopScrollClass = "custom-scrollbar max-lg:hide-scrollbar"
     const [customerSelectIntent, setCustomerSelectIntent] = useState<"default" | "shipping-preflight">("default")
+    const handleItemTypeTabChange = useCallback((val: "product" | "service") => {
+        setItemTypeTab(val)
+        setSelectedCategory("Todos")
+    }, [])
     const [isRemoveCustomerAlertOpen, setIsRemoveCustomerAlertOpen] = useState(false)
     const [isLeaveWithoutSaveAlertOpen, setIsLeaveWithoutSaveAlertOpen] = useState(false)
     const [pendingLeaveHref, setPendingLeaveHref] = useState<string | null>(null)
@@ -289,6 +320,15 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
     const filteredProducts = useMemo(() => {
         let result = products
+
+        if (hasBothProductsAndServices) {
+            if (itemTypeTab === "product") {
+                result = result.filter(p => p.product_type !== "Serviço" && p.product_type !== "service")
+            } else {
+                result = result.filter(p => p.product_type === "Serviço" || p.product_type === "service")
+            }
+        }
+
         const term = normalizePDVSearchTerm(debouncedSearch)
 
         if (selectedCategory !== "Todos") {
@@ -300,7 +340,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         }
 
         return result
-    }, [products, debouncedSearch, selectedCategory])
+    }, [products, debouncedSearch, selectedCategory, hasBothProductsAndServices, itemTypeTab])
 
     const itemCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart])
     const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.qty), 0), [cart])
@@ -446,6 +486,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 addToCart(matchedProduct, matchedVariantId)
                 notifySuccess(`Produto "${matchedProduct.name}" adicionado.`)
             }
+            setSearch("")
             return
         }
 
@@ -482,6 +523,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         addToCart(dbProduct, finalVariantId)
                         notifySuccess(`Produto "${dbProduct.name}" adicionado.`)
                     }
+                    setSearch("")
                 } else {
                     notifyError("Produto não encontrado.")
                 }
@@ -492,7 +534,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             console.error("Barcode scan search error:", e)
             notifyError("Erro ao buscar produto pelo código de barras.")
         }
-    }, [products, partnerId, addToCart, notifySuccess, notifyError])
+    }, [products, partnerId, addToCart, notifySuccess, notifyError, setSearch])
 
 
     const handleCreateQuickProduct = useCallback(async (payload: {
@@ -1201,14 +1243,13 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 selectedSellerId={selectedSellerId}
                                 teamMembers={teamMembers}
                                 onOpenSellerSheet={() => setIsSelectSellerOpen(true)}
+                                onScanBarcode={handleScanBarcode}
+                                onOpenCamera={() => setIsCameraOpen(true)}
+                                itemTypeTab={itemTypeTab}
+                                onItemTypeTabChange={handleItemTypeTabChange}
+                                hasBothProductsAndServices={hasBothProductsAndServices}
                             />
 
-                            <div className="mb-4 mt-2 px-1">
-                                <BarcodeScannerInput
-                                    onScan={handleScanBarcode}
-                                    placeholder="Escaneie o código de barras ou SKU..."
-                                />
-                            </div>
 
 
                             <AnimatePresence mode="wait">
@@ -1883,6 +1924,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         confirmText="Remover"
                         cancelText="Cancelar"
                         variant="warning"
+                    />
+                    <CameraScannerModal
+                        isOpen={isCameraOpen}
+                        onClose={() => setIsCameraOpen(false)}
+                        onScan={handleScanBarcode}
                     />
                 </FadeIn>
             )}

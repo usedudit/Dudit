@@ -78,7 +78,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const searchRef = useRef<HTMLDivElement>(null);
 
     // Instant product search (client-side bucket)
-    const productBucket = useProductBucket(fetchPartnerProductsBucket);
+    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 });
     const [isSaving, setIsSaving] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
     const getTabErrorCount = useCallback((tab: string) => {
@@ -482,7 +482,13 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 <motion.div
                                                                     initial={{ opacity: 0, y: 5 }}
                                                                     animate={{ opacity: 1, y: 0 }}
-                                                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl"
+                                                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl custom-scrollbar"
+                                                                    onScroll={(e) => {
+                                                                        const target = e.currentTarget
+                                                                        if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                                            productBucket.loadMore()
+                                                                        }
+                                                                    }}
                                                                 >
                                                                     {productBucket.isLoading ? (
                                                                         <div className="p-8 text-center text-sm text-brand-inactive-text flex flex-col items-center gap-2">

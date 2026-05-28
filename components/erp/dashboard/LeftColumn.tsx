@@ -16,6 +16,7 @@ import {
 } from "@/lib/icons";
 import { formatCurrency as brl } from "@/lib/utils";
 import { Dropdown, DropdownItem, Button, IconPlaceholder } from "@/components/reusable";
+import { useRouter } from "next/navigation";
 
 export function SummaryCards({ metrics }: { metrics: any[] }) {
   const icons = [MoneyIcon, SalesIcon, TagIcon, Users];
@@ -215,6 +216,8 @@ const iconMap: Record<string, any> = {
 };
 
 export function NeedsAttention({ alerts }: { alerts: any[] }) {
+  const router = useRouter();
+
   if (!alerts || alerts.length === 0) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 flex flex-col justify-center min-h-[340px]">
@@ -274,7 +277,24 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                     </span>
                   </td>
                   <td className="text-right w-[100px]">
-                    <Button variant="outline" size="sm" className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
+                      onClick={() => {
+                        if (item.id === "due-accounts") {
+                          router.push("/erp/transactions");
+                        } else if (item.id === "pending-orders") {
+                          router.push("/erp/orders");
+                        } else if (item.id === "low-stock") {
+                          router.push("/erp/products");
+                        } else if (item.id === "pending-appointments") {
+                          router.push("/erp/agendamentos");
+                        } else if (item.id === "late-deliveries") {
+                          router.push("/erp/logistics");
+                        }
+                      }}
+                    >
                       Resolver
                     </Button>
                   </td>

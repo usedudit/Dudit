@@ -90,6 +90,8 @@ interface OrderGeneralTabProps {
     setDeliveryStatus: (val: string) => void
     onCreateAccount: () => void
     handleSaveOrder: () => void
+    loadMoreProducts?: () => void
+    hasMoreProducts?: boolean
 
     // Options
     salesChannelOptions: any[]
@@ -114,6 +116,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     manualItemNameErrors = new Set<number>(),
     manualItemPriceErrors = new Set<number>(),
     setSearchQuery, setIsProductSearchOpen, handleSearchProduct, onSearchFocus, addProductToOrder,
+    loadMoreProducts, hasMoreProducts,
     updateItemField, updateItemPrice, updateItemQty, resolveItemQuantityMax, toggleItemEdit, removeItem, addBlankItem,
     setShippingFee, setOtherCosts, setDiscountValue, setDiscountType, setSelectedCustomer, setIsCustomerSheetOpen,
     setCouponCode, onApplyCoupon, onOpenDiscount, onOpenShipping,
@@ -200,6 +203,12 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 5 }}
                                         className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[60] max-h-60 overflow-y-auto custom-scrollbar"
+                                        onScroll={(e) => {
+                                            const target = e.currentTarget
+                                            if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                loadMoreProducts?.()
+                                            }
+                                        }}
                                     >
                                         {isSearching ? (
                                             <ThreeDotsLoader />

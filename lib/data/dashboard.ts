@@ -707,7 +707,7 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
     async () => {
       const supabase = createAdminClient()
 
-      // Fetch logs and join with profiles to get user names
+      // Fetch logs
       const { data, error } = await supabase
         .from("audit_logs")
         .select(`
@@ -717,13 +717,27 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
           change_lines, 
           created_at, 
           user_id,
-          profiles:user_id (full_name)
+          actor_user_id
         `)
         .eq("partner_id", partnerId)
         .order("created_at", { ascending: false })
         .limit(10)
 
       if (error || !data?.length) return { activity: [] }
+
+      const userIds = Array.from(new Set(data.map((row: any) => row.actor_user_id || row.user_id).filter(Boolean))) as string[]
+      const userNameById = new Map<string, string>()
+
+      if (userIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from("user_profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds)
+
+        for (const p of profileRows || []) {
+          userNameById.set(String((p as any).user_id), String((p as any).full_name || "Sistema"))
+        }
+      }
 
       const entityMeta: Record<string, { label: string; gender: "m" | "f"; icon: string }> = {
         order: { label: "Pedido", gender: "m", icon: "cart" },
@@ -784,7 +798,8 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
           try { return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(row.created_at)) } catch { return "" }
         })()
 
-        const userName = (row.profiles as any)?.full_name || "Sistema"
+        const userId = row.actor_user_id || row.user_id
+        const userName = userNameById.get(String(userId)) || "Sistema"
 
         return {
           id: row.id,

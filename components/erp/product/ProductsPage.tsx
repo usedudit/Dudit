@@ -67,8 +67,11 @@ import {
     CheckCircleIcon,
     BlockedIcon,
     SearchIcon,
-    EditIcon
+    EditIcon,
+    CameraIcon,
 } from "@/lib/icons"
+
+import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
 
 // --- CONSTANTES ---
 const UNIDADES_MEDIDA = UNITS.map(unit => ({ codigo: unit, descricao: unit }))
@@ -285,6 +288,7 @@ export default function ProductsPage({
     })
     const [modals, setModals] = useState({ filter: false, import: false, export: false })
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
+    const [isCameraOpen, setIsCameraOpen] = useState(false)
 
     const effectiveViewMode = viewMode
     const itemsPerPage = 8
@@ -662,6 +666,7 @@ export default function ProductsPage({
             playBeepSound();
             vibrateMobile();
             openEntity('view', localMatch.id);
+            setSearch("");
             return;
         }
 
@@ -673,6 +678,7 @@ export default function ProductsPage({
                     playBeepSound();
                     vibrateMobile();
                     openEntity('view', res.data.id);
+                    setSearch("");
                 } else {
                     setSearch(cleanCode);
                     notifyError("Produto não encontrado. Filtrando lista por código...");
@@ -767,6 +773,9 @@ export default function ProductsPage({
                                         showChevron={false}
                                         fullWidth={false}
                                     >
+                                        <DropdownItem onClick={() => setIsCameraOpen(true)}>
+                                            <CameraIcon size={16} /> Escanear Câmera
+                                        </DropdownItem>
                                         <DropdownItem onClick={() => setModals((p) => ({ ...p, import: true }))}>
                                             <UploadIcon size={16} /> Importar XML
                                         </DropdownItem>
@@ -785,17 +794,6 @@ export default function ProductsPage({
                                 </div>
                             </div>
 
-                        {hasProducts && (
-                            <div className="px-4 md:px-8 mb-4">
-                                <BarcodeScannerInput
-                                    onScan={handleScanBarcode}
-                                    placeholder="Escaneie o código de barras ou SKU para buscar/abrir..."
-                                    autoFocus={false}
-                                    showCameraOption={true}
-                                />
-                            </div>
-                        )}
-
                             {hasProducts && (
                                 <ProductPageControls
                                     activeTab={activeTab}
@@ -813,10 +811,12 @@ export default function ProductsPage({
                                         setViewModeState(mode)
                                     }}
                                     hasActiveFilters={hasActiveFilters}
+                                    onScanBarcode={handleScanBarcode}
+                                    onOpenCamera={() => setIsCameraOpen(true)}
                                 />
                             )}
 
-                            <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-0 px-4 md:px-8">
                                 <AnimatePresence mode="wait">
                                     {!hasProducts ? (
                                         <FadeIn key="empty-no-data" className="w-full h-full">

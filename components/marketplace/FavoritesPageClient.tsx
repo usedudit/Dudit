@@ -47,7 +47,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     const [isLoading, setIsLoading] = useState(true)
     const [counts, setCounts] = useState({ total: 0, produtos: 0, servicos: 0 })
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
-    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
     // Redirect unauthenticated users
     useEffect(() => {

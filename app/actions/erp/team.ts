@@ -87,7 +87,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const userIds = partnerUsers.map((pu: any) => pu.user_id)
         const { data: profiles } = await admin
             .from("user_profiles")
-            .select("user_id, full_name")
+            .select("user_id, full_name, avatar_url")
             .in("user_id", userIds)
 
         // Get auth emails
@@ -114,10 +114,10 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
             }
         }
 
-        const profileMap: Record<string, { full_name: string | null }> = {}
+        const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {}
         if (profiles) {
             for (const p of profiles) {
-                profileMap[p.user_id] = { full_name: p.full_name }
+                profileMap[p.user_id] = { full_name: p.full_name, avatar_url: p.avatar_url }
             }
         }
 
@@ -126,7 +126,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
             userId: pu.user_id,
             email: emailMap[pu.user_id] || "",
             fullName: profileMap[pu.user_id]?.full_name || null,
-            avatarUrl: null,
+            avatarUrl: profileMap[pu.user_id]?.avatar_url || null,
             role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
             permissions: null,
             createdAt: pu.created_at,
