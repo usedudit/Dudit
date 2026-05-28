@@ -12,6 +12,7 @@ import SelectVariantSheet from './SelectVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from "@/lib/permission-context";
+import { useSupabase } from "@/providers/supabase-provider";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade";
 import {
@@ -25,10 +26,11 @@ import {
     updateQuoteItemAction,
     deleteQuoteItemAction,
     duplicateQuoteAction,
+    getSalespeopleAction,
 } from '@/app/actions/erp/quotes';
 import { getQuoteEditCaps, QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
-import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders";
+import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders";
 import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
@@ -57,6 +59,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const { setHeaderOverride } = useSidebar();
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { user: authUser } = useSupabase();
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [realQuoteNumber, setRealQuoteNumber] = useState(existingQuote?.quote_number || '');
@@ -84,9 +87,52 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         fetchAddress();
     }, [partnerId]);
 
+    // Salesperson State
+    const [salespersonId, setSalespersonId] = useState<string>('');
+    const [salespeople, setSalespeople] = useState<{ id: string; name: string }[]>([]);
+    const [isSalespeopleLoaded, setIsSalespeopleLoaded] = useState(false);
+
+    // Fetch salespeople list on mount
+    useEffect(() => {
+        const fetchSalespeople = async () => {
+            const res = await getSalespeopleAction(partnerId);
+            if (res.success && res.sellers) {
+                setSalespeople(res.sellers);
+            }
+            setIsSalespeopleLoaded(true);
+        };
+        fetchSalespeople();
+    }, [partnerId]);
+
+    // Default salesperson to current user on creation
+    useEffect(() => {
+        if ((mode === 'create' || mode === 'duplicate') && authUser?.id && !salespersonId) {
+            setSalespersonId(authUser.id);
+        }
+    }, [mode, authUser?.id, salespersonId]);
+
     // Search States
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
-    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 });
+    const fetchCombinedBucket = useCallback(async () => {
+        const [products, services] = await Promise.all([
+            fetchPartnerProductsBucket(),
+            fetchPartnerServicesBucket()
+        ]);
+        const mappedServices = services.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            sku: 'SERVIÇO',
+            gtin: null,
+            price: s.price,
+            stock: 0,
+            allow_sell_without_stock: true,
+            image: null,
+            has_variants: false,
+            isService: true,
+        }));
+        return [...products, ...mappedServices];
+    }, []);
+    const productBucket = useProductBucket(fetchCombinedBucket, { pageSize: 10 });
 
     // Sheet States
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
@@ -129,7 +175,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [validationMessage, setValidationMessage] = useState('');
 
     const getItemMaxQuantity = useCallback((item: any) => {
-        if (!item || item.isBlank) return undefined;
+        if (!item || item.isBlank || item.isService) return undefined;
         return Math.max(0, Number(item.stock ?? 0));
     }, []);
 
@@ -137,7 +183,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const stockMap = new Map<string, { name: string; quantity: number; stock: number }>();
 
         for (const item of targetItems) {
-            if (item.isBlank || !item.id) continue;
+            if (item.isBlank || item.isService || !item.id) continue;
             const key = item.variantId ? `variant:${item.variantId}` : `product:${item.id}`;
             const existing = stockMap.get(key);
 
@@ -226,6 +272,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     setDiscountType(q.discount_type === 'percentage' ? '%' : 'R$');
                     setShippingFee(q.shipping_cost?.toString() || '');
                     setOtherCosts(q.additional_costs?.toString() || '');
+                    if (q.created_by_user_id) {
+                        setSalespersonId(q.created_by_user_id);
+                    }
 
                     // Snapshot for dirty check
                     const snapshot = {
@@ -239,7 +288,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         discount: q.discount_value?.toString() || '',
                         discountType: q.discount_type === 'percentage' ? '%' : 'R$',
                         shipping: q.shipping_cost?.toString() || '',
-                        others: q.additional_costs?.toString() || ''
+                        others: q.additional_costs?.toString() || '',
+                        salesperson: q.created_by_user_id || '',
                     };
                     setOriginalQuoteData(snapshot);
                 }
@@ -265,8 +315,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         discount,
         discountType,
         shipping: shippingFee,
-        others: otherCosts
-    }), [quoteItems, selectedCustomer, internalNote, staffInternalNotes, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts]);
+        others: otherCosts,
+        salesperson: salespersonId,
+    }), [quoteItems, selectedCustomer, internalNote, staffInternalNotes, quoteDate, expiryDate, status, discount, discountType, shippingFee, otherCosts, salespersonId]);
 
     const isDirty = useMemo(() => {
         if (!originalQuoteData) {
@@ -277,7 +328,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     !!staffInternalNotes.trim() ||
                     Number(discount) > 0 ||
                     Number(shippingFee) > 0 ||
-                    Number(otherCosts) > 0;
+                    Number(otherCosts) > 0 ||
+                    (salespersonId && authUser?.id && salespersonId !== authUser.id);
             }
             return false;
         }
@@ -294,6 +346,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             currentData.note !== originalQuoteData.note ||
             currentData.internalStaff !== originalQuoteData.internalStaff ||
             currentData.customer?.id !== originalQuoteData.customer?.id ||
+            currentData.salesperson !== originalQuoteData.salesperson ||
             currentData.items.length !== originalQuoteData.items.length
         ) {
             return true;
@@ -333,7 +386,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         const variants = product.variants || [];
 
         if (variants.length === 0) {
-            if (Number(product.stock || 0) < 1) {
+            if (!product.isService && Number(product.stock || 0) < 1) {
                 notifyError("Estoque insuficiente", `"${product.name}" está sem estoque disponível.`);
                 return;
             }
@@ -796,12 +849,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 shippingCost: Number(shippingFee) || 0,
                 additionalCosts: Number(otherCosts) || 0,
                 items: quoteItems.map((item, idx) => ({
-                    productId: item.isBlank ? null : item.id,
-                    customName: item.isBlank ? item.name : undefined,
+                    productId: (item.isBlank || item.isService) ? null : item.id,
+                    customName: (item.isBlank || item.isService) ? item.name : undefined,
                     quantity: item.qty,
                     unitPrice: item.price,
                     sortOrder: idx,
                 })),
+                userId: salespersonId || undefined,
             });
 
             if (result.success) {
@@ -934,7 +988,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                     Observações
                                                     {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
-                                                <TabsTrigger value="Visualização">Visualização</TabsTrigger>
+                                                <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
                                             </TabsList>
                                         </div>
                                     </div>
@@ -1010,6 +1064,9 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             manualItemNameErrors={manualItemNameErrors}
                                             manualItemPriceErrors={manualItemPriceErrors}
                                             isLoadingItems={isLoadingProposalItems}
+                                            salespersonId={salespersonId}
+                                            setSalespersonId={setSalespersonId}
+                                            salespeople={salespeople}
                                         />
                                     </div>
                                 </div>
@@ -1087,10 +1144,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     isOpen={showAlertModal}
                     onClose={() => setShowAlertModal(false)}
                     onConfirm={confirmNavigation}
-                    title="Descartar alterações?"
-                    description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+                    title="Sair sem salvar?"
+                    description="Você tem alterações no orçamento que ainda não foram salvas."
                     confirmText="Sair sem salvar"
-                    cancelText="Cancelar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
 
@@ -1099,10 +1156,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         isOpen={unsavedChangesDialogOpen}
                         onClose={handleUnsavedChangesDialogClose}
                         onConfirm={handleUnsavedChangesConfirm}
-                        title="Descartar alterações?"
-                        description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações no orçamento que ainda não foram salvas."
                         confirmText="Sair sem salvar"
-                        cancelText="Cancelar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}

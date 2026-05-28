@@ -671,9 +671,10 @@ export const BusinessDataSubPage = ({
                         isOpen={showConfirmDialog}
                         onClose={cancelNavigation}
                         onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Existem dados não salvos neste formulário. Se sair agora, você perderá o que preencheu."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações nos dados do negócio que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}

@@ -11,7 +11,8 @@ import {
     FileIcon,
     PlusIcon,
     TrashIcon,
-    ArrowRightIcon
+    ArrowRightIcon,
+    CameraIcon
 } from '@/lib/icons';
 import {
     Button,
@@ -25,9 +26,10 @@ import {
     IconPlaceholder,
     ThreeDotsLoader
 } from '@/components/reusable';
-import { BarcodeScannerInput } from '@/components/reusable';
 import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
 import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
+import { Lock, Unlock } from 'lucide-react';
+import { CameraScannerModal } from '@/components/reusable/CameraScannerModal';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
@@ -76,6 +78,52 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const [items, setItems] = useState<MovementItem[]>([]);
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
+
+    // Focus lock and camera scanner states
+    const [focusLock, setFocusLock] = useState(false);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (focusLock) {
+            const interval = setInterval(() => {
+                if (inputRef.current && document.activeElement !== inputRef.current) {
+                    inputRef.current.focus();
+                }
+            }, 500);
+            return () => clearInterval(interval);
+        }
+    }, [focusLock]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            const scannedValue = productBucket.searchQuery.trim();
+            if (scannedValue) {
+                handleScanBarcode(scannedValue);
+            }
+        }
+    };
+
+    const focusLockSuffix = (
+        <button
+            type="button"
+            onClick={(e) => {
+                e.stopPropagation();
+                setFocusLock(!focusLock);
+                setTimeout(() => {
+                    inputRef.current?.focus();
+                }, 50);
+            }}
+            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
+                    ? "text-brand-primary bg-brand-primary/15"
+                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+                }`}
+            title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
+        >
+            {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
+        </button>
+    );
 
     // Instant product search (client-side bucket)
     const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 });
@@ -165,7 +213,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
         }
 
         // 1. Search locally in the bucket (GTIN or SKU)
-        const localMatch = currentBucket.find(item => 
+        const localMatch = currentBucket.find(item =>
             (item.gtin && item.gtin.toLowerCase() === cleanCode.toLowerCase()) ||
             (item.sku && item.sku.toLowerCase() === cleanCode.toLowerCase())
         );
@@ -174,17 +222,19 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             addProduct(localMatch);
             playBeepSound();
             vibrateMobile();
+            productBucket.setSearchQuery('');
             return;
         }
 
         // 2. Search locally in the bucket (Variant SKU)
-        const localVariantMatch = currentBucket.find(item => 
+        const localVariantMatch = currentBucket.find(item =>
             item.variants?.some(v => v.sku && v.sku.toLowerCase() === cleanCode.toLowerCase())
         );
         if (localVariantMatch) {
             addProduct(localVariantMatch);
             playBeepSound();
             vibrateMobile();
+            productBucket.setSearchQuery('');
             return;
         }
 
@@ -215,6 +265,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                     addProduct(bucketItem);
                     playBeepSound();
                     vibrateMobile();
+                    productBucket.setSearchQuery('');
                 } else {
                     notifyError("Produto não encontrado.");
                 }
@@ -379,7 +430,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         </div>
 
                         {/* Content Body */}
-                        <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
 
                                 {/* Form Column */}
@@ -439,42 +490,47 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Itens da Movimentação</h3>
                                                     <div className="space-y-6">
 
-                                                        {/* Barcode Scanner Input */}
-                                                        <BarcodeScannerInput
-                                                            onScan={handleScanBarcode}
-                                                            placeholder="Escaneie o código de barras ou SKU do produto..."
-                                                            autoFocus={false}
-                                                            showCameraOption={true}
-                                                        />
-
                                                         {/* Product Search */}
                                                         <div ref={searchRef} className="relative">
-                                                            <div className="relative flex items-center w-full">
-                                                                <Input
-                                                                    type="text"
-                                                                    placeholder="Buscar por nome ou SKU para adicionar..."
-                                                                    value={productBucket.searchQuery}
-                                                                    onChange={(e) => {
-                                                                        productBucket.setSearchQuery(e.target.value);
-                                                                        setIsProductSearchOpen(true);
-                                                                        setFieldErrors(prev => {
-                                                                            const next = new Set(prev);
-                                                                            next.delete('items');
-                                                                            return next;
-                                                                        });
-                                                                    }}
-                                                                    onFocus={() => {
-                                                                        setIsProductSearchOpen(true);
-                                                                        productBucket.loadBucket();
-                                                                    }}
-                                                                    prefix={
-                                                                        <SearchIcon
-                                                                            size={18}
-                                                                            className="text-brand-inactive-text shrink-0"
-                                                                        />
-                                                                    }
-                                                                    error={fieldErrors.has('items') && items.length === 0}
-                                                                    errorMessage={fieldErrors.has('items') && items.length === 0 ? "Adicione pelo menos um produto" : undefined}
+                                                            <div className="relative flex items-center w-full gap-2">
+                                                                <div className="relative flex-1">
+                                                                    <Input
+                                                                        ref={inputRef}
+                                                                        type="text"
+                                                                        placeholder="Buscar por nome ou SKU para adicionar..."
+                                                                        value={productBucket.searchQuery}
+                                                                        onChange={(e) => {
+                                                                            productBucket.setSearchQuery(e.target.value);
+                                                                            setIsProductSearchOpen(true);
+                                                                            setFieldErrors(prev => {
+                                                                                const next = new Set(prev);
+                                                                                next.delete('items');
+                                                                                return next;
+                                                                            });
+                                                                        }}
+                                                                        onFocus={() => {
+                                                                            setIsProductSearchOpen(true);
+                                                                            productBucket.loadBucket();
+                                                                        }}
+                                                                        onKeyDown={handleKeyDown}
+                                                                        prefix={
+                                                                            <SearchIcon
+                                                                                size={18}
+                                                                                className="text-brand-inactive-text shrink-0"
+                                                                            />
+                                                                        }
+                                                                        suffix={focusLockSuffix}
+                                                                        error={fieldErrors.has('items') && items.length === 0}
+                                                                        errorMessage={fieldErrors.has('items') && items.length === 0 ? "Adicione pelo menos um produto" : undefined}
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    type="button"
+                                                                    onClick={() => setIsCameraOpen(true)}
+                                                                    className="h-10 px-3 shrink-0"
+                                                                    leftIcon={<CameraIcon size={18} />}
+                                                                    title="Escanear Câmera"
                                                                 />
                                                             </div>
 
@@ -482,7 +538,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 <motion.div
                                                                     initial={{ opacity: 0, y: 5 }}
                                                                     animate={{ opacity: 1, y: 0 }}
-                                                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl custom-scrollbar"
+                                                                    className="absolute z-[9999] top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl max-h-72 overflow-y-auto shadow-xl custom-scrollbar"
                                                                     onScroll={(e) => {
                                                                         const target = e.currentTarget
                                                                         if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -810,9 +866,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         isOpen={unsavedChangesDialogOpen}
                         onClose={handleUnsavedChangesDialogClose}
                         onConfirm={handleUnsavedChangesConfirm}
-                        title="Descartar alterações?"
-                        description="Você tem uma movimentação em andamento. Se sair agora, perderá os dados preenchidos."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações na movimentação que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}
@@ -821,14 +878,21 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         isOpen
                         onClose={() => setShowAlertModal(false)}
                         onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Existem dados não salvos neste formulário. Tem certeza que deseja cancelar o registro?"
+                        title="Sair sem salvar?"
+                        description="Você tem alterações na movimentação que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}
 
                 <SavingStatusModal isOpen={isSaving} text="Salvando movimentação de estoque..." />
+
+                <CameraScannerModal
+                    isOpen={isCameraOpen}
+                    onClose={() => setIsCameraOpen(false)}
+                    onScan={handleScanBarcode}
+                />
             </div>
         </FadeIn>
     );

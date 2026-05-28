@@ -490,7 +490,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                                     title="Nenhum item na fila"
                                     subtitle="Todos os produtos foram revisados ou não correspondem aos filtros atuais."
                                     itemButton={search || statusFilter !== "all" ? {
-                                        text: "Limpar Filtros",
+                                        text: "Limpar filtros",
                                         action: () => {
                                             setStatusFilter("all")
                                             setSearch("")

@@ -1334,7 +1334,7 @@ export default function TransactionsPage({
                                     title="Você ainda não tem transações"
                                     subtitle="As movimentações financeiras vão aparecer aqui assim que forem cadastradas."
                                     itemButton={{
-                                        text: "Adicionar Primeira Transação",
+                                        text: "Adicionar primeira transação",
                                         action: () => openEntity("create")
                                     }}
                                 />
@@ -1351,7 +1351,7 @@ export default function TransactionsPage({
                                     title="Nenhuma transação encontrada"
                                     subtitle="Tente ajustar os filtros ou o termo de busca."
                                     itemButton={{
-                                        text: "Limpar Filtros",
+                                        text: "Limpar filtros",
                                         action: handleClearFilters,
                                         variant: "outline",
                                     }}

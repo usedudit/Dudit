@@ -658,9 +658,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                         isOpen={showConfirmDialog}
                         onClose={cancelNavigation}
                         onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Você possui alterações não salvas. Se sair agora, perderá o que preencheu."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações no método de pagamento que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}

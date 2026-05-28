@@ -13,7 +13,12 @@ interface QuoteGridCardProps {
     onEdit: () => void
     onDelete: () => void
     onDuplicate: () => void
+    onPrint?: () => void
+    onShare?: () => void
     onClick?: () => void
+    onPrefetchMouseEnter?: React.MouseEventHandler<HTMLDivElement>
+    onPrefetchMouseLeave?: React.MouseEventHandler<HTMLDivElement>
+    onPrefetchTouchStart?: React.TouchEventHandler<HTMLDivElement>
 }
 
 const QuoteGridCard = React.memo(
@@ -24,7 +29,10 @@ const QuoteGridCard = React.memo(
         onEdit,
         onDelete,
         onDuplicate,
-        onClick
+        onClick,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: QuoteGridCardProps) => {
 
         return (
@@ -33,6 +41,9 @@ const QuoteGridCard = React.memo(
                 animate={{ opacity: 1 }}
                 className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative"
                 onClick={onClick}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <div className="flex gap-4 mb-2">
                     {/* Visual Indicator */}
@@ -117,9 +128,10 @@ const QuoteGridCard = React.memo(
                             }}
                         >
                             <ActionsDropdown
-                                onEdit={onEdit}
                                 onDuplicate={onDuplicate}
                                 onDelete={onDelete}
+                                onPrint={onPrint}
+                                onShare={onShare}
                             />
                         </div>
                     </div>

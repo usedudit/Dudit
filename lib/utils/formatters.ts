@@ -8,10 +8,19 @@
  */
 export function formatCurrency(value: number | string): string {
   const amount = typeof value === "string" ? parseFloat(value) : value
-  return new Intl.NumberFormat("pt-BR", {
+  let formatted = new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
   }).format(amount || 0)
+  
+  // Normalize output if the system locale fallback occurs
+  if (formatted.includes("BRL")) {
+    formatted = formatted.replace("BRL", "R$")
+  }
+  if (formatted.startsWith("$") && !formatted.startsWith("R$")) {
+    formatted = formatted.replace("$", "R$")
+  }
+  return formatted
 }
 
 /**

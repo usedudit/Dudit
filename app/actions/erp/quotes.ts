@@ -358,6 +358,7 @@ export async function createQuoteAction(data: {
     shippingCost?: number
     additionalCosts?: number
     items?: QuoteItemPayload[]
+    userId?: string | null
 }) {
     return withTelemetry("createQuoteAction", async () => {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -399,7 +400,7 @@ export async function createQuoteAction(data: {
             // Execute Native DB Transaction
             const { data: quoteResult, error: rpcError } = await supabase.rpc('create_quote_with_items', {
                 p_partner_id: data.partnerId,
-                p_user_id: user.id,
+                p_user_id: data.userId || user.id,
                 p_customer_id: data.customerId || null,
                 p_status: "draft",
                 p_issue_date: data.issueDate || new Date().toISOString().split("T")[0],
@@ -1595,4 +1596,39 @@ export async function batchUpdateQuotesStatusAction(quoteIds: string[], status: 
             return errorResponse(err.message || "Erro interno ao atualizar status")
         }
     });
+}
+
+export async function getSalespeopleAction(partnerId: string): Promise<{ success: true; sellers: { id: string; name: string }[] } | { success: false; error: string }> {
+    try {
+        const user = await requireUser()
+        await requirePartnerAccessWithPermission(partnerId, "quotes", "view", user)
+
+        const admin = getAdminClient()
+        const { data: partnerUsers, error: puError } = await admin
+            .from("partner_users")
+            .select("user_id")
+            .eq("partner_id", partnerId)
+
+        if (puError) throw puError
+
+        const userIds = Array.from(new Set((partnerUsers || []).map((row: any) => row.user_id).filter(Boolean)))
+        if (userIds.length === 0) return { success: true, sellers: [] }
+
+        const { data: profiles, error: pError } = await admin
+            .from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", userIds)
+
+        if (pError) throw pError
+
+        const sellers = (profiles || []).map((p: any) => ({
+            id: String(p.user_id),
+            name: String(p.full_name || "Vendedor")
+        })).sort((a, b) => a.name.localeCompare(b.name))
+
+        return { success: true, sellers }
+    } catch (err: any) {
+        console.error("[getSalespeopleAction] Error:", err)
+        return { success: false, error: err.message || "Erro ao carregar vendedores" }
+    }
 }

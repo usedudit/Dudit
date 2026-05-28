@@ -84,6 +84,9 @@ interface QuoteEditorProps {
     isLoadingItems?: boolean;
     loadMoreProducts?: () => void;
     hasMoreProducts?: boolean;
+    salespersonId?: string;
+    setSalespersonId?: (val: string) => void;
+    salespeople?: { id: string; name: string }[];
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -192,7 +195,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 5 }}
-                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar"
+                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
                                         onScroll={(e) => {
                                             const target = e.currentTarget;
                                             if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -207,16 +210,23 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                 <div
                                                     key={product.id}
                                                     onClick={() => props.handleProductClick(product)}
-                                                    className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
+                                                    className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
                                                 >
-                                                    <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku} • Estoque: {product.stock}</div>
+                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                        <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
                                                     </div>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                            {product.isService ? "Serviço" : `${product.stock} em estoque`}
+                                                        </div>
+                                                    </div>
                                                     {product.variants && product.variants.length > 0 && (
-                                                        <div className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-700 text-[10px] font-bold rounded text-brand-inactive-text uppercase">
+                                                        <div className="px-2 py-0.5 bg-gray-100 dark:bg-zinc-700 text-[10px] font-bold rounded text-brand-inactive-text uppercase whitespace-nowrap">
                                                             Opções
                                                         </div>
                                                     )}
@@ -474,98 +484,6 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             </div>
                         )}
 
-                        {/* --- ITEMS LIST (Mobile/Tablet) --- */}
-                        {false && props.quoteItems.length > 0 && (
-                            <div className="block md:hidden space-y-2 mb-6">
-                                {props.quoteItems.map((item, index) => (
-                                    <div key={index} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
-                                        {/* Left side: Avatar/Image */}
-                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
-                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className="w-full h-full object-cover" alt="" />
-                                        </div>
-
-                                        {/* Middle: Content */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start mb-0.5">
-                                                {item.isEditing ? (
-                                                    <input
-                                                        type="text"
-                                                        value={item.name}
-                                                        onChange={(e) => props.updateItemField(index, 'name', e.target.value)}
-                                                        placeholder="Nome do produto..."
-                                                        className="flex-1 h-8 px-2 rounded-lg border border-brand-border bg-white dark:bg-dark-background font-bold text-[13px] focus:ring-1 focus:ring-brand-primary outline-none transition-all mr-2"
-                                                    />
-                                                ) : (
-                                                    <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                        {item.name || 'Produto sem nome'}
-                                                    </h4>
-                                                )}
-                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading shrink-0">
-                                                    {formatCurrency(item.price * item.qty)}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate">
-                                                    {item.sku || 'Sem SKU'} • {item.qty} un • {formatCurrency(item.price)}
-                                                </p>
-                                                {!itemsLocked && (
-                                                    <div className="flex items-center gap-1">
-                                                        {item.isEditing ? (
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (item.isBlank && Number(item.price || 0) <= 0) {
-                                                                        setPriceErrors(prev => ({ ...prev, [index]: true }))
-                                                                        return
-                                                                    }
-                                                                    props.toggleItemEdit(index, false)
-                                                                }}
-                                                                className="w-8 h-8 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10 rounded-lg transition-colors"
-                                                            >
-                                                                <CheckIcon size={16} />
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => props.toggleItemEdit(index, true)}
-                                                                className="w-8 h-8 flex items-center justify-center text-brand-inactive-text hover:text-brand-dark hover:bg-brand-gray dark:hover:bg-dark-border rounded-lg transition-colors"
-                                                            >
-                                                                <EditIcon size={16} />
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => props.removeItem(index)}
-                                                            className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors"
-                                                        >
-                                                            <TrashIcon size={14} />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {!itemsLocked && (
-                                                <div className="flex items-center gap-4 mt-2">
-                                                    <QuantitySelector value={item.qty} onChange={(val) => props.updateItemQty(index, val)} max={item.isBlank ? undefined : Math.max(0, Number(item.stock ?? 0))} size="md" />
-                                                    <div className="flex items-center flex-1 max-w-[120px]">
-                                                        <span className="text-[11px] font-medium text-brand-inactive-text mr-1">R$</span>
-                                                        <input
-                                                            type="number"
-                                                            value={item.price}
-                                                            onChange={(e) => {
-                                                                props.updateItemPrice(index, parseFloat(e.target.value) || 0)
-                                                                if (priceErrors[index]) {
-                                                                    setPriceErrors(prev => ({ ...prev, [index]: false }))
-                                                                }
-                                                            }}
-                                                            className={`w-full h-8 px-2 rounded-lg border bg-white dark:bg-dark-background font-bold text-[11px] focus:ring-1 focus:ring-brand-primary outline-none ${priceErrors[index] ? 'border-red-500' : 'border-brand-border'}`}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
                         {/* --- Empty State --- */}
                         {props.quoteItems.length === 0 && (
                             <div className="w-full flex-col flex items-center justify-center">
@@ -644,7 +562,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                     <div className="mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Configurações</h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                             <DatePicker
                                 label="Data Emissão"
                                 value={props.quoteDate}
@@ -676,6 +594,16 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     setValue={props.setStatus}
                                     options={(props.mode === 'create' || props.mode === 'duplicate' ? statusOptions.filter(o => o.value === 'draft') : statusOptions).map(o => ({ value: o.value, label: o.label }))}
                                     disabled={statusLocked}
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <FormDropdown
+                                    label="Vendedor"
+                                    value={props.salespersonId || ""}
+                                    setValue={props.setSalespersonId || (() => {})}
+                                    options={(props.salespeople || []).map(s => ({ value: s.id, label: s.name }))}
+                                    disabled={props.mode === 'edit' || props.mode === 'view' || props.isReadOnly}
                                 />
                             </div>
                         </div>

@@ -158,7 +158,7 @@ const AuditLogList = ({ initialData }: AuditLogListProps) => {
                                         title="Nenhum log encontrado"
                                         subtitle="Tente ajustar seus filtros ou termos de busca."
                                         itemButton={{
-                                            text: "Limpar Filtros",
+                                            text: "Limpar filtros",
                                             action: () => {
                                                 setSearch("")
                                                 setActiveTab("all")

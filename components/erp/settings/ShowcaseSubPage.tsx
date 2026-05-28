@@ -299,12 +299,8 @@ export const ShowcaseSubPage = ({
                             </div>
 
                             {/* Desktop action buttons */}
-                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                <Button variant="outline" onClick={handleBack} disabled={isLoading}>
-                                    Cancelar
-                                </Button>
-                                <Button onClick={handleSubmit} disabled={isLoading}>
-                                    <SaveIcon className="w-5 h-5 mr-2" />
+                            <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
                                     {isLoading ? "Salvando..." : "Salvar"}
                                 </Button>
                             </div>
@@ -459,18 +455,11 @@ export const ShowcaseSubPage = ({
             {/* Mobile Bottom Action Bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex-1 h-[48px]"
-                    disabled={isLoading}
-                >
-                    Cancelar
-                </Button>
-                <Button
                     onClick={handleSubmit}
                     className="flex-1 h-[48px]"
                     disabled={isLoading}
                     isLoading={isLoading}
+                    leftIcon={<SaveIcon size={18} />}
                 >
                     Salvar
                 </Button>
@@ -483,9 +472,10 @@ export const ShowcaseSubPage = ({
                     isOpen={showConfirmDialog}
                     onClose={cancelNavigation}
                     onConfirm={confirmNavigation}
-                    title="Descartar alterações?"
-                    description="Existem dados não salvos neste formulário. Se sair agora, você perderá o que preencheu."
+                    title="Sair sem salvar?"
+                    description="Você tem alterações na vitrine que ainda não foram salvas."
                     confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
             )}

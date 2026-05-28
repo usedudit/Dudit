@@ -465,7 +465,7 @@ export default function CustomersPage({
                                                 title="Nenhum cliente encontrado"
                                                 subtitle="Tente ajustar seus filtros ou termos de busca."
                                                 itemButton={{
-                                                    text: "Limpar Filtros",
+                                                    text: "Limpar filtros",
                                                     action: handleClearFilters,
                                                     variant: "outline"
                                                 }}

@@ -107,7 +107,7 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh - 65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
@@ -140,14 +140,14 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                         onClick={handleSaveAll}
                                         isLoading={savingAll}
                                     >
-                                        Salvar Alterações
+                                        Salvar alterações
                                     </Button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="px-3 md:px-6 lg:y-6 max-w-[1300px] mx-auto min-h-[400px]">
                         {loading ? (
                             <div className="flex justify-center p-12">
                                 <ThreeDotsLoader />
@@ -169,9 +169,9 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                <th className="py-3 px-6 rounded-l-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Membro</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Tipo de Comissão</th>
-                                                <th className="py-3 px-4 rounded-r-lg text-[13px] font-bold text-brand-inactive-text dark:text-dark-body text-center">Valor</th>
+                                                <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Membro</th>
+                                                <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Tipo de Comissão</th>
+                                                <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors">Valor</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-brand-border dark:divide-dark-border">
@@ -258,7 +258,7 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
 
                                         return (
                                             <React.Fragment key={`${row.partnerUserId}:${row.commissionRole}`}>
-                                                <div className="py-6 space-y-4">
+                                                <div className="lg:py-6 lg:space-y-4">
                                                     <div className="flex items-center gap-4">
                                                         <UserProfileImage
                                                             fullName={row.name || "Usuário"}
@@ -330,17 +330,17 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                         <Button
                             variant="outline"
                             onClick={handleBack}
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-[48px]"
                         >
                             Voltar
                         </Button>
                         <Button
                             onClick={handleSaveAll}
                             isLoading={savingAll}
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-[48px]"
                             leftIcon={<SaveIcon size={18} />}
                         >
-                            Salvar Tudo
+                            Salvar
                         </Button>
                     </div>
                 </div>

@@ -4,6 +4,7 @@ import { getAvatarColor, getUserInitials } from "@/lib/utils/avatar"
 
 export { AVATAR_COLORS, getAvatarColor, getBannerUrlByColor, getUserInitials } from "@/lib/utils/avatar"
 
+
 /**
  * Avatar component using user initials and dynamic color
  * @param fullName - User's full name
@@ -14,10 +15,12 @@ export function UserProfileImage({
   fullName,
   className = "",
   imageUrl,
+  style,
 }: {
   fullName: string
   className?: string
   imageUrl?: string | null
+  style?: React.CSSProperties
 }) {
   const initials = getUserInitials(fullName)
   const backgroundColor = getAvatarColor(fullName)
@@ -26,7 +29,7 @@ export function UserProfileImage({
 
   if (hasImage) {
     return (
-      <div className={`overflow-hidden rounded-full ${className}`} title={fullName}>
+      <div className={`overflow-hidden rounded-full ${className}`} style={style} title={fullName}>
         <img src={normalizedImageUrl} alt={fullName} className="h-full w-full object-cover" />
       </div>
     )
@@ -35,6 +38,7 @@ export function UserProfileImage({
   return (
     <div
       className={`flex items-center justify-center rounded-full font-semibold text-white ${backgroundColor} ${className}`}
+      style={style}
       title={fullName}
     >
       {initials}

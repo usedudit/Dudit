@@ -31,7 +31,7 @@ interface PreferenceRequest {
 async function handler(request: NextRequest) {
   try {
     const body: PreferenceRequest = await request.json()
-    console.log("[v0] Request body:", { ...body, partnerId: body.partnerId ? "[HIDDEN]" : undefined })
+    console.log("Request body:", { ...body, partnerId: body.partnerId ? "[HIDDEN]" : undefined })
 
     const user = await getCurrentUser()
     const supabase = await getSupabaseServerClient()
@@ -86,12 +86,12 @@ async function handler(request: NextRequest) {
       .single()
 
     if (partnerError) {
-      console.error("[v0] Partner query error:", partnerError)
+      console.error("Partner query error:", partnerError)
       return NextResponse.json({ error: `Erro ao buscar vendedor: ${partnerError.message}` }, { status: 400 })
     }
 
     if (!partner) {
-      console.error("[v0] Partner not found for ID:", partnerId)
+      console.error("Partner not found for ID:", partnerId)
       return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
 
@@ -184,7 +184,7 @@ async function handler(request: NextRequest) {
         currency_id: "BRL",
       })
     }
-    
+
     // DELIVERY FEE
     const deliveryFee = Number(body.deliveryFee || 0)
     if (deliveryFee > 0) {
@@ -211,7 +211,7 @@ async function handler(request: NextRequest) {
 
       if (couponResult.valid) {
         couponDiscount = couponResult.discountAmount
-        
+
         // Add discount as a separate item in MP preference
         if (couponDiscount > 0) {
           preferenceItems.push({
@@ -263,14 +263,14 @@ async function handler(request: NextRequest) {
       body: JSON.stringify(preferencePayload),
     })
 
-    console.log("[v0] MP Response status:", mpResponse.status)
+    console.log("MP Response status:", mpResponse.status)
 
     if (!mpResponse.ok) {
       let errorMessage = "Erro ao criar preferência de pagamento"
       let mpErrorData: any = null
       try {
         mpErrorData = await mpResponse.json()
-        console.error("[v0] MP Error Response (full):", JSON.stringify(mpErrorData, null, 2))
+        console.error("MP Error Response (full):", JSON.stringify(mpErrorData, null, 2))
 
         // Tentar extrair mensagem de erro do Mercado Pago
         if (mpErrorData?.message) {
@@ -281,11 +281,11 @@ async function handler(request: NextRequest) {
           errorMessage = mpErrorData.errors[0].message
         }
       } catch (parseErr) {
-        console.error("[v0] Failed to parse MP error:", parseErr)
+        console.error("Failed to parse MP error:", parseErr)
         errorMessage = `HTTP ${mpResponse.status}`
       }
 
-      console.error("[v0] Final error message to return:", errorMessage)
+      console.error("Final error message to return:", errorMessage)
       SecureLogger.error("Mercado Pago preference creation failed", {
         status: mpResponse.status,
         errorMessage,
@@ -307,8 +307,8 @@ async function handler(request: NextRequest) {
       init_point: preference.init_point,
     })
   } catch (error: any) {
-    console.error("[v0] API Error:", error)
-    console.error("[v0] Error stack:", error?.stack)
+    console.error("API Error:", error)
+    console.error("Error stack:", error?.stack)
     SecureLogger.error("Failed to create preference", { error: error?.message })
     return NextResponse.json(
       { error: error?.message || "Erro interno ao criar preferência" },

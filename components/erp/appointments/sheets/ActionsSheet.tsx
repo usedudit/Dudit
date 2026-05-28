@@ -431,7 +431,7 @@ export const AddUnavailableSheet = ({
                     </Button>
                 )}
                 <Button className={isEditing ? "flex-1 h-[48px]" : "w-full h-[48px]"} onClick={handleConfirm}>
-                    {isEditing ? 'Salvar Alterações' : 'Salvar Horário'}
+                    {isEditing ? 'Salvar alterações' : 'Salvar horário'}
                 </Button>
             </div>
 

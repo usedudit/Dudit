@@ -807,3 +807,40 @@ html {
     -webkit-font-smoothing: subpixel-antialiased;
   }
 }
+
+/* Global Interactive Pointer Cursor Rules */
+button,
+a,
+select,
+summary,
+[role="button"],
+[role="tab"],
+[role="combobox"],
+[role="option"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"],
+[role="treeitem"],
+[role="switch"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+label[for],
+label:has(input),
+[data-radix-collection-item],
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Ensure disabled/inactive states respect standard behavior */
+button:disabled,
+input:disabled,
+select:disabled,
+[disabled],
+.cursor-not-allowed,
+[aria-disabled="true"],
+[disabled] * {
+  cursor: not-allowed !important;
+}

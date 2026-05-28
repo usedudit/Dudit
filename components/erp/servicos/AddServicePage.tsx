@@ -634,9 +634,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 isOpen={showAlertModal}
                 onClose={() => setShowAlertModal(false)}
                 onConfirm={confirmNavigationAction}
-                title="Descartar alterações?"
-                description="Você tem dados não salvos neste formulário. Tem certeza que deseja cancelar?"
+                title="Sair sem salvar?"
+                description="Você tem alterações no serviço que ainda não foram salvas."
                 confirmText="Sair sem salvar"
+                cancelText="Continuar editando"
                 variant="warning"
             />
 
@@ -645,9 +646,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                     isOpen={showConfirmDialog}
                     onClose={cancelNavigation}
                     onConfirm={confirmNavigation}
-                    title="Descartar alterações?"
-                    description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso."
+                    title="Sair sem salvar?"
+                    description="Você tem alterações no serviço que ainda não foram salvas."
                     confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
             )}

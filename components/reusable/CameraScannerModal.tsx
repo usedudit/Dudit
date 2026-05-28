@@ -48,12 +48,14 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         // Stop the stream tracks immediately so html5-qrcode can use the camera
                         stream.getTracks().forEach(track => track.stop())
                     } catch (mediaErr: any) {
-                        console.error("Camera permission request failed:", mediaErr)
                         if (mediaErr.name === "NotAllowedError" || mediaErr.name === "PermissionDeniedError") {
+                            console.warn("Camera permission denied (handled warning)")
                             throw new Error("Permissão de acesso à câmera negada. Por favor, ative a permissão de câmera nas configurações do navegador.")
                         } else if (mediaErr.name === "NotFoundError" || mediaErr.name === "DevicesNotFoundError") {
+                            console.warn("No camera device found on this system (handled warning)")
                             throw new Error("Nenhuma câmera encontrada no dispositivo.")
                         } else {
+                            console.error("Camera permission request failed:", mediaErr)
                             throw new Error(`Erro ao acessar a câmera: ${mediaErr.message || mediaErr}`)
                         }
                     }
@@ -104,7 +106,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                         }
                     )
                 } catch (err: any) {
-                    console.error("Camera scanner initialization failed:", err)
+                    const isExpected = err.message?.includes("Nenhuma câmera") || err.message?.includes("Permissão") || err.message?.includes("segura");
+                    if (isExpected) {
+                        console.warn("Camera scanner initialization (handled warning):", err.message || err)
+                    } else {
+                        console.error("Camera scanner initialization failed:", err)
+                    }
                     if (isMounted) {
                         setHasPermission(false)
                         setLoading(false)
@@ -153,9 +160,9 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     Aponte a câmera do celular para o código de barras do produto. Posicione o código dentro da marcação central.
                 </p>
 
-                <div className="relative w-full aspect-[4/3] max-w-sm rounded-2xl border border-brand-border dark:border-dark-border bg-black overflow-hidden flex items-center justify-center">
+                <div className="relative w-full aspect-[4/3] max-w-sm rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex items-center justify-center">
                     {loading && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 text-white space-y-3">
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-3">
                             <Spinner size={32} className="text-brand-primary" />
                             <span className="text-xs font-semibold">Iniciando câmera...</span>
                         </div>

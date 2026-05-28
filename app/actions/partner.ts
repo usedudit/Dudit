@@ -205,13 +205,13 @@ export async function createPartnerAction(data: CreatePartnerData) {
         })
 
         if (emailResult.success) {
-          console.log("[v0] Partner account created email sent:", emailResult.messageId)
+          console.log("Partner account created email sent:", emailResult.messageId)
         } else {
-          console.warn("[v0] Failed to send partner email:", emailResult.error)
+          console.warn("Failed to send partner email:", emailResult.error)
         }
       }
     } catch (emailError) {
-      console.error("[v0] Error sending partner creation email:", emailError)
+      console.error("Error sending partner creation email:", emailError)
       // Continue anyway, don't fail the partner creation
     }
 
@@ -273,7 +273,7 @@ export async function updatePartnerAction(
   }
 
   // Verificar se há mudanças sensíveis a SEO (nome da loja, cidade, estado)
-  const isSeoSensitiveChange = 
+  const isSeoSensitiveChange =
     (data.storeName && data.storeName !== partnerCheck.store_name) ||
     (data.city !== undefined && data.city !== partnerCheck.addresses?.[0]?.city) ||
     (data.state !== undefined && data.state !== partnerCheck.addresses?.[0]?.state)
@@ -355,7 +355,7 @@ export async function updatePartnerAction(
       data.state ?? currentAddr.state,
       "BR"
     ].filter(Boolean).join(", ")
-    
+
     try {
       const coords = await geocodeAddress(fullAddressString)
       if (coords) {

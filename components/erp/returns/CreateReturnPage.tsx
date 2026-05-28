@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import {
     Button,
     DatePicker,
@@ -13,7 +13,6 @@ import {
     TabsList,
     TabsTrigger,
     CustomerCard,
-    IconPlaceholder,
     FormTextarea,
     Badge,
     Checkbox,
@@ -36,6 +35,8 @@ import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { useNotification } from "@/hooks/use-notification"
 import AlertModal from "@/components/reusable/AlertModal"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 
 
 interface CreateReturnPageProps {
@@ -176,6 +177,32 @@ export default function CreateReturnPage({
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
     const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set())
     const [isUploading, setIsUploading] = useState(false)
+
+    const isDirty = useMemo(() => {
+        if (mode === "view" || isSaving || isUploading) return false
+        if (mode === "create") {
+            return selectedOrder !== null || observations !== "" || evidenceImages.length > 0 || replacementItems.length > 0
+        }
+        if (mode === "edit" && returnRequest) {
+            const statusChanged = returnStatus !== returnRequest.status
+            const resolutionTypeChanged = resolutionType !== (returnRequest.approvedResolution || returnRequest.desiredResolution || "refund")
+            const observationsChanged = observations !== (returnRequest.observations || "")
+            
+            const itemsChanged = returnItems.some(item => {
+                const orig = returnRequest.items.find(i => i.id === item.id)
+                if (!orig) return true
+                return !item.checked || item.quantity !== orig.quantity || item.reason !== mapToLegacyReason(orig.reason || "outro") || item.condition !== mapToLegacyCondition(orig.condition || "aberto")
+            })
+            
+            const initialImages = returnRequest.evidenceImages || []
+            const imagesChanged = evidenceImages.length !== initialImages.length || evidenceImages.some((img, idx) => img !== initialImages[idx])
+
+            return statusChanged || resolutionTypeChanged || observationsChanged || itemsChanged || imagesChanged
+        }
+        return false
+    }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems])
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
     // Load existing return data for edit/view modes
     useEffect(() => {
@@ -511,7 +538,7 @@ export default function CreateReturnPage({
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={() => handleNavigation(onBack)} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -536,7 +563,7 @@ export default function CreateReturnPage({
 
                                     {/* Desktop action buttons only */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={onBack} disabled={isSaving || isUploading}>
+                                        <Button variant="outline" onClick={() => handleNavigation(onBack)} disabled={isSaving || isUploading}>
                                             Cancelar
                                         </Button><Button onClick={handleFormSubmit} disabled={isSaveDisabled}>
                                             <SaveIcon className="w-5 h-5 mr-2" />
@@ -585,10 +612,10 @@ export default function CreateReturnPage({
 
                                                             {isOrderSearchOpen && orderPicker.searchQuery.trim() && (
                                                                 <motion.div
-                                                                    initial={{ opacity: 0 }}
-                                                                    animate={{ opacity: 1 }}
-                                                                    exit={{ opacity: 0 }}
-                                                                    className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto overflow-hidden rounded-2xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface custom-scrollbar"
+                                                                    initial={{ opacity: 0, y: 5 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    exit={{ opacity: 0, y: 5 }}
+                                                                    className="absolute left-0 right-0 top-full z-[9999] mt-2 max-h-72 overflow-y-auto rounded-xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface custom-scrollbar"
                                                                     onScroll={(e: React.UIEvent<HTMLDivElement>) => {
                                                                         const target = e.currentTarget
                                                                         if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -601,10 +628,9 @@ export default function CreateReturnPage({
                                                                         const searchDeliveryMeta = getDeliveryStatusMeta(order.deliveryStatus)
 
                                                                         return (
-                                                                            <button
+                                                                            <div
                                                                                 key={order.id}
-                                                                                type="button"
-                                                                                className="w-full border-b border-brand-border p-3 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border"
+                                                                                className="flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer"
                                                                                 onClick={() => {
                                                                                     setSelectedOrder(order)
                                                                                     orderPicker.setSearchQuery(order.displayId)
@@ -632,39 +658,37 @@ export default function CreateReturnPage({
                                                                                     setReturnItems(mappedItems)
                                                                                 }}
                                                                             >
-                                                                                <div className="flex items-center gap-3">
-                                                                                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border/40">
-                                                                                        <img
-                                                                                            src={getOrderPreviewImage(order)}
-                                                                                            alt={order.displayId}
-                                                                                            className="h-full w-full object-cover"
-                                                                                        />
-                                                                                    </div>
+                                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                    <img
+                                                                                        src={getOrderPreviewImage(order)}
+                                                                                        alt={order.displayId}
+                                                                                        className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                    />
+                                                                                </div>
 
-                                                                                    <div className="min-w-0 flex-1">
-                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                            {order.displayId}
-                                                                                        </div>
-                                                                                        <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                            {order.customer_name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
-                                                                                        </div>
+                                                                                <div className="min-w-0 flex-1">
+                                                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                                        {order.displayId}
                                                                                     </div>
-
-                                                                                    <div className="flex shrink-0 flex-col items-end gap-1">
-                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                            {formatCurrency(order.totalAmount || 0)}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-1">
-                                                                                            <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
-                                                                                                {searchPaymentMeta.label}
-                                                                                            </Badge>
-                                                                                            <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
-                                                                                                {searchDeliveryMeta.label}
-                                                                                            </Badge>
-                                                                                        </div>
+                                                                                    <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                                                        {order.customer_name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
                                                                                     </div>
                                                                                 </div>
-                                                                            </button>
+
+                                                                                <div className="flex shrink-0 flex-col items-end gap-1">
+                                                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                        {formatCurrency(order.totalAmount || 0)}
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                            {searchPaymentMeta.label}
+                                                                                        </Badge>
+                                                                                        <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                            {searchDeliveryMeta.label}
+                                                                                        </Badge>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
                                                                         )
                                                                     })}
                                                                 </motion.div>
@@ -733,7 +757,8 @@ export default function CreateReturnPage({
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    )}                       </div>
+                                                    )}
+                                                </div>
                                             </FormSection>
 
                                             {/* Return Item Checklist */}
@@ -1263,43 +1288,59 @@ export default function CreateReturnPage({
                                                                             prefix={<SearchIcon size={18} className="shrink-0 text-brand-inactive-text" />}
                                                                         />
 
-                                                                        {isReplacementSearchOpen && productBucket.searchQuery.trim() && (
-                                                                            <div className="absolute z-50 left-0 right-0 top-full mt-2 max-h-72 overflow-y-auto rounded-xl border border-brand-border bg-white dark:border-dark-border dark:bg-dark-surface">
-                                                                                {productBucket.isLoading ? (
-                                                                                    <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
-                                                                                ) : productBucket.filteredResults.length > 0 ? (
-                                                                                    productBucket.filteredResults.map((product) => {
-                                                                                        const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
-                                                                                        return (
-                                                                                            <button
-                                                                                                key={product.id}
-                                                                                                type="button"
-                                                                                                disabled={alreadyAdded}
-                                                                                                onClick={() => addReplacementProduct(product)}
-                                                                                                className="flex w-full items-center gap-3 border-b border-brand-border p-3 text-left transition-colors last:border-0 hover:bg-brand-gray/40 disabled:cursor-default disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-border/30"
-                                                                                            >
-                                                                                                <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border">
-                                                                                                    <img
-                                                                                                        src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                                                        alt={product.name}
-                                                                                                        className="h-full w-full object-cover"
-                                                                                                    />
+                                                                        <AnimatePresence>
+                                                                            {isReplacementSearchOpen && productBucket.searchQuery.trim() && (
+                                                                                <motion.div
+                                                                                    initial={{ opacity: 0, y: 5 }}
+                                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                                    exit={{ opacity: 0, y: 5 }}
+                                                                                    className="absolute left-0 right-0 top-full z-[9999] mt-2 max-h-72 overflow-y-auto rounded-xl border border-brand-border bg-white shadow-xl dark:border-dark-border dark:bg-dark-surface custom-scrollbar"
+                                                                                    onScroll={(e) => {
+                                                                                        const target = e.currentTarget
+                                                                                        if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                                                            productBucket.loadMore()
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    {productBucket.isLoading ? (
+                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Carregando produtos...</div>
+                                                                                    ) : productBucket.filteredResults.length > 0 ? (
+                                                                                        productBucket.filteredResults.map((product) => {
+                                                                                            const alreadyAdded = replacementItems.some(item => item.product.id === product.id)
+                                                                                            return (
+                                                                                                <div
+                                                                                                    key={product.id}
+                                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${alreadyAdded ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer'}`}
+                                                                                                    onClick={() => !alreadyAdded && addReplacementProduct(product)}
+                                                                                                >
+                                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                                        <img
+                                                                                                            src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                                            alt={product.name}
+                                                                                                            className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                    <div className="flex-1 min-w-0">
+                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku || "Sem SKU"}</div>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                                            {formatCurrency(product.price || 0)}
+                                                                                                        </div>
+                                                                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                                                            {product.stock} em estoque
+                                                                                                        </div>
+                                                                                                    </div>
                                                                                                 </div>
-                                                                                                <div className="min-w-0 flex-1">
-                                                                                                    <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
-                                                                                                    <p className="truncate text-xs text-brand-inactive-text dark:text-dark-body">{product.sku || "Sem SKU"}</p>
-                                                                                                </div>
-                                                                                                <div className="text-right text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                                                                                    {formatCurrency(product.price || 0)}
-                                                                                                </div>
-                                                                                            </button>
-                                                                                        )
-                                                                                    })
-                                                                                ) : (
-                                                                                    <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
+                                                                                            )
+                                                                                        })
+                                                                                    ) : (
+                                                                                        <div className="p-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto encontrado.</div>
+                                                                                    )}
+                                                                                </motion.div>
+                                                                            )}
+                                                                        </AnimatePresence>
                                                                     </div>
 
                                                                     {replacementItems.length > 0 && (
@@ -1453,7 +1494,7 @@ export default function CreateReturnPage({
 
             {/* Mobile action bar */}
             <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
-                <Button variant="outline" onClick={onBack} className="flex-1" disabled={isSaving || isUploading}>
+                <Button variant="outline" onClick={() => handleNavigation(onBack)} className="flex-1" disabled={isSaving || isUploading}>
                     Cancelar
                 </Button>
                 {mode !== "view" && (
@@ -1483,6 +1524,13 @@ export default function CreateReturnPage({
                 onClose={() => completeSave(false)}
                 disabled={isSaving}
                 isLoading={isSaving}
+            />
+
+            <UnsavedChangesDialog
+                open={showConfirmDialog}
+                onConfirm={confirmNavigation}
+                onCancel={cancelNavigation}
+                description="Você tem alterações na devolução que ainda não foram salvas."
             />
         </FadeIn>
     )

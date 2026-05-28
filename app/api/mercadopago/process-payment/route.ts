@@ -107,10 +107,10 @@ async function handler(request: NextRequest) {
     let totalAmount = 0
     const validatedItems = []
 
-    if (isDev) console.log("[v0] Starting item validation for", items.length, "items")
+    if (isDev) console.log("Starting item validation for", items.length, "items")
 
     for (const item of items) {
-      if (isDev) console.log("[v0] Validating item:", item)
+      if (isDev) console.log("Validating item:", item)
 
       // Validar formato do ID
       if (!item.id || typeof item.id !== "string") {
@@ -130,7 +130,7 @@ async function handler(request: NextRequest) {
       let resolvedVariantId: string | null = null
 
       if (item.variant_id) {
-        if (isDev) console.log("[v0] Validating variant with ID:", item.variant_id)
+        if (isDev) console.log("Validating variant with ID:", item.variant_id)
         const { data: variant } = await adminClient
           .from("product_variants")
           .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price)")
@@ -138,7 +138,7 @@ async function handler(request: NextRequest) {
           .single()
 
         if (!variant) {
-          if (isDev) console.error("[v0] ERROR: Variant not found:", item.variant_id)
+          if (isDev) console.error("ERROR: Variant not found:", item.variant_id)
           return NextResponse.json({ error: `Variante ${item.variant_id} não encontrada` }, { status: 400 })
         }
 
@@ -197,10 +197,10 @@ async function handler(request: NextRequest) {
         quantity: item.quantity,
       })
 
-      if (isDev) console.log("[v0] Item validated:", { product_id: resolvedProductId, price: resolvedPrice, quantity: item.quantity })
+      if (isDev) console.log("Item validated:", { product_id: resolvedProductId, price: resolvedPrice, quantity: item.quantity })
     }
 
-    if (isDev) console.log("[v0] All items validated. Total amount:", totalAmount)
+    if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
     // DELIVERY FEE
     const deliveryFee = Number(body.deliveryFee || 0)
@@ -223,13 +223,13 @@ async function handler(request: NextRequest) {
         couponIdToSave = couponResult.couponId || null
         couponDiscountAmount = couponResult.discountAmount
         totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
-        if (isDev) console.log("[v0] Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
+        if (isDev) console.log("Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
       }
     }
 
     if (deliveryFee > 0) {
       totalAmount += deliveryFee
-      if (isDev) console.log("[v0] Delivery fee applied:", deliveryFee, "New total:", totalAmount)
+      if (isDev) console.log("Delivery fee applied:", deliveryFee, "New total:", totalAmount)
     }
 
     // SEGURANÃ‡A: Validar que o total é positivo e razoável
@@ -342,7 +342,7 @@ async function handler(request: NextRequest) {
       body: JSON.stringify(mpPaymentRequest),
     })
 
-    if (isDev) console.log("[v0] MP Response status:", mpResponse.status)
+    if (isDev) console.log("MP Response status:", mpResponse.status)
 
     if (!mpResponse.ok) {
       let mpErrorData: any = null
@@ -350,13 +350,13 @@ async function handler(request: NextRequest) {
 
       try {
         mpErrorText = await mpResponse.text()
-        if (isDev) console.log("[v0] MP Error response (raw text):", mpErrorText)
+        if (isDev) console.log("MP Error response (raw text):", mpErrorText)
 
         try {
           mpErrorData = JSON.parse(mpErrorText)
-          if (isDev) console.log("[v0] MP Error response (parsed JSON):", JSON.stringify(mpErrorData, null, 2))
+          if (isDev) console.log("MP Error response (parsed JSON):", JSON.stringify(mpErrorData, null, 2))
         } catch (parseErr) {
-          if (isDev) console.log("[v0] Could not parse error response as JSON")
+          if (isDev) console.log("Could not parse error response as JSON")
         }
       } catch (readErr) {
         SecureLogger.error("Failed to read MP error response", {})
@@ -432,7 +432,7 @@ async function handler(request: NextRequest) {
     }
 
     // CRIAR ORDER NO BANCO
-    if (isDev) console.log("[v0] Creating order with data:", {
+    if (isDev) console.log("Creating order with data:", {
       partner_id: partnerId,
       buyer_id: buyerId,
       delivery_type: deliveryType,
@@ -479,7 +479,7 @@ async function handler(request: NextRequest) {
       })
     }
 
-    if (isDev) console.log("[v0] Order created successfully:", newOrder.id)
+    if (isDev) console.log("Order created successfully:", newOrder.id)
 
     // INSERIR ORDER ITEMS - Preparar dados ANTES do log
     const itemsWithSubtotal = validatedItems.map(item => ({
@@ -539,7 +539,7 @@ async function handler(request: NextRequest) {
         // Increment partner's total sales count
         await adminClient.rpc('increment_partner_sales', { partner_uuid: partnerId })
       } catch (txErr: any) {
-        console.error("[v0] Erro ao criar transaction ou incrementar vendas:", txErr.message)
+        console.error("Erro ao criar transaction ou incrementar vendas:", txErr.message)
       }
     }
 
@@ -557,7 +557,7 @@ async function handler(request: NextRequest) {
       if (deleteError) {
         SecureLogger.warn("Cart deletion failed but continuing", {})
       } else {
-        if (isDev) console.log("[v0] Cart items removed successfully")
+        if (isDev) console.log("Cart items removed successfully")
       }
     }
 

@@ -1439,7 +1439,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             partnerId,
             orderId: order.id,
             createdBy: user.id,
-            reason: "Venda de Produto",
+            reason: "Venda de Produtos",
             notes: data.notes?.trim() || undefined,
             items: stockItems,
         })

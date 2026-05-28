@@ -138,7 +138,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                 <div>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
-                            Endereço de Entrega
+                            Endereço
                         </h3>
                     </div>
 
@@ -169,7 +169,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                     ) : (
                         <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Nenhum endereço de entrega cadastrado.
+                                Nenhum endereço cadastrado.
                             </p>
                         </div>
                     )}

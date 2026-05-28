@@ -796,9 +796,10 @@ export function PaymentMethodDialog({ open, onClose, partnerId, editingMethod }:
                     isOpen={showUnsavedModal}
                     onClose={() => setShowUnsavedModal(false)}
                     onConfirm={() => handleAttemptClose(true)}
-                    title="Descartar alterações?"
-                    description="Existem dados não salvos neste formulário. Se sair agora, você perderá o que preencheu."
+                    title="Sair sem salvar?"
+                    description="Você tem alterações no método de pagamento que ainda não foram salvas."
                     confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
             )}

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       })
 
     if (userProfileError) {
-      console.error("[v0] Error creating user_profile:", {
+      console.error("Error creating user_profile:", {
         code: userProfileError.code,
         message: userProfileError.message,
         details: userProfileError.details,
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     } else {
-      console.log("[v0] User profile created successfully")
+      console.log("User profile created successfully")
     }
 
     // Send welcome email via Unosend
@@ -71,13 +71,13 @@ export async function POST(request: NextRequest) {
         })
 
         if (!emailResult.success) {
-          console.warn("[v0] Failed to send welcome email:", emailResult.error)
+          console.warn("Failed to send welcome email:", emailResult.error)
           // Continue anyway, don't fail the profile creation
         } else {
-          console.log("[v0] Welcome email sent successfully:", emailResult.messageId)
+          console.log("Welcome email sent successfully:", emailResult.messageId)
         }
       } catch (emailError) {
-        console.error("[v0] Error sending welcome email:", emailError)
+        console.error("Error sending welcome email:", emailError)
         // Continue anyway, don't fail the profile creation
       }
     }
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error("[v0] Unexpected error in create-profile:", error)
+    console.error("Unexpected error in create-profile:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

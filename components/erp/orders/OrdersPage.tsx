@@ -768,7 +768,7 @@ export default function OrdersPage({
                                                 title="Você ainda não tem pedidos"
                                                 subtitle="Seus pedidos aparecerão aqui assim que seus clientes começarem a comprar."
                                                 itemButton={{
-                                                    text: "Adicionar Primeiro Pedido",
+                                                    text: "Adicionar primeiro pedido",
                                                     action: handleAddOrder,
                                                 }}
                                             />
@@ -785,7 +785,7 @@ export default function OrdersPage({
                                                 title="Nenhum pedido encontrado"
                                                 subtitle="Tente ajustar seus filtros ou termos de busca."
                                                 itemButton={{
-                                                    text: "Limpar Filtros",
+                                                    text: "Limpar filtros",
                                                     action: handleClearFilters,
                                                     variant: "outline"
                                                 }}

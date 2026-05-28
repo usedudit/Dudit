@@ -1443,9 +1443,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         setShowAlertModal(false)
                         onBack()
                     }}
-                    title="Descartar alterações?"
-                    description="Se você sair agora, todas as informações preenchidas serão perdidas. Tem certeza que deseja descartar?"
+                    title="Sair sem salvar?"
+                    description="Você tem alterações no pedido que ainda não foram salvas."
                     confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
 
@@ -1454,9 +1455,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         isOpen={showConfirmDialog}
                         onClose={cancelNavigation}
                         onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Se você sair agora, todas as informações preenchidas serão perdidas. Tem certeza que deseja descartar?"
+                        title="Sair sem salvar?"
+                        description="Você tem alterações no pedido que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}

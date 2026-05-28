@@ -927,9 +927,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         isOpen={unsavedChangesDialogOpen}
                         onClose={handleUnsavedChangesDialogClose}
                         onConfirm={handleUnsavedChangesConfirm}
-                        title="Descartar alterações?"
-                        description="Você tem alterações não salvas. Se sair agora, perderá todo o progresso."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações no produto que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}
@@ -958,9 +959,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                         isOpen
                         onClose={() => setShowAlertModal(false)}
                         onConfirm={confirmNavigation}
-                        title="Descartar alterações?"
-                        description="Você tem dados não salvos. Tem certeza que deseja sair?"
+                        title="Sair sem salvar?"
+                        description="Você tem alterações no produto que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}

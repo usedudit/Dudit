@@ -124,10 +124,10 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
                 title={title}
                 subtitle={description}
                 itemButton={type === "no-data" ? {
-                    text: "Adicionar Primeiro Serviço",
+                    text: "Adicionar primeiro serviço",
                     action: onAddFirst,
                 } : type === "no-results" ? {
-                    text: "Limpar Filtros",
+                    text: "Limpar filtros",
                     action: onClearFilters,
                     variant: "outline"
                 } : undefined}

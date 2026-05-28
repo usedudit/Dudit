@@ -910,7 +910,7 @@ export function ExplorarPageClient({
                                         }}
                                         className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-full text-xs font-bold flex items-center gap-1 transition-all duration-200 select-none cursor-pointer"
                                     >
-                                        <span>Limpar Filtros</span>
+                                        <span>Limpar filtros</span>
                                     </button>
                                 )}
                             </div>

@@ -444,7 +444,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                                 text: "Nova movimentação",
                                                 action: () => openEntity('create'),
                                             } : {
-                                                text: "Limpar Filtros",
+                                                text: "Limpar filtros",
                                                 action: handleClearFilters,
                                                 variant: "outline"
                                             }}

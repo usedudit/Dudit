@@ -268,7 +268,7 @@ export default function ReportsList({ initialData, initialStats, initialHasMore,
                                     title="Nenhuma denúncia encontrada"
                                     subtitle="Tente ajustar seus filtros ou termos de busca."
                                     itemButton={{
-                                        text: "Limpar Filtros",
+                                        text: "Limpar filtros",
                                         action: () => {
                                             setSearch("")
                                             setFilters(INITIAL_FILTERS)

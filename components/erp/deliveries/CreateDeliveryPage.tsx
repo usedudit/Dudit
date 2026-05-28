@@ -3,6 +3,8 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { toast } from "@/hooks/use-notification"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePickerBucket } from "@/components/erp/hooks"
@@ -115,7 +117,14 @@ export default function CreateDeliveryPage({
     const [isOrderSearchOpen, setIsOrderSearchOpen] = useState(false)
     const [planAccess, setPlanAccess] = useState<{ allowed: boolean; maxOrders: number; planSlug: string; message?: string | null } | null>(null)
 
-    const handleBack = useCallback(() => onBack(), [onBack])
+    const isDirty = useMemo(() => {
+        if (isSaving) return false
+        return selectedOrderIds.length > 0 || !!selectedDeliveryPersonId || !!date || !!time || !!notes
+    }, [selectedOrderIds, selectedDeliveryPersonId, date, time, notes, isSaving])
+
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+
+    const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
     const [isScrolled, setIsScrolled] = useState(false)
@@ -339,7 +348,7 @@ export default function CreateDeliveryPage({
                                                                     initial={{ opacity: 0, y: 5 }}
                                                                     animate={{ opacity: 1, y: 0 }}
                                                                     exit={{ opacity: 0, y: 5 }}
-                                                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-xl custom-scrollbar"
+                                                                    className="absolute z-[9999] top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl max-h-72 overflow-y-auto shadow-xl custom-scrollbar"
                                                                     onScroll={(e) => {
                                                                         const target = e.currentTarget
                                                                         if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -357,57 +366,55 @@ export default function CreateDeliveryPage({
                                                                             const isDisabled = (!isSelected && !canAddMore) || isAlreadyInActiveDelivery || isDelivered
 
                                                                             return (
-                                                                                <button
+                                                                                <div
                                                                                     key={order.id}
-                                                                                    type="button"
-                                                                                    disabled={isDisabled}
-                                                                                    className={`w-full border-b border-brand-border p-3 text-left transition-colors last:border-0 dark:border-dark-border ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50 dark:hover:bg-dark-border"}`}
+                                                                                    className={`flex items-center gap-4 p-3.5 border-b border-brand-border dark:border-dark-border last:border-0 transition-colors ${isDisabled ? "opacity-40 cursor-default" : "hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer"}`}
                                                                                     onClick={() => {
-                                                                                        toggleOrder(order.id)
-                                                                                        orderPicker.setSearchQuery(String(order.displayId || ""))
-                                                                                        setIsOrderSearchOpen(false)
+                                                                                        if (!isDisabled) {
+                                                                                            toggleOrder(order.id)
+                                                                                            orderPicker.setSearchQuery(String(order.displayId || ""))
+                                                                                            setIsOrderSearchOpen(false)
+                                                                                        }
                                                                                     }}
                                                                                 >
-                                                                                    <div className="flex items-center gap-3">
-                                                                                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border/40">
-                                                                                            <img
-                                                                                                src={getOrderPreviewImage(order)}
-                                                                                                alt={String(order.displayId || "")}
-                                                                                                className="h-full w-full object-cover"
-                                                                                            />
-                                                                                        </div>
+                                                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                                        <img
+                                                                                            src={getOrderPreviewImage(order)}
+                                                                                            alt={String(order.displayId || "")}
+                                                                                            className="h-full w-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                        />
+                                                                                    </div>
 
-                                                                                        <div className="min-w-0 flex-1">
-                                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                                {order.displayId}
-                                                                                            </div>
-                                                                                            <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                                {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
-                                                                                            </div>
+                                                                                    <div className="min-w-0 flex-1">
+                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {order.displayId}
                                                                                         </div>
-
-                                                                                        <div className="flex shrink-0 flex-col items-end gap-1">
-                                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                                {formatCurrency(order.totalAmount || 0)}
-                                                                                            </div>
-                                                                                            <div className="flex items-center gap-1">
-                                                                                                <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
-                                                                                                    {searchPaymentMeta.label}
-                                                                                                </Badge>
-                                                                                                <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
-                                                                                                    {searchDeliveryMeta.label}
-                                                                                                </Badge>
-                                                                                            </div>
-                                                                                            {isSelected ? (
-                                                                                                <span className="text-[11px] font-bold text-brand-green">Selecionado</span>
-                                                                                            ) : isAlreadyInActiveDelivery ? (
-                                                                                                <span className="text-[11px] font-bold text-brand-red">Já em entrega ativa</span>
-                                                                                            ) : isDelivered ? (
-                                                                                                <span className="text-[11px] font-bold text-brand-inactive-text">Já entregue</span>
-                                                                                            ) : null}
+                                                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">
+                                                                                            {order.customer?.name || "Cliente"} • {order.orderDate ? formatDate(order.orderDate) : "-"}
                                                                                         </div>
                                                                                     </div>
-                                                                                </button>
+
+                                                                                    <div className="flex shrink-0 flex-col items-end gap-1">
+                                                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                            {formatCurrency(order.totalAmount || 0)}
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                                {searchPaymentMeta.label}
+                                                                                            </Badge>
+                                                                                            <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                                {searchDeliveryMeta.label}
+                                                                                            </Badge>
+                                                                                        </div>
+                                                                                        {isSelected ? (
+                                                                                            <span className="text-[10px] font-bold text-brand-green uppercase">Selecionado</span>
+                                                                                        ) : isAlreadyInActiveDelivery ? (
+                                                                                            <span className="text-[10px] font-bold text-brand-red uppercase">Já em entrega ativa</span>
+                                                                                        ) : isDelivered ? (
+                                                                                            <span className="text-[10px] font-bold text-brand-inactive-text uppercase">Já entregue</span>
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                </div>
                                                                             )
                                                                         })
                                                                     ) : (
@@ -717,7 +724,7 @@ export default function CreateDeliveryPage({
                             </AnimatePresence>
                         </div>
 
-                        {/* Mobile Bottom Action Bar */}
+            {/* Mobile Bottom Action Bar */}
                         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                             <Button variant="outline" className="flex-1" onClick={handleBack} disabled={isSaving}>
                                 Cancelar
@@ -729,6 +736,13 @@ export default function CreateDeliveryPage({
                     </div>
                 </Tabs>
             </div>
+
+            <UnsavedChangesDialog
+                open={showConfirmDialog}
+                onConfirm={confirmNavigation}
+                onCancel={cancelNavigation}
+                description="Você tem alterações na entrega que ainda não foram salvas."
+            />
         </FadeIn >
     )
 }

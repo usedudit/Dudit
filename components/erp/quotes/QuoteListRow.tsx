@@ -22,6 +22,11 @@ interface QuoteListItemProps {
     onDelete: (quote: any) => void
     onDuplicate: (quote: any) => void
     onClick: (quote: any) => void
+    onPrint?: (quote: any) => void
+    onShare?: (quote: any) => void
+    onPrefetchMouseEnter?: React.MouseEventHandler<HTMLTableRowElement>
+    onPrefetchMouseLeave?: React.MouseEventHandler<HTMLTableRowElement>
+    onPrefetchTouchStart?: React.TouchEventHandler<HTMLTableRowElement>
 }
 
 const QuoteListItem = React.memo(
@@ -34,6 +39,9 @@ const QuoteListItem = React.memo(
         onDelete,
         onDuplicate,
         onClick,
+        onPrefetchMouseEnter,
+        onPrefetchMouseLeave,
+        onPrefetchTouchStart,
     }: QuoteListItemProps) => {
 
         const renderCellContent = (colId: string) => {
@@ -101,9 +109,10 @@ const QuoteListItem = React.memo(
                             onClick={(e) => e.stopPropagation()}
                         >
                             <ActionsDropdown
-                                onEdit={() => onEdit(quote)}
                                 onDuplicate={() => onDuplicate(quote)}
                                 onDelete={() => onDelete(quote)}
+                                onPrint={onPrint ? () => onPrint(quote) : undefined}
+                                onShare={onShare ? () => onShare(quote) : undefined}
                             />
                         </div>
                     )
@@ -131,6 +140,9 @@ const QuoteListItem = React.memo(
                 animate={{ opacity: 1 }}
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onClick(quote)}
+                onMouseEnter={onPrefetchMouseEnter}
+                onMouseLeave={onPrefetchMouseLeave}
+                onTouchStart={onPrefetchTouchStart}
             >
                 <td
                     className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"

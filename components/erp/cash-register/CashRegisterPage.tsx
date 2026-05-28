@@ -561,7 +561,7 @@ export default function CashRegisterPage({
                                                 text: "Abrir Caixa",
                                                 action: () => setOpenModal(true),
                                             } : {
-                                                text: "Limpar Filtros",
+                                                text: "Limpar filtros",
                                                 action: handleClearFilters,
                                                 variant: "outline",
                                             }}

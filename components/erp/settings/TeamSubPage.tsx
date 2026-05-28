@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
 import cn from "classnames"
-import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem } from "@/components/reusable"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton } from "@/components/reusable"
 import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
@@ -195,7 +195,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh - 65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
                     {/* Sticky Header */}
                     <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out ${isScrolled ? "py-2 md:py-3" : ""}`}>
@@ -209,13 +209,13 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                             </div>
 
                             {/* Title row */}
-                            <div className="flex items-center justify-between">
+                            <div className="hidden md:flex items-start justify-between">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                     <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="truncate">Equipe</span>
                                     </h1>
 
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                         Gerencie os membros da sua equipe e suas permissões de acesso.
                                     </div>
                                 </div>
@@ -223,14 +223,14 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                 {/* Primary Action - Desktop */}
                                 <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowInviteModal(true)}>
-                                        Convidar Membro
+                                        Convidar membro
                                     </Button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                         {isLoadingMembers ? (
                             <div className="flex justify-center p-12">
                                 <ThreeDotsLoader />
@@ -287,12 +287,14 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                                                 className="w-10 h-10 text-[14px]"
                                                                             />
                                                                             <div className="flex flex-col min-w-0">
-                                                                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                                                                    {member.fullName || "Usuário"}
-                                                                                    {member.userId === currentUserId && (
-                                                                                        <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">Você</Badge>
-                                                                                    )}
-                                                                                </span>
+                                                                                <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        {member.fullName || "Usuário"}
+                                                                                        {member.userId === currentUserId && (
+                                                                                            <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">Você</Badge>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
                                                                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                                                                     {member.email}
                                                                                 </span>
@@ -515,7 +517,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                         onClick={() => setShowInviteModal(true)}
                         className="flex-1 h-[48px] font-bold"
                     >
-                        Convidar Membro
+                        Convidar membro
                     </Button>
                 </div>
 
@@ -527,7 +529,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                         setInviteUrl(null)
                         setInviteError(null)
                     }}
-                    title="Convidar Membro"
+                    title="Convidar membro"
                 >
                     {!inviteUrl ? (
                         <form onSubmit={handleInvite} className="space-y-4">
@@ -546,20 +548,19 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                 <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Função</label>
                                 <div className="space-y-2">
                                     {allowedInviteRoles.map((role) => (
-                                        <button
-                                            key={role}
-                                            type="button"
+                                        <ListItem
+                                            title={ROLE_LABELS[role]}
+                                            description={ROLE_DESCRIPTIONS[role]}
                                             onClick={() => setInviteRole(role)}
-                                            className={cn(
-                                                "w-full p-3 rounded-xl border text-left transition-all",
-                                                inviteRole === role
-                                                    ? "border-brand-dark bg-brand-dark text-white ring-4 ring-brand-dark/10"
-                                                    : "border-brand-border dark:border-dark-border text-brand-inactive-text hover:border-brand-dark/30",
-                                            )}
-                                        >
-                                            <p className="font-bold text-sm">{ROLE_LABELS[role]}</p>
-                                            <p className="text-xs opacity-70 leading-tight">{ROLE_DESCRIPTIONS[role]}</p>
-                                        </button>
+                                            right={
+                                                <RadioButton
+                                                    name="inviteRole"
+                                                    value={role}
+                                                    checked={inviteRole === role}
+                                                    onChange={() => setInviteRole(role)}
+                                                />
+                                            }
+                                        />
                                     ))}
                                 </div>
                             </div>

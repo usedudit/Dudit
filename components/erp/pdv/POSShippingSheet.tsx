@@ -334,9 +334,10 @@ export default function POSShippingSheet({
           isOpen={showAlertModal}
           onClose={() => setShowAlertModal(false)}
           onConfirm={confirmCloseAddressSheet}
-          title="Descartar alterações?"
-          description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+          title="Sair sem salvar?"
+          description="Você tem alterações no endereço que ainda não foram salvas."
           confirmText="Sair sem salvar"
+          cancelText="Continuar editando"
           variant="warning"
         />
         {showConfirmDialog && (
@@ -344,9 +345,10 @@ export default function POSShippingSheet({
             isOpen={showConfirmDialog}
             onClose={cancelNavigation}
             onConfirm={confirmNavigation}
-            title="Descartar alterações?"
-            description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+            title="Sair sem salvar?"
+            description="Você tem alterações no endereço que ainda não foram salvas."
             confirmText="Sair sem salvar"
+            cancelText="Continuar editando"
             variant="warning"
           />
         )}
@@ -393,9 +395,10 @@ export default function POSShippingSheet({
         isOpen={showAlertModal}
         onClose={() => setShowAlertModal(false)}
         onConfirm={confirmCloseAddressSheet}
-        title="Descartar alterações?"
-        description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+        title="Sair sem salvar?"
+        description="Você tem alterações no endereço que ainda não foram salvas."
         confirmText="Sair sem salvar"
+        cancelText="Continuar editando"
         variant="warning"
       />
       {showConfirmDialog && (
@@ -403,9 +406,10 @@ export default function POSShippingSheet({
           isOpen={showConfirmDialog}
           onClose={cancelNavigation}
           onConfirm={confirmNavigation}
-          title="Descartar alterações?"
-          description="Você tem alterações não salvas. Se sair agora, elas serão perdidas."
+          title="Sair sem salvar?"
+          description="Você tem alterações no endereço que ainda não foram salvas."
           confirmText="Sair sem salvar"
+          cancelText="Continuar editando"
           variant="warning"
         />
       )}

@@ -202,7 +202,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 5 }}
-                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[60] max-h-60 overflow-y-auto custom-scrollbar"
+                                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
                                         onScroll={(e) => {
                                             const target = e.currentTarget
                                             if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
@@ -220,17 +220,20 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         addProductToOrder(product);
                                                         setIsProductSearchOpen(false);
                                                     }}
-                                                    className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0"
+                                                    className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
                                                 >
-                                                    <img src={getR2ImageUrl(product.image, "thumbnail")} className={`w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border ${!product.image ? 'object-contain' : 'object-cover'}`} />
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</div>
-                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                            SKU: {product.sku} • Estoque: {product.stock}
-                                                        </div>
+                                                    <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                        <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
                                                     </div>
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(product.price)}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                        <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                        <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                            {product.stock} em estoque
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))

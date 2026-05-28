@@ -168,10 +168,10 @@ const EmptyState = React.memo(({ type, onAddFirst, onClearFilters }: EmptyStateP
                 title={title}
                 subtitle={description}
                 itemButton={type === "no-data" ? {
-                    text: "Adicionar Primeiro Produto",
+                    text: "Adicionar primeiro produto",
                     action: onAddFirst,
                 } : type === "no-results" ? {
-                    text: "Limpar Filtros",
+                    text: "Limpar filtros",
                     action: onClearFilters,
                     variant: "outline"
                 } : undefined}
@@ -657,7 +657,7 @@ export default function ProductsPage({
         if (!cleanCode) return;
 
         // 1. Search locally in the loaded products
-        const localMatch = products.find(p => 
+        const localMatch = products.find(p =>
             (p.gtin && p.gtin.toLowerCase() === cleanCode.toLowerCase()) ||
             (p.sku && p.sku.toLowerCase() === cleanCode.toLowerCase())
         );

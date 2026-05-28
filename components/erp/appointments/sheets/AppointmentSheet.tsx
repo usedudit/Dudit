@@ -1303,12 +1303,11 @@ export const AppointmentSheet = ({
                 isOpen={isUnsavedModalOpen}
                 onClose={() => setIsUnsavedModalOpen(false)}
                 onConfirm={onClose}
-                title="Descartar alterações?"
-                message="Você tem alterações não salvas. Se sair agora, todas as alterações serão perdidas. Deseja continuar?"
+                title="Sair sem salvar?"
+                message="Você tem alterações no agendamento que ainda não foram salvas."
                 confirmText="Sair sem salvar"
                 cancelText="Continuar editando"
-                variant="danger"
-                isDestructive
+                variant="warning"
             />
             <AlertModal
                 isOpen={isDeleteModalOpen}

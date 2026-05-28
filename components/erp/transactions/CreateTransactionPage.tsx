@@ -1746,7 +1746,7 @@ export default function CreateTransactionPage({
                                         </Button>
                                         <Button onClick={handleSave} disabled={isSaving}>
                                             <SaveIcon className="w-4.5 h-4.5 mr-2" />
-                                            {isSaving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar Lançamento"}
+                                            {isSaving ? "Salvando..." : isEditMode ? "Salvar alterações" : "Salvar lançamento"}
                                         </Button>
                                     </div>
                                 </div>
@@ -1773,7 +1773,7 @@ export default function CreateTransactionPage({
                             </div>
                         </div>
 
-                        <div className="px-4 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <TabsContent value="general" className="mt-0">
                                 <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
@@ -1900,7 +1900,7 @@ export default function CreateTransactionPage({
                         </Button>
                         <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-[48px]">
                             <SaveIcon className="w-4 h-4 mr-2" />
-                            {isSaving ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar"}
+                            {isSaving ? "Salvando..." : isEditMode ? "Salvar alterações" : "Salvar lançamento"}
                         </Button>
                     </div>
                 </Tabs>
@@ -2142,9 +2142,10 @@ export default function CreateTransactionPage({
                         isOpen={unsavedChangesDialogOpen}
                         onClose={handleUnsavedChangesDialogClose}
                         onConfirm={handleUnsavedChangesConfirm}
-                        title="Descartar alterações?"
-                        description="Você tem dados não salvos. Se sair agora, eles serão perdidos."
+                        title="Sair sem salvar?"
+                        description="Você tem alterações na transação que ainda não foram salvas."
                         confirmText="Sair sem salvar"
+                        cancelText="Continuar editando"
                         variant="warning"
                     />
                 )}
@@ -2153,9 +2154,10 @@ export default function CreateTransactionPage({
                     isOpen={showDiscardModal}
                     onClose={() => setShowDiscardModal(false)}
                     onConfirm={confirmDiscard}
-                    title="Descartar alterações?"
-                    description="Você tem dados não salvos. Se sair agora, eles serão perdidos."
+                    title="Sair sem salvar?"
+                    description="Você tem alterações na transação que ainda não foram salvas."
                     confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
                     variant="warning"
                 />
 

@@ -9,7 +9,7 @@ import { useStore } from "@/lib/store-context"
 import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant, SelectionBanner } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
-import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction } from "@/app/actions/erp/quotes"
+import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction, getERPQuotesPageAction, getQuoteDetailsAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -42,9 +42,8 @@ import {
     ClockIcon
 } from "@/lib/icons"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
-import { useInfiniteList } from "@/hooks/use-infinite-list"
+import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { getERPQuotesPageAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 // --- TYPES & INTERFACES ---
@@ -109,21 +108,36 @@ export default function QuotesPage({
     const queryKey = useMemo(() => ["erp", "quotes", partnerId] as const, [partnerId])
     const observerTarget = useRef<HTMLDivElement>(null)
 
-    const {
-        items: loadedQuotes,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-    } = useInfiniteList<any, ERPQuoteListCursor>({
+    // ── Entity Page Hook (URL state + cache + infinite list) ──────────
+    const entityPage = useEntityPage<any, any, ERPQuoteListCursor>({
+        entityType: 'quotes',
+        partnerId,
         queryKey,
-        initialPage: { items: rawQuotes, nextCursor: initialNextCursor, hasMore: initialHasMore },
-        fetchFn: async ({ cursor }) => {
+        initialItems: rawQuotes,
+        initialNextCursor,
+        initialHasMore,
+        fetchPageFn: async ({ cursor }) => {
             const res = await getERPQuotesPageAction(partnerId, { cursor, limit: 100 })
             if (!res.success) throw new Error(res.error || "Erro ao carregar orçamentos.")
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((q: any) => String(q?.id || ""), []),
+        getDetailFn: async (id: string) => {
+            const res = await getQuoteDetailsAction(id, partnerId)
+            if (res.success && res.data) return res.data
+            return null
+        },
+        listToDetail: (item: any) => item,
     })
+
+    const {
+        items: loadedQuotes, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading: isQueryLoading,
+        entityState, openEntity, closeEntity, isViewing, isEditing, isCreating, isDuplicating,
+        currentEntity, isLoadingDetail,
+        cache, getPrefetchProps,
+        search, setSearch, debouncedSearch,
+        afterMutation,
+    } = entityPage
 
     // Local state for instant updates (optimistic delete etc.)
     const [currentQuotes, setCurrentQuotes] = useState<any[]>(loadedQuotes)
@@ -136,19 +150,23 @@ export default function QuotesPage({
     }, [loadedQuotes])
 
     useEffect(() => {
-        const handleReset = () => {
-            setWrapperMode(null)
-            setActiveQuote(null)
-        }
+        const handleReset = () => closeEntity()
         window.addEventListener('erp-sidebar-reset', handleReset)
         return () => window.removeEventListener('erp-sidebar-reset', handleReset)
-    }, [])
+    }, [closeEntity])
 
-    // State
-    const [wrapperMode, setWrapperMode] = useState<'create' | 'edit' | 'duplicate' | 'view' | null>(null)
-    const [activeQuote, setActiveQuote] = useState<any>(null)
-    const [search, setSearch] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
+    // Derived states from Entity Page
+    const wrapperMode = useMemo(() => {
+        if (!entityState.isOpen) return null
+        return entityState.action
+    }, [entityState])
+
+    const activeQuote = useMemo(() => {
+        if (!entityState.isOpen || !entityState.entityId) return null
+        if (currentEntity) return currentEntity
+        return currentQuotes.find((q: any) => q.id === entityState.entityId) || null
+    }, [entityState, currentEntity, currentQuotes])
+
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [page, setPage] = useState(1)
@@ -162,16 +180,11 @@ export default function QuotesPage({
     const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
     const [confirmations, setConfirmations] = useState({ bulkDelete: false })
 
-    const isLoading = storeLoading && rawQuotes === undefined
+    const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
-
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 300)
-        return () => clearTimeout(t)
-    }, [search])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -343,32 +356,43 @@ export default function QuotesPage({
 
     // Handlers
     const handleAddQuote = useCallback(() => {
-        setWrapperMode('create')
-        setActiveQuote(null)
-    }, [])
+        openEntity('create')
+    }, [openEntity])
 
     const handleViewQuote = useCallback((quote: any) => {
-        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
-        setActiveQuote(rawQuote)
-        setWrapperMode('view')
-    }, [currentQuotes])
+        openEntity('view', quote.originalId || quote.id)
+    }, [openEntity])
 
     const handleEditQuote = useCallback((quote: any) => {
-        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
-        setActiveQuote(rawQuote)
-        setWrapperMode('edit')
-    }, [currentQuotes])
+        openEntity('edit', quote.originalId || quote.id)
+    }, [openEntity])
 
     const handleDuplicateQuote = useCallback((quote: any) => {
-        const rawQuote = currentQuotes.find((q: any) => q.id === (quote.originalId || quote.id))
-        setActiveQuote(rawQuote)
-        setWrapperMode('duplicate')
-    }, [currentQuotes])
+        openEntity('duplicate', quote.originalId || quote.id)
+    }, [openEntity])
 
     const handleDeleteQuote = useCallback((quote: any) => {
         setQuoteToDelete(quote)
         setModals(prev => ({ ...prev, delete: true }))
     }, [])
+
+    const handlePrintQuote = useCallback((quote: any) => {
+        window.open(`/print/orcamento/${quote.originalId || quote.id}`, "_blank")
+    }, [])
+
+    const handleShareQuote = useCallback((quote: any) => {
+        const shareUrl = `${window.location.origin}/print/orcamento/${quote.originalId || quote.id}`;
+        if (navigator.share) {
+            navigator.share({
+                title: `Orçamento ${quote.quote_number || quote.displayId || quote.id}`,
+                text: `Confira a proposta comercial`,
+                url: shareUrl
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(shareUrl);
+            success("Link copiado", "Link do orçamento copiado para a área de transferência.");
+        }
+    }, [success])
 
     const handleConfirmDelete = async () => {
         if (!quoteToDelete) return
@@ -383,7 +407,7 @@ export default function QuotesPage({
             const res = await deleteQuoteAction(quoteToDelete.originalId)
             if (res.success) {
                 success("Orçamento excluído", "O orçamento foi removido com sucesso.")
-                debouncedRefresh()
+                afterMutation(quoteToDelete.originalId)
             } else {
                 // Revert
                 setCurrentQuotes(previousQuotes)
@@ -406,7 +430,7 @@ export default function QuotesPage({
             if (res.success) {
                 success("Status atualizado", `${selection.ids.size} ${selection.ids.size === 1 ? 'orçamento atualizado' : 'orçamentos atualizados'} para ${payload.status}.`)
                 setSelection({ ids: new Set() })
-                debouncedRefresh()
+                afterMutation()
             } else {
                 error("Erro", res.error || "Erro ao atualizar status em massa.")
             }
@@ -423,7 +447,7 @@ export default function QuotesPage({
                 success("Orçamentos excluídos", `${selection.ids.size} orçamentos removidos com sucesso.`)
                 setSelection({ ids: new Set() })
                 setConfirmations(prev => ({ ...prev, bulkDelete: false }))
-                debouncedRefresh()
+                afterMutation()
             } else {
                 error("Erro", res.error || "Erro ao excluir orçamentos em massa.")
             }
@@ -445,7 +469,7 @@ export default function QuotesPage({
         setSearch("")
         setFilters(INITIAL_FILTERS)
         setActiveTab("Todos")
-    }, [])
+    }, [setSearch])
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -459,28 +483,26 @@ export default function QuotesPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {wrapperMode === 'view' && activeQuote ? (
+                {isViewing && activeQuote ? (
                     <FadeIn key="view-quote" className="w-full h-full">
                         <QuoteDetail
                             partnerId={partnerId}
                             quoteId={activeQuote.id}
-                            onBack={() => {
-                                setWrapperMode(null)
-                                setActiveQuote(null)
-                            }}
+                            onBack={closeEntity}
                             onEditQuote={handleEditQuote}
+                            onDuplicateQuote={handleDuplicateQuote}
                             initialQuote={activeQuote}
                         />
                     </FadeIn>
-                ) : wrapperMode !== null ? (
+                ) : (isCreating || isEditing || isDuplicating) ? (
                     <FadeIn key="create-quote" className="w-full h-full">
                         <CreateQuote
                             partnerId={partnerId}
                             existingQuote={activeQuote}
-                            mode={wrapperMode}
+                            mode={isCreating ? 'create' : isEditing ? 'edit' : isDuplicating ? 'duplicate' : 'view'}
                             onBack={() => {
-                                setWrapperMode(null)
-                                setActiveQuote(null)
+                                afterMutation(entityState.entityId || undefined)
+                                closeEntity()
                             }}
                         />
                     </FadeIn>
@@ -559,7 +581,7 @@ export default function QuotesPage({
                                                 title="Você ainda não tem orçamentos"
                                                 subtitle="Seus orçamentos aparecerão aqui assim que você criá-los."
                                                 itemButton={{
-                                                    text: "Adicionar Primeiro Orçamento",
+                                                    text: "Adicionar primeiro orçamento",
                                                     action: handleAddQuote,
                                                 }}
                                             />
@@ -576,7 +598,7 @@ export default function QuotesPage({
                                                 title="Nenhum orçamento encontrado"
                                                 subtitle="Tente ajustar seus filtros ou termos de busca."
                                                 itemButton={{
-                                                    text: "Limpar Filtros",
+                                                    text: "Limpar filtros",
                                                     action: handleClearFilters,
                                                     variant: "outline"
                                                 }}
@@ -598,55 +620,67 @@ export default function QuotesPage({
                                                 />
                                                 {isTablet ? (
                                                     <div className="flex flex-col w-full">
-                                                        {paginated.map((q: Quote, idx) => (
-                                                            <React.Fragment key={q.originalId}>
-                                                                <div
-                                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                                    onClick={() => handleViewQuote(q)}
-                                                                >
-                                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                        <div className="flex justify-between items-start">
-                                                                            <div className="flex flex-col min-w-0 pr-1">
-                                                                                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                    {q.displayId}
-                                                                                </h3>
-                                                                                <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                                    {q.customer_name} • {q.formattedIssueDate}
-                                                                                </span>
+                                                        {paginated.map((q: Quote, idx) => {
+                                                            const prefetch = getPrefetchProps(q.originalId)
+                                                            return (
+                                                                <React.Fragment key={q.originalId}>
+                                                                    <div
+                                                                        className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
+                                                                        onClick={() => handleViewQuote(q)}
+                                                                        onTouchStart={prefetch.onTouchStart}
+                                                                    >
+                                                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                                                            <div className="flex justify-between items-start">
+                                                                                <div className="flex flex-col min-w-0 pr-1">
+                                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                        {q.displayId}
+                                                                                    </h3>
+                                                                                    <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                                                                                        {q.customer_name} • {q.formattedIssueDate}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <Badge variant={q.statusColor} icon={q.statusIcon ?? undefined} className="shrink-0 text-[10px] h-5 px-1.5">
+                                                                                    {q.statusLabel}
+                                                                                </Badge>
                                                                             </div>
-                                                                            <Badge variant={q.statusColor} icon={q.statusIcon ?? undefined} className="shrink-0 text-[10px] h-5 px-1.5">
-                                                                                {q.statusLabel}
-                                                                            </Badge>
-                                                                        </div>
-                                                                        <div className="flex justify-between items-center mt-1">
-                                                                            <span className="text-[14px] font-bold text-brand-primary">
-                                                                                {formatCurrency(q.total_amount)}
-                                                                            </span>
-                                                                            <div className="flex items-center gap-4">
-                                                                                <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
-                                                                                    <Checkbox checked={selection.ids.has(q.originalId)} />
+                                                                            <div className="flex justify-between items-center mt-1">
+                                                                                <span className="text-[14px] font-bold text-brand-primary">
+                                                                                    {formatCurrency(q.total_amount)}
+                                                                                </span>
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
+                                                                                        <Checkbox checked={selection.ids.has(q.originalId)} />
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            </React.Fragment>
-                                                        ))}
+                                                                </React.Fragment>
+                                                            )
+                                                        })}
                                                     </div>
                                                 ) : viewMode === "grid" ? (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                        {paginated.map((q: Quote) => (
-                                                            <QuoteGridCard
-                                                                key={q.originalId}
-                                                                quote={q}
-                                                                selected={selection.ids.has(q.originalId)}
-                                                                onSelect={() => handleSelectRow(q.originalId)}
-                                                                onEdit={() => handleEditQuote(q)}
-                                                                onDuplicate={() => handleDuplicateQuote(q)}
-                                                                onDelete={() => handleDeleteQuote(q)}
-                                                                onClick={() => handleViewQuote(q)}
-                                                            />
-                                                        ))}
+                                                        {paginated.map((q: Quote) => {
+                                                            const prefetch = getPrefetchProps(q.originalId)
+                                                            return (
+                                                                <QuoteGridCard
+                                                                    key={q.originalId}
+                                                                    quote={q}
+                                                                    selected={selection.ids.has(q.originalId)}
+                                                                    onSelect={() => handleSelectRow(q.originalId)}
+                                                                    onEdit={() => handleEditQuote(q)}
+                                                                    onDuplicate={() => handleDuplicateQuote(q)}
+                                                                    onDelete={() => handleDeleteQuote(q)}
+                                                                    onPrint={() => handlePrintQuote(q)}
+                                                                    onShare={() => handleShareQuote(q)}
+                                                                    onClick={() => handleViewQuote(q)}
+                                                                    onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                    onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                    onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                />
+                                                            )
+                                                        })}
                                                     </div>
                                                 ) : (
                                                     <div className="w-full overflow-hidden rounded-xl relative">
@@ -702,19 +736,27 @@ export default function QuotesPage({
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
-                                                                    {paginated.map((q: Quote) => (
-                                                                        <QuoteListItem
-                                                                            key={q.originalId}
-                                                                            quote={q}
-                                                                            columns={COLUMNS}
-                                                                            selected={selection.ids.has(q.originalId)}
-                                                                            onSelect={handleSelectRow}
-                                                                            onEdit={handleEditQuote}
-                                                                            onDuplicate={handleDuplicateQuote}
-                                                                            onDelete={handleDeleteQuote}
-                                                                            onClick={handleViewQuote}
-                                                                        />
-                                                                    ))}
+                                                                    {paginated.map((q: Quote) => {
+                                                                        const prefetch = getPrefetchProps(q.originalId)
+                                                                        return (
+                                                                            <QuoteListItem
+                                                                                key={q.originalId}
+                                                                                quote={q}
+                                                                                columns={COLUMNS}
+                                                                                selected={selection.ids.has(q.originalId)}
+                                                                                onSelect={handleSelectRow}
+                                                                                onEdit={handleEditQuote}
+                                                                                onDuplicate={handleDuplicateQuote}
+                                                                                onDelete={handleDeleteQuote}
+                                                                                onPrint={handlePrintQuote}
+                                                                                onShare={handleShareQuote}
+                                                                                onClick={handleViewQuote}
+                                                                                onPrefetchMouseEnter={prefetch.onMouseEnter}
+                                                                                onPrefetchMouseLeave={prefetch.onMouseLeave}
+                                                                                onPrefetchTouchStart={prefetch.onTouchStart}
+                                                                            />
+                                                                        )
+                                                                    })}
                                                                 </tbody>
                                                             </table>
                                                         </div>
