@@ -154,7 +154,7 @@ export function WhatsAppIntegrationPage({
         <div>
           <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading">WhatsApp Business</h1>
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-            Automação transacional e lembretes para {partnerId.slice(0, 8)}…
+            Automação transacional e lembretes com whatsapp
           </p>
         </div>
         {isConnected && connection?.isActive && (
