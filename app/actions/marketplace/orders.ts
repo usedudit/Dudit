@@ -2,7 +2,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { OrderSchema } from "@/lib/validation/schemas"
-import { requireUser, requireOrderAccess } from "@/lib/auth/authorization"
+import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
@@ -246,18 +246,18 @@ export async function createOrderAction(data: {
   const finalTotal = pricingResult.finalTotal
   couponDiscountAmount = pricingResult.couponDiscountAmount
 
-  const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name").eq("user_id", buyerId).single()
+  const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name, phone").eq("user_id", buyerId).single()
 
   const paymentIsMp = String(data.paymentMethod || "").toLowerCase().includes("mercado pago")
   let financeAccountId: string | null = null
-  
+
   let bestMethod: any = null
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.paymentMethod)
   if (isUuid && !paymentIsMp) {
     const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", data.paymentMethod).single()
     bestMethod = methodData
   }
-  
+
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || data.paymentMethod)
 
   if (!bestMethod && !paymentIsMp) {
@@ -330,6 +330,20 @@ export async function createOrderAction(data: {
     paymentMethodName = bestMethod.name
   } else {
     paymentMethodName = formatPaymentMethodLabel(data.paymentMethod)
+  }
+
+  // Ensure customer exists/is updated for this partner
+  try {
+    const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+    await ensureMarketplaceCustomer({
+      partnerId: data.partnerId,
+      name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
+      email: user.email,
+      phone: buyerProfile?.phone || null,
+      cpf: null
+    })
+  } catch (e) {
+    console.error("Error ensuring marketplace customer in createOrderAction:", e)
   }
 
   const orderData: any = {

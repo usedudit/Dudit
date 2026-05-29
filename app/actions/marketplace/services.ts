@@ -288,37 +288,15 @@ export async function createPublicAppointment(data: {
 
     const customerName = profile?.full_name || user.email?.split("@")[0] || "Cliente"
 
-    // Try to find existing customer by email
-    let customerId: string | null = null
-    const { data: existingCustomer } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("partner_id", data.partnerId)
-      .eq("email", user.email)
-      .eq("status", "ativo")
-      .maybeSingle()
-
-    if (existingCustomer) {
-      customerId = existingCustomer.id
-    } else {
-      // Create new customer for this partner
-      const { data: newCustomer, error: custError } = await supabase
-        .from("customers")
-        .insert({
-          partner_id: data.partnerId,
-          name: customerName,
-          email: user.email,
-          phone: profile?.phone || null,
-          status: "ativo",
-          source: "marketplace",
-        })
-        .select("id")
-        .single()
-
-      if (!custError && newCustomer) {
-        customerId = newCustomer.id
-      }
-    }
+    // Ensure customer exists/is updated for this partner
+    const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+    const customerId = await ensureMarketplaceCustomer({
+      partnerId: data.partnerId,
+      name: customerName,
+      email: user.email,
+      phone: profile?.phone || null,
+      cpf: null
+    })
 
     // Calculate end_time
     const [h, m] = data.time.split(":").map(Number)

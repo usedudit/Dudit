@@ -5,6 +5,49 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { logAuditEvent } from "./timeline.service"
 import { getActiveWhatsappConnection } from "./whatsapp-connection.service"
 
+/**
+ * Normalizes Quick Reply button text for matching.
+ * Meta Quick Reply buttons ("Resposta pré-configurada") return the button text
+ * selected by the user rather than custom payload IDs. This helper strips
+ * whitespace, lowercases, and removes diacritics so that "Confirmar",
+ * "confirmar", "CONFIRMAR" all map to "confirmar".
+ */
+function normalizeQuickReplyText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // strip diacritics
+    .replace(/[^\p{L}\p{N}\s]/gu, "") // strip emojis and special characters
+    .trim()
+}
+
+/**
+ * Resolves the user's intended action from a webhook button interaction.
+ *
+ * Priority:
+ *  1. Legacy payload ID (e.g. "confirm_appointment") — backward compatibility.
+ *  2. Normalized button text (e.g. "Confirmar" → "confirmar") — primary path
+ *     for Meta Quick Reply templates.
+ */
+function resolveAppointmentAction(
+  buttonId: string,
+  buttonTitle: string,
+): "confirm" | "cancel" | "talk" | null {
+  // 1. Legacy payload-based detection
+  if (buttonId === "confirm_appointment") return "confirm"
+  if (buttonId === "cancel_appointment") return "cancel"
+  if (buttonId === "talk_to_business") return "talk"
+
+  // 2. Normalized text matching (Meta Quick Reply buttons)
+  const normalized = normalizeQuickReplyText(buttonTitle)
+  if (normalized === "confirmar") return "confirm"
+  if (normalized === "cancelar") return "cancel"
+  if (normalized.includes("falar")) return "talk"
+
+  return null
+}
+
 export function verifyMetaWebhookSignature(rawBody: string, signature: string | null, appSecret: string): boolean {
   if (!signature || !appSecret) return false
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex")
@@ -68,6 +111,10 @@ export async function handleWhatsappWebhookPayload(body: Record<string, unknown>
     }
   }
 
+  // Process interactive messages (Quick Reply button responses).
+  // Meta Quick Reply buttons may return the button text (title) instead of a
+  // custom payload ID. We support both: payload ID for backward compatibility
+  // and normalized text matching as the primary detection method.
   const messages = (value.messages as unknown[]) || []
   for (const msg of messages) {
     const m = msg as Record<string, unknown>
@@ -75,9 +122,11 @@ export async function handleWhatsappWebhookPayload(body: Record<string, unknown>
     const interactive = m.interactive as Record<string, unknown>
     const buttonReply = interactive?.button_reply as Record<string, unknown> | undefined
     const buttonId = String(buttonReply?.id || "")
+    const buttonTitle = String(buttonReply?.title || "")
     const fromPhone = String(m.from || "")
 
-    if (!buttonId) continue
+    // Skip if neither payload ID nor button text is available
+    if (!buttonId && !buttonTitle) continue
 
     const contextMessageId = String((m.context as Record<string, unknown>)?.id || "")
     let appointmentId: string | null = null
@@ -107,7 +156,10 @@ export async function handleWhatsappWebhookPayload(body: Record<string, unknown>
 
     if (!appointmentId) continue
 
-    if (buttonId === "confirm_appointment") {
+    // Resolve action from payload ID or button text (Meta Quick Reply)
+    const action = resolveAppointmentAction(buttonId, buttonTitle)
+
+    if (action === "confirm") {
       await admin
         .from("appointments")
         .update({ status: "Confirmado", updated_at: new Date().toISOString() })
@@ -123,7 +175,7 @@ export async function handleWhatsappWebhookPayload(body: Record<string, unknown>
         changeLines: ["Cliente confirmou agendamento via WhatsApp"],
         source: "webhook",
       })
-    } else if (buttonId === "cancel_appointment") {
+    } else if (action === "cancel") {
       await admin
         .from("appointments")
         .update({ status: "Cancelado", updated_at: new Date().toISOString() })
@@ -140,7 +192,7 @@ export async function handleWhatsappWebhookPayload(body: Record<string, unknown>
         source: "webhook",
       })
     }
-    // talk_to_business: no status change — customer opens normal WhatsApp chat
+    // "talk" / talk_to_business: no status change — customer opens normal WhatsApp chat
   }
 }
 

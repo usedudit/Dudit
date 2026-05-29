@@ -241,7 +241,7 @@ async function handler(request: NextRequest) {
     // Buscar dados do usuário para pegar o nome completo
     const { data: userProfile } = await supabase
       .from("user_profiles")
-      .select("full_name")
+      .select("full_name, phone")
       .eq("user_id", buyerId)
       .single()
 
@@ -429,6 +429,26 @@ async function handler(request: NextRequest) {
       paymentMethodDisplayName = "Boleto"
     } else {
       paymentMethodDisplayName = "Crédito"
+    }
+
+    // Ensure customer exists/is updated for this partner
+    let payerCpf: string | null = null
+    const idenType = String(paymentFormData.payer?.identification?.type || "").toUpperCase()
+    if (idenType === "CPF") {
+      payerCpf = paymentFormData.payer?.identification?.number || null
+    }
+
+    try {
+      const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+      await ensureMarketplaceCustomer({
+        partnerId: partnerId,
+        name: customerName,
+        email: user.email,
+        phone: userProfile?.phone || null,
+        cpf: payerCpf
+      })
+    } catch (e) {
+      console.error("Error ensuring marketplace customer in process-payment route:", e)
     }
 
     // CRIAR ORDER NO BANCO

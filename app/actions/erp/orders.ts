@@ -1550,8 +1550,41 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 .from("customers")
                 .select("id, name, email, phone, addresses(*)")
                 .eq("id", data.buyer_id)
-                .single()
+                .maybeSingle()
             customers = customerData
+
+            if (!customers) {
+                try {
+                    const { data: authUserRes } = await supabase.auth.admin.getUser(data.buyer_id)
+                    const user = authUserRes?.user
+                    if (user) {
+                        const email = user.email
+                        const phone = user.phone
+                        
+                        if (email || phone) {
+                            let query = supabase
+                                .from("customers")
+                                .select("id, name, email, phone, addresses(*)")
+                                .eq("partner_id", partnerId)
+                            
+                            if (email && phone) {
+                                query = query.or(`email.eq.${email},phone.eq.${phone}`)
+                            } else if (email) {
+                                query = query.eq("email", email)
+                            } else if (phone) {
+                                query = query.eq("phone", phone)
+                            }
+
+                            const { data: matchedCustomers } = await query.limit(1)
+                            if (matchedCustomers && matchedCustomers.length > 0) {
+                                customers = matchedCustomers[0]
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error looking up customer for marketplace order:", err)
+                }
+            }
         }
 
         let sellerName: string | null = null

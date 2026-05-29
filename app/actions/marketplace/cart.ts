@@ -591,7 +591,7 @@ export async function checkoutCartAction(
 
   const { data: buyerProfile } = await supabase
     .from("user_profiles")
-    .select("full_name")
+    .select("full_name, phone")
     .eq("user_id", user.id)
     .single()
 
@@ -873,6 +873,20 @@ export async function checkoutCartAction(
     paymentMethodName = bestMethod.name
   } else {
     paymentMethodName = formatPaymentMethodLabel(paymentMethod)
+  }
+
+  // Ensure customer exists/is updated for this partner
+  try {
+    const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+    await ensureMarketplaceCustomer({
+      partnerId,
+      name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
+      email: user.email,
+      phone: buyerProfile?.phone || null,
+      cpf: null
+    })
+  } catch (e) {
+    console.error("Error ensuring marketplace customer in checkoutCartAction:", e)
   }
 
   const { data: order, error: orderError } = await supabase
