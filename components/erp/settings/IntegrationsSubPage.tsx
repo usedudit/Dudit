@@ -6,6 +6,12 @@ import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/re
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
+import {
+    getWhatsappIntegrationAction,
+    connectWhatsappAction,
+    disconnectWhatsappAction,
+    type WhatsappConnectionView,
+} from "@/app/actions/whatsapp"
 import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
@@ -73,8 +79,97 @@ export const IntegrationsSubPage = ({
     const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
 
+    // WhatsApp integration state
+    const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
+    const [waIsLoading, setWaIsLoading] = useState(false)
+    const [waActiveModal, setWaActiveModal] = useState<"info" | "knowMore" | "connect" | null>(null)
+    const [waKnowMoreStep, setWaKnowMoreStep] = useState(0)
+
+    // WhatsApp form state
+    const [accessToken, setAccessToken] = useState("")
+    const [phoneNumberId, setPhoneNumberId] = useState("")
+    const [businessAccountId, setBusinessAccountId] = useState("")
+    const [phoneNumber, setPhoneNumber] = useState("")
+    const [provider] = useState<"meta">("meta")
+
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const fetchWaStatus = useCallback(async () => {
+        try {
+            const res = await getWhatsappIntegrationAction()
+            if (res.success && res.data) {
+                setWaConnection(res.data.connection)
+            }
+        } catch (err) {
+            console.error("Error fetching WA status:", err)
+        }
+    }, [])
+
+    const handleWaConnectClick = () => {
+        if (!hasMinimumPlan(planSlug, "crescer")) {
+            openPlanUpgrade("crescer")
+            return
+        }
+        setWaActiveModal("info")
+    }
+
+    const handleConnectWa = async () => {
+        if (!accessToken.trim() || !phoneNumberId.trim()) {
+            toast.error("Token e Phone Number ID são obrigatórios")
+            return
+        }
+        setWaIsLoading(true)
+        try {
+            const res = await connectWhatsappAction({
+                provider,
+                accessToken,
+                phoneNumberId,
+                businessAccountId: businessAccountId || undefined,
+                phoneNumber: phoneNumber || undefined,
+            })
+            if (!res.success) {
+                toast.error(res.error || "Erro ao conectar")
+                return
+            }
+            toast.success("WhatsApp conectado com sucesso")
+            setAccessToken("")
+            setPhoneNumberId("")
+            setBusinessAccountId("")
+            setPhoneNumber("")
+            setWaActiveModal(null)
+            await fetchWaStatus()
+        } catch (err) {
+            toast.error("Erro inesperado ao conectar")
+        } finally {
+            setWaIsLoading(false)
+        }
+    }
+
+    const handleDisconnectWa = async () => {
+        if (
+            !confirm(
+                "Tem certeza que deseja desconectar o WhatsApp? Suas mensagens automáticas deixarão de ser enviadas.",
+            )
+        ) {
+            return
+        }
+
+        setWaIsLoading(true)
+        try {
+            const result = await disconnectWhatsappAction(provider)
+            if (!result.success) {
+                toast.error(`Erro: ${result.error}`)
+            } else {
+                toast.success("WhatsApp desconectado com sucesso")
+                await fetchWaStatus()
+            }
+        } catch (err) {
+            toast.error("Erro inesperado ao desconectar")
+        } finally {
+            setWaIsLoading(false)
+        }
+    }
 
     const handleBack = useCallback(() => onBack(), [onBack])
 
@@ -97,7 +192,8 @@ export const IntegrationsSubPage = ({
 
     useEffect(() => {
         checkPlan()
-    }, [checkPlan])
+        fetchWaStatus()
+    }, [checkPlan, fetchWaStatus])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -278,30 +374,68 @@ export const IntegrationsSubPage = ({
 
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Mensagens</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
                                 <div>
                                     <div className="flex gap-4 items-start">
                                         <div className="w-12 h-12 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-lg shrink-0">
                                             WA
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
-                                                WhatsApp Business
-                                            </span>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                                Lembretes, confirmações e atualizações operacionais
-                                            </p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                    WhatsApp Business
+                                                </span>
+                                                {waConnection?.hasToken && waConnection?.status === "connected" ? (
+                                                    <Badge variant="green">Conectado</Badge>
+                                                ) : (
+                                                    <Badge variant="gray">Desconectado</Badge>
+                                                )}
+                                            </div>
+                                            {waConnection?.phoneNumber ? (
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
+                                                    {waConnection.phoneNumber}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
+                                                    Meta Cloud API
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
                                         Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos.
                                     </p>
                                 </div>
                                 <div className="mt-4">
                                     <hr className="my-4 border-brand-border dark:border-dark-border" />
-                                    <Link href="/erp/integrations/whatsapp">
-                                        <Button className="w-full">Configurar WhatsApp</Button>
-                                    </Link>
+                                    <div className="flex items-center justify-end gap-3">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setWaKnowMoreStep(0)
+                                                setWaActiveModal("knowMore")
+                                            }}
+                                        >
+                                            Saber mais
+                                        </Button>
+                                        <Link href="/erp/integrations/whatsapp">
+                                            <Button variant="outline">
+                                                Configurar
+                                            </Button>
+                                        </Link>
+                                        <Switch
+                                            checked={!!(waConnection?.hasToken && waConnection?.status === "connected")}
+                                            onCheckedChange={(checked) => {
+                                                if (waIsLoading || isCheckingPlan) return
+                                                if (checked) {
+                                                    handleWaConnectClick()
+                                                } else {
+                                                    handleDisconnectWa()
+                                                }
+                                            }}
+                                            className={waIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -309,6 +443,262 @@ export const IntegrationsSubPage = ({
                 </div>
 
                 {/* ─── Modals ───────────────────────────────────────────────────────── */}
+
+                {/* ─── WhatsApp Modals ────────────────────────────────────────────────── */}
+
+                {/* 1. WhatsApp Connection Info Modal */}
+                <DefaultModal
+                    isOpen={waActiveModal === "info"}
+                    onClose={() => setWaActiveModal(null)}
+                    title="Conectar ao WhatsApp Business"
+                    maxWidth="md"
+                >
+                    <div className="flex flex-col">
+                        {/* Header with Icons */}
+                        <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+                            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3">
+                                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-full h-full object-contain" />
+                            </div>
+
+                            <div className="flex flex-col items-center gap-1">
+                                <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                                    <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                                </div>
+                            </div>
+
+                            <div className="w-20 h-20 bg-[#25D366] rounded-2xl flex items-center justify-center text-white font-bold text-3xl transform transition-transform group-hover:rotate-3">
+                                WA
+                            </div>
+                        </div>
+
+                        <div className="px-2 text-center md:text-left">
+                            <p className="text-[15px] text-brand-inactive-text dark:text-dark-body mb-2 leading-relaxed">
+                                Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos direto para o WhatsApp do cliente.
+                            </p>
+
+                            <Button
+                                variant="link"
+                                onClick={() => {
+                                    setWaKnowMoreStep(0)
+                                    setWaActiveModal("knowMore")
+                                }}
+                                className="flex items-center gap-2 mb-4 px-0"
+                            >
+                                <InfoIcon size={14} />
+                                Saber mais sobre essa integração
+                            </Button>
+
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setWaActiveModal(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button className="flex-1 h-[46px]" onClick={() => setWaActiveModal("connect")}>
+                                    Conectar agora
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </DefaultModal>
+
+                {/* 2. WhatsApp Connection Modal */}
+                <DefaultModal
+                    isOpen={waActiveModal === "connect"}
+                    onClose={() => setWaActiveModal(null)}
+                    title="Configurações do WhatsApp Business"
+                    maxWidth="md"
+                >
+                    <div className="flex flex-col gap-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            Insira suas credenciais da API oficial do WhatsApp Cloud (Meta).
+                        </p>
+
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    Token de acesso permanente
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Token de acesso permanente"
+                                    value={accessToken}
+                                    onChange={(e) => setAccessToken(e.target.value)}
+                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    Phone Number ID
+                                </label>
+                                <input
+                                    placeholder="Phone Number ID"
+                                    value={phoneNumberId}
+                                    onChange={(e) => setPhoneNumberId(e.target.value)}
+                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    Business Account ID (opcional)
+                                </label>
+                                <input
+                                    placeholder="Business Account ID"
+                                    value={businessAccountId}
+                                    onChange={(e) => setBusinessAccountId(e.target.value)}
+                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                    Número exibido (opcional)
+                                </label>
+                                <input
+                                    placeholder="Ex: 5511999999999"
+                                    value={phoneNumber}
+                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row gap-3 mt-4">
+                            <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setWaActiveModal("info")}>
+                                Voltar
+                            </Button>
+                            <Button
+                                className="flex-1 h-[46px]"
+                                onClick={handleConnectWa}
+                                isLoading={waIsLoading}
+                            >
+                                Conectar
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+
+                {/* 3. WhatsApp Know More Modal */}
+                <DefaultModal
+                    isOpen={waActiveModal === "knowMore"}
+                    onClose={() => setWaActiveModal("info")}
+                    title="O que é o WhatsApp Business API?"
+                    maxWidth="lg"
+                >
+                    <div className="flex flex-col min-h-[400px]">
+                        <div className="bg-[#25D366]/10 dark:bg-[#25D366]/5 rounded-2xl py-12 flex items-center justify-center relative group">
+                            <div className="w-16 h-16 bg-[#25D366] rounded-2xl flex items-center justify-center text-white font-bold text-2xl">
+                                WA
+                            </div>
+                        </div>
+
+                        <div className="p-8 flex-1 flex flex-col">
+                            <div className="mb-8">
+                                <div className="flex gap-2">
+                                    {[0, 1, 2].map((_, i) => (
+                                        <motion.div
+                                            key={i}
+                                            layout
+                                            className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= waKnowMoreStep ? "bg-brand-green" : "bg-brand-gray dark:bg-dark-border"
+                                                }`}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={waKnowMoreStep}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="flex-1"
+                                >
+                                    {waKnowMoreStep === 0 && (
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                                O que é a integração do WhatsApp?
+                                            </h3>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                Envie lembretes de agendamentos, confirmações de pedidos, atualizações de logística e orçamentos automaticamente para seus clientes pelo WhatsApp.
+                                            </p>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed mt-4">
+                                                Com isso, você melhora a comunicação com seu cliente, reduz o no-show em agendamentos e aumenta a conversão de vendas.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {waKnowMoreStep === 1 && (
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                                Como funciona?
+                                            </h3>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                Usamos a API oficial da nuvem do WhatsApp (Meta Cloud API). As mensagens são enviadas de forma instantânea e segura, direto do número oficial do seu negócio.
+                                            </p>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed mt-4">
+                                                Toda a infraestrutura é escalável e gerenciada diretamente pelo provedor oficial, sem riscos de bloqueio por spam de envios manuais.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {waKnowMoreStep === 2 && (
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-4 leading-tight">
+                                                Como configurar?
+                                            </h3>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                                Você precisará de uma conta de desenvolvedor da Meta, um gerenciador de negócios verificado e obter as seguintes credenciais:
+                                            </p>
+                                            <ul className="space-y-4 mt-6">
+                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
+                                                    <strong>Token de acesso permanente:</strong> Permite que nossa plataforma envie mensagens em seu nome.
+                                                </li>
+                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
+                                                    <strong>Phone Number ID:</strong> Identificador exclusivo do número do seu WhatsApp Cloud API.
+                                                </li>
+                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
+                                                    <strong>Business Account ID:</strong> ID do gerenciador de negócios associado à sua conta WhatsApp.
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+
+                            <div className="flex flex-col md:flex-row gap-3 mt-8">
+                                <Button
+                                    variant="outline"
+                                    disabled={waKnowMoreStep === 0}
+                                    onClick={() => setWaKnowMoreStep(prev => prev - 1)}
+                                    className="flex-1 h-[46px]"
+                                >
+                                    Anterior
+                                </Button>
+
+                                {waKnowMoreStep === 2 ? (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => setWaActiveModal("info")}
+                                    >
+                                        Entendido
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => setWaKnowMoreStep(prev => prev + 1)}
+                                    >
+                                        Próximo
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </DefaultModal>
 
                 {/* 1. Connection Info Modal */}
                 <DefaultModal
