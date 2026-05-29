@@ -63,7 +63,7 @@ export async function upsertWhatsappConnection(params: {
       .eq("id", existing.id)
       .select("*")
       .single()
-    if (error) throw error
+    if (error) throw new Error(`Supabase update failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
     return data as PartnerWhatsappConnection
   }
 
@@ -72,7 +72,7 @@ export async function upsertWhatsappConnection(params: {
     .insert(row)
     .select("*")
     .single()
-  if (error) throw error
+  if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
   return data as PartnerWhatsappConnection
 }
 

@@ -96,7 +96,7 @@ export async function queueWhatsappMessage(input: QueueMessageInput): Promise<{ 
     .select("id")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error(`Supabase insert failed: ${error.message} (code: ${error.code}, details: ${error.details || "none"})`)
   return { messageId: inserted?.id || null, skipped: false }
 }
 

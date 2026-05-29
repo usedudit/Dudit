@@ -20,6 +20,20 @@ import type { ActionResponse } from "@/lib/types/action-response"
 import type { PartnerWhatsappConnection, WhatsappProviderId } from "@/lib/whatsapp/types"
 import { revalidatePath } from "next/cache"
 
+/** Extract a human-readable message from any thrown value (Error, Supabase PostgrestError, plain object, string). */
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    // Supabase PostgrestError has { message, code, details, hint }
+    const obj = error as Record<string, unknown>
+    if (typeof obj.message === "string") return obj.message
+    if (typeof obj.error === "string") return obj.error
+    try { return JSON.stringify(error) } catch { return "Erro desconhecido (objeto)" }
+  }
+  return "Erro desconhecido"
+}
+
 type WhatsappMessageRow = {
   id: string
   phone_number: string
@@ -123,8 +137,9 @@ export async function getWhatsappIntegrationAction(): Promise<
       },
     }
   } catch (error: unknown) {
-    console.error("[WhatsApp] getWhatsappIntegrationAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao carregar integração" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] getWhatsappIntegrationAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
 
@@ -165,11 +180,9 @@ export async function connectWhatsappAction(input: {
       },
     }
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    const errStack = error instanceof Error ? error.stack : undefined
-    console.error("[WhatsApp] connectWhatsappAction error:", errMsg)
-    if (errStack) console.error("[WhatsApp] connectWhatsappAction stack:", errStack)
-    return { success: false, error: `Erro ao conectar WhatsApp: ${errMsg}` }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] connectWhatsappAction error:", msg, error)
+    return { success: false, error: `Erro ao conectar WhatsApp: ${msg}` }
   }
 }
 
@@ -184,8 +197,9 @@ export async function disconnectWhatsappAction(
     revalidatePath("/erp/integrations/whatsapp")
     return { success: true, data: undefined }
   } catch (error: unknown) {
-    console.error("[WhatsApp] disconnectWhatsappAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao desconectar" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] disconnectWhatsappAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
 
@@ -201,8 +215,9 @@ export async function toggleWhatsappActiveAction(
     revalidatePath("/erp/integrations/whatsapp")
     return { success: true, data: undefined }
   } catch (error: unknown) {
-    console.error("[WhatsApp] toggleWhatsappActiveAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar status" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] toggleWhatsappActiveAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
 
@@ -235,8 +250,9 @@ export async function sendWhatsappTestMessageAction(phone: string): Promise<Acti
     revalidatePath("/erp/integrations/whatsapp")
     return { success: true, data: { messageId: result.messageId } }
   } catch (error: unknown) {
-    console.error("[WhatsApp] sendWhatsappTestMessageAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao enviar teste" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] sendWhatsappTestMessageAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
 
@@ -272,8 +288,9 @@ export async function resendWhatsappMessageAction(messageId: string): Promise<Ac
     revalidatePath("/erp/integrations/whatsapp")
     return { success: true, data: undefined }
   } catch (error: unknown) {
-    console.error("[WhatsApp] resendWhatsappMessageAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao reenviar" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] resendWhatsappMessageAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
 
@@ -298,7 +315,8 @@ export async function dispatchWhatsappAutomationAction(params: {
 
     return { success: true, data: undefined }
   } catch (error: unknown) {
-    console.error("[WhatsApp] dispatchWhatsappAutomationAction error:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Erro ao disparar automação" }
+    const msg = extractErrorMessage(error)
+    console.error("[WhatsApp] dispatchWhatsappAutomationAction error:", msg, error)
+    return { success: false, error: msg }
   }
 }
