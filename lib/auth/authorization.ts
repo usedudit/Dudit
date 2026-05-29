@@ -647,6 +647,7 @@ function specificPermissionToPermissionKey(specificPermission: string): string |
     case "can_add_delivery": return "pdv.can_add_delivery"
     case "can_view_delivery_details": return "delivery.view"
     case "can_update_delivery_status": return "delivery.update_status"
+    case "can_manage_integrations": return "settings.settings_integrations"
     default: return null
   }
 }

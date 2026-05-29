@@ -107,8 +107,8 @@ export const IntegrationsSubPage = ({
     }, [])
 
     const handleWaConnectClick = () => {
-        if (!hasMinimumPlan(planSlug, "crescer")) {
-            openPlanUpgrade("crescer")
+        if (!hasMinimumPlan(planSlug, "escalar")) {
+            openPlanUpgrade("escalar")
             return
         }
         setWaActiveModal("info")
@@ -403,7 +403,7 @@ export const IntegrationsSubPage = ({
                                         </div>
                                     </div>
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
-                                        Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos.
+                                        Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos e entregas.
                                     </p>
                                 </div>
                                 <div className="mt-4">

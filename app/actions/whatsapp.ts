@@ -2,7 +2,7 @@
 
 import { randomBytes } from "crypto"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
-import { requireUser, requirePartnerRouteAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerRouteAccess, requireMinimumPlan } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import {
@@ -61,6 +61,7 @@ async function requireIntegrationsAccess(partnerId: string) {
   await requirePartnerRouteAccess(partnerId, "settings_integrations", {
     specificPermission: "can_manage_integrations",
   })
+  await requireMinimumPlan(partnerId, "escalar")
   return user
 }
 
