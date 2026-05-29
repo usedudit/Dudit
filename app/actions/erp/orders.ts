@@ -2143,6 +2143,17 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)
+
+    import("@/lib/services/whatsapp-automation.service")
+        .then(({ onOrderStatusChanged }) =>
+            onOrderStatusChanged(
+                { ...currentOrder, partner_id: data.partnerId, id: orderId },
+                paymentState.situation !== currentOrder.situation ? paymentState.situation : undefined,
+                data.deliveryStatus !== currentOrder.delivery_status ? data.deliveryStatus : undefined,
+            ),
+        )
+        .catch(console.error)
+
     return { success: true }
 }
 
@@ -2737,6 +2748,30 @@ export async function updateOrdersStatusInBatchAction(payload: {
         (currentOrders || []).flatMap((order: any) => order.order_items || [])
     )
     await revalidateOrders(payload.partnerId)
+
+    import("@/lib/services/whatsapp-automation.service")
+        .then(({ onOrderStatusChanged }) => {
+            for (const order of currentOrders || []) {
+                if (payload.actionType === "payment_status" && payload.statusValue) {
+                    const paymentStatusMap: Record<string, string> = {
+                        paid: "paid",
+                        pending: "pending",
+                        partially_paid: "partially_paid",
+                    }
+                    const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
+                    onOrderStatusChanged({ ...order, partner_id: payload.partnerId }, situation).catch(console.error)
+                }
+                if (payload.actionType === "delivery_status" && payload.statusValue) {
+                    onOrderStatusChanged(
+                        { ...order, partner_id: payload.partnerId },
+                        undefined,
+                        payload.statusValue,
+                    ).catch(console.error)
+                }
+            }
+        })
+        .catch(() => {})
+
     if (overallWarnings.length > 0) {
         return { success: true, warning: overallWarnings.join(" | ") }
     }

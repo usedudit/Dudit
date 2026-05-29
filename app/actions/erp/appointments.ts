@@ -577,6 +577,14 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
+    import("@/lib/services/whatsapp-automation.service")
+      .then(({ onAppointmentCreated }) => {
+        for (const row of createdRows) {
+          onAppointmentCreated(row).catch(console.error)
+        }
+      })
+      .catch(() => {})
+
     return { success: true, created: data || [] }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao criar agendamento", created: [] }
@@ -707,7 +715,14 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
-    return { success: true, item: syncedAppointment || updated }
+    const finalRow = syncedAppointment || updated
+    import("@/lib/services/whatsapp-automation.service")
+      .then(({ onAppointmentStatusChanged }) =>
+        onAppointmentStatusChanged(finalRow, String(current.status), String(normalizedStatus)),
+      )
+      .catch(console.error)
+
+    return { success: true, item: finalRow }
   } catch (error: any) {
     return { success: false, error: error?.message || "Erro ao atualizar agendamento" }
   }

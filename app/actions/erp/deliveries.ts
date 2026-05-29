@@ -1419,6 +1419,15 @@ export async function updateERPDeliveryStatusAction(params: {
     metadata: { oldStatus: String(currentDelivery.status || ""), newStatus: nextStatus },
   })
 
+  import("@/lib/services/whatsapp-automation.service")
+    .then(({ onDeliveryStatusChanged }) =>
+      onDeliveryStatusChanged(
+        { partner_id: params.partnerId, id: params.deliveryId, delivery_id: params.deliveryId },
+        nextStatus,
+      ),
+    )
+    .catch(console.error)
+
   if (params.status === "delivered" && currentDelivery.delivery_person_id) {
     const { data: deliveryOrders } = await supabase
       .from("delivery_orders")

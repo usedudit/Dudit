@@ -55,6 +55,7 @@ const SUPPORTED_VERSIONS: readonly KeyVersion[] = ["v1", "v2"] as const
 const CONTEXT_INFO = {
   cpf: "cpf-encryption",
   mercadopago: "mercadopago-token-encryption",
+  whatsapp: "whatsapp-token-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO

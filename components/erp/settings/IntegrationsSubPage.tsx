@@ -6,6 +6,7 @@ import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/re
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
+import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
@@ -271,6 +272,36 @@ export const IntegrationsSubPage = ({
                                             className={isLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
                                         />
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Mensagens</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between">
+                                <div>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-12 h-12 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-lg shrink-0">
+                                            WA
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                WhatsApp Business
+                                            </span>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
+                                                Lembretes, confirmações e atualizações operacionais
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed">
+                                        Conecte o número do seu negócio para enviar mensagens automáticas de agendamentos, pedidos, entregas e orçamentos.
+                                    </p>
+                                </div>
+                                <div className="mt-4">
+                                    <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                    <Link href="/erp/integrations/whatsapp">
+                                        <Button className="w-full">Configurar WhatsApp</Button>
+                                    </Link>
                                 </div>
                             </div>
                         </div>

@@ -798,6 +798,9 @@ export async function updateQuoteStatusAction(data: {
                     quote: updatedQuote,
                     actorUserId: user.id
                 }).catch(console.error)
+                import("@/lib/services/whatsapp-automation.service")
+                    .then(({ onQuoteShared }) => onQuoteShared(updatedQuote))
+                    .catch(console.error)
             }
 
             await revalidateQuotes(data.partnerId, data.quoteId)
