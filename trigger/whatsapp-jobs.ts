@@ -1,6 +1,8 @@
 /**
  * Trigger.dev jobs for WhatsApp automation.
- * Falls back to DB scheduled jobs + cron when TRIGGER_SECRET_KEY is not set.
+ *
+ * Trigger.dev is the ONLY async execution layer for WhatsApp jobs.
+ * TRIGGER_SECRET_KEY must be configured — there is no fallback.
  */
 
 import { randomUUID } from "crypto"
@@ -16,18 +18,25 @@ export type WhatsappScheduledJobPayload = {
   runAt: string
 }
 
+/**
+ * Enqueue a scheduled WhatsApp job via Trigger.dev.
+ *
+ * TRIGGER_SECRET_KEY is required. If not set, throws an explicit error.
+ * No silent fallbacks — the system must be properly configured.
+ */
 export async function triggerWhatsappScheduledJob(payload: WhatsappScheduledJobPayload): Promise<void> {
-  if (!process.env.TRIGGER_SECRET_KEY) return
-
-  try {
-    const { tasks } = await import("@trigger.dev/sdk/v3")
-    await tasks.trigger("whatsapp-scheduled-job", payload, {
-      delay: new Date(payload.runAt),
-      idempotencyKey: `${payload.jobType}:${payload.entityType}:${payload.entityId}:${payload.runAt}`,
-    })
-  } catch (err) {
-    console.warn("[whatsapp] Trigger.dev unavailable, using cron fallback", err)
+  if (!process.env.TRIGGER_SECRET_KEY) {
+    throw new Error(
+      "[whatsapp] TRIGGER_SECRET_KEY is required. Configure Trigger.dev to enable WhatsApp job scheduling."
+    )
   }
+
+  // @ts-ignore
+  const { tasks } = await import("@trigger.dev/sdk/v3")
+  await tasks.trigger("whatsapp-scheduled-job", payload, {
+    delay: new Date(payload.runAt),
+    idempotencyKey: `${payload.jobType}:${payload.entityType}:${payload.entityId}:${payload.runAt}`,
+  })
 }
 
 export async function executeWhatsappScheduledJob(payload: WhatsappScheduledJobPayload): Promise<void> {

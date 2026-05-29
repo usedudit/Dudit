@@ -92,8 +92,15 @@ export async function scheduleWhatsappJob(params: {
       partnerId: params.partnerId,
       runAt: params.runAt.toISOString(),
     })
-  } catch {
-    // Cron fallback processes whatsapp_scheduled_jobs when Trigger.dev is unavailable
+  } catch (err) {
+    // Log the error explicitly — Trigger.dev is required, not optional.
+    // The DB record (whatsapp_scheduled_jobs) serves as recovery source
+    // and will be picked up by the cron-job.org → process-whatsapp-reminders endpoint.
+    console.error("[whatsapp] Failed to enqueue Trigger.dev job — will be recovered by cron sweep", {
+      jobType: params.jobType,
+      entityId: params.entityId,
+      error: err instanceof Error ? err.message : "unknown",
+    })
   }
 }
 
