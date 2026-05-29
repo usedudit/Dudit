@@ -121,6 +121,7 @@ export const IntegrationsSubPage = ({
         }
         setWaIsLoading(true)
         try {
+            console.log("[WhatsApp] Connecting with provider:", provider)
             const res = await connectWhatsappAction({
                 provider,
                 accessToken,
@@ -128,7 +129,9 @@ export const IntegrationsSubPage = ({
                 businessAccountId: businessAccountId || undefined,
                 phoneNumber: phoneNumber || undefined,
             })
+            console.log("[WhatsApp] Connect result:", JSON.stringify(res, null, 2))
             if (!res.success) {
+                console.error("[WhatsApp] Connect failed:", res.error)
                 toast.error(res.error || "Erro ao conectar")
                 return
             }
@@ -140,7 +143,9 @@ export const IntegrationsSubPage = ({
             setWaActiveModal(null)
             await fetchWaStatus()
         } catch (err) {
-            toast.error("Erro inesperado ao conectar")
+            console.error("[WhatsApp] Unexpected connect error:", err)
+            const message = err instanceof Error ? err.message : "Erro inesperado ao conectar"
+            toast.error(message)
         } finally {
             setWaIsLoading(false)
         }
