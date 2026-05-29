@@ -1,14 +1,14 @@
 import React from "react"
 import { Button, Input } from "@/components/reusable"
-import { SearchIcon, FilterIcon, GridIcon, ListIcon, PlusIcon } from "@/lib/icons"
+import { SearchIcon, FilterIcon, GridIcon, ListIcon, PlusIcon, ColumnsIcon } from "@/lib/icons"
 
 interface DeliveryPageControlsProps {
     search: string
     onSearchChange: (v: string) => void
     onOpenFilter: () => void
     onAdd: () => void
-    viewMode: "list" | "grid"
-    onViewModeChange: (mode: "list" | "grid") => void
+    viewMode: "list" | "grid" | "kanban"
+    onViewModeChange: (mode: "list" | "grid" | "kanban") => void
     addDisabled?: boolean
 }
 
@@ -56,10 +56,13 @@ export default function DeliveryPageControls({
                 </div>
                 <div className="flex-1" />
                 <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
-                    <button onClick={() => onViewModeChange("list")} className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border" : "text-gray-400"}`}>
+                    <button onClick={() => onViewModeChange("kanban")} className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "kanban" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400"}`} title="Visualização em Kanban">
+                        <ColumnsIcon className="w-[18px] h-[18px]" />
+                    </button>
+                    <button onClick={() => onViewModeChange("list")} className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400"}`} title="Visualização em Lista">
                         <ListIcon className="w-[18px] h-[18px]" />
                     </button>
-                    <button onClick={() => onViewModeChange("grid")} className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border" : "text-gray-400"}`}>
+                    <button onClick={() => onViewModeChange("grid")} className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400"}`} title="Visualização em Grade">
                         <GridIcon className="w-[18px] h-[18px]" />
                     </button>
                 </div>

@@ -1219,7 +1219,7 @@ export async function getERPDeliveriesPageAction(
           position,
           status,
           delivered_at,
-          orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id)
+          orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
         )
       `)
       .eq("partner_id", partnerId)
@@ -1283,7 +1283,8 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           total_amount,
           delivery_fee,
           delivery_address,
-          buyer_id
+          buyer_id,
+          order_source
         )
       )
     `)

@@ -14,6 +14,7 @@ import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import DeliveryPageControls from "./DeliveryPageControls"
 import DeliveryListItem from "./DeliveryListRow"
 import DeliveryGridCard from "./DeliveryGridCard"
+import DeliveryKanbanBoard from "./DeliveryKanbanBoard"
 import CreateDeliveryPage from "./CreateDeliveryPage"
 import DeliveryDetailPage from "./DeliveryDetailPage"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -52,7 +53,7 @@ export default function DeliveriesPage({
     const { openPlanUpgrade } = usePlanUpgrade()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+    const [viewMode, setViewMode] = useState<"list" | "grid" | "kanban">("kanban")
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [filters, setFilters] = useState<{ status: string[] }>({ status: [] })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -168,6 +169,8 @@ export default function DeliveriesPage({
                 orderCount: links.length,
                 orderDisplayId: order.order_number || (firstLink?.order_id ? `#${String(firstLink.order_id).slice(0, 8).toUpperCase()}` : "-"),
                 customerName: order.customer_name || "Cliente",
+                customerAddress: order.delivery_address || "",
+                orderSource: order.order_source || "Manual",
                 status: effectiveStatus,
                 deliveryPersonName,
                 estimatedDurationMinutes: Number(raw.estimated_duration_minutes || 0),
@@ -304,6 +307,14 @@ export default function DeliveriesPage({
                                             }
                                         />
                                     </FadeIn>
+                                ) : viewMode === "kanban" ? (
+                                    <FadeIn key="kanban" className="w-full">
+                                        <DeliveryKanbanBoard
+                                            deliveries={mapped}
+                                            onDetails={(id) => { setSelectedDeliveryId(id); setWrapper("detail") }}
+                                            onQuickStatusChange={handleQuickStatusChange}
+                                        />
+                                    </FadeIn>
                                 ) : viewMode === "grid" ? (
                                     <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
@@ -351,7 +362,7 @@ export default function DeliveriesPage({
                             {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                         </div>
 
-                        {mapped.length > 0 ? (
+                        {mapped.length > 0 && viewMode !== "kanban" ? (
                             <Pagination
                                 currentPage={page}
                                 totalPages={totalPages}
