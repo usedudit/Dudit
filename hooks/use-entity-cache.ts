@@ -152,10 +152,17 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
                                 // Full detail: set partial=false so it won't refetch
                                 cacheMap.set(id, { data: detail, timestamp: Date.now(), partial: false })
                                 notifySubscribers(cacheKey)
+                            } else {
+                                const existing = cacheMap.get(id)
+                                cacheMap.set(id, { data: (existing?.data ?? null) as any, timestamp: Date.now(), partial: false })
+                                notifySubscribers(cacheKey)
                             }
                         })
                         .catch(() => {
-                            // Silently fail - partial/stale data is still shown
+                            // Silently fail - but mark partial = false so we don't get stuck loading
+                            const existing = cacheMap.get(id)
+                            cacheMap.set(id, { data: (existing?.data ?? null) as any, timestamp: Date.now(), partial: false })
+                            notifySubscribers(cacheKey)
                         })
                         .finally(() => {
                             inFlightRequests.delete(flightKey)
@@ -167,7 +174,7 @@ export function useEntityCache<TListItem extends { id: string }, TDetail extends
             // Return cached data immediately (SWR pattern), or null if nothing cached
             return {
                 data: entry?.data ?? null,
-                isLoading: !entry, // Only "loading" if we have NO data at all
+                isLoading: !entry || !!entry.partial,
                 isStale: !!entry?.partial || (!!entry && Date.now() - entry.timestamp >= staleTime),
             }
         },

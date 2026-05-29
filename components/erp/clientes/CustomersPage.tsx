@@ -113,7 +113,7 @@ export default function CustomersPage({
     const {
         items: rawCustomers, fetchNextPage, hasNextPage, isFetchingNextPage, isListLoading: isQueryLoading,
         entityState, openEntity, closeEntity, isViewing, isCreating: isCreatingEntity, isEditing: isEditingEntity,
-        currentEntity,
+        currentEntity, isLoadingDetail,
         cache, getPrefetchProps,
         search, setSearch, debouncedSearch,
         afterMutation,
@@ -359,7 +359,11 @@ export default function CustomersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {(isCreatingEntity || isEditingEntity) ? (
+                {entityState.isOpen && (isViewing || isEditingEntity) && isLoadingDetail ? (
+                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : (isCreatingEntity || isEditingEntity) ? (
                     <NewCustomerPage
                         key="form"
                         partnerId={partnerId}

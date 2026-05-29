@@ -10,7 +10,7 @@ import {
     RotateIcon,
     Package
 } from '@/lib/icons';
-import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal, SelectionBanner } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Input, Badge, AlertModal, SelectionBanner, ThreeDotsLoader } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet";
 import Pagination from "@/components/reusable/Pagination";
@@ -366,14 +366,18 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                     onSuccess={() => { afterMutation(); closeEntity(); }}
                 />
             ) : isViewing && entityState.entityId ? (
-                <StockMovementDetailPage
-                    key="detail"
-                    movement={isLoadingDetail
-                        ? null
-                        : (currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null)}
-                    isLoading={isLoadingDetail}
-                    onBack={closeEntity}
-                />
+                isLoadingDetail ? (
+                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : (
+                    <StockMovementDetailPage
+                        key="detail"
+                        movement={currentEntity || formattedMovements.find(m => m.id === entityState.entityId) || null}
+                        isLoading={isLoadingDetail}
+                        onBack={closeEntity}
+                    />
+                )
             ) : (
                 <FadeIn
                     key="list"

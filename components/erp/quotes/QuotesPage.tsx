@@ -1,12 +1,12 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useStore } from "@/lib/store-context"
 
 // Components
-import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant, SelectionBanner } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, Badge, Checkbox, BadgeVariant, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils";
 import QuoteSkeleton from "./QuoteSkeleton"
 import { deleteQuoteAction, batchDeleteQuotesAction, batchUpdateQuotesStatusAction, getERPQuotesPageAction, getQuoteDetailsAction, type ERPQuoteListCursor } from "@/app/actions/erp/quotes"
@@ -40,7 +40,10 @@ import {
     FileIcon,
     TelegramIcon,
     ClockIcon,
-    CheckCircleIcon
+    XIcon,
+    FileBlockIcon,
+    FileViewIcon,
+    FileVerifiedIcon
 } from "@/lib/icons"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -222,11 +225,11 @@ export default function QuotesPage({
                     draft: { label: "Rascunho", color: "gray", icon: <FileIcon size={12} /> },
                     sent: { label: "Enviado", color: "blue", icon: <TelegramIcon size={12} /> },
                     pending_client: { label: "Pendente", color: "purple", icon: <ClockIcon size={12} /> },
-                    viewed: { label: "Visualizado", color: "teal", icon: <CheckCircleIcon size={12} /> },
-                    approved: { label: "Aprovado", color: "green", icon: null },
-                    rejected: { label: "Rejeitado", color: "red", icon: null },
+                    viewed: { label: "Visualizado", color: "cyan", icon: <FileViewIcon size={12} /> },
+                    approved: { label: "Aprovado", color: "green", icon: <FileVerifiedIcon size={12} /> },
+                    rejected: { label: "Rejeitado", color: "red", icon: <FileBlockIcon size={12} /> },
                     expired: { label: "Expirado", color: "orange", icon: <ClockIcon size={12} /> },
-                    cancelled: { label: "Cancelado", color: "gray", icon: <FileIcon size={12} /> },
+                    cancelled: { label: "Cancelado", color: "red", icon: <XIcon size={12} /> },
                     converted_to_order: { label: "Convertido", color: "gray", icon: null }
                 }
                 const statusInfo = statusMap[q.status] || { label: q.status, color: "gray", icon: null }
@@ -488,7 +491,11 @@ export default function QuotesPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {isViewing && activeQuote ? (
+                {entityState.isOpen && (isViewing || isEditing || isDuplicating) && isLoadingDetail ? (
+                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : isViewing && activeQuote ? (
                     <FadeIn key="view-quote" className="w-full h-full">
                         <QuoteDetail
                             partnerId={partnerId}

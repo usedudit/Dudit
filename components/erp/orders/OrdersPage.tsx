@@ -638,7 +638,11 @@ export default function OrdersPage({
     return (
         <>
             <AnimatePresence mode="wait">
-                {entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
+                {entityState.isOpen && (entityState.action === 'view' || entityState.action === 'edit') && isLoadingDetail ? (
+                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : entityState.isOpen && entityState.action === 'view' && entityState.entityId ? (
                     <FadeIn key="view-order" className="w-full h-full bg-white dark:bg-dark-background">
                         <OrderDetailView
                             orderId={entityState.entityId}

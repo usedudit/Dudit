@@ -23,7 +23,7 @@ import {
 } from "@/app/actions/erp/servicos"
 
 // Components
-import { Button, IconPlaceholder, Checkbox, SelectionBanner } from "@/components/reusable"
+import { Button, IconPlaceholder, Checkbox, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
@@ -466,22 +466,28 @@ export default function ServicesPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    <AddServicePage
-                        key="form"
-                        mode={formMode as any}
-                        setMode={(m) => {
-                            // Map AddServicePage mode changes to URL updates
-                            if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                            else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                        }}
-                        service={formService}
-                        onBack={closeEntity}
-                        partnerId={partnerId}
-                        partner={partner}
-                        storeId={selectedStore?.id}
-                        isLoadingDetails={isLoadingDetail}
-                        onClose={handleFormClose}
-                    />
+                    isLoadingDetail ? (
+                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                            <ThreeDotsLoader />
+                        </div>
+                    ) : (
+                        <AddServicePage
+                            key="form"
+                            mode={formMode as any}
+                            setMode={(m) => {
+                                // Map AddServicePage mode changes to URL updates
+                                if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                                else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                            }}
+                            service={formService}
+                            onBack={closeEntity}
+                            partnerId={partnerId}
+                            partner={partner}
+                            storeId={selectedStore?.id}
+                            isLoadingDetails={isLoadingDetail}
+                            onClose={handleFormClose}
+                        />
+                    )
                 ) : (
                     <FadeIn
                         key="list"

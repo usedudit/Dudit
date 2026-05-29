@@ -266,17 +266,7 @@ export function ExplorarPageClient({
 
     const [currentType, setCurrentType] = useState(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
-    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(() => {
-        if (pathCity) return pathCity
-        if (cidade) return cidade
-        if (typeof window !== "undefined") {
-            const savedCity = localStorage.getItem("dudit_city")
-            if (savedCity) return savedCity
-            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-            if (match) return match[1]
-        }
-        return null
-    })
+    const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || pathCity || null)
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
 
     const categoriesList = useMemo(() => {

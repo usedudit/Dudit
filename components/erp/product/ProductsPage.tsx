@@ -34,7 +34,7 @@ import {
 } from "@/app/actions/erp/products"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, SelectionBanner, BarcodeScannerInput } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, SelectionBanner, BarcodeScannerInput, ThreeDotsLoader } from "@/components/reusable"
 import { playBeepSound, vibrateMobile } from "@/lib/utils/barcode"
 import Dropdown from "../../reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
@@ -714,26 +714,32 @@ export default function ProductsPage({
         <>
             <AnimatePresence mode="wait">
                 {entityState.isOpen && formMode ? (
-                    <AddProductPage
-                        key="form"
-                        mode={formMode as any}
-                        setMode={(m) => {
-                            // Map AddProductPage mode changes to URL updates
-                            if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
-                            else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
-                        }}
-                        product={formProduct}
-                        onBack={closeEntity}
-                        onClose={closeEntity}
-                        onSave={handleSaveProduct}
-                        isSaving={isSaving}
-                        suppliers={suppliers}
-                        unidadesMedida={UNIDADES_MEDIDA}
-                        partnerId={partnerId}
-                        partner={partner}
-                        storeId={selectedStore?.id || ""}
-                        isLoadingDetails={isLoadingDetail}
-                    />
+                    isLoadingDetail ? (
+                        <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                            <ThreeDotsLoader />
+                        </div>
+                    ) : (
+                        <AddProductPage
+                            key="form"
+                            mode={formMode as any}
+                            setMode={(m) => {
+                                // Map AddProductPage mode changes to URL updates
+                                if (m === 'edit' && entityState.entityId) openEntity('edit', entityState.entityId)
+                                else if (m === 'details' && entityState.entityId) openEntity('view', entityState.entityId)
+                            }}
+                            product={formProduct}
+                            onBack={closeEntity}
+                            onClose={closeEntity}
+                            onSave={handleSaveProduct}
+                            isSaving={isSaving}
+                            suppliers={suppliers}
+                            unidadesMedida={UNIDADES_MEDIDA}
+                            partnerId={partnerId}
+                            partner={partner}
+                            storeId={selectedStore?.id || ""}
+                            isLoadingDetails={isLoadingDetail}
+                        />
+                    )
                 ) : (
                     <FadeIn
                         key="list"

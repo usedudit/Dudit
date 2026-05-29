@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { PlusIcon, ExportFileIcon, ReturnIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -234,15 +234,21 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
     return (
         <AnimatePresence mode="wait">
             {entityState.isOpen ? (
-                <CreateReturnPage
-                    key="form"
-                    partnerId={partnerId}
-                    mode={entityState.action as any}
-                    returnRequest={activeReturnRequest}
-                    onBack={closeEntity}
-                    onSave={handleSaveReturn}
-                    isSaving={isSaving}
-                />
+                isLoading ? (
+                    <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : (
+                    <CreateReturnPage
+                        key="form"
+                        partnerId={partnerId}
+                        mode={entityState.action as any}
+                        returnRequest={activeReturnRequest}
+                        onBack={closeEntity}
+                        onSave={handleSaveReturn}
+                        isSaving={isSaving}
+                    />
+                )
             ) : (
                 <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
                     <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
@@ -293,7 +299,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
                                     <div className="h-[400px] flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary" />
+                                        <ThreeDotsLoader />
                                     </div>
                                 ) : paginatedReturns.length === 0 ? (
                                     <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">

@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, DropdownItem, FormDropdown, MoneyInput } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, DropdownItem, FormDropdown, MoneyInput, ThreeDotsLoader } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -266,7 +266,7 @@ export default function TransactionsPage({
     const {
         items: loadedTransactions, fetchNextPage, hasNextPage, isFetchingNextPage,
         entityState, openEntity, closeEntity, isViewing, isEditing, isCreating,
-        currentEntity, getPrefetchProps,
+        currentEntity, isLoadingDetail, getPrefetchProps,
         afterMutation, cache, queryClient: entityQueryClient,
     } = entityPage
     const [settlePaymentsByInstallment, setSettlePaymentsByInstallment] = useState<
@@ -1077,6 +1077,13 @@ export default function TransactionsPage({
     ])
 
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        if (isLoadingDetail) {
+            return (
+                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                    <ThreeDotsLoader />
+                </div>
+            )
+        }
         return (
             <motion.div
                 key={`tx-detail-${entityState.entityId}`}
@@ -1204,6 +1211,13 @@ export default function TransactionsPage({
         : null
 
     if (isFormOpen) {
+        if (entityState.action === "edit" && isLoadingDetail) {
+            return (
+                <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                    <ThreeDotsLoader />
+                </div>
+            )
+        }
         return (
             <motion.div
                 key={editingRecurringTemplateId ? `edit-rec-${editingRecurringTemplateId}` : editingTx ? `edit-${editingTx.id}` : "create-transaction"}

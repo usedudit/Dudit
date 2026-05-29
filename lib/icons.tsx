@@ -79,7 +79,7 @@ import {
     Alert02Icon,
     File02Icon,
     FileUploadIcon,
-    FileVerifiedIcon as FileVerified01Icon,
+    FileVerifiedIcon as FileVerifiedIcon01,
     ArrowUpDownIcon as ArrowUpDown,
     MoreVerticalCircle01Icon,
     Copy01Icon,
@@ -89,6 +89,8 @@ import {
     InformationCircleIcon,
     SparklesIcon as CoreSparklesIcon,
     Cancel01Icon,
+    FileBlockIcon as FileBlockIcon01,
+    FileViewIcon as FileViewIcon01,
     CancelCircleIcon as CancelCircle,
     UnfoldMoreIcon as UnfoldMore01Icon,
     ZoomInAreaIcon,
@@ -128,7 +130,7 @@ import {
     Rocket01Icon,
     Briefcase01Icon,
     File02Icon as File02Icon01,
-    Key01Icon
+    Key01Icon,
 } from "@hugeicons/core-free-icons"
 
 
@@ -222,13 +224,15 @@ export const HelpCircleIcon = CreateIcon(HelpCircle)
 export const CancelIcon = CreateIcon(Cancel01Icon)
 export const CancelCircleIcon = CreateIcon(CancelCircle)
 export const XIcon = CreateIcon(Cancel01Icon)
+export const FileBlockIcon = CreateIcon(FileBlockIcon01)
+export const FileViewIcon = CreateIcon(FileViewIcon01)
 
 // ============================
 // FILES / MEDIA
 // ============================
 
 export const FileIcon = CreateIcon(File02Icon)
-export const FileVerifiedIcon = CreateIcon(FileVerified01Icon)
+export const FileVerifiedIcon = CreateIcon(FileVerifiedIcon01)
 
 export const UploadImageIcon = CreateIcon(ImageUploadIcon)
 export const RemoveImageIcon = CreateIcon(ImageDelete02Icon)

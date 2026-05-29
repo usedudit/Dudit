@@ -81,7 +81,7 @@ const CouponGridCard = React.memo(
                         </div>
                     </div>
 
-                    <div className="flex items-end justify-between mt-3">
+                    <div className="flex items-end justify-between mt-1">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Escopo</span>
                             <div className="flex items-center gap-2.5">
