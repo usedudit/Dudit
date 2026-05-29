@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, Fragment } from "react"
+import { useState, useRef, Fragment, useEffect } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"

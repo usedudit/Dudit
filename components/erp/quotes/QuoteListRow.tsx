@@ -39,6 +39,8 @@ const QuoteListItem = React.memo(
         onDelete,
         onDuplicate,
         onClick,
+        onPrint,
+        onShare,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,

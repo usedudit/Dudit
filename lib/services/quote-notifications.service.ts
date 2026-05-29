@@ -114,7 +114,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             // Email to customer with approval details
             await UnosendService.sendEmail({
                 userId: quote.user_id || undefined,
-                to: [customerEmail],
+                to: [{ email: customerEmail, name: customerName }],
                 subject: `Orçamento Disponível - ${quoteNum}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #113833;">
@@ -144,7 +144,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             // Email to seller notifying approval
             await UnosendService.sendEmail({
                 userId: quote.user_id || undefined,
-                to: [sellerEmail],
+                to: [{ email: sellerEmail }],
                 subject: `Orçamento Aprovado! - ${quoteNum}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #113833;">
@@ -168,7 +168,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             // Email to seller notifying rejection
             await UnosendService.sendEmail({
                 userId: quote.user_id || undefined,
-                to: [sellerEmail],
+                to: [{ email: sellerEmail }],
                 subject: `Orçamento Recusado - ${quoteNum}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #113833;">

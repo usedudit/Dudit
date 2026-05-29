@@ -7,6 +7,7 @@ import { Button, Input, IconPlaceholder, Badge } from "@/components/reusable"
 import { useToast } from "@/hooks/use-toast"
 import {
   listCampaignsAction,
+  listPromotionsAction,
   deleteCampaignAction,
   deletePromotionAction,
   togglePromotionStatusAction,
@@ -336,7 +337,7 @@ export default function PromotionsPage({
                       <Div className="flex items-center gap-2">
                         <Button
                           variant="outline"
-                          size="small"
+                          size="sm"
                           onClick={() => {
                             setSelectedCampaignId(camp.id)
                             setViewMode("edit_campaign")
@@ -346,7 +347,7 @@ export default function PromotionsPage({
                         </Button>
                         <Button
                           variant="outline"
-                          size="small"
+                          size="sm"
                           className="text-red-500 hover:bg-red-50"
                           onClick={() => handleDeleteCampaign(camp.id)}
                         >

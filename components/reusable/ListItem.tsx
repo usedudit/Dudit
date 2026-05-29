@@ -60,7 +60,7 @@ export const ListItem: React.FC<ListItemProps> = ({
 
                 {description && (
                     <p
-                        className={`text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate ${descriptionClassName}`}
+                        className={`text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words ${descriptionClassName}`}
                     >
                         {description}
                     </p>

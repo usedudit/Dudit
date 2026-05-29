@@ -212,45 +212,45 @@ export const IntegrationsSubPage = ({
 
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Pagamentos</h3>
 
-                        <div className="flex flex-col gap-4">
-                            <ListItem
-                                left={
-                                    <img
-                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                        alt="Mercado Pago"
-                                        className="w-12 h-12 rounded-xl object-contain shrink-0"
-                                    />
-                                }
-                                title={
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg leading-none">Mercado Pago</span>
-                                            {mpConnected ? (
-                                                <Badge variant="green">Conectado</Badge>
-                                            ) : (
-                                                <Badge variant="gray">Desconectado</Badge>
-                                            )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
+                                <div>
+                                    <div className="flex gap-4 items-start">
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                            alt="Mercado Pago"
+                                            className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight">Mercado Pago</span>
+                                                {mpConnected ? (
+                                                    <Badge variant="green">Conectado</Badge>
+                                                ) : (
+                                                    <Badge variant="gray">Desconectado</Badge>
+                                                )}
+                                            </div>
+                                            <a
+                                                href="https://www.mercadopago.com.br"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-brand-blue dark:text-blue-400 hover:underline w-max mt-1 font-medium block"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                mercadopago.com.br
+                                            </a>
                                         </div>
-                                        <a
-                                            href="https://www.mercadopago.com.br"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-brand-blue dark:text-blue-400 hover:underline w-max mt-1 font-medium"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            mercadopago.com.br
-                                        </a>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2 leading-relaxed whitespace-normal pr-4 font-normal">
-                                            Conecte sua conta para receber pagamentos online com split automático. Aceite cartões, PIX e boleto.
-                                        </p>
                                     </div>
-                                }
-                                titleClassName="!whitespace-normal !overflow-visible !truncate-none"
-                                right={
-                                    <div className="flex items-center gap-4 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
+                                        Conecte sua conta para receber pagamentos online com split automático. Aceite cartões, PIX e boleto.
+                                    </p>
+                                </div>
+
+                                <div className="mt-4">
+                                    <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                    <div className="flex items-center justify-end gap-3">
                                         <Button
                                             variant="outline"
-                                            className="h-9 px-4 text-xs font-semibold rounded-xl"
                                             onClick={() => {
                                                 setKnowMoreStep(0)
                                                 setActiveModal("knowMore")
@@ -271,9 +271,8 @@ export const IntegrationsSubPage = ({
                                             className={isLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
                                         />
                                     </div>
-                                }
-                                className="!border-none !shadow-none !bg-transparent !p-0 !cursor-default hover:!bg-transparent hover:!border-none flex items-start gap-4"
-                            />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

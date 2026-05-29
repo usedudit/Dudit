@@ -329,7 +329,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     Number(discount) > 0 ||
                     Number(shippingFee) > 0 ||
                     Number(otherCosts) > 0 ||
-                    (salespersonId && authUser?.id && salespersonId !== authUser.id);
+                    (!!salespersonId && !!authUser?.id && salespersonId !== authUser.id);
             }
             return false;
         }

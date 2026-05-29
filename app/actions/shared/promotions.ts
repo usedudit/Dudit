@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache"
 // Schemas
 // ---------------------------------------------------------------------------
 
-export const CampaignSchema = z.object({
+const CampaignSchema = z.object({
   partnerId: z.string().uuid(),
   name: z.string().min(1, "O nome da campanha é obrigatório."),
   description: z.string().nullable().optional(),
@@ -24,7 +24,7 @@ export const CampaignSchema = z.object({
   customerIds: z.array(z.string().uuid()).optional().default([]),
 })
 
-export const PromotionSchema = z.object({
+const PromotionSchema = z.object({
   partnerId: z.string().uuid(),
   campaignId: z.string().uuid(),
   name: z.string().min(1, "O nome da promoção é obrigatório."),
@@ -62,7 +62,7 @@ export async function listCampaignsAction(
   params?: { search?: string; isActive?: string; page?: number; limit?: number }
 ) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "view")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   const page = Math.max(1, Number(params?.page || 1))
@@ -99,7 +99,7 @@ export async function createCampaignAction(input: z.infer<typeof CampaignSchema>
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "marketing_promotions", "create")
+  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
   const { data: campaign, error } = await supabase
@@ -142,7 +142,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "marketing_promotions", "edit")
+  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   const { error: updateError } = await supabase
@@ -183,7 +183,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
 
 export async function deleteCampaignAction(partnerId: string, campaignId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "delete")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -204,7 +204,7 @@ export async function deleteCampaignAction(partnerId: string, campaignId: string
 
 export async function listPromotionsAction(partnerId: string, campaignId?: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "view")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   let query = supabase
@@ -232,7 +232,7 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "marketing_promotions", "create")
+  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
   // Validate logical constraints
@@ -302,7 +302,7 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   }
   const data = parsed.data
   await requireUser()
-  await requirePartnerAccessWithPermission(data.partnerId, "marketing_promotions", "edit")
+  await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   // Validate logical constraints
@@ -369,7 +369,7 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
 
 export async function deletePromotionAction(partnerId: string, promotionId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "delete")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -386,7 +386,7 @@ export async function deletePromotionAction(partnerId: string, promotionId: stri
 
 export async function togglePromotionStatusAction(partnerId: string, promotionId: string, isActive: boolean) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "edit")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
   const { error } = await supabase
@@ -413,43 +413,48 @@ export async function simulatePromotionsAction(
     shippingCost?: number
   }
 ) {
-  await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "view")
-  const supabase = await getSupabaseServerClient()
+  try {
+    await requireUser()
+    await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
+    const supabase = await getSupabaseServerClient()
 
-  // 1. Fetch active promotions for this partner
-  const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId)
+    // 1. Fetch active promotions for this partner
+    const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId)
 
-  // 2. Validate coupon if provided
-  let pricingCoupon = null
-  if (mockCart.couponCode?.trim()) {
-    const validationResult = await validateCoupon({
-      partnerId,
-      code: mockCart.couponCode,
-      subtotal: mockCart.items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0),
-      shippingCost: mockCart.shippingCost || 0,
-      items: mockCart.items.map((i) => ({ productId: i.productId })),
-    }, supabase)
+    // 2. Validate coupon if provided
+    let pricingCoupon = null
+    if (mockCart.couponCode?.trim()) {
+      const validationResult = await validateCoupon({
+        partnerId,
+        code: mockCart.couponCode,
+        subtotal: mockCart.items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0),
+        shippingCost: mockCart.shippingCost || 0,
+        items: mockCart.items.map((i) => ({ productId: i.productId })),
+      }, supabase)
 
-    if (validationResult.valid) {
-      pricingCoupon = validationResult.pricingCoupon
+      if (validationResult.valid) {
+        pricingCoupon = validationResult.pricingCoupon
+      }
     }
+
+    // 3. Run pricing calculation
+    const result = calculateOrderPricing({
+      items: mockCart.items.map((i) => ({
+        productId: i.productId,
+        categoryId: i.categoryId || null,
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      })),
+      shippingCost: mockCart.shippingCost || 0,
+      coupon: pricingCoupon,
+      promotions: promotionsData,
+    })
+
+    return { success: true, result }
+  } catch (err: any) {
+    console.error("[simulatePromotionsAction] Error:", err)
+    return { success: false, error: err.message || "Erro ao simular promoções." }
   }
-
-  // 3. Run pricing calculation
-  const result = calculateOrderPricing({
-    items: mockCart.items.map((i) => ({
-      productId: i.productId,
-      categoryId: i.categoryId || null,
-      unitPrice: i.unitPrice,
-      quantity: i.quantity,
-    })),
-    shippingCost: mockCart.shippingCost || 0,
-    coupon: pricingCoupon,
-    promotions: promotionsData,
-  })
-
-  return { success: true, result }
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +577,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
 
 export async function getPromotionScopeDataAction(partnerId: string) {
   await requireUser()
-  await requirePartnerAccessWithPermission(partnerId, "marketing_promotions", "view")
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
   const [{ data: products }, { data: categories }, { data: customers }] = await Promise.all([

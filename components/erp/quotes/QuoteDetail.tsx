@@ -49,7 +49,7 @@ const getStatusInfo = (s: string) => {
     switch (s) {
         case 'sent': return { label: 'Enviado', variant: 'blue' as const, icon: <TelegramIcon size={12} />, color: 'bg-blue-500' };
         case 'pending_client': return { label: 'Pendente', variant: 'purple' as const, icon: <ClockIcon size={12} />, color: 'bg-purple-500' };
-        case 'viewed': return { label: 'Visualizado', variant: 'teal' as const, icon: <CheckCircleIcon size={12} />, color: 'bg-teal-500' };
+        case 'viewed': return { label: 'Visualizado', variant: 'cyan' as const, icon: <CheckCircleIcon size={12} />, color: 'bg-teal-500' };
         case 'approved': return { label: 'Aprovado', variant: 'green' as const, icon: undefined, color: 'bg-green-500' };
         case 'rejected': return { label: 'Rejeitado', variant: 'red' as const, icon: undefined, color: 'bg-red-500' };
         case 'expired': return { label: 'Expirado', variant: 'orange' as const, icon: <ClockIcon size={12} />, color: 'bg-orange-500' };
@@ -301,7 +301,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         setIsRegeneratingCode(true);
         try {
             const res = await regenerateQuoteApprovalCodeAction(quoteId, partnerId);
-            if (res.success && res.data) {
+            if (res.success) {
                 setQuote((prev: any) => ({
                     ...prev,
                     metadata: {

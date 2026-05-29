@@ -29,6 +29,8 @@ const QuoteGridCard = React.memo(
         onEdit,
         onDelete,
         onDuplicate,
+        onPrint,
+        onShare,
         onClick,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,

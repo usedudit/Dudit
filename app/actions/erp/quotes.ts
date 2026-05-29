@@ -1815,7 +1815,7 @@ export async function getSalespeopleAction(partnerId: string): Promise<{ success
         const sellers = (profiles || []).map((p: any) => ({
             id: String(p.user_id),
             name: String(p.full_name || "Vendedor")
-        })).sort((a, b) => a.name.localeCompare(b.name))
+        })).sort((a: any, b: any) => a.name.localeCompare(b.name))
 
         return { success: true, sellers }
     } catch (err: any) {

@@ -32,7 +32,7 @@ export async function getCartItemCountAction() {
 }
 
 // --- LEITURA DO CARRINHO (sem cache para garantir dados frescos) ---
-export const getCachedCart = async (userId: string) => {
+export async function getCachedCart(userId: string) {
   const supabase = getAdminClient()
 
   // 1. Busca Itens do Carrinho e Dados Relacionados
