@@ -156,7 +156,7 @@ async function processStatusWebhook(params: {
   })
   if (!claimed) return "duplicate"
 
-  const updates: Record<string, string> = {}
+  const updates: Record<string, string | null> = {}
   if (status === "sent") {
     updates.sent_at = new Date().toISOString()
     updates.status = "sent"
@@ -172,6 +172,37 @@ async function processStatusWebhook(params: {
   if (status === "failed") {
     updates.failed_at = new Date().toISOString()
     updates.status = "failed"
+
+    // Extract error details from Meta's webhook payload
+    const errors = params.status.errors as Array<Record<string, unknown>> | undefined
+    if (errors && errors.length > 0) {
+      const firstError = errors[0]
+      const code = String(firstError.code || "")
+      const title = String(firstError.title || "")
+      const message = String(firstError.message || "")
+      const errorData = firstError.error_data as Record<string, unknown> | undefined
+      const details = errorData ? String(errorData.details || "") : ""
+
+      const parts = [code && `[${code}]`, title, message, details && `(${details})`].filter(Boolean)
+      updates.error_message = parts.join(" ") || "Falha na entrega (sem detalhes da Meta)"
+
+      SecureLogger.error("[whatsapp webhook] Message delivery failed", {
+        providerMessageId,
+        partnerId: params.partnerId,
+        errorCode: code,
+        errorTitle: title,
+        errorMessage: message,
+        errorDetails: details,
+        rawErrors: errors,
+      })
+    } else {
+      updates.error_message = "Falha na entrega (sem detalhes da Meta)"
+      SecureLogger.warn("[whatsapp webhook] Message failed without error details", {
+        providerMessageId,
+        partnerId: params.partnerId,
+        rawStatus: params.status,
+      })
+    }
   }
 
   if (!Object.keys(updates).length) return "skipped"

@@ -68,6 +68,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Log raw payload for debugging delivery failures
+    SecureLogger.info("[whatsapp webhook] Raw payload", {
+      requestId,
+      body: JSON.stringify(body),
+    })
+
     const result = await handleWhatsappWebhookPayload(body, { requestId })
     SecureLogger.info("[whatsapp webhook] Processed", {
       requestId,
