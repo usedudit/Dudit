@@ -40,6 +40,7 @@ async function _getMarketplaceProductBase(id: string) {
         store_image_url, banner_url, max_installments, interest_rate_percent,
         mp_user_id, mp_public_key, opening_hours,
         logo_moderation_status, banner_moderation_status,
+        vendas_totais, created_at,
         addresses(city, state),
         payment_methods(*)
       )

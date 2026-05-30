@@ -37,6 +37,8 @@ async function _getMarketplaceService(serviceId: string) {
         opening_hours,
         mp_user_id,
         mp_public_key,
+        vendas_totais,
+        created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
         payment_methods (*)
       ),

@@ -1,9 +1,10 @@
 "use client"
 
-import React from "react"
-import { DefaultModal } from "@/components/reusable"
+import React, { useEffect, useState } from "react"
+import { DefaultModal, ListItem } from "@/components/reusable"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { formatCurrency } from "@/lib/utils"
+import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 
 interface VendorPaymentMethodsModalProps {
   isOpen: boolean
@@ -72,9 +73,42 @@ export function VendorPaymentMethodsModal({
   const hasSimplePayments = pixMethods.length > 0 || cashMethods.length > 0 || transferMethods.length > 0
   const hasPaymentSections = hasSimplePayments || creditMethods.length > 0 || debitMethods.length > 0
 
-  // Calculate standard credit card installments options (1x up to maxInstallments) interest-free
   const ccMethod = creditMethods[0]
   const maxCcInstallments = ccMethod ? Math.max(1, Number(ccMethod.max_installments || 1)) : 1
+
+  const [installmentOptions, setInstallmentOptions] = useState<any[]>([])
+  const [isLoadingInstallments, setIsLoadingInstallments] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen || !ccMethod?.id || price <= 0) {
+      setInstallmentOptions([])
+      return
+    }
+
+    let active = true
+    setIsLoadingInstallments(true)
+
+    previewMarketplacePaymentAction({
+      partnerId: ccMethod.partner_id,
+      paymentMethodId: ccMethod.id,
+      originalAmount: price,
+    })
+      .then((res) => {
+        if (active && res.success && res.installmentOptions) {
+          setInstallmentOptions(res.installmentOptions)
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading installments in modal:", err)
+      })
+      .finally(() => {
+        if (active) setIsLoadingInstallments(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [isOpen, ccMethod?.id, price])
 
   return (
     <DefaultModal
@@ -85,15 +119,18 @@ export function VendorPaymentMethodsModal({
     >
       <div className="py-2 space-y-6">
         {mpConnected && (
-          <div className="p-4 bg-emerald-50/50 border border-emerald-100/80 rounded-xl flex items-start gap-3.5 shadow-sm">
-            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-8 h-8 object-contain shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <h5 className="text-[14px] font-bold text-brand-dark">Mercado Pago Integrado</h5>
-              <p className="text-[12px] text-brand-inactive-text mt-1 leading-relaxed">
-                Este vendedor aceita pagamentos online direto pela Dudit! Pague por Pix ou Cartão de Crédito e garanta agilidade.
-              </p>
-            </div>
-          </div>
+          <ListItem
+            className="!border-none !bg-transparent p-0 cursor-default"
+            icon={
+              <img
+                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                alt="Mercado Pago"
+                className="w-10 h-10 object-contain shrink-0"
+              />
+            }
+            title="Mercado Pago"
+            description="Pague com cartão, Pix ou saldo MP."
+          />
         )}
 
         {hasPaymentSections ? (
@@ -119,20 +156,70 @@ export function VendorPaymentMethodsModal({
                 )}
 
                 {maxCcInstallments > 1 && price > 0 && (
-                  <div className="mt-4 border border-brand-border rounded-xl p-3.5 bg-brand-gray/30">
-                    <span className="text-[11px] font-bold text-brand-inactive-text uppercase tracking-wider">Simulação de Parcelamento</span>
-                    <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
-                      {Array.from({ length: maxCcInstallments }, (_, idx) => {
-                        const count = idx + 1
-                        const val = price / count
-                        return (
-                          <div key={count} className="flex justify-between items-center text-[13px] text-brand-dark border-b border-brand-border/40 pb-1 last:border-0 sm:last:border-b">
-                            <span className="font-medium">{count}x de {formatCurrency(val)}</span>
-                            <span className="text-brand-green font-semibold text-[11px] uppercase">Sem juros</span>
-                          </div>
-                        )
-                      })}
-                    </div>
+                  <div className="mt-4">
+                    <span className="text-[13px] font-bold text-brand-dark">Opções de parcelamento</span>
+                    
+                    {isLoadingInstallments ? (
+                      <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text select-none">
+                        Carregando opções de parcelamento...
+                      </div>
+                    ) : installmentOptions.length > 0 ? (
+                      <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                        {installmentOptions.map((opt, idx) => {
+                          const isEven = idx % 2 === 0
+                          return (
+                            <div
+                              key={opt.installments}
+                              className={`flex justify-between items-center py-2.5 px-4 text-brand-dark transition-colors ${
+                                isEven ? "bg-brand-gray/30" : "bg-white"
+                              }`}
+                            >
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-[13px] sm:text-sm">
+                                  {opt.installments}x de {formatCurrency(opt.installmentValue)}
+                                </span>
+                                {!opt.hasInterest && (
+                                  <span className="text-[11px] text-brand-inactive-text mt-0.5">
+                                    Sem Juros
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[13px] sm:text-sm font-semibold text-brand-dark">
+                                {formatCurrency(opt.finalAmount)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                        {Array.from({ length: maxCcInstallments }, (_, idx) => {
+                          const count = idx + 1
+                          const val = price / count
+                          const isEven = idx % 2 === 0
+                          return (
+                            <div
+                              key={count}
+                              className={`flex justify-between items-center py-2.5 px-4 text-brand-dark ${
+                                isEven ? "bg-brand-gray/30" : "bg-white"
+                              }`}
+                            >
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-[13px] sm:text-sm">
+                                  {count}x de {formatCurrency(val)}
+                                </span>
+                                <span className="text-[11px] text-brand-inactive-text mt-0.5">
+                                  Sem Juros
+                                </span>
+                              </div>
+                              <span className="text-[13px] sm:text-sm font-semibold text-brand-dark">
+                                {formatCurrency(price)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

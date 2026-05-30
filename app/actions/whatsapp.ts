@@ -238,13 +238,30 @@ export async function sendWhatsappTestMessageAction(phone: string): Promise<Acti
             phoneNumber: phone,
             messageType: "template",
             templateName: "hello_world",
-            payload: { triggerType: "test_message" },
+            payload: { triggerType: "test_message", languageCode: "en_US" },
             triggerType: "test_message",
             idempotencyKey: `test:${context.partnerId}:${phone}:${Date.now()}`,
         })
 
         if (result.messageId) {
             await processWhatsappMessageById(result.messageId)
+
+            // Re-read the message to check if sending actually succeeded
+            const admin = getAdminClient()
+            const { data: updatedMsg } = await admin
+                .from("whatsapp_messages")
+                .select("status, error_message")
+                .eq("id", result.messageId)
+                .single()
+
+            if (updatedMsg && updatedMsg.status === "failed") {
+                revalidatePath("/erp/integrations/whatsapp")
+                return { success: false, error: updatedMsg.error_message || "Falha ao enviar mensagem de teste" }
+            }
+            if (updatedMsg && updatedMsg.status === "pending" && updatedMsg.error_message) {
+                revalidatePath("/erp/integrations/whatsapp")
+                return { success: false, error: updatedMsg.error_message }
+            }
         }
 
         revalidatePath("/erp/integrations/whatsapp")

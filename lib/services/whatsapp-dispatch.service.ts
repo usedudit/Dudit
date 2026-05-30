@@ -210,6 +210,17 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
     const maxRetries = Number(message.max_retries || 5)
     const errorMessage = err instanceof Error ? err.message : "Erro ao enviar mensagem"
 
+    console.error("[whatsapp] sendQueuedMessage failed", {
+      messageId,
+      partnerId,
+      phone: String(message.phone_number),
+      template: message.template_name,
+      error: errorMessage,
+      retryable,
+      retryCount,
+      rawError: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
+    })
+
     if (retryable && retryCount < maxRetries) {
       await admin
         .from("whatsapp_messages")

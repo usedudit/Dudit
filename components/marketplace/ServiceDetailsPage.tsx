@@ -18,11 +18,14 @@ import {
   HeartIcon,
   MapPinIcon,
   XIcon,
+  TruckIcon,
+  ArrowLeftRightIcon,
+  PlusIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { FavoriteButton } from "./FavoriteButton"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormSection, IconPlaceholder } from "@/components/reusable"
+import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { VitrineCard } from "./shared-components"
@@ -33,7 +36,7 @@ import {
   createPublicAppointment,
 } from "@/app/actions/marketplace/services"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
-import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
@@ -122,6 +125,8 @@ export function ServiceDetailsPageClient({
   const [cep, setCep] = useState("")
   const [shippingState, setShippingState] = useState<"initial" | "calculated">("initial")
   const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
   const [deliveryLoading, setDeliveryLoading] = useState(false)
@@ -129,6 +134,18 @@ export function ServiceDetailsPageClient({
   const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
   const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
   const [isTeamMember, setIsTeamMember] = useState(false)
+
+  // Address flow states (checkout-like)
+  const [userAddresses, setUserAddresses] = useState<any[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("")
+  const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [showAddressModal, setShowAddressModal] = useState(false)
+  const [loadingAddresses, setLoadingAddresses] = useState(false)
+  const [loadingCep, setLoadingCep] = useState(false)
+  const [newAddressData, setNewAddressData] = useState({
+      zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
+  })
 
   const partner = useMemo(() => {
     const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
@@ -150,6 +167,8 @@ export function ServiceDetailsPageClient({
       max_installments: p?.max_installments || 12,
       mp_user_id: p?.mp_user_id,
       mp_public_key: p?.mp_public_key,
+      vendas_totais: p?.vendas_totais || 0,
+      created_at: p?.created_at,
     }
   }, [service])
 
@@ -183,107 +202,211 @@ export function ServiceDetailsPageClient({
     }
   }, [partner.id])
 
-  // Load default address and calculate delivery if logged in
+  // Load user addresses if logged in
   useEffect(() => {
-    if (typeof userId !== "string" || !partner.id) return
-    const activeUserId = userId
-    let active = true
+      if (userId) {
+          loadUserAddresses()
+      } else {
+          setUserAddresses([])
+          setSelectedAddressId("")
+      }
+  }, [userId])
 
-    async function loadDefaultAddress() {
-      setDeliveryLoading(true)
+  const loadUserAddresses = async () => {
+      if (!userId) return
+      setLoadingAddresses(true)
       try {
-        const result = await getAddressesAction(activeUserId, "user")
-        if (!active) return
-        const defaultAddress = result.addresses?.find((a: any) => a.is_default)
-        if (defaultAddress) {
-          const addressStr = `${defaultAddress.street}, ${defaultAddress.number}${defaultAddress.complement ? `, ${defaultAddress.complement}` : ""} - ${defaultAddress.neighborhood}, ${defaultAddress.city} - ${defaultAddress.state}, ${defaultAddress.zip_code}`
-          setCep(defaultAddress.zip_code || "")
-          setCalculatedAddress(`${defaultAddress.city} - ${defaultAddress.state}`)
-          setShippingState("calculated")
-
-          const quote = await quoteDeliveryFeeAction({
-            partnerId: partner.id,
-            destinationAddress: addressStr,
-          })
-          if (!active) return
-          if (quote.success) {
-            setDeliveryFee(Number(quote.fee || 0))
-            setDeliveryError(null)
-          } else {
-            setDeliveryFee(null)
-            setDeliveryError(quote.error || "Erro ao calcular entrega.")
+          const result = await getAddressesAction(userId, "user")
+          if (result.addresses) {
+              const list = result.addresses as any[]
+              setUserAddresses(list)
+              const defaultAddress = list.find((a: any) => a.is_default)
+              if (defaultAddress) {
+                  setSelectedAddressId(defaultAddress.id)
+              } else if (list.length > 0) {
+                  setSelectedAddressId(list[0].id)
+              }
           }
-        }
       } catch (err) {
-        console.error("Error loading user address for shipping:", err)
+          console.error("Error loading addresses:", err)
       } finally {
-        if (active) setDeliveryLoading(false)
+          setLoadingAddresses(false)
       }
-    }
+  }
 
-    loadDefaultAddress()
-    return () => { active = false }
-  }, [userId, partner.id])
+  const buildAddressString = (a: any) =>
+      `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
-  // Automatically calculate delivery when CEP becomes 8 digits (excluding non-digits)
-  useEffect(() => {
-    const cleanedCep = cep.replace(/\D/g, "")
-    if (cleanedCep.length !== 8) {
-      if (cleanedCep.length === 0) {
-        setDeliveryFee(null)
-        setDeliveryError(null)
-        setCalculatedAddress(null)
-        setShippingState("initial")
-      }
-      return
-    }
+  const handleAddressSelect = (addressId: string) => {
+      setSelectedAddressId(addressId)
+  }
 
-    let active = true
-    async function calculateForCep() {
-      setDeliveryLoading(true)
-      setDeliveryError(null)
+  const handleCepBlur = async () => {
+      const zip = newAddressData.zipCode.replace(/\D/g, "")
+      if (zip.length !== 8) return
+      setLoadingCep(true)
       try {
-        const response = await fetch(`/api/cep?cep=${cleanedCep}`)
-        const data = await response.json()
-        if (!active) return
-
-        if (data.erro || data.error) {
-          setDeliveryError("CEP não encontrado.")
-          setDeliveryFee(null)
-          setCalculatedAddress(null)
-          return
-        }
-
-        const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
-        setCalculatedAddress(`${data.localidade} - ${data.uf}`)
-        setShippingState("calculated")
-
-        const quote = await quoteDeliveryFeeAction({
-          partnerId: partner.id,
-          destinationAddress: addressStr,
-        })
-        if (!active) return
-        if (quote.success) {
-          setDeliveryFee(Number(quote.fee || 0))
-          setDeliveryError(null)
-        } else {
-          setDeliveryFee(null)
-          setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
-        }
+          const response = await fetch(`/api/cep?cep=${zip}`)
+          const data = await response.json()
+          if (!data.erro && !data.error) {
+              setNewAddressData(prev => ({
+                  ...prev,
+                  street: data.logradouro || prev.street,
+                  neighborhood: data.bairro || prev.neighborhood,
+                  city: data.localidade || data.municipio || prev.city,
+                  state: data.uf || prev.state,
+              }))
+          }
       } catch (err) {
-        if (active) {
-          setDeliveryError("Erro ao calcular o frete.")
-          setDeliveryFee(null)
-          setCalculatedAddress(null)
-        }
+          console.error("Erro ao buscar CEP:", err)
       } finally {
-        if (active) setDeliveryLoading(false)
+          setLoadingCep(false)
       }
-    }
+  }
 
-    calculateForCep()
-    return () => { active = false }
-  }, [cep, partner.id])
+  const handleSaveNewAddress = async () => {
+      if (!userId) return
+      const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+      const finalNumber = noNumber ? "S/N" : number
+      if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
+          setDeliveryError("Preencha todos os campos obrigatórios do endereço")
+          return
+      }
+      setDeliveryLoading(true)
+      let csrfToken = ""
+      try {
+          const csrfRes = await fetch("/api/csrf-token")
+          const csrfData = await csrfRes.json()
+          csrfToken = csrfData.token || ""
+      } catch {
+          notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
+          setDeliveryLoading(false)
+          return
+      }
+      const result = await createAddressAction({
+          entityId: userId, entityType: "user",
+          street, number: finalNumber, complement: newAddressData.complement,
+          neighborhood, city, state, zipCode,
+          isDefault: userAddresses.length === 0,
+          csrf_token: csrfToken,
+      })
+      if (result.error) {
+          setDeliveryError(result.error)
+      } else {
+          if (result.address) {
+              setUserAddresses(prev => [...prev, result.address])
+              setSelectedAddressId(result.address.id)
+          } else {
+              await loadUserAddresses()
+          }
+          setShowAddressForm(false)
+          setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
+          setDeliveryError(null)
+      }
+      setDeliveryLoading(false)
+  }
+
+  // Automatically calculate delivery when selectedAddress changes (for logged in users)
+  useEffect(() => {
+      if (!selectedAddress || !partner.id) return
+      let active = true
+
+      async function calculateForAddress() {
+          setDeliveryLoading(true)
+          setDeliveryError(null)
+          try {
+              const addressStr = buildAddressString(selectedAddress)
+              setCalculatedAddress(`${selectedAddress.city} - ${selectedAddress.state}`)
+              setShippingState("calculated")
+              setCep(selectedAddress.zip_code || "")
+
+              const quote = await quoteDeliveryFeeAction({
+                  partnerId: partner.id,
+                  destinationAddress: addressStr,
+              })
+              if (!active) return
+              if (quote.success) {
+                  setDeliveryFee(Number(quote.fee || 0))
+                  setDeliveryError(null)
+              } else {
+                  setDeliveryFee(null)
+                  setDeliveryError(quote.error || "Não realizamos entrega para este endereço.")
+              }
+          } catch (err) {
+              if (active) {
+                  setDeliveryError("Erro ao calcular o frete.")
+                  setDeliveryFee(null)
+                  setCalculatedAddress(null)
+              }
+          } finally {
+              if (active) setDeliveryLoading(false)
+          }
+      }
+
+      calculateForAddress()
+      return () => { active = false }
+  }, [selectedAddress, partner.id])
+
+  // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
+  useEffect(() => {
+      if (userId) return // If logged in, use selectedAddress useEffect
+      const cleanedCep = cep.replace(/\D/g, "")
+      if (cleanedCep.length !== 8) {
+          if (cleanedCep.length === 0) {
+              setDeliveryFee(null)
+              setDeliveryError(null)
+              setCalculatedAddress(null)
+              setShippingState("initial")
+          }
+          return
+      }
+
+      let active = true
+      async function calculateForCep() {
+          setDeliveryLoading(true)
+          setDeliveryError(null)
+          try {
+              const response = await fetch(`/api/cep?cep=${cleanedCep}`)
+              const data = await response.json()
+              if (!active) return
+
+              if (data.erro || data.error) {
+                  setDeliveryError("CEP não encontrado.")
+                  setDeliveryFee(null)
+                  setCalculatedAddress(null)
+                  return
+              }
+
+              const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
+              setCalculatedAddress(`${data.localidade} - ${data.uf}`)
+              setShippingState("calculated")
+
+              const quote = await quoteDeliveryFeeAction({
+                  partnerId: partner.id,
+                  destinationAddress: addressStr,
+              })
+              if (!active) return
+              if (quote.success) {
+                  setDeliveryFee(Number(quote.fee || 0))
+                  setDeliveryError(null)
+              } else {
+                  setDeliveryFee(null)
+                  setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
+              }
+          } catch (err) {
+              if (active) {
+                  setDeliveryError("Erro ao calcular o frete.")
+                  setDeliveryFee(null)
+                  setCalculatedAddress(null)
+              }
+          } finally {
+              if (active) setDeliveryLoading(false)
+          }
+      }
+
+      calculateForCep()
+      return () => { active = false }
+  }, [cep, partner.id, userId])
 
   useEffect(() => { setIsMounted(true) }, [])
   useEffect(() => { if (!userId && user?.id) setUserId(user.id) }, [userId, user])
@@ -347,6 +470,42 @@ export function ServiceDetailsPageClient({
     reviews.length > 0 ? reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length : 0,
     [reviews]
   )
+
+  const displayRating = useMemo(() => {
+    return reviews.length >= 3 ? avgRating.toFixed(1) : "-";
+  }, [reviews, avgRating])
+
+  const formattedJoinedDate = useMemo(() => {
+    if (!partner.created_at) return "Recente"
+    try {
+      const date = new Date(partner.created_at)
+      return date.toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
+    } catch {
+      return "Recente"
+    }
+  }, [partner.created_at])
+
+  const reputationLevel = useMemo(() => {
+    const sales = partner.vendas_totais || 0
+    const rating = partner.rating || 5.0
+    if (sales >= 2000 && rating >= 4.7) {
+      return { name: "Diamante", badge: "💎", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Diamante com excelente histórico de atendimento.", level: 5 }
+    }
+    if (sales >= 500 && rating >= 4.5) {
+      return { name: "Platina", badge: "💎", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Destaque Platina na Dudit.", level: 4 }
+    }
+    if (sales >= 100 && rating >= 4.3) {
+      return { name: "Ouro", badge: "🥇", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional com reputação Ouro e ótimo serviço.", level: 3 }
+    }
+    if (sales >= 20 && rating >= 4.0) {
+      return { name: "Prata", badge: "🥈", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Prata consistente na plataforma.", level: 2 }
+    }
+    return { name: "Bronze", badge: "🥉", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Bronze iniciando seus serviços na Dudit.", level: 1 }
+  }, [partner])
+
+  const partnerProfileImageUrl = useMemo(() => {
+    return getR2ImageUrl(partner.store_avatar)
+  }, [partner.store_avatar])
 
   const selectedStaff = useMemo(() => staff.find((s) => s.id === selectedStaffId), [staff, selectedStaffId])
 
@@ -475,13 +634,14 @@ export function ServiceDetailsPageClient({
               if (hasPromo && hasPix) {
                   return (
                       <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{totalDiscountPercent}% OFF</span>
+                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                  {formatCurrency(pixUnitPrice)}
+                              </p>
+                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                              <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
                           </div>
-                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                              {formatCurrency(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
-                          </p>
                           <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                               ou {formatCurrency(pricing.current)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
                           </p>
@@ -493,13 +653,13 @@ export function ServiceDetailsPageClient({
               if (hasPromo && !hasPix) {
                   return (
                       <div className="space-y-1">
+                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
                           <div className="flex items-center gap-2">
-                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                  {formatCurrency(pricing.current)}
+                              </p>
                               <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                           </div>
-                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                              {formatCurrency(pricing.current)}
-                          </p>
                           <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
                               ver meios de pagamento
                           </button>
@@ -511,13 +671,13 @@ export function ServiceDetailsPageClient({
               if (!hasPromo && hasPix) {
                   return (
                       <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                  {formatCurrency(pixUnitPrice)}
+                              </p>
                               <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
                           </div>
-                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                              {formatCurrency(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
-                          </p>
                           <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                               ou {formatCurrency(pricing.original)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
                           </p>
@@ -733,28 +893,57 @@ export function ServiceDetailsPageClient({
       {/* Shipping */}
       {!isProductOwner && (
         <FormSection title="Entrega" className="mt-6 mb-6">
-          <div className="flex flex-col gap-3">
-            {/* Retirar no local - Always show if store exists */}
-            <div className="flex flex-col border border-brand-border rounded-lg bg-white">
-              <div className="flex justify-between items-start py-3 px-4">
-                <div>
-                  <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                  {preparationEstimate && Number(service.availability_value || 0) > 0 && (
-                    <p className="text-xs text-brand-inactive-text">
-                      Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
+          <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden">
+            {/* CEP Input or User Address */}
+            {userId ? (
+              loadingAddresses ? (
+                <div className="p-4 bg-brand-gray/10 text-center text-xs text-brand-inactive-text animate-pulse">
+                  Carregando endereços...
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-brand-green">Grátis</p>
+              ) : userAddresses.length > 0 && selectedAddress ? (
+                <div className="flex items-center justify-between w-full p-4 bg-brand-gray/10">
+                  <div className="flex items-stretch gap-3">
+                    <img
+                      src="https://img.dudit.com.br/static/Map.png"
+                      alt="Endereço de entrega"
+                      className="w-12 h-12 object-cover rounded-xl shrink-0"
+                    />
+                    <div className="flex flex-col justify-center">
+                      <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
+                      <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
+                        {selectedAddress.street}, {selectedAddress.number}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
+                    Trocar
+                  </Button>
                 </div>
+              ) : (
+                <div className="p-4 bg-brand-gray/10 flex flex-col items-center justify-center text-center gap-2">
+                  <p className="text-xs text-brand-inactive-text">Nenhum endereço cadastrado</p>
+                  <Button variant="outline" size="sm" className="h-8 border-brand-green text-brand-green hover:bg-green-50" onClick={() => setShowAddressForm(true)}>
+                    Cadastrar endereço
+                  </Button>
+                </div>
+              )
+            ) : (
+              <div className="p-4 bg-brand-gray/10">
+                <CepInput
+                  value={cep}
+                  onChange={setCep}
+                  className="bg-white"
+                  label="Calcular entrega"
+                />
               </div>
-            </div>
+            )}
+
+            <Separator className="opacity-60" />
 
             {/* Delivery Option if configured */}
             {deliveryConfig?.settings?.isDeliveryEnabled ? (
-              <div className="flex flex-col border border-brand-border rounded-lg bg-white">
-                <div className="flex justify-between items-start py-3 px-4 border-b border-brand-border/60">
+              <>
+                <div className="flex justify-between items-start py-4 px-4">
                   <div>
                     <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pela loja</p>
                     {deliveryLoading ? (
@@ -780,23 +969,11 @@ export function ServiceDetailsPageClient({
                   </div>
                 </div>
 
-                {/* CEP Input */}
-                <div className="p-3 bg-brand-gray/20">
-                  <label className="text-[11px] font-bold text-brand-inactive-text mb-1.5 block uppercase tracking-wider">Calcular Frete</label>
-                  <div className="relative">
-                    <Input placeholder="00000-000" value={cep} onChange={handleCepChange} maxLength={9} className="h-[40px] w-full text-sm bg-white" />
-                    {deliveryLoading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="w-3.5 h-3.5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                <Separator className="opacity-60" />
+              </>
             ) : (
-              /* A combinar if no delivery config but store is active */
-              <div className="flex flex-col border border-brand-border rounded-lg bg-white">
-                <div className="flex justify-between items-start py-3 px-4">
+              <>
+                <div className="flex justify-between items-start py-4 px-4">
                   <div>
                     <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
                     <p className="text-xs text-brand-inactive-text">Fale com o profissional no WhatsApp após o pedido</p>
@@ -805,72 +982,86 @@ export function ServiceDetailsPageClient({
                     <p className="text-sm font-bold text-brand-dark">A combinar</p>
                   </div>
                 </div>
-              </div>
+
+                <Separator className="opacity-60" />
+              </>
             )}
+
+            {/* Retirar no local - Always show if store exists */}
+            <div className="flex justify-between items-start py-4 px-4">
+              <div>
+                <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                {preparationEstimate && Number(service.availability_value || 0) > 0 && (
+                  <p className="text-xs text-brand-inactive-text">
+                    Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-brand-green">Grátis</p>
+              </div>
+            </div>
           </div>
         </FormSection>
       )}
 
-      {/* Segurança e Garantia (Etsy-style Accordions) */}
+      {/* Informações importantes Accordion */}
       <div className="border-t border-brand-border pt-4 mb-6">
-        <h4 className="font-bold text-brand-dark text-sm mb-3 uppercase tracking-wider">Políticas da Loja e Segurança</h4>
-        <div className="space-y-2">
-          {[
-            {
-              id: "payment_info",
-              title: "Pagamento Direto ao Profissional",
-              content: "Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra. Isso significa que o seu dinheiro vai direto para o profissional, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!"
-            },
-            {
-              id: "seller_responsibility",
-              title: "Quem cuida do seu pedido?",
-              content: "A Dudit é a ponte que conecta você ao profissional. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução do serviço é por conta do profissional. A responsabilidade por realizar o serviço, oferecer garantia e resolver eventuais problemas é exclusivamente do profissional. Se tiver qualquer dúvida sobre o agendamento, o melhor caminho é chamar o profissional no WhatsApp para alinhar tudo, beleza?"
-            }
-          ].map((item) => {
-            const isExpanded = expandedAccordion === item.id;
-            return (
-              <div key={item.id} className="border-b border-brand-border pb-3 last:border-0">
-                <button
-                  type="button"
-                  onClick={() => setExpandedAccordion(isExpanded ? null : item.id)}
-                  className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
-                >
-                  <span className="font-bold text-brand-dark text-sm">{item.title}</span>
-                  <ChevronDownIcon
-                    size={18}
-                    className={`text-brand-inactive-text transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                  />
-                </button>
-                <AnimatePresence initial={false}>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="overflow-hidden"
-                    >
-                      <p className="text-xs md:text-sm text-brand-inactive-text leading-relaxed mt-1 pb-2">
-                        {item.content}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+        <div className="border-b border-brand-border pb-3">
+          <button
+            type="button"
+            onClick={() => setExpandedAccordion(expandedAccordion === "important_info" ? null : "important_info")}
+            className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
+          >
+            <span className="font-bold text-brand-dark text-sm">Informações importantes</span>
+            <ChevronDownIcon
+              size={18}
+              className={`text-brand-inactive-text transition-transform duration-200 ${expandedAccordion === "important_info" ? "rotate-180" : ""}`}
+            />
+          </button>
+          <AnimatePresence initial={false}>
+            {expandedAccordion === "important_info" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2 pb-1 flex flex-col gap-3">
+                  {/* Item 1 */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(true)}
+                    className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 transition-colors flex flex-col gap-0.5"
+                  >
+                    <span className="text-sm font-semibold text-brand-dark">Pagamento direto ao profissional</span>
+                    <span className="text-xs text-brand-inactive-text">Entenda onde vai o seu dinheiro nesta compra</span>
+                  </button>
+                  {/* Item 2 */}
+                  <button
+                    type="button"
+                    onClick={() => setShowResponsibilityModal(true)}
+                    className="w-full text-left py-2 px-1 hover:bg-brand-gray/50 transition-colors flex flex-col gap-0.5"
+                  >
+                    <span className="text-sm font-semibold text-brand-dark">Quem cuida do seu pedido?</span>
+                    <span className="text-xs text-brand-inactive-text">Entenda sobre a entrega, garantia e pós-venda</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* Store (Mercado Livre Style) */}
+      {/* Store (Reputation & Levels Card) */}
       <div className="mb-8 mt-4">
         {(() => {
           const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : "https://img.dudit.com.br/static/Placeholder.png";
           const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null;
-          const displayRating = partner.rating > 0 ? partner.rating : 5.0;
 
           return (
-            <div className="border border-brand-border rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
               {/* Banner */}
               <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
                 <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
@@ -880,7 +1071,7 @@ export function ServiceDetailsPageClient({
               {/* Profile Header */}
               <div className="px-4 pb-4 pt-0 relative flex flex-col">
                 {/* Avatar Container overlapping the banner */}
-                <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white shadow-sm -mt-8 z-10 self-start">
+                <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white -mt-8 z-10 self-start">
                   <UserProfileImage
                     fullName={partner.store_name}
                     imageUrl={sellerAvatarImage}
@@ -894,43 +1085,65 @@ export function ServiceDetailsPageClient({
                     <Link href={getPartnerUrl(partner)} className="font-bold text-brand-dark hover:text-brand-green hover:underline text-base truncate">
                       {partner.store_name}
                     </Link>
-                    <span className="text-[11px] font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-full whitespace-nowrap">
-                      Parceiro Oficial
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0 bg-brand-gray border border-brand-border/60 rounded px-1.5 py-0.5">
+                      <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
+                      <span className="text-xs font-bold text-brand-dark">{displayRating}</span>
+                    </div>
                   </div>
                   <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
                     {partner.city} - {partner.state}
                   </p>
                 </div>
 
-                {/* Level / Status Badge */}
-                <div className="mt-3 flex items-center gap-2 py-1.5 px-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
-                  <StarIcon size={14} className="text-brand-green fill-brand-green shrink-0" strokeWidth={0} />
-                  <p className="text-xs text-brand-green font-semibold">
-                    Excelente reputação ({displayRating.toFixed(1)}/5.0) · Profissional Destaque!
+                {/* Reputation & Levels Bar (iFood / ML style) */}
+                <div className="mt-3 flex flex-col gap-2 p-3 bg-brand-gray/50 rounded-xl border border-brand-border/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base leading-none">{reputationLevel.badge}</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-brand-dark">Selo Dudit: {reputationLevel.name}</span>
+                      <span className="text-[10px] text-brand-inactive-text">Nível do profissional baseado em reputação e vendas</span>
+                    </div>
+                  </div>
+                  
+                  {/* Horizontal segment bars */}
+                  <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
+                    {[1, 2, 3, 4, 5].map((lvl) => (
+                      <div
+                        key={lvl}
+                        className={`flex-1 h-full rounded-sm transition-all duration-300 ${
+                          reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  {/* Labels */}
+                  <div className="flex justify-between text-[9px] font-semibold text-brand-inactive-text mt-0.5 select-none">
+                    <span className={reputationLevel.level === 1 ? "text-brand-green font-bold" : ""}>Bronze</span>
+                    <span className={reputationLevel.level === 2 ? "text-brand-green font-bold" : ""}>Prata</span>
+                    <span className={reputationLevel.level === 3 ? "text-brand-green font-bold" : ""}>Ouro</span>
+                    <span className={reputationLevel.level === 4 ? "text-brand-green font-bold" : ""}>Platina</span>
+                    <span className={reputationLevel.level === 5 ? "text-brand-green font-bold" : ""}>Diamante</span>
+                  </div>
+                  <p className="text-xs text-brand-inactive-text mt-1 leading-relaxed">
+                    {reputationLevel.description}
                   </p>
                 </div>
 
-                {/* 3 columns metrics (Mercado Livre style) */}
+                {/* 3 columns metrics */}
                 <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-brand-border/60 text-center select-none">
                   <div className="flex flex-col items-center">
-                    <span className="text-sm font-bold text-brand-dark">+50</span>
-                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Vendas</span>
+                    <span className="text-sm font-bold text-brand-dark">{displayRating}</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Avaliação</span>
                   </div>
                   <div className="flex flex-col items-center border-x border-brand-border/60">
-                    <span className="text-sm font-bold text-brand-dark">99%</span>
-                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Atendimento</span>
+                    <span className="text-sm font-bold text-brand-dark">{partner.vendas_totais || 0}</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Vendas</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="text-sm font-bold text-brand-dark">Rápida</span>
-                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Entrega</span>
+                    <span className="text-sm font-bold text-brand-dark">{formattedJoinedDate}</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5">Cadastro</span>
                   </div>
                 </div>
-                
-                {/* View Store Button */}
-                <Link href={getPartnerUrl(partner)} className="mt-4 w-full py-2.5 bg-brand-gray hover:bg-gray-200 text-brand-dark font-bold text-xs rounded-lg text-center transition-colors">
-                  Ver vitrine do profissional
-                </Link>
               </div>
             </div>
           );
@@ -960,6 +1173,222 @@ export function ServiceDetailsPageClient({
         price={pricing.current}
         mpConnected={!!partner.mp_user_id}
       />
+
+      <DefaultModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        maxWidth="md"
+        hideHeader={true}
+      >
+        <div className="flex flex-col relative">
+          <button
+            onClick={() => setShowPaymentModal(false)}
+            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+            title="Fechar"
+          >
+            <XIcon size={16} />
+          </button>
+          {/* Header with Dual Squares */}
+          <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden"
+            style={{ background: 'linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)' }}>
+            <img
+              src="https://img.dudit.com.br/static/icons/Pagamento.png"
+              alt="Pagamento"
+              className="w-64 h-auto object-contain transform translate-y-6"
+            />
+          </div>
+
+          <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Onde vai o seu dinheiro?</h4>
+          <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
+            <p>
+              Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra.
+            </p>
+            <p>
+              Isso significa que o seu dinheiro vai direto para o profissional, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!
+            </p>
+          </div>
+          <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8 h-12">Entendi</Button>
+        </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={showResponsibilityModal}
+        onClose={() => setShowResponsibilityModal(false)}
+        maxWidth="md"
+        hideHeader={true}
+      >
+        <div className="flex flex-col relative">
+          <button
+            onClick={() => setShowResponsibilityModal(false)}
+            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors"
+            title="Fechar"
+          >
+            <XIcon size={16} />
+          </button>
+          {/* Header with Dual Squares */}
+          <div className="bg-brand-gray dark:bg-dark-border/50 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3 overflow-hidden">
+              <UserProfileImage
+                fullName={partner.store_name}
+                imageUrl={partnerProfileImageUrl.includes("Placeholder.png") ? null : partnerProfileImageUrl}
+                className="w-full h-full rounded-lg"
+              />
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
+                <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+              </div>
+            </div>
+
+            <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
+              <TruckIcon size={32} className="text-brand-green" />
+            </div>
+          </div>
+
+          <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Quem cuida do seu pedido?</h4>
+          <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
+            <p>
+              A Dudit é a ponte que conecta você ao profissional. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução do serviço é por conta do profissional.
+            </p>
+            <p>
+              A responsabilidade por realizar o serviço, oferecer garantia e resolver eventuais problemas é exclusivamente do profissional. Se tiver qualquer dúvida sobre o agendamento, o melhor caminho é chamar o profissional no WhatsApp para alinhar tudo, beleza?
+            </p>
+          </div>
+          <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8 h-12">Entendi</Button>
+        </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        title="Seus Endereços"
+        maxWidth="md"
+      >
+        <div className="space-y-3 pb-4">
+          {userAddresses.map((address) => (
+            <div
+              key={address.id}
+              onClick={() => {
+                handleAddressSelect(address.id)
+                setShowAddressModal(false)
+              }}
+              className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${
+                selectedAddressId === address.id
+                  ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                  : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+              }`}
+            >
+              <div className="mt-2.5 shrink-0 px-4">
+                <RadioButton
+                  name="addressSelect"
+                  value={address.id}
+                  checked={selectedAddressId === address.id}
+                  onChange={() => {
+                    handleAddressSelect(address.id)
+                    setShowAddressModal(false)
+                  }}
+                />
+              </div>
+              <div className="flex-1 pr-4">
+                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                <p className="text-sm text-brand-inactive-text mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                <p className="text-xs text-brand-inactive-text mt-1">CEP: {address.zip_code}</p>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              setShowAddressModal(false)
+              setShowAddressForm(true)
+            }}
+            className="w-full py-3 border border-dashed border-brand-border dark:border-dark-border rounded-xl text-sm font-medium text-brand-dark dark:text-dark-heading transition-colors flex items-center justify-center gap-2 mt-4"
+          >
+            <PlusIcon size={16} /> Adicionar outro endereço
+          </button>
+        </div>
+      </DefaultModal>
+
+      <DefaultModal
+        isOpen={showAddressForm}
+        onClose={() => setShowAddressForm(false)}
+        title="Adicionar novo endereço"
+      >
+        <div className="flex flex-col gap-4">
+          <div onBlur={handleCepBlur}>
+            <CepInput
+              value={newAddressData.zipCode}
+              onChange={(val) => setNewAddressData({ ...newAddressData, zipCode: val })}
+              disabled={loadingCep}
+            />
+          </div>
+          <div>
+            <Input
+              label="Rua/Avenida"
+              value={newAddressData.street}
+              onChange={(e) => setNewAddressData({ ...newAddressData, street: e.target.value })}
+              placeholder="Rua, Avenida, etc."
+              disabled={loadingCep}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <NumberInputWithCheckbox
+                label="Número"
+                number={newAddressData.number}
+                noNumber={newAddressData.noNumber}
+                onNumberChange={(val) => setNewAddressData({ ...newAddressData, number: val })}
+                onNoNumberChange={(checked) => setNewAddressData({ ...newAddressData, noNumber: checked, number: checked ? "S/N" : "" })}
+                placeholder="123"
+              />
+            </div>
+            <div>
+              <Input
+                label="Complemento"
+                value={newAddressData.complement}
+                onChange={(e) => setNewAddressData({ ...newAddressData, complement: e.target.value })}
+                placeholder="Apto, Bloco, etc."
+              />
+            </div>
+          </div>
+          <div>
+            <Input
+              label="Bairro"
+              value={newAddressData.neighborhood}
+              onChange={(e) => setNewAddressData({ ...newAddressData, neighborhood: e.target.value })}
+              disabled={loadingCep}
+              placeholder="Nome do bairro"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Input
+                label="Cidade"
+                value={newAddressData.city}
+                onChange={(e) => setNewAddressData({ ...newAddressData, city: e.target.value })}
+                disabled={loadingCep}
+                placeholder="Nome da cidade"
+              />
+            </div>
+            <div>
+              <StateComboBox
+                value={newAddressData.state}
+                onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSaveNewAddress}
+            disabled={deliveryLoading || loadingCep}
+            className="w-full mb-4"
+          >
+            {deliveryLoading ? <Spinner className="mr-2" size={16} /> : null}
+            Salvar Endereço
+          </Button>
+        </div>
+      </DefaultModal>
 
       <MarketplaceHeader
         userProfile={userProfile}
