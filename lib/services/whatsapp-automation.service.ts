@@ -138,11 +138,11 @@ export async function dispatchWhatsappAutomation(params: {
     deliveryId: params.deliveryId,
     phoneNumber: phone,
     templateName,
-    messageType: params.includeAppointmentButtons ? "interactive" : "template",
+    messageType: "template",
     payload: {
       templateName,
       variables: params.templateVariables || {},
-      interactiveButtons: params.includeAppointmentButtons ? APPOINTMENT_BUTTONS : undefined,
+      expectsAppointmentButtons: params.includeAppointmentButtons || undefined,
       triggerType: params.trigger,
     },
     triggerType: params.trigger,

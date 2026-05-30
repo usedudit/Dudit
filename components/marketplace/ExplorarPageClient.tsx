@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard } from "./shared-components"
@@ -55,16 +55,17 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "outros": "Outros"
 }
 
-const CATEGORY_COLORS = [
-    { bg: "bg-[#FFEFE5]", circle: "bg-[#FFDCC8]" }, // Peach
-    { bg: "bg-[#ECFDF5]", circle: "bg-[#A7F3D0]" }, // Green
-    { bg: "bg-[#EFF6FF]", circle: "bg-[#DBEAFE]" }, // Blue
-    { bg: "bg-[#F3E8FF]", circle: "bg-[#E9D5FF]" }, // Purple
-    { bg: "bg-[#FFF1F2]", circle: "bg-[#FFE4E6]" }, // Rose
-    { bg: "bg-[#FEF3C7]", circle: "bg-[#FDE68A]" }, // Yellow
-    { bg: "bg-[#E0F2FE]", circle: "bg-[#BAE6FD]" }, // Sky
-    { bg: "bg-[#F0FDF4]", circle: "bg-[#DCFCE7]" }  // Emerald
+const CATEGORY_GRADIENTS = [
+    "from-[#FF8008] to-[#FFC837]", // Warm Orange/Yellow
+    "from-[#11998e] to-[#38ef7d]", // Fresh Green
+    "from-[#00c6ff] to-[#0072ff]", // Ocean Blue
+    "from-[#7F00FF] to-[#E100FF]", // Vivid Purple
+    "from-[#fe0979] to-[#ff6a00]", // Sunset Pink/Orange
+    "from-[#F7971E] to-[#FFD200]", // Golden Yellow
+    "from-[#4facfe] to-[#00f2fe]", // Sky Blue
+    "from-[#00b09b] to-[#96c93d]"  // Lime/Emerald
 ]
+
 
 const FALLBACK_CATEGORIES = [
     { name: "Casa & Utilidades", icon_url: "https://img.dudit.com.br/static/categories/products/Casa-e-utilidades.png" },
@@ -744,6 +745,32 @@ export function ExplorarPageClient({
         return `Explorar`
     }, [query, currentType, selectedCategories, selectedCitySlug])
 
+    const emptySubtitle = useMemo(() => {
+        const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
+        const term = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
+        if (term) {
+            return `Ainda não temos vendedores ou resultados para <strong class='text-brand-dark'>"${term}"</strong> em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro ou convidar um vendedor?`
+        }
+        if (currentType === "produtos") {
+            return `Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a vender seus produtos de graça, sem comissão nenhuma?`
+        }
+        if (currentType === "servicos") {
+            return `Ainda não temos profissionais ou serviços cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a oferecer seus serviços de graça, sem comissão nenhuma?`
+        }
+        if (currentType === "vitrines") {
+            return `Ainda não temos lojas ou empresas cadastradas em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e criar a vitrine do seu negócio de graça, sem comissão nenhuma?`
+        }
+        return `Ainda não temos vendedores, produtos ou serviços cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`
+    }, [currentType, selectedCitySlug, query, selectedCategories])
+
+    const handleInvite = useCallback(() => {
+        const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
+        const term = query || (selectedCategories.length > 0 ? selectedCategories[0] : "") || "produtos e serviços"
+        const text = `Oi! Procurei por "${term}" na Dudit em ${cityNameOnly} e ainda não encontrei vendedores. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/invite`
+        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+        window.open(url, "_blank")
+    }, [selectedCitySlug, query, selectedCategories])
+
     return (
         <>
             {!hideHeaderAndFooter && <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />}
@@ -764,37 +791,36 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 2. CATEGORIES RECTANGULAR SLIDER */}
-                {!isLandingPage && (currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
+                {(currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
                     <div className="bg-white py-6">
                         <div className="container mx-auto px-4 max-w-[1400px]">
-                            <div className="flex gap-6 overflow-x-auto scrollbar-none py-2 px-1">
+                            <div className="flex gap-3 overflow-x-auto scrollbar-none py-2 px-1">
                                 {activeCategoriesList.map((cat, idx) => {
                                     const isSelected = selectedCategories.includes(cat.name)
-                                    const colors = CATEGORY_COLORS[idx % CATEGORY_COLORS.length]
+                                    const gradient = CATEGORY_GRADIENTS[idx % CATEGORY_GRADIENTS.length]
                                     return (
                                         <div
                                             key={cat.name}
                                             onClick={() => toggleCategory(cat.name)}
-                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 w-[90px] sm:w-[110px]"
+                                            className="flex flex-col items-center cursor-pointer select-none shrink-0 w-[80px] sm:w-[96px]"
                                         >
                                             <div
-                                                className={`relative w-[85px] h-[105px] sm:w-[100px] sm:h-[120px] rounded-[20px] overflow-hidden border border-transparent select-none ${colors.bg} ${isSelected
+                                                className={`relative w-[80px] h-[80px] sm:w-[96px] sm:h-[96px] rounded-[24px] overflow-hidden border border-transparent select-none bg-gradient-to-br ${gradient} ${isSelected
                                                     ? "ring-2 ring-brand-green ring-offset-2"
                                                     : ""
                                                     }`}
                                             >
-                                                {/* Background Circle Watermark - Positioned lower/bottom right */}
-                                                <div className={`absolute -bottom-6 -right-6 w-16 h-16 sm:w-20 sm:h-20 rounded-full opacity-60 ${colors.circle}`} />
-
-                                                {cat.icon_url ? (
-                                                    <img
-                                                        src={cat.icon_url}
-                                                        alt={cat.name}
-                                                        className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-14 h-14 sm:w-18 sm:h-18 object-contain z-10 select-none"
-                                                    />
-                                                ) : (
-                                                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-3xl sm:text-4xl filter drop-shadow-sm select-none z-10">📦</span>
-                                                )}
+                                                <div className="flex items-center justify-center w-full h-full p-4 sm:p-5">
+                                                    {cat.icon_url ? (
+                                                        <img
+                                                            src={cat.icon_url}
+                                                            alt={cat.name}
+                                                            className="w-12 h-12 sm:w-14 sm:h-14 object-contain select-none"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-3xl sm:text-4xl filter drop-shadow-sm select-none">📦</span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <span
                                                 className={`text-[12px] sm:text-[13px] font-bold text-center mt-2 leading-tight truncate w-full select-none ${isSelected ? "text-brand-green font-extrabold" : "text-brand-dark"
@@ -811,7 +837,7 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 3. FILTERS BAR (NOT STICKY - SCROLLS ALONG WITH THE PAGE) */}
-                {!isLandingPage && (
+                {!isLandingPage && rawItems.length > 0 && (
                     <div className="bg-white py-4">
                         <div className="container mx-auto px-4 max-w-[1400px] flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 flex-1">
@@ -944,14 +970,21 @@ export function ExplorarPageClient({
                                         imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
                                         imageAlt="Estamos Chegando!"
                                         title="Estamos Chegando!"
-                                        subtitle={`Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${formatCitySlug(selectedCitySlug).split(" - ")[0]}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
-                                        itemButton={{
-                                            text: "Começar a vender na Dudit",
-                                            action: () => {
-                                                router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                        subtitle={emptySubtitle}
+                                        buttons={[
+                                            {
+                                                text: "Começar a vender na Dudit",
+                                                action: () => {
+                                                    router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                },
+                                                variant: "default"
                                             },
-                                            variant: "default"
-                                        }}
+                                            {
+                                                text: "Convidar um vendedor",
+                                                action: handleInvite,
+                                                variant: "outline"
+                                            }
+                                        ]}
                                     />
                                 </div>
                             ) : isLandingPage ? (
@@ -962,11 +995,11 @@ export function ExplorarPageClient({
                                         </h2>
 
                                         {/* Premium iFood-style Banners */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto md:overflow-visible scrollbar-none snap-x snap-mandatory px-4 md:px-0 -mx-4 md:mx-0 py-1">
                                             {/* Banner 1: Produtos */}
                                             <div
                                                 onClick={() => handleTypeChange("produtos")}
-                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
+                                                className="w-[82vw] md:w-auto shrink-0 md:shrink snap-center relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
                                                     src="https://img.dudit.com.br/static/banners/BannerProdutos.png"
@@ -978,7 +1011,7 @@ export function ExplorarPageClient({
                                             {/* Banner 2: Serviços */}
                                             <div
                                                 onClick={() => handleTypeChange("servicos")}
-                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
+                                                className="w-[82vw] md:w-auto shrink-0 md:shrink snap-center relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
                                                     src="https://img.dudit.com.br/static/banners/BannerServicos.png"
@@ -994,7 +1027,7 @@ export function ExplorarPageClient({
                                                     setSelectedCategories(["Alimentação"])
                                                     updateUrl(selectedCitySlug, ["Alimentação"], query, "tudo")
                                                 }}
-                                                className="relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
+                                                className="w-[82vw] md:w-auto shrink-0 md:shrink snap-center relative overflow-hidden rounded-lg cursor-pointer select-none active:scale-[0.98] transition-all duration-300 group"
                                             >
                                                 <img
                                                     src="https://img.dudit.com.br/static/banners/BannerAlimentacao.png"
@@ -1011,21 +1044,21 @@ export function ExplorarPageClient({
                                             Lojas e Profissionais em {formatCitySlug(selectedCitySlug).split(" - ")[0]}
                                         </h3>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                                        <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-none snap-x snap-mandatory px-4 md:px-0 -mx-4 md:mx-0 py-1 md:grid md:grid-cols-3 lg:grid-cols-4 md:gap-6 md:overflow-visible md:pb-0">
                                             {normalizedInitialResults.map((item) => (
-                                                <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
+                                                <VitrineCard key={`vitrine-landing-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-[260px] sm:w-[280px] md:w-full shrink-0 md:shrink snap-center" />
                                             ))}
 
                                             {/* INFINITE SCROLL OBSERVER */}
                                             {hasNextPage && (
                                                 <div
                                                     ref={observerTarget}
-                                                    className="col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]"
+                                                    className="shrink-0 w-[120px] md:col-span-full md:w-full py-6 md:py-12 flex flex-col items-center justify-center min-h-[120px] snap-center"
                                                 >
                                                     {isFetchingNextPage ? (
-                                                        <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                            <SkeletonLoader height={24} width={180} />
-                                                            <span className="text-[11px] font-bold text-brand-inactive-text">Carregando mais opções...</span>
+                                                        <div className="flex flex-col items-center gap-2 animate-pulse text-center">
+                                                            <SkeletonLoader height={24} width={80} />
+                                                            <span className="text-[9px] md:text-[11px] font-bold text-brand-inactive-text">Carregando...</span>
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -1136,7 +1169,7 @@ export function ExplorarPageClient({
                                                     )}
                                                 </div>
                                             ) : (
-                                                <div className={`grid ${currentType === 'vitrines' ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6`}>
+                                                <div className={`grid ${currentType === 'vitrines' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6`}>
                                                     {remainingResults.map((item) => {
                                                         if (item.itemType === 'loja') {
                                                             return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />

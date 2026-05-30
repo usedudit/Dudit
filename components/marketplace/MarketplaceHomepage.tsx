@@ -158,11 +158,39 @@ export default function MarketplaceHome({
             rating: product.rating,
             reviews: 0,
             partners: Array.isArray(product.partners) ? product.partners[0] : product.partners,
+            category: product.category || null,
         }
     }), [products])
 
     const recentProducts = displayProducts.slice(0, 10)
     const alsoLikeProducts = displayProducts.slice(10, 20)
+
+    const promoProducts = useMemo(() => {
+        return displayProducts
+            .filter((p) => p.originalPrice && p.originalPrice > p.price)
+            .slice(0, 10)
+    }, [displayProducts])
+
+    const categoriesWithProducts = useMemo(() => {
+        const groups: { [key: string]: any[] } = {}
+        displayProducts.forEach((item) => {
+            const cat = item.category || "Outros"
+            if (!groups[cat]) groups[cat] = []
+            groups[cat].push(item)
+        })
+        return Object.entries(groups)
+            .map(([name, list]) => ({ name, list }))
+            .filter((g) => g.list.length >= 2)
+            .slice(0, 3)
+    }, [displayProducts])
+
+    const sortedVitrines = useMemo(() => {
+        return [...vitrines].sort((a, b) => {
+            const ratingA = Number(a.rating ?? a.partners?.rating ?? 0)
+            const ratingB = Number(b.rating ?? b.partners?.rating ?? 0)
+            return ratingB - ratingA
+        })
+    }, [vitrines])
 
     const handleAddressFetched = (addr: any) => {
         setForm(f => ({
@@ -588,6 +616,15 @@ export default function MarketplaceHome({
                     />
                 )}
 
+                {promoProducts.length > 0 && (
+                    <ProductCarousel
+                        title="Coisas em promoção"
+                        products={promoProducts}
+                        seeMoreLink="/explorar?type=produtos"
+                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                    />
+                )}
+
                 <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] mb-16">
                     <div className="bg-[#dfff00] rounded-[20px] p-6 md:px-12 md:py-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                         <div className="text-center md:text-left">
@@ -602,7 +639,17 @@ export default function MarketplaceHome({
                     </div>
                 </div>
 
-                <CategoryList vitrines={vitrines} />
+                {categoriesWithProducts.map((catGroup) => (
+                    <ProductCarousel
+                        key={catGroup.name}
+                        title={`Mais procurados em ${catGroup.name}`}
+                        products={catGroup.list}
+                        seeMoreLink={`/explorar?q=${encodeURIComponent(catGroup.name)}`}
+                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                    />
+                ))}
+
+                <CategoryList vitrines={sortedVitrines} />
 
                 <InfoSection />
 

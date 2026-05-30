@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator } from "@/components/reusable"
+import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -20,8 +20,11 @@ import { InfoCard } from "@/components/reusable/InfoCard"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
-import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
+import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { FavoriteButton } from "./FavoriteButton"
+import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
+import { getPartnerUrl } from "@/lib/utils/url-generator"
 
 interface ProductDetailsPageClientProps {
     product: any
@@ -123,26 +126,12 @@ export function ProductDetailsPageClient({
     const [showQuantityModal, setShowQuantityModal] = useState(false)
     const [customQuantity, setCustomQuantity] = useState("")
     const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
-
-
-    const galleryContainerRef = useRef<HTMLDivElement>(null)
-    const reviewsRef = useRef<HTMLDivElement>(null)
-    const lightboxJustOpened = useRef(false)
-    const isActionInProgress = useRef(false)
-
-    const zoomOriginX = useMotionValue(50)
-    const zoomOriginY = useMotionValue(50)
-    const zoomScale = useMotionValue(1)
-    const smoothScale = useSpring(zoomScale, { stiffness: 180, damping: 22 })
-    const transformOrigin = useTransform([zoomOriginX, zoomOriginY], ([x, y]) => `${x}% ${y}%`)
-
-    useEffect(() => { setIsMounted(true) }, [])
-
-    useEffect(() => {
-        if (!userId && user?.id) {
-            setUserId(user.id)
-        }
-    }, [userId, user])
+    const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false)
+    const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
+    const [deliveryError, setDeliveryError] = useState<string | null>(null)
+    const [deliveryLoading, setDeliveryLoading] = useState(false)
+    const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
+    const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
 
     const partner = useMemo(() => {
         const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
@@ -172,6 +161,127 @@ export function ProductDetailsPageClient({
             rating: p?.rating || p?.average_rating || 0,
         }
     }, [product])
+
+    // Load default address and calculate delivery if logged in
+    useEffect(() => {
+        if (typeof userId !== "string" || !partner.id) return
+        const activeUserId = userId
+        let active = true
+        
+        async function loadDefaultAddress() {
+            setDeliveryLoading(true)
+            try {
+                const result = await getAddressesAction(activeUserId, "user")
+                if (!active) return
+                const defaultAddress = result.addresses?.find((a: any) => a.is_default)
+                if (defaultAddress) {
+                    const addressStr = `${defaultAddress.street}, ${defaultAddress.number}${defaultAddress.complement ? `, ${defaultAddress.complement}` : ""} - ${defaultAddress.neighborhood}, ${defaultAddress.city} - ${defaultAddress.state}, ${defaultAddress.zip_code}`
+                    setCep(defaultAddress.zip_code || "")
+                    setCalculatedAddress(`${defaultAddress.city} - ${defaultAddress.state}`)
+                    setShippingState("calculated")
+                    
+                    const quote = await quoteDeliveryFeeAction({
+                        partnerId: partner.id,
+                        destinationAddress: addressStr,
+                    })
+                    if (!active) return
+                    if (quote.success) {
+                        setDeliveryFee(Number(quote.fee || 0))
+                        setDeliveryError(null)
+                    } else {
+                        setDeliveryFee(null)
+                        setDeliveryError(quote.error || "Erro ao calcular entrega.")
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading user address for shipping:", err)
+            } finally {
+                if (active) setDeliveryLoading(false)
+            }
+        }
+        
+        loadDefaultAddress()
+        return () => { active = false }
+    }, [userId, partner.id])
+
+    // Automatically calculate delivery when CEP becomes 8 digits (excluding non-digits)
+    useEffect(() => {
+        const cleanedCep = cep.replace(/\D/g, "")
+        if (cleanedCep.length !== 8) {
+            if (cleanedCep.length === 0) {
+                setDeliveryFee(null)
+                setDeliveryError(null)
+                setCalculatedAddress(null)
+                setShippingState("initial")
+            }
+            return
+        }
+
+        let active = true
+        async function calculateForCep() {
+            setDeliveryLoading(true)
+            setDeliveryError(null)
+            try {
+                const response = await fetch(`/api/cep?cep=${cleanedCep}`)
+                const data = await response.json()
+                if (!active) return
+
+                if (data.erro || data.error) {
+                    setDeliveryError("CEP não encontrado.")
+                    setDeliveryFee(null)
+                    setCalculatedAddress(null)
+                    return
+                }
+
+                const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
+                setCalculatedAddress(`${data.localidade} - ${data.uf}`)
+                setShippingState("calculated")
+
+                const quote = await quoteDeliveryFeeAction({
+                    partnerId: partner.id,
+                    destinationAddress: addressStr,
+                })
+                if (!active) return
+                if (quote.success) {
+                    setDeliveryFee(Number(quote.fee || 0))
+                    setDeliveryError(null)
+                } else {
+                    setDeliveryFee(null)
+                    setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
+                }
+            } catch (err) {
+                if (active) {
+                    setDeliveryError("Erro ao calcular o frete.")
+                    setDeliveryFee(null)
+                    setCalculatedAddress(null)
+                }
+            } finally {
+                if (active) setDeliveryLoading(false)
+            }
+        }
+
+        calculateForCep()
+        return () => { active = false }
+    }, [cep, partner.id])
+
+    const galleryContainerRef = useRef<HTMLDivElement>(null)
+    const reviewsRef = useRef<HTMLDivElement>(null)
+    const lightboxJustOpened = useRef(false)
+    const isActionInProgress = useRef(false)
+
+    const zoomOriginX = useMotionValue(50)
+    const zoomOriginY = useMotionValue(50)
+    const zoomScale = useMotionValue(1)
+    const smoothScale = useSpring(zoomScale, { stiffness: 180, damping: 22 })
+    const transformOrigin = useTransform([zoomOriginX, zoomOriginY], ([x, y]) => `${x}% ${y}%`)
+
+    useEffect(() => { setIsMounted(true) }, [])
+
+    useEffect(() => {
+        if (!userId && user?.id) {
+            setUserId(user.id)
+        }
+    }, [userId, user])
 
     const productImages = useMemo(() => {
         let images = (product.images || [])
@@ -577,25 +687,78 @@ export function ProductDetailsPageClient({
 
             {/* Price */}
             <div className="mb-6">
-                <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-                    <p className="text-xl sm:text-2xl md:text-[2rem] leading-none font-medium text-brand-dark">
-                        {formatMoney(pricing.current)}
-                    </p>
-                    {pricing.pixDiscountPercent > 0 && (
-                        <>
-                            <span className="bg-[#e1ff00] text-[#025107] text-[0.75rem] font-bold px-2 py-0.5 rounded-sm">-{pricing.pixDiscountPercent}% no Pix</span>
-                            <span className="font-semibold text-brand-dark text-base md:text-lg">{formatMoney(pricing.pix)}</span>
-                        </>
-                    )}
-                    {pricing.hasPromo && (
-                        <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
-                    )}
-                </div>
-                {pricing.hasCC && (
-                    <p className="text-xs md:text-[0.875rem] text-brand-inactive-text">
-                        ou {pricing.maxInstallments}x sem juros de {formatMoney(pricing.installment)} no cartão
-                    </p>
-                )}
+                {(() => {
+                    const hasPromo = pricing.hasPromo;
+                    const hasPix = pricing.pixDiscountPercent > 0;
+                    const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
+                    const totalDiscountPercent = pricing.original > 0 ? Math.round(((pricing.original - pixUnitPrice) / pricing.original) * 100) : 0;
+
+                    // Caso 3: Promoção + Pix (melhor opção)
+                    if (hasPromo && hasPix) {
+                        return (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{totalDiscountPercent}% OFF</span>
+                                </div>
+                                <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                    {formatMoney(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
+                                </p>
+                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                    ou {formatMoney(pricing.current)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                                </p>
+                            </div>
+                        );
+                    }
+
+                    // Caso 1: Só promoção
+                    if (hasPromo && !hasPix) {
+                        return (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                                </div>
+                                <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                    {formatMoney(pricing.current)}
+                                </p>
+                                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                                    ver meios de pagamento
+                                </button>
+                            </div>
+                        );
+                    }
+
+                    // Caso 2: Só desconto no Pix
+                    if (!hasPromo && hasPix) {
+                        return (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                    <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
+                                </div>
+                                <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                    {formatMoney(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
+                                </p>
+                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                    ou {formatMoney(pricing.original)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                                </p>
+                            </div>
+                        );
+                    }
+
+                    // Caso 4: Sem promoção e sem Pix
+                    return (
+                        <div className="space-y-1">
+                            <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                {formatMoney(pricing.current)}
+                            </p>
+                            <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                                ver meios de pagamento
+                            </button>
+                        </div>
+                    );
+                })()}
             </div>
 
             {VariantsSection}
@@ -622,111 +785,209 @@ export function ProductDetailsPageClient({
 
             {/* Shipping */}
             {!isProductOwner && (
-                <div className="mb-8">
-                    <label className="text-sm font-bold text-brand-dark mb-2 block">Frete e Entrega</label>
-
-                    {/* Retirar no local - Always show if store exists */}
-                    <div className="flex flex-col border border-brand-border rounded-lg bg-white mb-3">
-                        <div className="flex justify-between items-start py-3 px-4 border-b border-brand-border last:border-0">
-                            <div>
-                                <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                                {preparationEstimate && (
-                                    <p className="text-xs text-brand-inactive-text">
-                                        Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm font-bold text-brand-green">Grátis</p>
+                <FormSection title="Entrega" className="mb-8">
+                    <div className="flex flex-col gap-3">
+                        {/* Retirar no local - Always show if store exists */}
+                        <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+                            <div className="flex justify-between items-start py-3 px-4">
+                                <div>
+                                    <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                                    {preparationEstimate && Number(product.availability_value || 0) > 0 && (
+                                        <p className="text-xs text-brand-inactive-text">
+                                            Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold text-brand-green">Grátis</p>
+                                </div>
                             </div>
                         </div>
 
                         {/* Delivery Option if configured */}
-                        {deliveryConfig?.settings?.isDeliveryEnabled && (
-                            <div className="flex justify-between items-start py-3 px-4 border-b border-brand-border last:border-0">
-                                <div>
-                                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pela loja</p>
-                                    {userProfile?.address ? (
-                                        <p className="text-xs text-brand-inactive-text">Para {userProfile.address}</p>
-                                    ) : (
-                                        <p className="text-xs text-brand-inactive-text">Calcule informando seu CEP no checkout</p>
-                                    )}
+                        {deliveryConfig?.settings?.isDeliveryEnabled ? (
+                            <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+                                <div className="flex justify-between items-start py-3 px-4 border-b border-brand-border/60">
+                                    <div>
+                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pela loja</p>
+                                        {deliveryLoading ? (
+                                            <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
+                                        ) : deliveryError ? (
+                                            <p className="text-xs text-red-500">{deliveryError}</p>
+                                        ) : calculatedAddress ? (
+                                            <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                                        ) : (
+                                            <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
+                                        )}
+                                    </div>
+                                    <div className="text-right">
+                                        {deliveryLoading ? (
+                                            <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                                        ) : deliveryFee !== null ? (
+                                            <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
+                                                {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm font-semibold text-brand-inactive-text">-</p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    {(() => {
-                                        const fee = Number(deliveryConfig?.settings?.baseFee || 0)
-                                        return <p className={`text-sm font-bold ${fee > 0 ? "text-brand-dark" : "text-brand-green"}`}>{fee > 0 ? formatMoney(fee) : "Grátis"}</p>
-                                    })()}
+
+                                {/* CEP Input */}
+                                <div className="p-3 bg-brand-gray/20">
+                                    <label className="text-[11px] font-bold text-brand-inactive-text mb-1.5 block uppercase tracking-wider">Calcular Frete</label>
+                                    <div className="relative">
+                                        <Input placeholder="00000-000" value={cep} onChange={handleCepChange} maxLength={9} className="h-[40px] w-full text-sm bg-white" />
+                                        {deliveryLoading && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <div className="w-3.5 h-3.5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        )}
-
-                        {/* A combinar if no delivery config but store is active */}
-                        {!deliveryConfig?.settings?.isDeliveryEnabled && (
-                            <div className="flex justify-between items-start py-3 px-4 last:border-0">
-                                <div>
-                                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
-                                    <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                        ) : (
+                            /* A combinar if no delivery config but store is active */
+                            <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+                                <div className="flex justify-between items-start py-3 px-4">
+                                    <div>
+                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
+                                        <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
-
-                    {/* CEP Input if no address */}
-                    {!userProfile?.address && shippingState === "initial" && (
-                        <div className="flex gap-2">
-                            <Input placeholder="00000-000" value={cep} onChange={handleCepChange} maxLength={9} className="h-[48px] flex-1" />
-                            <Button onClick={() => { if (cep.replace("-", "").length >= 8) setShippingState("calculated") }}
-                                className="h-[48px] w-[48px] shrink-0">OK</Button>
-                        </div>
-                    )}
-
-                    {userProfile?.address && (
-                        <p className="text-[11px] text-brand-inactive-text px-1">
-                            Os valores e prazos são estimativas baseadas no endereço do seu perfil.
-                        </p>
-                    )}
-                </div>
+                </FormSection>
             )}
 
-            {/* Segurança jurídica*/}
-            <div className="border-t border-brand-border mb-6">
-                {[
-                    {
-                        title: "Pagamento Direto ao Vendedor",
-                        onClick: () => setShowPaymentModal(true)
-                    },
-                    {
-                        title: "Entrega e Garantia do Vendedor",
-                        onClick: () => setShowResponsibilityModal(true)
-                    },
-                ].map(({ title, onClick }) => (
-                    <button
-                        key={title}
-                        onClick={onClick}
-                        className="w-full flex items-center gap-3 py-4 px-3 border-b border-brand-border hover:bg-brand-gray text-left transition-colors"
-                    >
-                        <div className="bg-brand-green w-1 rounded-full self-stretch shrink-0 min-h-[20px]" />
-                        <span className="font-bold text-brand-dark text-sm flex-grow">{title}</span>
-                        <ChevronRightIcon className="text-brand-dark shrink-0" size={20} />
-                    </button>
-                ))}
+            {/* Segurança e Garantia (Etsy-style Accordions) */}
+            <div className="border-t border-brand-border pt-4 mb-6">
+                <h4 className="font-bold text-brand-dark text-sm mb-3 uppercase tracking-wider">Políticas da Loja e Segurança</h4>
+                <div className="space-y-2">
+                    {[
+                        {
+                            id: "payment_info",
+                            title: "Pagamento Direto ao Vendedor",
+                            content: "Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra. Isso significa que o seu dinheiro vai direto para o vendedor, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!"
+                        },
+                        {
+                            id: "seller_responsibility",
+                            title: "Quem cuida do seu pedido?",
+                            content: "A Dudit é a ponte que conecta você ao vendedor. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução da venda é por conta do vendedor. A responsabilidade por separar o produto, realizar a entrega, oferecer garantia e resolver trocas ou devoluções é exclusivamente do vendedor. Se tiver qualquer dúvida sobre o seu item, o melhor caminho é chamar o vendedor no WhatsApp para alinhar tudo, beleza?"
+                        }
+                    ].map((item) => {
+                        const isExpanded = expandedAccordion === item.id;
+                        return (
+                            <div key={item.id} className="border-b border-brand-border pb-3 last:border-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setExpandedAccordion(isExpanded ? null : item.id)}
+                                    className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
+                                >
+                                    <span className="font-bold text-brand-dark text-sm">{item.title}</span>
+                                    <ChevronDownIcon
+                                        size={18}
+                                        className={`text-brand-inactive-text transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                                    />
+                                </button>
+                                <AnimatePresence initial={false}>
+                                    {isExpanded && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                                            className="overflow-hidden"
+                                        >
+                                            <p className="text-xs md:text-sm text-brand-inactive-text leading-relaxed mt-1 pb-2">
+                                                {item.content}
+                                            </p>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* Store */}
-            <div className="mb-8">
-                <VitrineCard vitrine={{
-                    ...partner,
-                    name: partner.store_name,
-                    partners: {
-                        ...partner,
-                        store_avatar: partner.profile_image_url
-                    },
-                    images: partner.banner_url ? [partner.banner_url] : []
-                }} />
+            {/* Store (Mercado Livre Style) */}
+            <div className="mb-8 mt-4">
+                {(() => {
+                    const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : "https://img.dudit.com.br/static/Placeholder.png";
+                    const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null;
+                    const displayRating = partner.rating > 0 ? partner.rating : 5.0;
+
+                    return (
+                        <div className="border border-brand-border rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all duration-300">
+                            {/* Banner */}
+                            <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
+                                <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/10" />
+                            </div>
+                            
+                            {/* Profile Header */}
+                            <div className="px-4 pb-4 pt-0 relative flex flex-col">
+                                {/* Avatar Container overlapping the banner */}
+                                <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white shadow-sm -mt-8 z-10 self-start">
+                                    <UserProfileImage
+                                        fullName={partner.store_name}
+                                        imageUrl={sellerAvatarImage}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                
+                                {/* Store Name and Details */}
+                                <div className="mt-2 min-w-0">
+                                    <div className="flex items-center gap-1.5 justify-between">
+                                        <Link href={getPartnerUrl(partner)} className="font-bold text-brand-dark hover:text-brand-green hover:underline text-base truncate">
+                                            {partner.store_name}
+                                        </Link>
+                                        <span className="text-[11px] font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                            Parceiro Oficial
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
+                                        {partner.city} - {partner.state}
+                                    </p>
+                                </div>
+
+                                {/* Level / Status Badge */}
+                                <div className="mt-3 flex items-center gap-2 py-1.5 px-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                                    <StarIcon size={14} className="text-brand-green fill-brand-green shrink-0" strokeWidth={0} />
+                                    <p className="text-xs text-brand-green font-semibold">
+                                        Excelente reputação ({displayRating.toFixed(1)}/5.0) · Vendedor Destaque!
+                                    </p>
+                                </div>
+
+                                {/* 3 columns metrics (Mercado Livre style) */}
+                                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-brand-border/60 text-center select-none">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm font-bold text-brand-dark">+50</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Vendas</span>
+                                    </div>
+                                    <div className="flex flex-col items-center border-x border-brand-border/60">
+                                        <span className="text-sm font-bold text-brand-dark">99%</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Atendimento</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm font-bold text-brand-dark">Rápida</span>
+                                        <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Entrega</span>
+                                    </div>
+                                </div>
+                                
+                                {/* View Store Button */}
+                                <Link href={getPartnerUrl(partner)} className="mt-4 w-full py-2.5 bg-brand-gray hover:bg-gray-200 text-brand-dark font-bold text-xs rounded-lg text-center transition-colors">
+                                    Ver vitrine do vendedor
+                                </Link>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {!isProductOwner && (
@@ -851,6 +1112,15 @@ export function ProductDetailsPageClient({
                 targetType="product"
                 targetId={product.id}
                 targetName={product.name}
+            />
+
+            <VendorPaymentMethodsModal
+                isOpen={showPaymentMethodsModal}
+                onClose={() => setShowPaymentMethodsModal(false)}
+                storeName={partner.store_name}
+                paymentMethods={partner.paymentMethods}
+                price={pricing.current}
+                mpConnected={!!partner.mp_user_id}
             />
 
             <DefaultModal

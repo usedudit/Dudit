@@ -77,7 +77,7 @@
   --brand-page-bg: #fff;
   --brand-sidebar-bg: #ffffff;
   --brand-component-bg: #ffffff;
-  --brand-dark: #003d32;
+  --brand-dark: #003229;
   --brand-inactive-text: #6b7280;
   --brand-gray: #F9FAFB;
   --brand-slate: #f3f5f9;
@@ -843,4 +843,4 @@ select:disabled,
 [aria-disabled="true"],
 [disabled] * {
   cursor: not-allowed !important;
-}
+}

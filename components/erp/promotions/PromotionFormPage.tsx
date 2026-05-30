@@ -14,6 +14,7 @@ import {
 import SelectPromotionProductsSheet from "./SelectPromotionProductsSheet"
 import SelectPromotionCategoriesSheet from "./SelectPromotionCategoriesSheet"
 import { ChevronLeftIcon } from "@/lib/icons"
+import { formatCurrency } from "@/lib/utils"
 
 const Div = (props: any) => React.createElement("div", props)
 const P = (props: any) => React.createElement("p", props)

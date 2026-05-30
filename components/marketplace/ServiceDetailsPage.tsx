@@ -9,6 +9,7 @@ import {
   StarIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
+  ChevronDownIcon,
   CheckCircleIcon,
   ClockIcon,
   CalendarIcon,
@@ -16,11 +17,12 @@ import {
   ShareIcon,
   HeartIcon,
   MapPinIcon,
+  XIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { FavoriteButton } from "./FavoriteButton"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, IconPlaceholder } from "@/components/reusable"
+import { Button, Input, FormSection, IconPlaceholder } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { VitrineCard } from "./shared-components"
@@ -30,6 +32,11 @@ import {
   getPublicAvailableTimeSlots,
   createPublicAppointment,
 } from "@/app/actions/marketplace/services"
+import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
+import { getPartnerUrl } from "@/lib/utils/url-generator"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -95,7 +102,7 @@ export function ServiceDetailsPageClient({
   cartCount,
 }: ServiceDetailsPageClientProps) {
   const router = useRouter()
-  const { user } = useSupabase()
+  const { user, supabase } = useSupabase()
   const { success: notifySuccess, error: notifyError } = useNotification()
 
   const [userId, setUserId] = useState<string | null | undefined>(initialUserId || user?.id)
@@ -111,10 +118,17 @@ export function ServiceDetailsPageClient({
   const [isMounted, setIsMounted] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
-  useEffect(() => { setIsMounted(true) }, [])
-  useEffect(() => { if (!userId && user?.id) setUserId(user.id) }, [userId, user])
-
-  // ─── Derived ──────────────────────────────────────────────────────────────
+  // Redesign states
+  const [cep, setCep] = useState("")
+  const [shippingState, setShippingState] = useState<"initial" | "calculated">("initial")
+  const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false)
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
+  const [deliveryError, setDeliveryError] = useState<string | null>(null)
+  const [deliveryLoading, setDeliveryLoading] = useState(false)
+  const [calculatedAddress, setCalculatedAddress] = useState<string | null>(null)
+  const [expandedAccordion, setExpandedAccordion] = useState<string | null>(null)
+  const [deliveryConfig, setDeliveryConfig] = useState<any>(null)
+  const [isTeamMember, setIsTeamMember] = useState(false)
 
   const partner = useMemo(() => {
     const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
@@ -133,8 +147,148 @@ export function ServiceDetailsPageClient({
       opening_hours: p?.opening_hours || null,
       rating: p?.rating || 0,
       paymentMethods: p?.payment_methods || [],
+      max_installments: p?.max_installments || 12,
+      mp_user_id: p?.mp_user_id,
+      mp_public_key: p?.mp_public_key,
     }
   }, [service])
+
+  const handleCepChange = useCallback((e: any) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 8)
+    setCep(raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw)
+  }, [])
+
+  // Check if user is team member of the partner
+  useEffect(() => {
+    if (userId && userId !== partner.user_id && partner.id) {
+      supabase
+        .from("partner_users")
+        .select("id")
+        .eq("partner_id", partner.id)
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data }: any) => {
+          if (data) setIsTeamMember(true)
+        })
+        .catch(() => { })
+    }
+  }, [userId, partner.id, partner.user_id, supabase])
+
+  // Load partner delivery configuration
+  useEffect(() => {
+    if (partner.id) {
+      getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
+        if (res.success) setDeliveryConfig(res)
+      })
+    }
+  }, [partner.id])
+
+  // Load default address and calculate delivery if logged in
+  useEffect(() => {
+    if (typeof userId !== "string" || !partner.id) return
+    const activeUserId = userId
+    let active = true
+
+    async function loadDefaultAddress() {
+      setDeliveryLoading(true)
+      try {
+        const result = await getAddressesAction(activeUserId, "user")
+        if (!active) return
+        const defaultAddress = result.addresses?.find((a: any) => a.is_default)
+        if (defaultAddress) {
+          const addressStr = `${defaultAddress.street}, ${defaultAddress.number}${defaultAddress.complement ? `, ${defaultAddress.complement}` : ""} - ${defaultAddress.neighborhood}, ${defaultAddress.city} - ${defaultAddress.state}, ${defaultAddress.zip_code}`
+          setCep(defaultAddress.zip_code || "")
+          setCalculatedAddress(`${defaultAddress.city} - ${defaultAddress.state}`)
+          setShippingState("calculated")
+
+          const quote = await quoteDeliveryFeeAction({
+            partnerId: partner.id,
+            destinationAddress: addressStr,
+          })
+          if (!active) return
+          if (quote.success) {
+            setDeliveryFee(Number(quote.fee || 0))
+            setDeliveryError(null)
+          } else {
+            setDeliveryFee(null)
+            setDeliveryError(quote.error || "Erro ao calcular entrega.")
+          }
+        }
+      } catch (err) {
+        console.error("Error loading user address for shipping:", err)
+      } finally {
+        if (active) setDeliveryLoading(false)
+      }
+    }
+
+    loadDefaultAddress()
+    return () => { active = false }
+  }, [userId, partner.id])
+
+  // Automatically calculate delivery when CEP becomes 8 digits (excluding non-digits)
+  useEffect(() => {
+    const cleanedCep = cep.replace(/\D/g, "")
+    if (cleanedCep.length !== 8) {
+      if (cleanedCep.length === 0) {
+        setDeliveryFee(null)
+        setDeliveryError(null)
+        setCalculatedAddress(null)
+        setShippingState("initial")
+      }
+      return
+    }
+
+    let active = true
+    async function calculateForCep() {
+      setDeliveryLoading(true)
+      setDeliveryError(null)
+      try {
+        const response = await fetch(`/api/cep?cep=${cleanedCep}`)
+        const data = await response.json()
+        if (!active) return
+
+        if (data.erro || data.error) {
+          setDeliveryError("CEP não encontrado.")
+          setDeliveryFee(null)
+          setCalculatedAddress(null)
+          return
+        }
+
+        const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
+        setCalculatedAddress(`${data.localidade} - ${data.uf}`)
+        setShippingState("calculated")
+
+        const quote = await quoteDeliveryFeeAction({
+          partnerId: partner.id,
+          destinationAddress: addressStr,
+        })
+        if (!active) return
+        if (quote.success) {
+          setDeliveryFee(Number(quote.fee || 0))
+          setDeliveryError(null)
+        } else {
+          setDeliveryFee(null)
+          setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
+        }
+      } catch (err) {
+        if (active) {
+          setDeliveryError("Erro ao calcular o frete.")
+          setDeliveryFee(null)
+          setCalculatedAddress(null)
+        }
+      } finally {
+        if (active) setDeliveryLoading(false)
+      }
+    }
+
+    calculateForCep()
+    return () => { active = false }
+  }, [cep, partner.id])
+
+  useEffect(() => { setIsMounted(true) }, [])
+  useEffect(() => { if (!userId && user?.id) setUserId(user.id) }, [userId, user])
+
+  // ─── Derived ──────────────────────────────────────────────────────────────
 
   const serviceImages = useMemo(() => {
     const images = (service.images || [])
@@ -147,6 +301,47 @@ export function ServiceDetailsPageClient({
   const bufferMinutes = Number(service.buffer_minutes || 0)
   const price = Number(service.price || 0)
   const categoryName = (service as any).service_categories?.name || "Serviço"
+
+  const pricing = useMemo(() => {
+      const base = Number(service.price) || 0
+      const promo = Number(service.promotional_price) || 0
+      const hasPromo = promo > 0 && promo < base
+      const current = hasPromo ? promo : base
+      const total = current
+
+      // Real Pix Discount from Partner's payment methods
+      const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
+      const pixDiscountPercent = pixMethod?.discount_percent || 0
+      const pixTotal = total * (1 - (pixDiscountPercent / 100))
+
+      // Real Installments from Partner's credit card method
+      const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
+      const hasCC = !!ccMethod
+      const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
+      const installmentPrice = total / maxInstallments
+
+      return {
+          current, original: base, hasPromo, total,
+          pix: pixTotal,
+          pixDiscountPercent,
+          hasCC,
+          maxInstallments,
+          installment: installmentPrice,
+          discountPercent: Math.round(((base - promo) / base) * 100),
+      }
+  }, [service, partner])
+
+  const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
+      products: [{
+          availability_value: Number(service.availability_value || 0),
+          availability_unit: service.availability_unit || "Minutos",
+      }],
+      openingHours: partner.opening_hours || null,
+      pickupWindowMinutes: 30,
+      deliveryTimeEstimateMinutes: 0,
+  }), [service, partner.opening_hours])
+
+  const isProductOwner = !!(userId && (userId === partner.user_id || isTeamMember))
 
   const avgRating = useMemo(() =>
     reviews.length > 0 ? reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length : 0,
@@ -268,14 +463,82 @@ export function ServiceDetailsPageClient({
         {service.name}
       </h1>
 
-      {/* Price + Duration */}
+      {/* Price */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <p className="text-xl sm:text-2xl md:text-[2rem] leading-none font-medium text-brand-dark">
-            {formatCurrency(price)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-brand-inactive-text">
+          {(() => {
+              const hasPromo = pricing.hasPromo;
+              const hasPix = pricing.pixDiscountPercent > 0;
+              const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
+              const totalDiscountPercent = pricing.original > 0 ? Math.round(((pricing.original - pixUnitPrice) / pricing.original) * 100) : 0;
+
+              // Caso 3: Promoção + Pix (melhor opção)
+              if (hasPromo && hasPix) {
+                  return (
+                      <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{totalDiscountPercent}% OFF</span>
+                          </div>
+                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                              {formatCurrency(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
+                          </p>
+                          <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                              ou {formatCurrency(pricing.current)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                          </p>
+                      </div>
+                  );
+              }
+
+              // Caso 1: Só promoção
+              if (hasPromo && !hasPix) {
+                  return (
+                      <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                          </div>
+                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                              {formatCurrency(pricing.current)}
+                          </p>
+                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                              ver meios de pagamento
+                          </button>
+                      </div>
+                  );
+              }
+
+              // Caso 2: Só desconto no Pix
+              if (!hasPromo && hasPix) {
+                  return (
+                      <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                              <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                              <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
+                          </div>
+                          <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                              {formatCurrency(pixUnitPrice)} <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm ml-1.5">no Pix</span>
+                          </p>
+                          <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                              ou {formatCurrency(pricing.original)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                          </p>
+                      </div>
+                  );
+              }
+
+              // Caso 4: Sem promoção e sem Pix
+              return (
+                  <div className="space-y-1">
+                      <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                          {formatCurrency(pricing.current)}
+                      </p>
+                      <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                          ver meios de pagamento
+                      </button>
+                  </div>
+              );
+          })()}
+        
+        <div className="flex items-center gap-2 text-sm text-brand-inactive-text mt-3">
           <ClockIcon size={14} />
           <span>{formatDuration(durationMinutes)}</span>
           {bufferMinutes > 0 && (
@@ -467,17 +730,211 @@ export function ServiceDetailsPageClient({
         </Button>
       </div>
 
-      {/* Store Card */}
+      {/* Shipping */}
+      {!isProductOwner && (
+        <FormSection title="Entrega" className="mt-6 mb-6">
+          <div className="flex flex-col gap-3">
+            {/* Retirar no local - Always show if store exists */}
+            <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+              <div className="flex justify-between items-start py-3 px-4">
+                <div>
+                  <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                  {preparationEstimate && Number(service.availability_value || 0) > 0 && (
+                    <p className="text-xs text-brand-inactive-text">
+                      Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-brand-green">Grátis</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Option if configured */}
+            {deliveryConfig?.settings?.isDeliveryEnabled ? (
+              <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+                <div className="flex justify-between items-start py-3 px-4 border-b border-brand-border/60">
+                  <div>
+                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pela loja</p>
+                    {deliveryLoading ? (
+                      <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
+                    ) : deliveryError ? (
+                      <p className="text-xs text-red-500">{deliveryError}</p>
+                    ) : calculatedAddress ? (
+                      <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                    ) : (
+                      <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    {deliveryLoading ? (
+                      <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                    ) : deliveryFee !== null ? (
+                      <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
+                        {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                      </p>
+                    ) : (
+                      <p className="text-sm font-semibold text-brand-inactive-text">-</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* CEP Input */}
+                <div className="p-3 bg-brand-gray/20">
+                  <label className="text-[11px] font-bold text-brand-inactive-text mb-1.5 block uppercase tracking-wider">Calcular Frete</label>
+                  <div className="relative">
+                    <Input placeholder="00000-000" value={cep} onChange={handleCepChange} maxLength={9} className="h-[40px] w-full text-sm bg-white" />
+                    {deliveryLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="w-3.5 h-3.5 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* A combinar if no delivery config but store is active */
+              <div className="flex flex-col border border-brand-border rounded-lg bg-white">
+                <div className="flex justify-between items-start py-3 px-4">
+                  <div>
+                    <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
+                    <p className="text-xs text-brand-inactive-text">Fale com o profissional no WhatsApp após o pedido</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </FormSection>
+      )}
+
+      {/* Segurança e Garantia (Etsy-style Accordions) */}
+      <div className="border-t border-brand-border pt-4 mb-6">
+        <h4 className="font-bold text-brand-dark text-sm mb-3 uppercase tracking-wider">Políticas da Loja e Segurança</h4>
+        <div className="space-y-2">
+          {[
+            {
+              id: "payment_info",
+              title: "Pagamento Direto ao Profissional",
+              content: "Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra. Isso significa que o seu dinheiro vai direto para o profissional, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!"
+            },
+            {
+              id: "seller_responsibility",
+              title: "Quem cuida do seu pedido?",
+              content: "A Dudit é a ponte que conecta você ao profissional. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução do serviço é por conta do profissional. A responsabilidade por realizar o serviço, oferecer garantia e resolver eventuais problemas é exclusivamente do profissional. Se tiver qualquer dúvida sobre o agendamento, o melhor caminho é chamar o profissional no WhatsApp para alinhar tudo, beleza?"
+            }
+          ].map((item) => {
+            const isExpanded = expandedAccordion === item.id;
+            return (
+              <div key={item.id} className="border-b border-brand-border pb-3 last:border-0">
+                <button
+                  type="button"
+                  onClick={() => setExpandedAccordion(isExpanded ? null : item.id)}
+                  className="w-full flex items-center justify-between py-2 text-left hover:text-brand-green transition-colors"
+                >
+                  <span className="font-bold text-brand-dark text-sm">{item.title}</span>
+                  <ChevronDownIcon
+                    size={18}
+                    className={`text-brand-inactive-text transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-xs md:text-sm text-brand-inactive-text leading-relaxed mt-1 pb-2">
+                        {item.content}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Store (Mercado Livre Style) */}
       <div className="mb-8 mt-4">
-        <VitrineCard vitrine={{
-          ...partner,
-          name: partner.store_name,
-          partners: {
-            ...partner,
-            store_avatar: partner.profile_image_url
-          },
-          images: partner.banner_url ? [partner.banner_url] : []
-        }} />
+        {(() => {
+          const sellerBannerImage = partner.banner_url ? getR2ImageUrl(partner.banner_url) : "https://img.dudit.com.br/static/Placeholder.png";
+          const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar) : null;
+          const displayRating = partner.rating > 0 ? partner.rating : 5.0;
+
+          return (
+            <div className="border border-brand-border rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all duration-300">
+              {/* Banner */}
+              <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
+                <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/10" />
+              </div>
+              
+              {/* Profile Header */}
+              <div className="px-4 pb-4 pt-0 relative flex flex-col">
+                {/* Avatar Container overlapping the banner */}
+                <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white shadow-sm -mt-8 z-10 self-start">
+                  <UserProfileImage
+                    fullName={partner.store_name}
+                    imageUrl={sellerAvatarImage}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Store Name and Details */}
+                <div className="mt-2 min-w-0">
+                  <div className="flex items-center gap-1.5 justify-between">
+                    <Link href={getPartnerUrl(partner)} className="font-bold text-brand-dark hover:text-brand-green hover:underline text-base truncate">
+                      {partner.store_name}
+                    </Link>
+                    <span className="text-[11px] font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      Parceiro Oficial
+                    </span>
+                  </div>
+                  <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
+                    {partner.city} - {partner.state}
+                  </p>
+                </div>
+
+                {/* Level / Status Badge */}
+                <div className="mt-3 flex items-center gap-2 py-1.5 px-2.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <StarIcon size={14} className="text-brand-green fill-brand-green shrink-0" strokeWidth={0} />
+                  <p className="text-xs text-brand-green font-semibold">
+                    Excelente reputação ({displayRating.toFixed(1)}/5.0) · Profissional Destaque!
+                  </p>
+                </div>
+
+                {/* 3 columns metrics (Mercado Livre style) */}
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-brand-border/60 text-center select-none">
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-brand-dark">+50</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Vendas</span>
+                  </div>
+                  <div className="flex flex-col items-center border-x border-brand-border/60">
+                    <span className="text-sm font-bold text-brand-dark">99%</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Atendimento</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm font-bold text-brand-dark">Rápida</span>
+                    <span className="text-[10px] font-semibold text-brand-inactive-text mt-0.5 uppercase tracking-wider">Entrega</span>
+                  </div>
+                </div>
+                
+                {/* View Store Button */}
+                <Link href={getPartnerUrl(partner)} className="mt-4 w-full py-2.5 bg-brand-gray hover:bg-gray-200 text-brand-dark font-bold text-xs rounded-lg text-center transition-colors">
+                  Ver vitrine do profissional
+                </Link>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   )
@@ -493,6 +950,15 @@ export function ServiceDetailsPageClient({
         title={service.name}
         shareMessage={`🗓️ Olha esse serviço na Dudit!\n\n*${service.name}*\nConfere aqui os detalhes:`}
         label="Link do serviço"
+      />
+
+      <VendorPaymentMethodsModal
+        isOpen={showPaymentMethodsModal}
+        onClose={() => setShowPaymentMethodsModal(false)}
+        storeName={partner.store_name}
+        paymentMethods={partner.paymentMethods}
+        price={pricing.current}
+        mpConnected={!!partner.mp_user_id}
       />
 
       <MarketplaceHeader
@@ -665,8 +1131,12 @@ export function ServiceDetailsPageClient({
           {/* Mobile bottom bar */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
             <div className="flex-1 flex flex-col justify-center">
-              <span className="text-lg font-bold text-brand-dark leading-none">{formatCurrency(price)}</span>
-              <span className="text-xs text-brand-inactive-text">{formatDuration(durationMinutes)}</span>
+              <span className="text-lg font-bold text-brand-dark leading-none">
+                {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
+              </span>
+              <span className="text-xs text-brand-inactive-text">
+                {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
+              </span>
             </div>
             <Button
               className="flex-1 rounded-full"

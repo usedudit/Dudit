@@ -2,7 +2,7 @@ export type WhatsappProviderId = "meta" | "evolution" | "twilio"
 
 export type WhatsappConnectionStatus = "disconnected" | "pending" | "connected" | "error"
 
-export type WhatsappMessageStatus = "pending" | "queued" | "sent" | "delivered" | "read" | "failed"
+export type WhatsappMessageStatus = "pending" | "queued" | "sent" | "delivered" | "read" | "failed" | "failed_permanently"
 
 export type WhatsappAutomationTrigger =
   | "appointment_created"
@@ -29,7 +29,9 @@ export type WhatsappAutomationTrigger =
 
 export interface WhatsappTemplateComponent {
   type: "body" | "header" | "button"
-  parameters?: Array<{ type: string; text?: string }>
+  sub_type?: string
+  index?: string
+  parameters?: Array<{ type: string; text?: string; payload?: string }>
 }
 
 export interface SendTemplateInput {

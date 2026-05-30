@@ -6,11 +6,30 @@ import { createWhatsappProviderFromConnection } from "@/lib/whatsapp/providers"
 import { getActiveWhatsappConnection } from "./whatsapp-connection.service"
 import { normalizePhoneToE164 } from "@/lib/whatsapp/phone"
 import { isRetryableWhatsappError } from "@/lib/whatsapp/errors"
-import type { QueueMessageInput, WhatsappAutomationTrigger } from "@/lib/whatsapp/types"
+import type { QueueMessageInput, WhatsappAutomationTrigger, WhatsappTemplateComponent } from "@/lib/whatsapp/types"
 
 function calculateNextRetryAt(retryCount: number): string {
   const delayMinutes = Math.pow(2, Math.min(retryCount, 5))
   return new Date(Date.now() + delayMinutes * 60 * 1000).toISOString()
+}
+
+export function buildTemplateComponentsFromPayload(payload: Record<string, unknown>): WhatsappTemplateComponent[] | undefined {
+  if (Array.isArray(payload.components)) {
+    return payload.components as WhatsappTemplateComponent[]
+  }
+
+  const variables = payload.variables
+  if (!variables || typeof variables !== "object" || Array.isArray(variables)) {
+    return undefined
+  }
+
+  const parameters = Object.values(variables as Record<string, unknown>)
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => ({ type: "text", text: String(value) }))
+
+  if (parameters.length === 0) return undefined
+
+  return [{ type: "body", parameters }]
 }
 
 export async function logWhatsappAutomation(params: {
@@ -141,8 +160,8 @@ export async function sendQueuedMessage(message: Record<string, unknown>): Promi
       result = await provider.sendTemplate({
         to: phone,
         templateName: String(message.template_name || payload.templateName || "hello_world"),
-        languageCode: String(payload.languageCode || "pt_BR"),
-        components: payload.components as never,
+        languageCode: String(payload.languageCode || "en_US"),
+        components: buildTemplateComponentsFromPayload(payload),
         interactiveButtons,
       })
     }

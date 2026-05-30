@@ -25,6 +25,16 @@ interface IconPlaceholderProps {
     variant?: "default" | "outline" | "outlinered" | "destructive" | "ghost" | "filled"
     className?: string
   }
+  buttons?: Array<{
+    text: string
+    action?: string | (() => void)
+    type?: "file" | "button"
+    accept?: string
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+    disabled?: boolean
+    variant?: "default" | "outline" | "outlinered" | "destructive" | "ghost" | "filled"
+    className?: string
+  }>
   className?: string
 }
 
@@ -41,6 +51,7 @@ export default function IconPlaceholder({
   titleClass = "text-xl font-bold text-brand-dark dark:text-dark-heading mb-2",
   subtitleClass = "text-brand-inactive-text dark:text-dark-body max-w-sm mb-2 text-md",
   itemButton,
+  buttons,
   className,
 }: IconPlaceholderProps) {
   const isImage = placeholderType === "image" || !!imageSrc
@@ -55,18 +66,18 @@ export default function IconPlaceholder({
     : "text-sm"
 
   const defaultSubtitleClass = isImage
-    ? `text-brand-inactive-text dark:text-dark-body max-w-sm text-md ${itemButton ? "mb-8" : ""}`
+    ? `text-brand-inactive-text dark:text-dark-body max-w-sm text-md ${(itemButton || (buttons && buttons.length > 0)) ? "mb-8" : ""}`
     : "text-xs"
 
   const Icon = icon || (!imageSrc && placeholderType === "default" ? AlertCircleIcon : null)
 
-  const renderButton = () => {
-    if (!itemButton) return null
-    const { text, action, type, accept, onChange, disabled, variant = "default", className = "" } = itemButton
+  const renderSingleButton = (btn: any, idx?: number) => {
+    const { text, action, type, accept, onChange, disabled, variant = "default", className = "" } = btn
+    const key = idx !== undefined ? idx : "single"
 
     if (type === "file") {
       return (
-        <Button asChild variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
+        <Button key={key} asChild variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
           <label className="cursor-pointer">
             <input
               type="file"
@@ -84,7 +95,7 @@ export default function IconPlaceholder({
 
     if (typeof action === "string") {
       return (
-        <Button asChild variant={variant} className={`mt-4 ${className}`}>
+        <Button key={key} asChild variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
           <Link href={action} prefetch={false}>
             {text}
           </Link>
@@ -93,10 +104,24 @@ export default function IconPlaceholder({
     }
 
     return (
-      <Button onClick={action} variant={variant} className={`mt-4 ${className}`}>
+      <Button key={key} onClick={action} variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
         {text}
       </Button>
     )
+  }
+
+  const renderButtons = () => {
+    if (buttons && buttons.length > 0) {
+      return (
+        <div className="flex flex-row flex-wrap items-center justify-center gap-3">
+          {buttons.map((btn, idx) => renderSingleButton(btn, idx))}
+        </div>
+      )
+    }
+    if (itemButton) {
+      return renderSingleButton(itemButton)
+    }
+    return null
   }
 
   return (
@@ -135,7 +160,7 @@ export default function IconPlaceholder({
         </span>
       )}
 
-      {renderButton()}
+      {renderButtons()}
     </div>
   )
 }

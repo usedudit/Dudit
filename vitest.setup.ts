@@ -17,3 +17,5 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
 }))
+
+vi.mock("server-only", () => ({}))

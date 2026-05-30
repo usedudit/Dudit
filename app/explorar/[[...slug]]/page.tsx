@@ -96,6 +96,8 @@ export default async function ExplorarPage({
             const queryStr = queryParams.toString()
             const queryPart = queryStr ? `?${queryStr}` : ""
             redirect(`/explorar/${savedCity}${queryPart}`)
+        } else {
+            redirect("/")
         }
     }
     const categorySlug = slug[1] || ""

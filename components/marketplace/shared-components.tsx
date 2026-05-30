@@ -31,12 +31,12 @@ const DURATION = 5000;
 
 export const HeroBanner: React.FC = () => {
     return (
-        <section className="mt-6 mb-12 px-4 lg:px-0 group">
-            <div className="mx-auto max-w-[1400px] w-full relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300">
+        <section className="mt-6 mb-12 px-4 lg:px-0 group flex justify-center w-full">
+            <div className="w-[82vw] md:w-full max-w-[1400px] aspect-[2.65/1] md:aspect-auto md:h-[300px] relative rounded-[20px] overflow-hidden cursor-pointer select-none active:scale-[0.99] hover:shadow-lg transition-all duration-300">
                 <img
                     src="https://img.dudit.com.br/static/banners/Banner-1.png"
                     alt="Dudit Marketplace"
-                    className="w-full h-auto block object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                     loading="lazy"
                 />
             </div>
