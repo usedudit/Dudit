@@ -46,7 +46,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
-        const cityData = await getHomeDataByCity(cityName, state)
+        const isDefaultSP = citySlug === "sao-paulo-sp" && cityName === "Estado de São Paulo"
+        const cityData = await getHomeDataByCity(cityName, state, isDefaultSP)
         products = cityData.products
         vitrines = cityData.vitrines
     }
@@ -117,9 +118,11 @@ export default async function HomePage() {
         }
     }
 
+    let isDefaultStateSP = false
     if (!citySlug || !cityName) {
         citySlug = "sao-paulo-sp"
-        cityName = "São Paulo"
+        cityName = "Estado de São Paulo"
+        isDefaultStateSP = true
     }
 
     const userProfile = dbProfile
@@ -137,7 +140,7 @@ export default async function HomePage() {
             full_name: null,
             latitude: null,
             longitude: null,
-            address: `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`,
+            address: isDefaultStateSP ? "Estado de São Paulo" : `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`,
             city: cityName,
             state: citySlug.split("-").pop()?.toUpperCase(),
         } : null)

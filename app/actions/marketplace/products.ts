@@ -371,7 +371,7 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
 /**
  * Fetches products and vitrines (partners) located in the specified city and state.
  */
-export async function getHomeDataByCity(city: string, state: string) {
+export async function getHomeDataByCity(city: string, state: string, stateOnly?: boolean) {
   const supabase = getAdminClient()
 
   // 1. Fetch all active partners in the state (filtering state on database)
@@ -401,17 +401,19 @@ export async function getHomeDataByCity(city: string, state: string) {
     .replace(/(^-|-$)/g, "")
 
   // Filter partners in JS to match target city (case-insensitive and accent-insensitive)
-  const filteredPartners = rawPartners.filter((item: any) => {
-    const addr = item.addresses?.[0] || item.addresses
-    if (!addr || !addr.city) return false
-    const itemCitySlug = addr.city
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-    return itemCitySlug === targetCitySlug
-  })
+  const filteredPartners = stateOnly
+    ? rawPartners
+    : rawPartners.filter((item: any) => {
+        const addr = item.addresses?.[0] || item.addresses
+        if (!addr || !addr.city) return false
+        const itemCitySlug = addr.city
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "")
+        return itemCitySlug === targetCitySlug
+      })
 
   const partnerIds = filteredPartners.map((p: any) => p.id)
 
