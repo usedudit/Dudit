@@ -225,6 +225,43 @@ export async function connectWhatsappAction(input: {
     }
 }
 
+/** Public Embedded Signup config for the browser (app id + config id are not secrets). */
+export async function getWhatsappEmbeddedSignupClientConfigAction(): Promise<
+    ActionResponse<{
+        appId: string
+        configId: string
+        graphVersion: string
+        configured: boolean
+    }>
+> {
+    try {
+        await requireUser()
+        const appId =
+            process.env.NEXT_PUBLIC_META_APP_ID?.trim() || process.env.META_APP_ID?.trim() || ""
+        const configId =
+            process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID?.trim() ||
+            process.env.META_EMBEDDED_SIGNUP_CONFIG_ID?.trim() ||
+            ""
+        const graphVersion =
+            process.env.NEXT_PUBLIC_META_GRAPH_API_VERSION?.trim() ||
+            process.env.META_GRAPH_API_VERSION?.trim() ||
+            "v21.0"
+
+        return {
+            success: true,
+            data: {
+                appId,
+                configId,
+                graphVersion,
+                configured: Boolean(appId && configId),
+            },
+        }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        return { success: false, error: msg }
+    }
+}
+
 export async function prepareWhatsappEmbeddedSignupAction(): Promise<ActionResponse<void>> {
     try {
         const context = await getCurrentPartnerContext()

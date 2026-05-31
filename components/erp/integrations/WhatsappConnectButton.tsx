@@ -7,11 +7,19 @@ import { toast } from "@/hooks/use-notification"
 import {
   prepareWhatsappEmbeddedSignupAction,
   completeWhatsappEmbeddedSignupAction,
+  getWhatsappEmbeddedSignupClientConfigAction,
 } from "@/app/actions/whatsapp"
 
 type EmbeddedSignupSession = {
   wabaId: string
   phoneNumberId: string
+}
+
+type EmbeddedSignupClientConfig = {
+  appId: string
+  configId: string
+  graphVersion: string
+  configured: boolean
 }
 
 type FbLoginResponse = {
@@ -28,10 +36,6 @@ declare global {
     fbAsyncInit?: () => void
   }
 }
-
-const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID
-const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID
-const META_GRAPH_VERSION = process.env.NEXT_PUBLIC_META_GRAPH_API_VERSION || "v21.0"
 
 function waitForSignupSession(
   getSession: () => EmbeddedSignupSession | null,
@@ -66,25 +70,45 @@ export function WhatsappConnectButton({
   className?: string
   children?: React.ReactNode
 }) {
+  const [metaConfig, setMetaConfig] = useState<EmbeddedSignupClientConfig | null>(null)
+  const [configLoading, setConfigLoading] = useState(true)
   const [sdkReady, setSdkReady] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const signupSessionRef = useRef<EmbeddedSignupSession | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const res = await getWhatsappEmbeddedSignupClientConfigAction()
+      if (cancelled) return
+      if (res.success) {
+        setMetaConfig(res.data)
+      } else {
+        setMetaConfig({ appId: "", configId: "", graphVersion: "v21.0", configured: false })
+        console.error("[WhatsApp] Failed to load Embedded Signup config:", res.error)
+      }
+      setConfigLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const initSdk = useCallback(() => {
-    if (!window.FB || !META_APP_ID) return
+    if (!window.FB || !metaConfig?.appId) return
     window.FB.init({
-      appId: META_APP_ID,
+      appId: metaConfig.appId,
       autoLogAppEvents: true,
       xfbml: false,
-      version: META_GRAPH_VERSION,
+      version: metaConfig.graphVersion,
     })
     setSdkReady(true)
-  }, [])
+  }, [metaConfig])
 
   useEffect(() => {
     window.fbAsyncInit = initSdk
-    if (window.FB) initSdk()
-  }, [initSdk])
+    if (window.FB && metaConfig?.appId) initSdk()
+  }, [initSdk, metaConfig])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -116,10 +140,18 @@ export function WhatsappConnectButton({
   }, [])
 
   const handleConnect = async () => {
-    if (!META_APP_ID || !META_CONFIG_ID) {
-      toast.error("Integração WhatsApp não configurada. Contate o suporte.")
+    if (configLoading) {
+      toast.error("Carregando configuração da Meta…")
       return
     }
+
+    if (!metaConfig?.configured) {
+      toast.error(
+        "Integração WhatsApp não configurada no servidor (META_APP_ID e META_EMBEDDED_SIGNUP_CONFIG_ID). Contate o suporte.",
+      )
+      return
+    }
+
     if (!sdkReady || !window.FB) {
       toast.error("Aguarde o carregamento da Meta e tente novamente")
       return
@@ -136,6 +168,8 @@ export function WhatsappConnectButton({
         return
       }
 
+      const { configId } = metaConfig
+
       const codePromise = new Promise<string>((resolve, reject) => {
         window.FB!.login(
           (response) => {
@@ -151,7 +185,7 @@ export function WhatsappConnectButton({
             reject(new Error("Não foi possível obter autorização da Meta"))
           },
           {
-            config_id: META_CONFIG_ID,
+            config_id: configId,
             response_type: "code",
             override_default_response_type: true,
             extras: { setup: {}, sessionInfoVersion: "3" },
@@ -185,22 +219,25 @@ export function WhatsappConnectButton({
     }
   }
 
+  const buttonLabel =
+    configLoading ? "Carregando…" : children ?? "Conectar WhatsApp"
+
   return (
     <>
       <Script
         src="https://connect.facebook.net/en_US/sdk.js"
-        strategy="lazyOnload"
+        strategy="afterInteractive"
         crossOrigin="anonymous"
         onLoad={initSdk}
       />
       <Button
         type="button"
         onClick={handleConnect}
-        disabled={disabled || isConnecting || !META_APP_ID || !META_CONFIG_ID}
-        isLoading={isConnecting}
+        disabled={disabled || isConnecting || configLoading}
+        isLoading={isConnecting || configLoading}
         className={className}
       >
-        {children ?? "Conectar WhatsApp"}
+        {buttonLabel}
       </Button>
     </>
   )
