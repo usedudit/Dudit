@@ -23,6 +23,8 @@ const ALLOWED_UPLOAD_MIME_TYPES: readonly string[] = [
   "image/avif",
 ]
 
+const MIME_TO_EXT_MAP = new Map<string, string>(Object.entries(MIME_TO_EXT))
+
 async function handleUpload(request: NextRequest) {
   try {
     // =============================
@@ -169,7 +171,7 @@ async function handleUpload(request: NextRequest) {
     }
 
     // Extrair extensão segura do MIME type
-    const extension = MIME_TO_EXT[mimeType] || "jpg"
+    const extension = MIME_TO_EXT_MAP.get(mimeType) || "jpg"
 
     // =============================
     // Hash

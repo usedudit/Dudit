@@ -151,7 +151,7 @@ export async function getWhatsappIntegrationAction(): Promise<
             success: true,
             data: {
                 connection,
-                templates: (templateRows || []).map((t) => {
+                templates: (templateRows || []).map((t: any) => {
                     const vars = (t.variables || {}) as Record<string, unknown>
                     return {
                         id: t.id,
