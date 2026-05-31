@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useMemo } from "react"
+import { useMemo } from "react"
 import { formatCurrency } from "@/lib/utils"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import {
     DEFAULT_RECEIPT_ACKNOWLEDGMENT,
     type SaleReceiptData,
@@ -39,7 +40,7 @@ const SaleReceiptA4Preview = ({
     const otherCosts = data.otherCosts + data.methodFee + data.methodInterest
     const subtotal = data.subtotal
     const total = data.total
-    const saleDate = data.saleDateTime.split(" ")[0] || data.saleDateTime
+    const saleDate = data.saleDateTime
 
     const pages = useMemo(() => {
         const ROW_HEIGHT = 85
@@ -86,14 +87,14 @@ const SaleReceiptA4Preview = ({
 
     return (
         <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
-                printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
-            }`}
+            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
+                }`}
         >
             <div
-                className={`flex-1 overflow-auto custom-scrollbar flex flex-col items-center ${
-                    printMode ? "p-0" : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border p-12 pt-12 space-y-8"
-                }`}
+                className={printMode
+                    ? "w-full flex flex-col items-center p-0"
+                    : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
+                }
             >
                 {pages.map((page, pageIndex) => (
                     <div
@@ -126,9 +127,9 @@ const SaleReceiptA4Preview = ({
                             </div>
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-6">
-                                    {partnerAvatar ? (
+                                    {partnerAvatar && !partnerAvatar.includes("Placeholder.png") ? (
                                         <div className="w-8 h-8 rounded-full overflow-hidden bg-white shrink-0">
-                                            <img src={partnerAvatar} className="w-full h-full object-cover" alt="Logo" />
+                                            <img src={getR2ImageUrl(partnerAvatar)} className="w-full h-full object-cover" alt="Logo" />
                                         </div>
                                     ) : (
                                         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black shrink-0">

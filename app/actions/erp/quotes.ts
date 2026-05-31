@@ -1919,7 +1919,16 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             // 1. Fetch quote by public_token
             const { data: quote, error: quoteErr } = await supabase
                 .from("quotes")
-                .select("*, customers(*)")
+                .select(`
+                    *,
+                    customers (
+                        id, name, email, phone,
+                        addresses (*)
+                    ),
+                    partners (
+                        id, store_name, store_image_url, email, phone
+                    )
+                `)
                 .eq("public_token", publicToken)
                 .maybeSingle()
 
@@ -2020,6 +2029,94 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 .eq("quote_id", quote.id)
                 .order("created_at", { ascending: true })
 
+            // 5. Fetch details for fallback snapshot if formal snapshot is null
+            let sellerInfo = null
+            let items: any[] = []
+            let fallbackSnapshot = null
+
+            if (!quote.snapshot) {
+                if (quote.user_id) {
+                    const { data: profile } = await admin
+                        .from("user_profiles")
+                        .select("full_name, email")
+                        .eq("user_id", quote.user_id)
+                        .maybeSingle()
+                    if (profile) {
+                        sellerInfo = {
+                            name: profile.full_name,
+                            email: profile.email
+                        }
+                    }
+                }
+
+                const { data: quoteItems } = await admin
+                    .from("quote_items")
+                    .select("*, products(name, sku, images, unit)")
+                    .eq("quote_id", quote.id)
+                    .order("sort_order", { ascending: true })
+                items = quoteItems || []
+
+                const formattedItems = items.map((item: any) => ({
+                    id: item.id,
+                    product_id: item.product_id,
+                    name: item.custom_name || item.product_name_snapshot || item.products?.name || "Produto sem nome",
+                    sku: item.product_sku_snapshot || item.products?.sku || "",
+                    quantity: Number(item.quantity || 0),
+                    unit_price: Number(item.unit_price || 0),
+                    total_price: Number(item.unit_price || 0) * Number(item.quantity || 0),
+                    description: item.description || "",
+                    image: item.products?.images && item.products.images.length > 0 ? item.products.images[0] : "https://img.dudit.com.br/static/Placeholder.png",
+                    unit: item.products?.unit || "un"
+                }))
+
+                let partnerAddressFormatted = "Endereço não cadastrado"
+                const { data: partnerAddr } = await admin
+                    .from("addresses")
+                    .select("*")
+                    .eq("partner_id", quote.partner_id)
+                    .eq("is_default", true)
+                    .maybeSingle()
+                if (partnerAddr) {
+                    partnerAddressFormatted = `${partnerAddr.street}, ${partnerAddr.number}${partnerAddr.complement ? ` - ${partnerAddr.complement}` : ""}\n${partnerAddr.neighborhood} - ${partnerAddr.city}/${partnerAddr.state}\nCEP: ${partnerAddr.zip_code}`
+                }
+
+                const { data: store } = await admin
+                    .from("stores")
+                    .select("name, image_url")
+                    .eq("partner_id", quote.partner_id)
+                    .limit(1)
+                    .maybeSingle()
+
+                fallbackSnapshot = {
+                    quote_number: quote.quote_number,
+                    issue_date: quote.issue_date,
+                    expiration_date: quote.expiration_date,
+                    notes: quote.notes,
+                    subtotal: Number(quote.subtotal || 0),
+                    discount_type: quote.discount_type,
+                    discount_value: Number(quote.discount_value || 0),
+                    shipping_cost: Number(quote.shipping_cost || 0),
+                    additional_costs: Number(quote.additional_costs || 0),
+                    total: Number(quote.total || 0),
+                    partner: {
+                        name: store?.name || quote.partners?.store_name || "Parceiro",
+                        image_url: store?.image_url || quote.partners?.store_image_url || null,
+                        email: quote.partners?.email || null,
+                        phone: quote.partners?.phone || null,
+                        address: partnerAddressFormatted
+                    },
+                    seller: sellerInfo,
+                    customer: quote.customers ? {
+                        ...quote.customers,
+                        addresses: quote.customers.addresses || []
+                    } : null,
+                    items: formattedItems,
+                    payment_terms: quote.metadata?.payment_terms || null,
+                    coupon_data: quote.metadata?.coupon_data || null,
+                    metadata: quote.metadata || {}
+                }
+            }
+
             return successResponse({
                 quote: {
                     id: quote.id,
@@ -2042,9 +2139,12 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     approver_name: quote.approver_name,
                     rejection_reason: quote.rejection_reason,
                     lockout_until: quote.lockout_until,
-                    partner_id: quote.partner_id
+                    partner_id: quote.partner_id,
+                    customers: quote.customers || null,
+                    partners: quote.partners || null,
+                    items: items
                 },
-                snapshot: quote.snapshot || null,
+                snapshot: quote.snapshot || fallbackSnapshot,
                 interactions: interactions || []
             })
         } catch (err: any) {

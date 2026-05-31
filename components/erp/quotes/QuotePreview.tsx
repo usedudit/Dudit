@@ -167,7 +167,7 @@ const QuotePreview = ({
     return (
         <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "quote-a4-print" : "border-l border-brand-border dark:border-dark-border"}`}>
             <div className={printMode ? "w-full p-0" : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-sm"}>
-                <div className={printMode ? "w-full flex flex-col items-center p-0" : "flex-1 overflow-auto custom-scrollbar p-12 flex flex-col items-center pt-12 space-y-8"}>
+                <div className={printMode ? "w-full flex flex-col items-center p-0" : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8"}>
                     {pages.map((page, pageIndex) => (
                         <div
                             key={pageIndex}

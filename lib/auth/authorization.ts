@@ -648,6 +648,8 @@ function specificPermissionToPermissionKey(specificPermission: string): string |
     case "can_view_delivery_details": return "delivery.view"
     case "can_update_delivery_status": return "delivery.update_status"
     case "can_manage_integrations": return "settings.settings_integrations"
+    case "can_create_deliveries": return "delivery.create"
+    case "can_assign_driver": return "delivery.edit"
     default: return null
   }
 }

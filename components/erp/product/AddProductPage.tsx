@@ -742,8 +742,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 <Button variant="outline" onClick={handleCancelEdit} disabled={isSavingProduct || isLoadingDetails}>
                                                     Cancelar
                                                 </Button>
-                                                <Button onClick={handleSaveProduct} disabled={isSavingProduct || isLoadingDetails}>
-                                                    <SaveIcon className="w-5 h-5 mr-2" />
+                                                <Button onClick={handleSaveProduct} disabled={isSavingProduct || isLoadingDetails} leftIcon={<SaveIcon size={18} />}>
                                                     {isSavingProduct ? "Salvando..." : "Salvar"}
                                                 </Button>
                                             </>
@@ -754,8 +753,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     onShare={handleShareProduct}
                                                     onDelete={() => setShowDeleteModal(true)}
                                                 />
-                                                <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails}>
-                                                    <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                                <Button onClick={enterEditMode} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />} disabled={isLoadingDetails}>
                                                     Editar produto
                                                 </Button>
                                             </>
@@ -878,14 +876,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     variant="outline"
                                     onClick={handleCancelEdit}
                                     disabled={isSavingProduct || isLoadingDetails}
-                                    className="flex-1"
+                                    className="flex-1 h-[48px]"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={handleSaveProduct}
                                     disabled={isSavingProduct || isLoadingDetails}
-                                    className="flex-1"
+                                    className="flex-1 h-[48px]"
                                     leftIcon={<SaveIcon size={18} />}
                                 >
                                     {isSavingProduct ? "Salvando..." : "Salvar"}
@@ -900,7 +898,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     trigger={
                                         <Button
                                             variant="outline"
-                                            className="flex-1"
+                                            className="flex-1 h-[48px]"
                                             disabled={isLoadingDetails}
                                             leftIcon={<ThreeDotsIcon size={18} />}
                                         >
@@ -910,7 +908,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 />
                                 <Button
                                     onClick={enterEditMode}
-                                    className="flex-1 whitespace-nowrap"
+                                    className="flex-1 h-[48px]"
                                     disabled={isLoadingDetails}
                                     leftIcon={<EditIcon size={18} />}
                                 >

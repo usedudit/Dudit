@@ -28,12 +28,15 @@ export function MarketplaceBottomMenu() {
         }
     }, [])
 
-    // Do not show on ERP, admin, auth, or checkout screens
+    // Do not show on ERP, admin, auth, checkout, quote or print screens
     const isExcluded =
+        !pathname ||
         pathname.startsWith("/erp") ||
         pathname.startsWith("/ddt-admin") ||
         pathname.startsWith("/auth") ||
-        pathname.startsWith("/checkout")
+        pathname.startsWith("/checkout") ||
+        pathname.startsWith("/quote") ||
+        pathname.startsWith("/print")
 
     // Dynamically apply bottom padding to body to prevent bottom bar from overlapping content
     useEffect(() => {
@@ -115,7 +118,7 @@ export function MarketplaceBottomMenu() {
         <>
             {/* Bottom Nav Bar */}
             <nav
-                className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[68px] flex justify-around items-center"
+                className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-dark-background/95 border-t border-gray-100 dark:border-dark-border shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px))] h-[68px] flex justify-around items-center"
                 style={{ paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))" }}
             >
                 <Link

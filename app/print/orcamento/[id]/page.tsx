@@ -6,6 +6,7 @@ import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { notFound, redirect } from "next/navigation"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -48,13 +49,15 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     }
 
     // Fetch partner logo and address details
-    const [partnerRes, addressRes] = await Promise.all([
-        supabase.from("partners").select("store_name, image_url").eq("id", quote.partner_id).maybeSingle(),
+    const [partnerRes, storeRes, addressRes] = await Promise.all([
+        supabase.from("partners").select("store_name, store_image_url").eq("id", quote.partner_id).maybeSingle(),
+        supabase.from("stores").select("name, image_url").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         getPartnerAddressAction(quote.partner_id)
     ])
 
-    const partnerName = partnerRes.data?.store_name || "Parceiro"
-    const partnerAvatar = partnerRes.data?.image_url || undefined
+    const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
+    const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || undefined
+    const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
     const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
 
     const formattedItems = (quoteDetails.items || []).map((item: any) => ({

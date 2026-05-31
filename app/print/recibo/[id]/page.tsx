@@ -8,6 +8,7 @@ import SaleReceiptA4Preview from "@/components/erp/orders/receipt/SaleReceiptA4P
 import SaleReceiptThermalPreview from "@/components/erp/orders/receipt/SaleReceiptThermalPreview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { notFound, redirect } from "next/navigation"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -92,9 +93,10 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
     const order = orderRes.data
 
     // Fetch partner header and logo details
-    const [headerRes, partnerRes] = await Promise.all([
+    const [headerRes, partnerRes, storeRes] = await Promise.all([
         getPartnerReceiptHeaderAction(partnerId),
-        supabase.from("partners").select("image_url").eq("id", partnerId).maybeSingle()
+        supabase.from("partners").select("store_image_url").eq("id", partnerId).maybeSingle(),
+        supabase.from("stores").select("image_url").eq("partner_id", partnerId).limit(1).maybeSingle()
     ])
 
     const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
@@ -103,7 +105,8 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         addressLine: "",
         taxIdLine: "",
     }
-    const partnerAvatar = partnerRes.data?.image_url || undefined
+    const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || undefined
+    const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
     // Build receipt payload
     const receiptData = buildSaleReceiptFromOrder(order, partnerHeader, {

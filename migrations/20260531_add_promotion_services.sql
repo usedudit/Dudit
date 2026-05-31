@@ -1,0 +1,40 @@
+-- ============================================================================
+-- Migration: Add specific services support to Promotions/Campaigns
+-- Recreate RLS policies using get_user_partner_ids() helper to prevent recursion and insertion failures
+-- ============================================================================
+
+-- Create promotion_services table if not exists
+CREATE TABLE IF NOT EXISTS public.promotion_services (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  promotion_id uuid NOT NULL REFERENCES public.promotions(id) ON DELETE CASCADE,
+  service_id uuid NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT promotion_services_unique UNIQUE (promotion_id, service_id)
+);
+
+-- Enable RLS for promotion_services
+ALTER TABLE public.promotion_services ENABLE ROW LEVEL SECURITY;
+
+-- Drop check constraint and recreate it on promotions
+ALTER TABLE public.promotions DROP CONSTRAINT IF EXISTS promotions_apply_scope_check;
+ALTER TABLE public.promotions ADD CONSTRAINT promotions_apply_scope_check CHECK (apply_scope IN ('specific_products', 'category', 'entire_cart', 'specific_services'));
+
+-- Recreate policies for campaigns
+DROP POLICY IF EXISTS campaigns_partner_users ON public.campaigns;
+CREATE POLICY campaigns_partner_users ON public.campaigns FOR ALL USING (partner_id IN (SELECT public.get_user_partner_ids()));
+
+-- Recreate policies for promotions
+DROP POLICY IF EXISTS promotions_partner_users ON public.promotions;
+CREATE POLICY promotions_partner_users ON public.promotions FOR ALL USING (partner_id IN (SELECT public.get_user_partner_ids()));
+
+-- Recreate policies for promotion_products
+DROP POLICY IF EXISTS promotion_products_partner_users ON public.promotion_products;
+CREATE POLICY promotion_products_partner_users ON public.promotion_products FOR ALL USING (EXISTS (SELECT 1 FROM public.promotions p WHERE p.id = promotion_products.promotion_id AND p.partner_id IN (SELECT public.get_user_partner_ids())));
+
+-- Recreate policies for promotion_categories
+DROP POLICY IF EXISTS promotion_categories_partner_users ON public.promotion_categories;
+CREATE POLICY promotion_categories_partner_users ON public.promotion_categories FOR ALL USING (EXISTS (SELECT 1 FROM public.promotions p WHERE p.id = promotion_categories.promotion_id AND p.partner_id IN (SELECT public.get_user_partner_ids())));
+
+-- Create policy for promotion_services
+DROP POLICY IF EXISTS promotion_services_partner_users ON public.promotion_services;
+CREATE POLICY promotion_services_partner_users ON public.promotion_services FOR ALL USING (EXISTS (SELECT 1 FROM public.promotions p WHERE p.id = promotion_services.promotion_id AND p.partner_id IN (SELECT public.get_user_partner_ids())));

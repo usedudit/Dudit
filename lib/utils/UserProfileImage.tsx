@@ -1,6 +1,7 @@
 "use client"
 
 import { getAvatarColor, getUserInitials } from "@/lib/utils/avatar"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export { AVATAR_COLORS, getAvatarColor, getBannerUrlByColor, getUserInitials } from "@/lib/utils/avatar"
 
@@ -24,8 +25,9 @@ export function UserProfileImage({
 }) {
   const initials = getUserInitials(fullName)
   const backgroundColor = getAvatarColor(fullName)
-  const normalizedImageUrl = typeof imageUrl === "string" ? imageUrl.trim() : ""
-  const hasImage = normalizedImageUrl.length > 0
+  const rawImageUrl = typeof imageUrl === "string" ? imageUrl.trim() : ""
+  const hasImage = rawImageUrl.length > 0 && !rawImageUrl.includes("Placeholder.png")
+  const normalizedImageUrl = hasImage ? getR2ImageUrl(rawImageUrl) : ""
 
   if (hasImage) {
     return (

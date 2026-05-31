@@ -1,48 +1,272 @@
+"use client"
+
+import React from "react"
 import type { ServicesDashboardData } from "@/lib/data/dashboard"
-import { DashboardMetricCard } from "../cards/DashboardMetricCard"
-import { DashboardSectionCard } from "../cards/DashboardSectionCard"
-import { DashboardList } from "../tables/DashboardList"
-import { ChartIcon, CalendarIcon } from "@/lib/icons"
+import { SummaryCards } from "../LeftColumn"
+import { DashboardPieChart, DashboardBarChart, DashboardLineChart, CHART_COLORS } from "../charts/DashboardCharts"
+import { formatCurrency as brl } from "@/lib/utils"
+import { Dropdown, DropdownItem, Button } from "@/components/reusable"
+import { CalendarIcon, Users, WrenchIcon, TagIcon, AwardIcon } from "@/lib/icons"
+import { useRouter } from "next/navigation"
 
 export function ServicesTab({ data }: { data: ServicesDashboardData }) {
-  return (
-    <div className="space-y-6">
-      {/* Unified Metrics Card */}
-      <div className="overflow-hidden rounded-2xl border border-brand-border bg-white shadow-sm shadow-brand-dark/5 dark:border-dark-border dark:bg-dark-surface">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6">
-          {data.metrics.map((metric, index) => (
-            <DashboardMetricCard 
-              key={metric.title} 
-              metric={metric} 
-              isLast={index === data.metrics.length - 1} 
-            />
-          ))}
-        </div>
-      </div>
+  const router = useRouter()
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
-        <DashboardSectionCard title="Distribuição operacional" icon={ChartIcon}>
-          <div className="grid grid-cols-1 gap-0 lg:grid-cols-3">
-            <div className="border-b border-brand-border dark:border-dark-border lg:border-b-0 lg:border-r">
-              <div className="px-5 py-3 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Funcionários</div>
-              <DashboardList items={data.staffRows} />
+  // Helper to parse BRL string (e.g. "R$ 1.200,00" -> 1200)
+  const parseBrl = (val?: string) => {
+    if (!val) return 0
+    const clean = val.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")
+    return Number(clean) || 0
+  }
+
+  // 1. Categoria de Serviços (Donut Chart)
+  const totalCategoryServices = (data.categoryRows || []).reduce((acc, c) => acc + (Number(c.value) || 0), 0)
+
+  // 2. Faturamento por Profissional (Bar Chart)
+  const staffChartData = (data.staffRows || []).map(s => ({
+    label: s.title,
+    value: parseBrl(s.value)
+  }))
+
+  // 3. Faturamento por Serviço (Line Chart / Evolution Style)
+  const serviceChartData = (data.serviceRows || []).map(s => ({
+    label: s.title,
+    value: parseBrl(s.value)
+  }))
+
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        
+        {/* Row 1 Left: Metrics (SummaryCards style) */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
+          <SummaryCards metrics={data.metrics} />
+        </div>
+
+        {/* Row 1 Right: Category Distribution Donut Chart (ExpenseBreakdown style) */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col h-full justify-between">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                <TagIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+                Distribuição por Categoria
+              </h3>
+              <Dropdown
+                fullWidth={false}
+                align="right"
+                width="w-44"
+                trigger={
+                  <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
+                    <span>Últimos 30 Dias</span>
+                  </button>
+                }
+              >
+                <DropdownItem>Hoje</DropdownItem>
+                <DropdownItem>Últimos 7 Dias</DropdownItem>
+                <DropdownItem>Últimos 30 Dias</DropdownItem>
+              </Dropdown>
             </div>
-            <div className="border-b border-brand-border dark:border-dark-border lg:border-b-0 lg:border-r">
-              <div className="px-5 py-3 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Categorias</div>
-              <DashboardList items={data.categoryRows} />
-            </div>
-            <div>
-              <div className="px-5 py-3 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Serviços</div>
-              <DashboardList items={data.serviceRows} />
+
+            <div className="flex flex-col sm:flex-row items-center sm:items-center gap-8 sm:gap-12 flex-1">
+              <div className="w-full max-w-[240px] mx-auto shrink-0 flex items-center justify-center">
+                <DashboardPieChart
+                  data={(data.categoryRows || []).map(c => ({ label: c.title, value: Number(c.value || 0) }))}
+                  totalValue={String(totalCategoryServices)}
+                  totalLabel="Total Serviços"
+                  innerRadius={68}
+                  outerRadius={92}
+                  className="h-[220px]"
+                />
+              </div>
+
+              <div className="flex flex-col flex-1 w-full justify-center">
+                <div className="space-y-1.5">
+                  {(data.categoryRows || []).slice(0, 5).map((item, index) => {
+                    const percent = totalCategoryServices > 0 ? Math.round((Number(item.value) / totalCategoryServices) * 100) : 0
+                    const color = CHART_COLORS[index % CHART_COLORS.length]
+
+                    return (
+                      <div key={item.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-[14px] h-[14px] rounded-[4px] shrink-0" style={{ backgroundColor: color }} />
+                          <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading leading-none">
+                            {item.title} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1.5">•</span> {item.value} ativos
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-brand-dark dark:text-dark-heading bg-brand-green-light dark:bg-dark-border/40 px-2 py-1 rounded-full border border-brand-border dark:border-dark-border">
+                          {percent}%
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
-        </DashboardSectionCard>
-        
-        <DashboardSectionCard title="Agendamentos de hoje" icon={CalendarIcon}>
-          <DashboardList items={data.todayAppointments} empty="Nenhum agendamento hoje." />
-        </DashboardSectionCard>
+        </div>
+
+        {/* Row 2 Left: Services Faturamento Line/Area Chart (Cashflow style) */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
+            <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                <WrenchIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+                Faturamento por Serviço
+              </h3>
+              <Dropdown
+                fullWidth={false}
+                align="right"
+                width="w-44"
+                trigger={
+                  <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
+                    <span>Últimos 30 Dias</span>
+                  </button>
+                }
+              >
+                <DropdownItem>Hoje</DropdownItem>
+                <DropdownItem>Últimos 7 Dias</DropdownItem>
+                <DropdownItem>Últimos 30 Dias</DropdownItem>
+              </Dropdown>
+            </div>
+
+            <div className="flex flex-wrap items-end justify-between mb-8 gap-4">
+              <div>
+                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Receita Total de Serviços</span>
+                <div className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mt-1">
+                  {data.metrics.find(m => m.title.includes("Receita"))?.value || "R$ 0,00"}
+                </div>
+              </div>
+            </div>
+
+            <DashboardLineChart data={serviceChartData} />
+          </div>
+        </div>
+
+        {/* Row 2 Right: Staff Performance Bar Chart (TopCategories style) */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
+            <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                <Users size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+                Desempenho da Equipe (Receita)
+              </h3>
+              <Dropdown
+                fullWidth={false}
+                align="right"
+                width="w-44"
+                trigger={
+                  <button className="flex items-center text-[13px] font-bold text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border rounded-full px-4 py-2 hover:bg-brand-green-light dark:hover:bg-dark-border transition-colors">
+                    <span>Últimos 30 Dias</span>
+                  </button>
+                }
+              >
+                <DropdownItem>Hoje</DropdownItem>
+                <DropdownItem>Últimos 7 Dias</DropdownItem>
+                <DropdownItem>Últimos 30 Dias</DropdownItem>
+              </Dropdown>
+            </div>
+
+            <DashboardBarChart data={staffChartData} />
+          </div>
+        </div>
+
+        {/* Row 3 Left: Today's Appointments Table (NeedsAttention style) */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
+            <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                <CalendarIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+                Agendamentos de Hoje
+              </h3>
+            </div>
+
+            {(!data.todayAppointments || data.todayAppointments.length === 0) ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center">
+                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum agendamento para hoje.</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left whitespace-nowrap min-w-[500px]">
+                  <tbody>
+                    {data.todayAppointments.slice(0, 6).map((item) => {
+                      return (
+                        <tr key={item.id} className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[80px]">
+                          <td className="pl-2">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
+                                <CalendarIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                              </div>
+                              <div>
+                                <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-0.5">{item.title}</div>
+                                <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                  {item.subtitle} · Hora: {item.meta}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="text-right pr-6">
+                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                              {item.value}
+                            </span>
+                          </td>
+                          <td className="text-right w-[100px]">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
+                              onClick={() => router.push("/erp/agendamentos")}
+                            >
+                              Ver Agenda
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Row 3 Right: Operational Distribution List (RecentActivities style) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                <AwardIcon size={20} className="text-brand-dark dark:text-dark-heading opacity-80" />
+                Atendimento da Equipe
+              </h3>
+            </div>
+
+            <div className="space-y-8">
+              <div>
+                <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Atendimento por Profissional</div>
+                <div className="space-y-6 relative">
+                  <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+                  
+                  {data.staffRows.slice(0, 4).map((item) => (
+                    <div key={item.id} className="flex relative z-10 w-full">
+                      <div className="w-8 h-8 rounded-full bg-brand-green-second dark:bg-dark-border/40 flex-shrink-0 flex items-center justify-center mr-4 border-[3px] border-white dark:border-dark-surface shadow-[0_0_0_2px_#ffffff] dark:shadow-[0_0_0_2px_rgba(28,28,30,0.5)]">
+                        <Users size={14} className="text-brand-green" />
+                      </div>
+                      <div className="flex flex-col justify-start -mt-0.5">
+                        <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">
+                          {item.meta}
+                        </div>
+                        <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">
+                          {item.title} <span className="text-brand-inactive-text dark:text-dark-body font-medium mx-1">•</span> {item.subtitle}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )
 }
-

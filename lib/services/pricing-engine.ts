@@ -128,7 +128,8 @@ function isItemInScope(
   item: CartUnit,
   applyScope: ApplyScope,
   applicableProductIds?: string[] | null,
-  applicableCategoryIds?: string[] | null
+  applicableCategoryIds?: string[] | null,
+  applicableServiceIds?: string[] | null
 ): boolean {
   if (applyScope === ApplyScope.ENTIRE_CART) {
     return true
@@ -139,11 +140,15 @@ function isItemInScope(
   if (applyScope === ApplyScope.CATEGORY) {
     return Boolean(item.categoryId && applicableCategoryIds?.includes(item.categoryId))
   }
+  if (applyScope === ApplyScope.SPECIFIC_SERVICES) {
+    return Boolean(item.serviceId && applicableServiceIds?.includes(item.serviceId))
+  }
   return false
 }
 
 interface CartUnit {
   productId?: string | null
+  serviceId?: string | null
   categoryId?: string | null
   originalPrice: number
   currentPrice: number
@@ -178,6 +183,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     for (let i = 0; i < qty; i++) {
       units.push({
         productId: item.productId || null,
+        serviceId: item.serviceId || null,
         categoryId: item.categoryId || null,
         originalPrice: effective,
         currentPrice: effective,
@@ -208,7 +214,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
     // Filter units in scope
     const eligibleUnits = units.filter((u) =>
-      isItemInScope(u, promo.applyScope, promo.applicableProductIds, promo.applicableCategoryIds)
+      isItemInScope(u, promo.applyScope, promo.applicableProductIds, promo.applicableCategoryIds, promo.applicableServiceIds)
     )
 
     if (eligibleUnits.length === 0) {

@@ -13,7 +13,8 @@ export enum DiscountType {
 export enum ApplyScope {
     SPECIFIC_PRODUCTS = "specific_products",
     CATEGORY = "category",
-    ENTIRE_CART = "entire_cart"
+    ENTIRE_CART = "entire_cart",
+    SPECIFIC_SERVICES = "specific_services"
 }
 
 export interface PricingPromotion {
@@ -34,4 +35,5 @@ export interface PricingPromotion {
     allowCouponCombination: boolean
     applicableProductIds?: string[]
     applicableCategoryIds?: string[]
+    applicableServiceIds?: string[]
 }

@@ -38,13 +38,14 @@ const PromotionSchema = z.object({
   buyQuantity: z.number().int().min(1).nullable().optional(),
   payQuantity: z.number().int().min(1).nullable().optional(),
   priority: z.number().int().default(0),
-  applyScope: z.enum(["specific_products", "category", "entire_cart"]),
+  applyScope: z.enum(["specific_products", "category", "entire_cart", "specific_services"]),
   allowCouponCombination: z.boolean().default(false),
   usageLimit: z.number().int().min(0).nullable().optional(),
   usageLimitPerCustomer: z.number().int().min(0).nullable().optional(),
   isActive: z.boolean().default(true),
   productIds: z.array(z.string().uuid()).optional().default([]),
   categoryIds: z.array(z.string().uuid()).optional().default([]),
+  serviceIds: z.array(z.string().uuid()).optional().default([]),
 })
 
 // Helper to revalidate promotions routes
@@ -212,7 +213,8 @@ export async function listPromotionsAction(partnerId: string, campaignId?: strin
     .select(`
       *,
       promotion_products(product_id),
-      promotion_categories(category_id)
+      promotion_categories(category_id),
+      promotion_services(service_id)
     `)
     .eq("partner_id", partnerId)
 
@@ -291,6 +293,11 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
     await supabase.from("promotion_categories").insert(records)
   }
 
+  if (data.applyScope === "specific_services" && data.serviceIds.length > 0) {
+    const records = data.serviceIds.map((sid) => ({ promotion_id: promoId, service_id: sid }))
+    await supabase.from("promotion_services").insert(records)
+  }
+
   await revalidatePromotions(data.partnerId)
   return { success: true, id: promoId }
 }
@@ -351,6 +358,7 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   // Clear scopes
   await supabase.from("promotion_products").delete().eq("promotion_id", promotionId)
   await supabase.from("promotion_categories").delete().eq("promotion_id", promotionId)
+  await supabase.from("promotion_services").delete().eq("promotion_id", promotionId)
 
   // Insert scopes
   if (data.applyScope === "specific_products" && data.productIds.length > 0) {
@@ -361,6 +369,11 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   if (data.applyScope === "category" && data.categoryIds.length > 0) {
     const records = data.categoryIds.map((cid) => ({ promotion_id: promotionId, category_id: cid }))
     await supabase.from("promotion_categories").insert(records)
+  }
+
+  if (data.applyScope === "specific_services" && data.serviceIds.length > 0) {
+    const records = data.serviceIds.map((sid) => ({ promotion_id: promotionId, service_id: sid }))
+    await supabase.from("promotion_services").insert(records)
   }
 
   await revalidatePromotions(data.partnerId)
@@ -516,7 +529,8 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
     .select(`
       *,
       promotion_products(product_id),
-      promotion_categories(category_id)
+      promotion_categories(category_id),
+      promotion_services(service_id)
     `)
     .eq("partner_id", partnerId)
     .eq("is_active", true)
@@ -569,6 +583,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       allowCouponCombination: promo.allow_coupon_combination,
       applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
       applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+      applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
     })
   }
 
@@ -580,10 +595,16 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
-  const [{ data: products }, { data: categories }, { data: customers }] = await Promise.all([
+  const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active")
+      .eq("partner_id", partnerId)
+      .order("name")
+      .limit(200),
+    supabase
+      .from("services")
+      .select("id, name, category:service_categories!category_id(name), category_id, price, sku, images, is_active")
       .eq("partner_id", partnerId)
       .order("name")
       .limit(200),
@@ -612,6 +633,16 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       sku: p.sku,
       image: Array.isArray(p.images) ? p.images[0] || null : null,
       isActive: Boolean(p.is_active),
+    })),
+    services: (services || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      category: s.category?.name || null,
+      categoryId: s.category_id,
+      price: s.price ? Number(s.price) : 0,
+      sku: s.sku,
+      image: Array.isArray(s.images) ? s.images[0] || null : null,
+      isActive: Boolean(s.is_active),
     })),
     categories: (categories || []).map((c: any) => ({
       id: c.id,

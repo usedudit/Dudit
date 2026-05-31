@@ -11,13 +11,45 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
     const isProd = process.env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT
 
     if (isProd) {
-        const chromium = (await import("@sparticuz/chromium")).default
-        
+        // Use system-installed Chromium (from nixpacks.toml apt packages)
+        const fs = await import("fs")
+        const systemPaths = [
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/google-chrome",
+        ]
+
+        let executablePath = process.env.CHROMIUM_PATH || ""
+        if (!executablePath) {
+            for (const p of systemPaths) {
+                if (fs.existsSync(p)) {
+                    executablePath = p
+                    break
+                }
+            }
+        }
+
+        if (!executablePath) {
+            throw new Error(
+                "Nenhum executável de Chromium encontrado no sistema. " +
+                "Verifique se o pacote 'chromium' está instalado no nixpacks.toml. " +
+                `Paths verificados: ${systemPaths.join(", ")}`
+            )
+        }
+
         browser = (await puppeteer.launch({
-            args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
+            executablePath,
+            headless: true,
+            args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--font-render-hinting=none",
+                "--single-process",
+            ],
+            protocolTimeout: 60000,
         })) as unknown as Browser
     } else {
         // Local Windows environment browser fallback

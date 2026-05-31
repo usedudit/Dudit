@@ -1,12 +1,25 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { 
     getPublicQuoteAction, 
     submitPublicCommentAction, 
     approvePublicQuoteAction, 
     rejectPublicQuoteAction 
 } from "@/app/actions/erp/quotes"
+import { 
+    Button, 
+    Badge, 
+    Tabs, 
+    TabsList, 
+    TabsTrigger, 
+    TabsContent, 
+    CustomerCard,
+    ThreeDotsLoader
+} from "@/components/reusable"
+import QuotePreview from "@/components/erp/quotes/QuotePreview"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { formatCurrency } from "@/lib/utils"
 
 interface PublicQuotePortalProps {
     token: string
@@ -19,11 +32,34 @@ interface PublicQuotePortalProps {
     userAgent: string
 }
 
+const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+        case "approved": return "green" as const
+        case "rejected": return "red" as const
+        case "expired": return "orange" as const
+        case "cancelled": return "gray" as const
+        case "viewed": return "cyan" as const
+        default: return "blue" as const
+    }
+}
+
+const getStatusLabel = (status: string) => {
+    switch (status) {
+        case "approved": return "Aprovado"
+        case "rejected": return "Recusado"
+        case "expired": return "Expirado"
+        case "cancelled": return "Cancelado"
+        case "viewed": return "Visualizado"
+        default: return "Pendente"
+    }
+}
+
 export default function PublicQuotePortal({ token, initialData, ip, userAgent }: PublicQuotePortalProps) {
     // ─── STATE MANAGEMENT ────────────────────────────────────────────────────
     const [quote, setQuote] = useState(initialData.quote)
     const [snapshot, setSnapshot] = useState(initialData.snapshot)
     const [interactions, setInteractions] = useState(initialData.interactions)
+    const [activeTab, setActiveTab] = useState("Dados Gerais")
     
     const [newComment, setNewComment] = useState("")
     const [isSubmittingComment, setIsSubmittingComment] = useState(false)
@@ -41,15 +77,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
-    const [copied, setCopied] = useState(false)
     
     const commentEndRef = useRef<HTMLDivElement>(null)
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
-    const formatCurrency = (val: number) => {
-        return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val)
-    }
-
     const formatDateString = (dateStr: string) => {
         if (!dateStr) return "---"
         const parts = dateStr.split("-")
@@ -69,7 +100,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
     // ─── REAL-TIME POLLING ───────────────────────────────────────────────────
     useEffect(() => {
-        // Poll for updates every 15 seconds to sync comments or status changes
         const interval = setInterval(async () => {
             try {
                 const res = await getPublicQuoteAction(token, ip, userAgent)
@@ -99,7 +129,6 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         setIsSubmittingComment(true)
         setErrorMessage(null)
         
-        // Ask for guest name if not provided
         let guestName = "Cliente"
         if (typeof window !== "undefined") {
             const savedName = localStorage.getItem("dudit_guest_name")
@@ -184,394 +213,406 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     }
 
     // ─── RENDERING COMPUTED DATA ─────────────────────────────────────────────
-    // Prefer snapshot if available to guarantee historical consistency
     const dataQuote = snapshot || quote
     const items = snapshot?.items || quote.items || []
     
-    // Status Badge Helpers
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case "approved":
-                return <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Aprovado</span>
-            case "rejected":
-                return <span className="bg-rose-100 text-rose-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Recusado</span>
-            case "expired":
-                return <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Expirado</span>
-            case "cancelled":
-                return <span className="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Cancelado</span>
-            case "viewed":
-                return <span className="bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>Visualizado</span>
-            default:
-                return <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Pendente</span>
-        }
-    }
-
-    const partnerName = snapshot?.partner?.name || "Parceiro"
-    const partnerLogo = snapshot?.partner?.image_url || null
+    const partnerName = snapshot?.partner?.name || quote.partners?.store_name || "Parceiro"
+    const partnerLogo = getR2ImageUrl(snapshot?.partner?.image_url || quote.partners?.store_image_url || null)
     const partnerAddress = snapshot?.partner?.address || "Endereço comercial não disponível"
-    const partnerEmail = snapshot?.partner?.email || "vendas@dudit.com"
-    const partnerPhone = snapshot?.partner?.phone || ""
+    const partnerEmail = snapshot?.partner?.email || quote.partners?.email || "vendas@dudit.com"
+    const partnerPhone = snapshot?.partner?.phone || quote.partners?.phone || ""
 
     const sellerName = snapshot?.seller?.name || "Vendedor Responsável"
     const sellerEmail = snapshot?.seller?.email || ""
 
-    const customerName = snapshot?.customer?.name || "Consumidor final"
-    const customerEmail = snapshot?.customer?.email || ""
-    const customerPhone = snapshot?.customer?.phone || ""
+    const selectedCustomer = snapshot?.customer || quote.customers || null
+    const customerName = selectedCustomer?.name || "Consumidor final"
+    const customerEmail = selectedCustomer?.email || ""
+    const customerPhone = selectedCustomer?.phone || ""
     
     // Address rendering for customer
     const customerAddressText = (() => {
-        if (!snapshot?.customer?.addresses?.length) return null
-        const addr = snapshot.customer.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || snapshot.customer.addresses[0]
+        if (!selectedCustomer?.addresses?.length) return null
+        const addr = selectedCustomer.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses[0]
         return `${addr.street || ""}, ${addr.number || ""}${addr.complement ? ` - ${addr.complement}` : ""}\n${addr.neighborhood || ""} - ${addr.city || ""}/${addr.state || ""}\nCEP: ${addr.zip_code || ""}`
     })()
+    
+    // Items mapping for QuotePreview component
+    const mappedPreviewItems = useMemo(() => {
+        return items.map((item: any) => ({
+            name: item.name || item.custom_name || "Produto sem nome",
+            qty: item.quantity,
+            price: Number(item.unit_price || 0),
+            sku: item.sku || "N/A"
+        }))
+    }, [items])
 
     // Disable approval features if quote is finalized
     const isFinalized = quote.status === "approved" || quote.status === "rejected" || quote.status === "expired" || quote.status === "cancelled" || quote.converted
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16 relative">
+        <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
             <style>{`
-                @media print {
-                    .no-print { display: none !important; }
-                    .print-only { display: block !important; }
-                    .print-card { box-shadow: none !important; border: none !important; background: white !important; }
-                }
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            {/* ─── HEADER BAR ─────────────────────────────────────────────────── */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-40 no-print shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        {partnerLogo ? (
-                            <img src={partnerLogo} alt={partnerName} className="h-8 w-8 object-cover rounded-lg border border-slate-200" />
-                        ) : (
-                            <div className="h-8 w-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                {partnerName.substring(0, 2).toUpperCase()}
-                            </div>
-                        )}
-                        <div>
-                            <span className="font-bold text-sm text-slate-900 block leading-tight">{partnerName}</span>
-                            <span className="text-[11px] text-slate-400 block uppercase tracking-wider">Proposta Comercial</span>
-                        </div>
-                    </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                <div className="flex-1 w-full h-full relative pb-20 md:pb-0 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
 
-                    <div className="flex items-center gap-3">
-                        {getStatusBadge(quote.status)}
-                        <button 
-                            onClick={() => window.print()}
-                            className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg transition-colors border border-slate-200"
-                            title="Imprimir Proposta"
+                        {/* LEFT COLUMN: INFO & ACTIONS */}
+                        <div
+                            className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative`}
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Notification banners */}
-                {successMessage && (
-                    <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center gap-3 animate-fade-in no-print">
-                        <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-sm font-medium">{successMessage}</span>
-                        <button onClick={() => setSuccessMessage(null)} className="ml-auto text-emerald-500 hover:text-emerald-700">✕</button>
-                    </div>
-                )}
-
-                {errorMessage && (
-                    <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl flex items-center gap-3 animate-fade-in no-print">
-                        <svg className="w-5 h-5 text-rose-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-sm font-medium">{errorMessage}</span>
-                        <button onClick={() => setErrorMessage(null)} className="ml-auto text-rose-500 hover:text-rose-700">✕</button>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-12 gap-8 items-start">
-                    {/* ─── LEFT COLUMN: QUOTE DETAILS ─────────────────────────────── */}
-                    <div className="col-span-12 lg:col-span-8 space-y-8 print-card">
-                        {/* Quote Main Details Box */}
-                        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
-                            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border-b border-slate-100 pb-6 mb-6">
-                                <div>
-                                    <span className="text-xs text-slate-400 block uppercase tracking-wider mb-1">Código da Proposta</span>
-                                    <h2 className="text-2xl font-bold text-slate-900 leading-tight">
-                                        {dataQuote.quote_number || "Orçamento"}
-                                    </h2>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-slate-600">
-                                    <div>
-                                        <span className="text-slate-400 block">Data de Emissão</span>
-                                        <span className="font-bold text-slate-800">{formatDateString(dataQuote.issue_date)}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400 block">Validade da Proposta</span>
-                                        <span className="font-bold text-slate-800">{formatDateString(dataQuote.expiration_date)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Issuer vs Customer Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8 text-xs text-slate-600">
-                                <div className="space-y-2">
-                                    <h3 className="font-bold text-slate-900 uppercase tracking-wide border-b border-slate-100 pb-2">Emitente (Fornecedor)</h3>
-                                    <p className="font-bold text-slate-800 text-sm">{partnerName}</p>
-                                    <p className="whitespace-pre-wrap">{partnerAddress}</p>
-                                    {partnerPhone && <p>Telefone: {partnerPhone}</p>}
-                                    <p>E-mail: {partnerEmail}</p>
-                                    {sellerName && <p className="mt-2 text-emerald-800 dark:text-emerald-400 font-medium">Vendedor: {sellerName}</p>}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <h3 className="font-bold text-slate-900 uppercase tracking-wide border-b border-slate-100 pb-2">Destinatário (Cliente)</h3>
-                                    <p className="font-bold text-slate-800 text-sm">{customerName}</p>
-                                    {customerAddressText ? (
-                                        <p className="whitespace-pre-wrap">{customerAddressText}</p>
-                                    ) : (
-                                        <p className="text-slate-400 italic">Endereço de entrega não especificado.</p>
-                                    )}
-                                    {customerPhone && <p>Telefone: {customerPhone}</p>}
-                                    {customerEmail && <p>E-mail: {customerEmail}</p>}
-                                </div>
-                            </div>
-
-                            {/* Itemized Table */}
-                            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wide mb-3">Itens da Proposta</h3>
-                            <div className="overflow-x-auto -mx-6 sm:-mx-8">
-                                <table className="w-full text-left border-collapse min-w-[600px]">
-                                    <thead>
-                                        <tr className="bg-slate-50/70 border-b border-t border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                            <th className="py-3 pl-8 pr-4">Item / Produto</th>
-                                            <th className="py-3 px-4 text-center w-24">Qtd</th>
-                                            <th className="py-3 px-4 text-right w-32">Preço Unit.</th>
-                                            <th className="py-3 pl-4 pr-8 text-right w-36">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 text-sm">
-                                        {items.map((item: any, idx: number) => {
-                                            const total = (item.quantity || 0) * (item.unit_price || 0)
-                                            return (
-                                                <tr key={item.id || idx}>
-                                                    <td className="py-4 pl-8 pr-4 flex items-center gap-3">
-                                                        {item.image && (
-                                                            <img 
-                                                                src={item.image} 
-                                                                alt={item.name} 
-                                                                className="w-10 h-10 object-cover rounded-lg border border-slate-100 shrink-0" 
-                                                                onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                            />
-                                                        )}
-                                                        <div className="min-w-0">
-                                                            <span className="font-bold text-slate-900 block truncate max-w-[280px]" title={item.name}>{item.name}</span>
-                                                            {item.sku && <span className="text-[10px] text-slate-400 block uppercase">{item.sku}</span>}
-                                                            {item.description && <span className="text-xs text-slate-400 block mt-0.5 max-w-[280px] truncate">{item.description}</span>}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 px-4 text-center font-medium text-slate-600">
-                                                        {item.quantity} <span className="text-xs text-slate-400">{item.unit || "un"}</span>
-                                                    </td>
-                                                    <td className="py-4 px-4 text-right text-slate-600 font-medium">
-                                                        {formatCurrency(item.unit_price)}
-                                                    </td>
-                                                    <td className="py-4 pl-4 pr-8 text-right font-bold text-slate-900">
-                                                        {formatCurrency(total)}
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Summary / Totals */}
-                            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 items-start pt-6 border-t border-slate-100">
-                                <div className="text-xs text-slate-500">
-                                    {dataQuote.notes ? (
-                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                            <h4 className="font-bold text-slate-700 uppercase mb-2">Observações Comerciais</h4>
-                                            <p className="whitespace-pre-wrap leading-relaxed">{dataQuote.notes}</p>
-                                        </div>
-                                    ) : (
-                                        <p className="italic">Nenhuma observação informada.</p>
-                                    )}
-                                </div>
-
-                                <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-3 text-xs text-slate-600 ml-auto w-full max-w-[360px]">
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-400 font-medium">Subtotal</span>
-                                        <span className="font-bold text-slate-800">{formatCurrency(Number(dataQuote.subtotal || 0))}</span>
-                                    </div>
-                                    {Number(dataQuote.shipping_cost || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400 font-medium">Frete</span>
-                                            <span className="font-bold text-slate-800">{formatCurrency(Number(dataQuote.shipping_cost))}</span>
-                                        </div>
-                                    )}
-                                    {Number(dataQuote.additional_costs || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400 font-medium">Outras taxas</span>
-                                            <span className="font-bold text-slate-800">{formatCurrency(Number(dataQuote.additional_costs))}</span>
-                                        </div>
-                                    )}
-                                    {Number(dataQuote.discount_value || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400 font-medium">Desconto</span>
-                                            <span className="font-bold text-rose-600">-{formatCurrency(Number(dataQuote.discount_value))}</span>
-                                        </div>
-                                    )}
-
-                                    <div className="border-t border-slate-200 my-2"></div>
-
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-900 text-sm">Valor Total</span>
-                                        <span className="bg-slate-900 text-white font-extrabold text-base px-3 py-1.5 rounded-lg">
-                                            {formatCurrency(Number(dataQuote.total || 0))}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ─── RIGHT COLUMN: INTERACTION PANEL ───────────────────────── */}
-                    <div className="col-span-12 lg:col-span-4 space-y-8 no-print">
-                        {/* Action Panel for Approval */}
-                        {!isFinalized ? (
-                            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                                <h3 className="font-bold text-slate-950 text-base leading-tight">Decisão Comercial</h3>
-                                <p className="text-xs text-slate-500 leading-relaxed">
-                                    Analise os itens e valores acima e responda online. É rápido, prático e dispensa reuniões.
-                                </p>
-                                
-                                <div className="flex flex-col gap-2">
-                                    <button 
-                                        onClick={() => setShowApproveModal(true)}
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3 px-4 rounded-2xl transition-colors shadow-md"
-                                    >
-                                        ✓ Aprovar Proposta
-                                    </button>
-                                    
-                                    <button 
-                                        onClick={() => setShowRejectModal(true)}
-                                        className="w-full bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 font-bold text-sm py-3 px-4 rounded-2xl transition-colors"
-                                    >
-                                        ✕ Recusar Proposta
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center space-y-3">
-                                <h3 className="font-bold text-slate-950 text-base leading-tight">Proposta Finalizada</h3>
-                                <div className="flex justify-center">
-                                    {quote.status === "approved" ? (
-                                        <div className="bg-emerald-50 text-emerald-800 text-xs font-semibold px-4 py-2 rounded-2xl border border-emerald-100 space-y-1 w-full text-left">
-                                            <div className="font-bold text-sm flex items-center gap-1.5 text-emerald-900">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                Aprovado pelo Cliente
-                                            </div>
-                                            <div>Aprovador: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
-                                            <div>Data: {formatDateTime(quote.approved_at)}</div>
-                                        </div>
-                                    ) : quote.status === "rejected" ? (
-                                        <div className="bg-rose-50 text-rose-800 text-xs font-semibold px-4 py-2 rounded-2xl border border-rose-100 space-y-1 w-full text-left">
-                                            <div className="font-bold text-sm flex items-center gap-1.5 text-rose-900">
-                                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                                                Recusado pelo Cliente
-                                            </div>
-                                            <div>Autor: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
-                                            <div>Data: {formatDateTime(quote.rejected_at)}</div>
-                                            {quote.rejection_reason && <div className="mt-1.5 italic text-slate-500 bg-white/60 p-2 rounded-lg border border-rose-100">"{quote.rejection_reason}"</div>}
-                                        </div>
-                                    ) : quote.status === "expired" ? (
-                                        <div className="bg-amber-50 text-amber-800 text-xs font-semibold px-4 py-2 rounded-2xl border border-amber-100 w-full text-left">
-                                            A proposta atingiu seu limite de validade em <span className="font-bold">{formatDateString(quote.expiration_date)}</span> e expirou.
-                                        </div>
-                                    ) : (
-                                        <div className="bg-gray-50 text-gray-800 text-xs font-semibold px-4 py-2 rounded-2xl border border-gray-100 w-full text-left">
-                                            Orçamento cancelado pelo vendedor.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Negotiation Chat Card */}
-                        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                            <h3 className="font-bold text-slate-950 text-base leading-tight">Canal de Negociação</h3>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                                Dúvidas, pedidos de desconto ou prazos diferenciados? Negocie diretamente com o vendedor abaixo.
-                            </p>
-
-                            {/* Chat stream */}
-                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2 border-b border-slate-100 pb-4">
-                                {interactions.length === 0 ? (
-                                    <div className="text-center py-8 text-xs text-slate-400 italic">
-                                        Nenhuma mensagem trocada ainda.
-                                    </div>
-                                ) : (
-                                    interactions.map((msg: any) => {
-                                        const isCustomer = msg.author_role === "customer"
-                                        return (
-                                            <div 
-                                                key={msg.id} 
-                                                className={`p-3.5 rounded-2xl text-xs max-w-[85%] ${
-                                                    isCustomer 
-                                                        ? "bg-slate-100 text-slate-800 align-self-start self-start" 
-                                                        : "bg-emerald-50 border border-emerald-100 text-emerald-900 align-self-end self-end text-right ml-auto"
-                                                }`}
-                                            >
-                                                <div className="font-bold mb-1">
-                                                    {isCustomer ? `${msg.author_name} (Cliente)` : `${msg.author_name} (Vendedor)`}
+                            {/* Sticky Header inside left column */}
+                            <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                                <div className="px-4 md:px-6 pt-4 pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {partnerLogo ? (
+                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-lg border border-brand-border dark:border-dark-border" />
+                                            ) : (
+                                                <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                    {partnerName.substring(0, 2).toUpperCase()}
                                                 </div>
-                                                <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
-                                                <span className="text-[9px] text-slate-400 block mt-1.5">
-                                                    {formatDateTime(msg.created_at)}
-                                                </span>
+                                            )}
+                                            <div>
+                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
+                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block uppercase tracking-wider">Proposta Comercial</span>
                                             </div>
-                                        )
-                                    })
-                                )}
-                                <div ref={commentEndRef}></div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant={getStatusBadgeVariant(quote.status)}>
+                                                {getStatusLabel(quote.status)}
+                                            </Badge>
+                                        </div>
+                                    </div>
+
+                                    {/* Responsive Tabs List */}
+                                    <div className="w-full mt-4">
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
+                                            <TabsTrigger value="Canal de Negociação">Canal de Negociação</TabsTrigger>
+                                            <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
+                                        </TabsList>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Input Form */}
-                            {!isFinalized && (
-                                <form onSubmit={handleSendComment} className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                        placeholder="Digite sua dúvida ou contraproposta..."
-                                        className="flex-1 text-xs bg-slate-50 p-3 rounded-2xl border border-slate-200 outline-none focus:border-slate-400 text-slate-800"
-                                        disabled={isSubmittingComment}
-                                    />
-                                    <button 
-                                        type="submit"
-                                        disabled={!newComment.trim() || isSubmittingComment}
-                                        className="bg-slate-900 text-white hover:bg-slate-800 font-semibold text-xs px-4 py-2 rounded-2xl transition-colors shrink-0 disabled:opacity-50"
-                                    >
-                                        {isSubmittingComment ? "..." : "Enviar"}
-                                    </button>
-                                </form>
-                            )}
+                            {/* Scrollable Content inside left column */}
+                            <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
+                                {/* Success and Error Banners */}
+                                {successMessage && (
+                                    <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3">
+                                        <span className="text-xs font-semibold">{successMessage}</span>
+                                        <button onClick={() => setSuccessMessage(null)} className="ml-auto text-green-500 hover:text-green-700">✕</button>
+                                    </div>
+                                )}
+
+                                {errorMessage && (
+                                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-center gap-3">
+                                        <span className="text-xs font-semibold">{errorMessage}</span>
+                                        <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
+                                    </div>
+                                )}
+
+                                {/* TABS CONTENT */}
+                                <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
+                                    
+                                    {/* ─── TAB: DADOS GERAIS ─── */}
+                                    {activeTab === "Dados Gerais" && (
+                                        <div className="space-y-6 text-left">
+                                            {/* Code & Expiry Card */}
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/10 dark:bg-dark-surface/10 space-y-3">
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Código da Proposta</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Data de Emissão</span>
+                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body uppercase tracking-wider font-semibold">Validade da Proposta</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Issuer / Seller Card */}
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2">
+                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide border-b border-brand-border dark:border-dark-border pb-1.5">Fornecedor</h3>
+                                                <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{partnerName}</p>
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap">{partnerAddress}</p>
+                                                {partnerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {partnerPhone}</p>}
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {partnerEmail}</p>
+                                                {sellerName && <p className="text-xs font-semibold text-brand-green mt-2">Vendedor: {sellerName} ({sellerEmail})</p>}
+                                            </div>
+
+                                            {/* Customer Card */}
+                                            {selectedCustomer ? (
+                                                <CustomerCard customer={selectedCustomer} />
+                                            ) : (
+                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2">
+                                                    <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide border-b border-brand-border dark:border-dark-border pb-1.5">Destinatário</h3>
+                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
+                                                    {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {customerPhone}</p>}
+                                                    {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {customerEmail}</p>}
+                                                </div>
+                                            )}
+
+                                            {/* Items List */}
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                <div className="p-4 border-b border-brand-border dark:border-dark-border">
+                                                    <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Itens do Orçamento</h3>
+                                                </div>
+                                                <div className="divide-y divide-brand-border dark:divide-dark-border">
+                                                    {items.map((item: any, idx: number) => {
+                                                        const itemTotal = Number(item.unit_price || 0) * Number(item.quantity || 0)
+                                                        const itemImage = getR2ImageUrl(item.image || item.products?.images?.[0] || null)
+                                                        return (
+                                                            <div key={item.id || idx} className="flex gap-3 p-4 hover:bg-brand-gray/10 dark:hover:bg-dark-surface/10 transition-colors">
+                                                                <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-brand-border dark:border-dark-border bg-white flex items-center justify-center">
+                                                                    <img src={itemImage} alt={item.name} className="w-full h-full object-cover" onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <h4 className="font-bold text-xs text-brand-dark dark:text-dark-heading truncate">{item.name || item.custom_name}</h4>
+                                                                        <span className="font-bold text-xs text-brand-dark dark:text-dark-heading ml-2">{formatCurrency(itemTotal)}</span>
+                                                                    </div>
+                                                                    {item.sku && <p className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">{item.sku}</p>}
+                                                                    <div className="flex justify-between items-center text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
+                                                                        <span>{item.quantity} {item.unit || "un"} • {formatCurrency(item.unit_price)} / un</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Totals Summary */}
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/5 dark:bg-dark-surface/5 space-y-3">
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.subtotal || 0))}</span>
+                                                </div>
+                                                {Number(dataQuote.shipping_cost || 0) > 0 && (
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.shipping_cost))}</span>
+                                                    </div>
+                                                )}
+                                                {Number(dataQuote.additional_costs || 0) > 0 && (
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outras taxas</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.additional_costs))}</span>
+                                                    </div>
+                                                )}
+                                                {Number(dataQuote.discount_value || 0) > 0 && (
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
+                                                        <span className="font-bold text-red-600">-{formatCurrency(Number(dataQuote.discount_value))}</span>
+                                                    </div>
+                                                )}
+                                                <div className="border-t border-brand-border dark:border-dark-border my-2"></div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">Valor Total</span>
+                                                    <span className="bg-brand-dark dark:bg-dark-surface text-white dark:text-dark-heading font-extrabold text-base px-3 py-1.5 rounded-lg">
+                                                        {formatCurrency(Number(dataQuote.total || 0))}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Commercial Notes / Observation */}
+                                            {dataQuote.notes && (
+                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-2 bg-brand-gray/10 dark:bg-dark-surface/5">
+                                                    <h4 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Observações Comerciais</h4>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{dataQuote.notes}</p>
+                                                </div>
+                                            )}
+
+                                            {/* Decision Action Buttons */}
+                                            {!isFinalized ? (
+                                                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                                                    <Button 
+                                                        onClick={() => setShowApproveModal(true)}
+                                                        className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
+                                                    >
+                                                        ✓ Aprovar Proposta
+                                                    </Button>
+                                                    <Button 
+                                                        onClick={() => setShowRejectModal(true)}
+                                                        variant="outline"
+                                                        className="flex-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 font-bold text-sm h-11 border-red-200 dark:border-red-900/30"
+                                                    >
+                                                        ✕ Recusar Proposta
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="p-4 rounded-2xl border text-xs font-semibold text-left space-y-2">
+                                                    {quote.status === "approved" ? (
+                                                        <div className="bg-green-50 border-green-100 text-green-800 p-2.5 rounded-xl space-y-1">
+                                                            <div className="font-bold text-sm text-green-900 flex items-center gap-1.5">
+                                                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                                                Aprovado pelo Cliente
+                                                            </div>
+                                                            <div>Aprovador: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
+                                                            <div>Data: {formatDateTime(quote.approved_at)}</div>
+                                                        </div>
+                                                    ) : quote.status === "rejected" ? (
+                                                        <div className="bg-red-50 border-red-100 text-red-800 p-2.5 rounded-xl space-y-1">
+                                                            <div className="font-bold text-sm text-red-900 flex items-center gap-1.5">
+                                                                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                                                Recusado pelo Cliente
+                                                            </div>
+                                                            <div>Autor: <span className="font-bold">{quote.approver_name || "Cliente"}</span></div>
+                                                            <div>Data: {formatDateTime(quote.rejected_at)}</div>
+                                                            {quote.rejection_reason && <div className="mt-1.5 italic text-slate-500 bg-white/60 p-2 rounded-lg border border-red-100">"{quote.rejection_reason}"</div>}
+                                                        </div>
+                                                    ) : quote.status === "expired" ? (
+                                                        <div className="bg-orange-50 border-orange-100 text-brand-orange p-2.5 rounded-xl">
+                                                            A proposta atingiu seu limite de validade em <span className="font-bold">{formatDateString(quote.expiration_date)}</span> e expirou.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-gray-50 border-brand-border text-brand-dark p-2.5 rounded-xl">
+                                                            Orçamento cancelado pelo vendedor.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* ─── TAB: CANAL DE NEGOCIAÇÃO ─── */}
+                                    {activeTab === "Canal de Negociação" && (
+                                        <div className="space-y-4 text-left h-full flex flex-col">
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 bg-brand-gray/5 dark:bg-dark-surface/5">
+                                                <h3 className="font-bold text-xs text-brand-dark dark:text-dark-heading uppercase tracking-wide">Mensagens</h3>
+                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">Dúvidas, pedidos de desconto ou prazos diferenciados? Negocie diretamente com o vendedor.</p>
+                                            </div>
+
+                                            {/* Chat stream */}
+                                            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex-1">
+                                                {interactions.length === 0 ? (
+                                                    <div className="text-center py-8 text-xs text-brand-inactive-text italic my-auto">
+                                                        Nenhuma mensagem trocada ainda.
+                                                    </div>
+                                                ) : (
+                                                    interactions.map((msg: any) => {
+                                                        const isCustomer = msg.author_role === "customer"
+                                                        return (
+                                                            <div 
+                                                                key={msg.id} 
+                                                                className={`p-3 rounded-2xl text-xs max-w-[85%] ${
+                                                                    isCustomer 
+                                                                        ? "bg-brand-gray/20 dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading align-self-start self-start" 
+                                                                        : "bg-green-50 border border-green-100 text-green-900 align-self-end self-end text-right ml-auto"
+                                                                }`}
+                                                            >
+                                                                <div className="font-bold mb-1">
+                                                                    {isCustomer ? `${msg.author_name} (Cliente)` : `${msg.author_name} (Vendedor)`}
+                                                                </div>
+                                                                <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                                                                <span className="text-[9px] text-brand-inactive-text dark:text-dark-body block mt-1">
+                                                                    {formatDateTime(msg.created_at)}
+                                                                </span>
+                                                            </div>
+                                                        )
+                                                    })
+                                                )}
+                                                <div ref={commentEndRef}></div>
+                                            </div>
+
+                                            {/* Chat Input Form */}
+                                            {!isFinalized && (
+                                                <form onSubmit={handleSendComment} className="flex gap-2 pt-2">
+                                                    <input 
+                                                        type="text"
+                                                        value={newComment}
+                                                        onChange={(e) => setNewComment(e.target.value)}
+                                                        placeholder="Digite sua dúvida ou contraproposta..."
+                                                        className="flex-1 text-xs bg-brand-gray/10 dark:bg-dark-surface/20 p-3 rounded-2xl border border-brand-border dark:border-dark-border outline-none focus:border-brand-inactive-text text-brand-dark dark:text-dark-heading"
+                                                        disabled={isSubmittingComment}
+                                                    />
+                                                    <Button 
+                                                        type="submit"
+                                                        disabled={!newComment.trim() || isSubmittingComment}
+                                                        className="bg-brand-dark text-white hover:bg-brand-dark/90 font-semibold text-xs px-4 h-11 shrink-0 rounded-2xl"
+                                                    >
+                                                        {isSubmittingComment ? "..." : "Enviar"}
+                                                    </Button>
+                                                </form>
+                                            )}
+                                        </div>
+                                    )}
+
+                                </div>
+
+                                {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
+                                <TabsContent value="Visualização" className="m-0 p-0 h-full flex flex-col focus-visible:outline-none lg:hidden" forceMount>
+                                    <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
+                                        <QuotePreview
+                                            invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                            quoteDate={dataQuote.issue_date || ""}
+                                            expiryDate={dataQuote.expiration_date || ""}
+                                            selectedCustomer={selectedCustomer}
+                                            quoteItems={mappedPreviewItems}
+                                            subtotal={Number(dataQuote.subtotal || 0)}
+                                            shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                            otherCosts={Number(dataQuote.additional_costs || 0)}
+                                            discountValue={Number(dataQuote.discount_value || 0)}
+                                            total={Number(dataQuote.total || 0)}
+                                            note={dataQuote.notes || undefined}
+                                            primaryColor={dataQuote.primary_color || undefined}
+                                            secondaryColor={dataQuote.secondary_color || undefined}
+                                            quoteTitle={dataQuote.quote_title || undefined}
+                                            quoteSubtitle={dataQuote.quote_subtitle || undefined}
+                                            partnerName={partnerName}
+                                            partnerAddress={partnerAddress}
+                                            partnerAvatar={partnerLogo || undefined}
+                                            printMode={false}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </div>
                         </div>
+
+                        {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
+                        <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
+                            <QuotePreview
+                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                quoteDate={dataQuote.issue_date || ""}
+                                expiryDate={dataQuote.expiration_date || ""}
+                                selectedCustomer={selectedCustomer}
+                                quoteItems={mappedPreviewItems}
+                                subtotal={Number(dataQuote.subtotal || 0)}
+                                shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                otherCosts={Number(dataQuote.additional_costs || 0)}
+                                discountValue={Number(dataQuote.discount_value || 0)}
+                                total={Number(dataQuote.total || 0)}
+                                note={dataQuote.notes || undefined}
+                                primaryColor={dataQuote.primary_color || undefined}
+                                secondaryColor={dataQuote.secondary_color || undefined}
+                                quoteTitle={dataQuote.quote_title || undefined}
+                                quoteSubtitle={dataQuote.quote_subtitle || undefined}
+                                partnerName={partnerName}
+                                partnerAddress={partnerAddress}
+                                partnerAvatar={partnerLogo || undefined}
+                                printMode={false}
+                            />
+                        </div>
+
                     </div>
                 </div>
-            </main>
+            </Tabs>
 
             {/* ─── MODAL: APPROVE PROPOSAL ─────────────────────────────────────── */}
             {showApproveModal && (
                 <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scale-in text-left">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-slate-900 text-lg">Aprovar Proposta</h3>
                             <button onClick={() => setShowApproveModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
@@ -607,19 +648,20 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </div>
 
                         <div className="flex gap-3 pt-2">
-                            <button 
+                            <Button 
+                                variant="outline"
                                 onClick={() => setShowApproveModal(false)}
-                                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl transition-colors"
+                                className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
                             >
                                 Cancelar
-                            </button>
-                            <button 
+                            </Button>
+                            <Button 
                                 onClick={handleApprove}
                                 disabled={!approverName.trim() || approvalCode.length < 4 || isProcessingAction}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                                className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm py-2.5 h-auto"
                             >
                                 {isProcessingAction ? "Aprovando..." : "Confirmar Aprovação"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -628,9 +670,9 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
             {/* ─── MODAL: REJECT PROPOSAL ─────────────────────────────────────── */}
             {showRejectModal && (
                 <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-scale-in text-left">
+                    <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-slate-900 text-lg text-rose-600">Recusar Proposta</h3>
+                            <h3 className="font-bold text-slate-900 text-lg text-red-600">Recusar Proposta</h3>
                             <button onClick={() => setShowRejectModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
                         </div>
 
@@ -675,19 +717,20 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </div>
 
                         <div className="flex gap-3 pt-2">
-                            <button 
+                            <Button 
+                                variant="outline"
                                 onClick={() => setShowRejectModal(false)}
-                                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl transition-colors"
+                                className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
                             >
                                 Cancelar
-                            </button>
-                            <button 
+                            </Button>
+                            <Button 
                                 onClick={handleReject}
                                 disabled={!approverName.trim() || approvalCode.length < 4 || !rejectionReason.trim() || isProcessingAction}
-                                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-2.5 h-auto"
                             >
                                 {isProcessingAction ? "Recusando..." : "Confirmar Recusa"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

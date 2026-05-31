@@ -261,88 +261,88 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 {/* ESTOQUE */}
                 {!isQuickMode && (
                     <div className="mt-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Estoque</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-                        <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
-                        <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Estoque</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
+                            <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
+                            <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
 
-                        <FormCombobox
-                            label="Localização"
-                            options={locations}
-                            value={productData.location_id}
-                            onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
-                            disabled={!isEditing}
-                            width="w-full"
-                            actionItem={{ label: "Criar novo local", icon: <PlusIcon size={18} />, onClick: () => openAddItemModal("location") }}
-                        />
-                    </div>
+                            <FormCombobox
+                                label="Localização"
+                                options={locations}
+                                value={productData.location_id}
+                                onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                                actionItem={{ label: "Criar novo local", icon: <PlusIcon size={18} />, onClick: () => openAddItemModal("location") }}
+                            />
+                        </div>
 
-                    <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
-                        <Checkbox
-                            checked={productData.allow_sell_without_stock}
-                            onChange={(c) =>
-                                handleFieldChange({
-                                    target: { name: "allow_sell_without_stock", value: c }
-                                })
-                            }
-                            name="allow_sell_without_stock"
-                            disabled={!isEditing}
-                            label="Permitir vender sem estoque"
-                        />
-                    </div>
+                        <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
+                            <Checkbox
+                                checked={productData.allow_sell_without_stock}
+                                onChange={(c) =>
+                                    handleFieldChange({
+                                        target: { name: "allow_sell_without_stock", value: c }
+                                    })
+                                }
+                                name="allow_sell_without_stock"
+                                disabled={!isEditing}
+                                label="Permitir vender sem estoque"
+                            />
+                        </div>
                     </div>
                 )}
 
                 {/* ENVIO - Agora com estilo corrigido */}
                 {!isQuickMode && (
                     <div className="mt-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
 
-                    <Accordion title="Envio e Dimensões" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
-                        <div className="pb-4">
-                            <div className="space-y-5">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                                    <Input label="Peso Líquido (kg)" name="weight_net" value={productData.weight_net} onChange={handleFieldChange} disabled={!isEditing} />
-                                    {/* ... restante dos inputs ... */}
-                                    <Input label="Peso Bruto (kg)" name="weight_gross" value={productData.weight_gross} onChange={handleFieldChange} disabled={!isEditing} />
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <Input
-                                            label="Prazo de Preparação (dias)"
-                                            name="preparation_days"
-                                            type="number"
-                                            value={productData.preparation_days}
-                                            onChange={handleFieldChange}
-                                            disabled={!isEditing}
-                                            placeholder="0"
-                                        />
-                                        <FormDropdown
-                                            label="Tipo de Embalagem"
-                                            options={[
-                                                { value: "package", label: "Pacote/Caixa" },
-                                                { value: "cilinder", label: "Cilindro/Rolo" },
-                                                { value: "envelope", label: "Envelope" }
-                                            ]}
-                                            value={productData.packaging_type}
-                                            setValue={(v) => handleFieldChange({ target: { name: "packaging_type", value: v } })}
-                                            disabled={!isEditing}
-                                            width="w-full"
-                                        />
+                        <Accordion title="Envio e Dimensões" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
+                            <div className="pb-4">
+                                <div className="space-y-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                                        <Input label="Peso Líquido (kg)" name="weight_net" value={productData.weight_net} onChange={handleFieldChange} disabled={!isEditing} />
+                                        {/* ... restante dos inputs ... */}
+                                        <Input label="Peso Bruto (kg)" name="weight_gross" value={productData.weight_gross} onChange={handleFieldChange} disabled={!isEditing} />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input
+                                                label="Prazo de Preparação (dias)"
+                                                name="preparation_days"
+                                                type="number"
+                                                value={productData.preparation_days}
+                                                onChange={handleFieldChange}
+                                                disabled={!isEditing}
+                                                placeholder="0"
+                                            />
+                                            <FormDropdown
+                                                label="Tipo de Embalagem"
+                                                options={[
+                                                    { value: "package", label: "Pacote/Caixa" },
+                                                    { value: "cilinder", label: "Cilindro/Rolo" },
+                                                    { value: "envelope", label: "Envelope" }
+                                                ]}
+                                                value={productData.packaging_type}
+                                                setValue={(v) => handleFieldChange({ target: { name: "packaging_type", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                                        <Input label="Largura (cm)" name="width" value={productData.width} onChange={handleFieldChange} disabled={!isEditing} />
+                                        <Input label="Altura (cm)" name="height" value={productData.height} onChange={handleFieldChange} disabled={!isEditing} />
+                                        <Input label="Profund. (cm)" name="length" value={productData.length} onChange={handleFieldChange} disabled={!isEditing} />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                                    <Input label="Largura (cm)" name="width" value={productData.width} onChange={handleFieldChange} disabled={!isEditing} />
-                                    <Input label="Altura (cm)" name="height" value={productData.height} onChange={handleFieldChange} disabled={!isEditing} />
-                                    <Input label="Profund. (cm)" name="length" value={productData.length} onChange={handleFieldChange} disabled={!isEditing} />
-                                </div>
                             </div>
-                        </div>
-                    </Accordion>
+                        </Accordion>
                     </div>
                 )}
             </div>
 
-            {/* DIREITA (Widgets) */}
+            {/* Right Column */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                 <SidebarCard hasTopStrip>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Organização</h3>

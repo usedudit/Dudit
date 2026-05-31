@@ -101,8 +101,9 @@ export default function PromotionsPage({
   } = entityPage
 
   const [promotions, setPromotions] = useState<any[]>(initialPromotions)
-  const [scopeData, setScopeData] = useState<{ products: any[]; categories: any[]; customers: any[] }>({
+  const [scopeData, setScopeData] = useState<{ products: any[]; services: any[]; categories: any[]; customers: any[] }>({
     products: [],
+    services: [],
     categories: [],
     customers: [],
   })
@@ -139,6 +140,7 @@ export default function PromotionsPage({
         if (res.success) {
           setScopeData({
             products: res.products || [],
+            services: res.services || [],
             categories: res.categories || [],
             customers: res.customers || [],
           })
