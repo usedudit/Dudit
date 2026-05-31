@@ -187,13 +187,13 @@ export default function CreateReturnPage({
             const statusChanged = returnStatus !== returnRequest.status
             const resolutionTypeChanged = resolutionType !== (returnRequest.approvedResolution || returnRequest.desiredResolution || "refund")
             const observationsChanged = observations !== (returnRequest.observations || "")
-            
+
             const itemsChanged = returnItems.some(item => {
                 const orig = returnRequest.items.find(i => i.id === item.id)
                 if (!orig) return true
                 return !item.checked || item.quantity !== orig.quantity || item.reason !== mapToLegacyReason(orig.reason || "outro") || item.condition !== mapToLegacyCondition(orig.condition || "aberto")
             })
-            
+
             const initialImages = returnRequest.evidenceImages || []
             const imagesChanged = evidenceImages.length !== initialImages.length || evidenceImages.some((img, idx) => img !== initialImages[idx])
 
@@ -203,6 +203,7 @@ export default function CreateReturnPage({
     }, [mode, isSaving, isUploading, selectedOrder, observations, evidenceImages, replacementItems.length, returnRequest, returnStatus, resolutionType, returnItems])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+    const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
     // Load existing return data for edit/view modes
     useEffect(() => {
@@ -528,9 +529,9 @@ export default function CreateReturnPage({
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-8">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -538,7 +539,7 @@ export default function CreateReturnPage({
 
                                 {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                    <Button variant="filled" onClick={() => handleNavigation(onBack)} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -563,7 +564,7 @@ export default function CreateReturnPage({
 
                                     {/* Desktop action buttons only */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button variant="outline" onClick={() => handleNavigation(onBack)} disabled={isSaving || isUploading}>
+                                        <Button variant="outline" onClick={handleBack} disabled={isSaving || isUploading}>
                                             Cancelar
                                         </Button><Button onClick={handleFormSubmit} disabled={isSaveDisabled}>
                                             <SaveIcon className="w-5 h-5 mr-2" />
@@ -1494,7 +1495,7 @@ export default function CreateReturnPage({
 
             {/* Mobile action bar */}
             <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-background p-4 flex gap-3">
-                <Button variant="outline" onClick={() => handleNavigation(onBack)} className="flex-1" disabled={isSaving || isUploading}>
+                <Button variant="outline" onClick={handleBack} className="flex-1" disabled={isSaving || isUploading}>
                     Cancelar
                 </Button>
                 {mode !== "view" && (

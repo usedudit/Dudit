@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -98,6 +98,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
   const isDirty = currentSnapshot !== initialSnapshot
 
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+  const handleBack = useCallback(() => handleNavigation(), [handleNavigation])
 
   const handleCNPJBlur = async () => {
     const cnpj = formData.cnpj
@@ -528,7 +529,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
       {error && <InfoCard message={error} color="red" className="mb-4" />}
 
       <div className="flex gap-2 mt-6">
-        <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={() => handleNavigation()}>
+        <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={handleBack}>
           Cancelar
         </Button>
         <Button type="submit" className="flex-1" disabled={isLoading}>

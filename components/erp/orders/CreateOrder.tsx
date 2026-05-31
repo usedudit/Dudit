@@ -1171,224 +1171,226 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     return (
         <FadeIn>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                    {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                            {/* Back button - desktop only */}
-                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
 
-                            {/* Title and Actions */}
-                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        <span className="hidden md:inline truncate">{editOrderId ? "Editar pedido" : "Novo pedido"}</span>
-                                    </h1>
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                        {editOrderId ? "Atualize as informações da venda" : "Preencha as informações da nova venda"}
+                                {/* Title and Actions */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">{editOrderId ? "Editar pedido" : "Novo pedido"}</span>
+                                        </h1>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            {editOrderId ? "Atualize as informações da venda" : "Preencha as informações da nova venda"}
+                                        </div>
+                                    </div>
+
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <Button variant="outline" onClick={handleBack} disabled={isSaving}>
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleSaveOrder} disabled={isSaving}>
+                                            <SaveIcon className="w-5 h-5 mr-2" />
+                                            {isSaving ? "Salvando..." : primaryActionLabel}
+                                        </Button>
                                     </div>
                                 </div>
 
-                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={handleBack} disabled={isSaving}>
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={handleSaveOrder} disabled={isSaving}>
-                                        <SaveIcon className="w-5 h-5 mr-2" />
-                                        {isSaving ? "Salvando..." : primaryActionLabel}
-                                    </Button>
+                                {/* Tabs Navigation */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        {deliveryMethod === 'delivery' && (
+                                            <TabsTrigger value="delivery">
+                                                Entrega
+                                                {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                        )}
+                                        {!isQuick && (
+                                            <TabsTrigger value="observations">
+                                                Observações
+                                                {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                        )}
+                                    </TabsList>
                                 </div>
-                            </div>
-
-                            {/* Tabs Navigation */}
-                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                    <TabsTrigger value="general">
-                                        Dados gerais
-                                        {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                    </TabsTrigger>
-                                    {deliveryMethod === 'delivery' && (
-                                        <TabsTrigger value="delivery">
-                                            Entrega
-                                            {getTabErrorCount("delivery") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                        </TabsTrigger>
-                                    )}
-                                    {!isQuick && (
-                                        <TabsTrigger value="observations">
-                                            Observações
-                                            {getTabErrorCount("observations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                        </TabsTrigger>
-                                    )}
-                                </TabsList>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                        {isPaidOrder && (
-                            <div className="mb-6 p-4 rounded-2xl border transition-all duration-300 shadow-sm flex flex-col md:flex-row md:items-center gap-4 bg-brand-light-gray dark:bg-dark-border/10 border-brand-border dark:border-dark-border">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
-                                        <span className="text-xl font-bold text-amber-600 dark:text-amber-400">!</span>
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            {isPaidOrder && (
+                                <div className="mb-6 p-4 rounded-2xl border transition-all duration-300 shadow-sm flex flex-col md:flex-row md:items-center gap-4 bg-brand-light-gray dark:bg-dark-border/10 border-brand-border dark:border-dark-border">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+                                            <span className="text-xl font-bold text-amber-600 dark:text-amber-400">!</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                Edição Restrita (Pedido Pago)
+                                            </h4>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 leading-relaxed">
+                                                Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas dados de entrega, observações e status de expedição podem ser atualizados.
+                                            </p>
+                                        </div>
                                     </div>
+                                </div>
+                            )}
+                            <TabsContent value="general" className="mt-0">
+                                <FadeIn key="general">
                                     <div>
-                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                            Edição Restrita (Pedido Pago)
-                                        </h4>
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 leading-relaxed">
-                                            Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas dados de entrega, observações e status de expedição podem ser atualizados.
-                                        </p>
+                                        <OrderGeneralTab
+                                            items={items}
+                                            searchQuery={productBucket.searchQuery}
+                                            isProductSearchOpen={isProductSearchOpen}
+                                            isSearching={productBucket.isLoading}
+                                            searchResults={productBucket.filteredResults}
+                                            loadMoreProducts={productBucket.loadMore}
+                                            hasMoreProducts={productBucket.hasMore}
+                                            subtotal={subtotal}
+                                            discountAmount={discountAmount}
+                                            discountValue={discountValue}
+                                            discountType={discountType}
+                                            shippingFee={shippingFee}
+                                            otherCosts={otherCosts}
+                                            totalAmount={totalAmount}
+                                            selectedCustomer={selectedCustomer}
+                                            orderDate={orderDate}
+                                            salesChannel={salesChannel}
+                                            deliveryMethod={deliveryMethod}
+                                            paymentStatus={paymentStatus}
+                                            deliveryStatus={deliveryStatus}
+                                            financeAccountId={financeAccountId}
+                                            accountOptions={accountOptions}
+                                            remainingPaymentAmount={editOrderId ? remainingAmount : 0}
+                                            manualItemNameErrors={manualItemNameErrors}
+                                            manualItemPriceErrors={manualItemPriceErrors}
+                                            isSaving={isSaving}
+                                            setSearchQuery={productBucket.setSearchQuery}
+                                            setIsProductSearchOpen={setIsProductSearchOpen}
+                                            onSearchFocus={productBucket.loadBucket}
+                                            addProductToOrder={addProductToOrder}
+                                            updateItemField={updateItemField}
+                                            updateItemPrice={updateItemPrice}
+                                            updateItemQty={updateItemQty}
+                                            resolveItemQuantityMax={getItemMaxQuantity}
+                                            toggleItemEdit={toggleItemEdit}
+                                            removeItem={removeItem}
+                                            addBlankItem={addBlankItem}
+                                            setShippingFee={setShippingFee}
+                                            setOtherCosts={setOtherCosts}
+                                            setDiscountValue={setDiscountValue}
+                                            setDiscountType={setDiscountType}
+                                            couponCode={couponCode}
+                                            setCouponCode={setCouponCode}
+                                            couponDiscountAmount={effectiveCouponDiscountAmount}
+                                            onApplyCoupon={handleApplyCoupon}
+                                            onOpenDiscount={() => setIsDiscountModalOpen(true)}
+                                            onOpenShipping={handleOpenShippingSheet}
+                                            setSelectedCustomer={setSelectedCustomer}
+                                            setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                            setOrderDate={setOrderDate}
+                                            setSalesChannel={setSalesChannel}
+                                            setDeliveryMethod={setDeliveryMethod}
+                                            setDeliveryStatus={setDeliveryStatus}
+                                            setFinanceAccountId={setFinanceAccountId}
+                                            onCreateAccount={() => {
+                                                setNewAccountName("")
+                                                setNewAccountType("cash")
+                                                setNewAccountInitialBalance(0)
+                                                setNewAccountIsDefault(
+                                                    !financeAccounts.some(
+                                                        (acc) =>
+                                                            acc.type === "cash" &&
+                                                            (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                                    ),
+                                                )
+                                                setNewAccountIsActive(true)
+                                                setIsAccountModalOpen(true)
+                                            }}
+                                            handleSaveOrder={handleOpenPaymentModal}
+                                            isQuickMode={isQuick}
+                                            salesChannelOptions={salesChannelOptions}
+                                            deliveryMethodOptions={deliveryMethodOptions}
+                                            deliveryStatusOptions={deliveryStatusOptions}
+                                            fieldErrors={fieldErrors}
+                                            setFieldErrors={setFieldErrors}
+                                            isMarketplaceOrder={isMarketplaceOrder}
+                                            isMarketplaceLocked={isMarketplaceLocked}
+                                            isPaidOrder={isPaidOrder}
+                                            role={role}
+                                        />
                                     </div>
-                                </div>
-                            </div>
-                        )}
-                        <TabsContent value="general" className="mt-0">
-                            <FadeIn key="general">
-                                <div>
-                                    <OrderGeneralTab
-                                        items={items}
-                                        searchQuery={productBucket.searchQuery}
-                                        isProductSearchOpen={isProductSearchOpen}
-                                        isSearching={productBucket.isLoading}
-                                        searchResults={productBucket.filteredResults}
-                                        loadMoreProducts={productBucket.loadMore}
-                                        hasMoreProducts={productBucket.hasMore}
-                                        subtotal={subtotal}
-                                        discountAmount={discountAmount}
-                                        discountValue={discountValue}
-                                        discountType={discountType}
-                                        shippingFee={shippingFee}
-                                        otherCosts={otherCosts}
-                                        totalAmount={totalAmount}
-                                        selectedCustomer={selectedCustomer}
-                                        orderDate={orderDate}
-                                        salesChannel={salesChannel}
-                                        deliveryMethod={deliveryMethod}
-                                        paymentStatus={paymentStatus}
-                                        deliveryStatus={deliveryStatus}
-                                        financeAccountId={financeAccountId}
-                                        accountOptions={accountOptions}
-                                        remainingPaymentAmount={editOrderId ? remainingAmount : 0}
-                                        manualItemNameErrors={manualItemNameErrors}
-                                        manualItemPriceErrors={manualItemPriceErrors}
-                                        isSaving={isSaving}
-                                        setSearchQuery={productBucket.setSearchQuery}
-                                        setIsProductSearchOpen={setIsProductSearchOpen}
-                                        onSearchFocus={productBucket.loadBucket}
-                                        addProductToOrder={addProductToOrder}
-                                        updateItemField={updateItemField}
-                                        updateItemPrice={updateItemPrice}
-                                        updateItemQty={updateItemQty}
-                                        resolveItemQuantityMax={getItemMaxQuantity}
-                                        toggleItemEdit={toggleItemEdit}
-                                        removeItem={removeItem}
-                                        addBlankItem={addBlankItem}
-                                        setShippingFee={setShippingFee}
-                                        setOtherCosts={setOtherCosts}
-                                        setDiscountValue={setDiscountValue}
-                                        setDiscountType={setDiscountType}
-                                        couponCode={couponCode}
-                                        setCouponCode={setCouponCode}
-                                        couponDiscountAmount={effectiveCouponDiscountAmount}
-                                        onApplyCoupon={handleApplyCoupon}
-                                        onOpenDiscount={() => setIsDiscountModalOpen(true)}
-                                        onOpenShipping={handleOpenShippingSheet}
-                                        setSelectedCustomer={setSelectedCustomer}
-                                        setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                                        setOrderDate={setOrderDate}
-                                        setSalesChannel={setSalesChannel}
-                                        setDeliveryMethod={setDeliveryMethod}
-                                        setDeliveryStatus={setDeliveryStatus}
-                                        setFinanceAccountId={setFinanceAccountId}
-                                        onCreateAccount={() => {
-                                            setNewAccountName("")
-                                            setNewAccountType("cash")
-                                            setNewAccountInitialBalance(0)
-                                            setNewAccountIsDefault(
-                                                !financeAccounts.some(
-                                                    (acc) =>
-                                                        acc.type === "cash" &&
-                                                        (!acc.integration_source || acc.integration_source !== "mercadopago"),
-                                                ),
-                                            )
-                                            setNewAccountIsActive(true)
-                                            setIsAccountModalOpen(true)
-                                        }}
-                                        handleSaveOrder={handleOpenPaymentModal}
-                                        isQuickMode={isQuick}
-                                        salesChannelOptions={salesChannelOptions}
-                                        deliveryMethodOptions={deliveryMethodOptions}
-                                        deliveryStatusOptions={deliveryStatusOptions}
-                                        fieldErrors={fieldErrors}
-                                        setFieldErrors={setFieldErrors}
-                                        isMarketplaceOrder={isMarketplaceOrder}
-                                        isMarketplaceLocked={isMarketplaceLocked}
-                                        isPaidOrder={isPaidOrder}
-                                        role={role}
-                                    />
-                                </div>
-                            </FadeIn>
-                        </TabsContent>
+                                </FadeIn>
+                            </TabsContent>
 
-                        <TabsContent value="delivery" className="mt-0">
-                            <FadeIn key="delivery">
-                                <div>
-                                    <AddressTab
-                                        cep={cep}
-                                        street={street}
-                                        number={number}
-                                        complement={complement}
-                                        neighborhood={neighborhood}
-                                        city={city}
-                                        uf={uf}
-                                        noNumber={noNumber}
-                                        deliveryMethod={deliveryMethod}
-                                        deliveryStatus={deliveryStatus}
-                                        selectedDeliveryPersonId={selectedDeliveryPersonId}
-                                        deliveryDate={deliveryDate}
-                                        deliveryTime={deliveryTime}
-                                        deliveryPeopleOptions={deliveryPeopleOptions}
-                                        setDeliveryStatus={setDeliveryStatus}
-                                        setSelectedDeliveryPersonId={setSelectedDeliveryPersonId}
-                                        setDeliveryDate={setDeliveryDate}
-                                        setDeliveryTime={setDeliveryTime}
-                                        deliveryStatusOptions={deliveryStatusOptions}
-                                        setCep={setCep}
-                                        setStreet={setStreet}
-                                        setNumber={setNumber}
-                                        setComplement={setComplement}
-                                        setNeighborhood={setNeighborhood}
-                                        setCity={setCity}
-                                        setUf={setUf}
-                                        setNoNumber={setNoNumber}
-                                        isMarketplaceOrder={isMarketplaceOrder}
-                                        originalDeliveryStatus={originalDeliveryStatus}
-                                        isMarketplaceLocked={isMarketplaceLocked}
-                                        isPaidOrder={isPaidOrder}
-                                        role={role}
-                                    />
-                                </div>
-                            </FadeIn>
-                        </TabsContent>
+                            <TabsContent value="delivery" className="mt-0">
+                                <FadeIn key="delivery">
+                                    <div>
+                                        <AddressTab
+                                            cep={cep}
+                                            street={street}
+                                            number={number}
+                                            complement={complement}
+                                            neighborhood={neighborhood}
+                                            city={city}
+                                            uf={uf}
+                                            noNumber={noNumber}
+                                            deliveryMethod={deliveryMethod}
+                                            deliveryStatus={deliveryStatus}
+                                            selectedDeliveryPersonId={selectedDeliveryPersonId}
+                                            deliveryDate={deliveryDate}
+                                            deliveryTime={deliveryTime}
+                                            deliveryPeopleOptions={deliveryPeopleOptions}
+                                            setDeliveryStatus={setDeliveryStatus}
+                                            setSelectedDeliveryPersonId={setSelectedDeliveryPersonId}
+                                            setDeliveryDate={setDeliveryDate}
+                                            setDeliveryTime={setDeliveryTime}
+                                            deliveryStatusOptions={deliveryStatusOptions}
+                                            setCep={setCep}
+                                            setStreet={setStreet}
+                                            setNumber={setNumber}
+                                            setComplement={setComplement}
+                                            setNeighborhood={setNeighborhood}
+                                            setCity={setCity}
+                                            setUf={setUf}
+                                            setNoNumber={setNoNumber}
+                                            isMarketplaceOrder={isMarketplaceOrder}
+                                            originalDeliveryStatus={originalDeliveryStatus}
+                                            isMarketplaceLocked={isMarketplaceLocked}
+                                            isPaidOrder={isPaidOrder}
+                                            role={role}
+                                        />
+                                    </div>
+                                </FadeIn>
+                            </TabsContent>
 
-                        <TabsContent value="observations" className="mt-0">
-                            <FadeIn key="observations">
-                                <OrderObservationsTab
-                                    notes={notes}
-                                    setNotes={setNotes}
-                                    disabled={role === 'DELIVERY'}
-                                />
-                            </FadeIn>
-                        </TabsContent>
+                            <TabsContent value="observations" className="mt-0">
+                                <FadeIn key="observations">
+                                    <OrderObservationsTab
+                                        notes={notes}
+                                        setNotes={setNotes}
+                                        disabled={role === 'DELIVERY'}
+                                    />
+                                </FadeIn>
+                            </TabsContent>
+                        </div>
                     </div>
-                </div>
+                </Tabs>
 
                 <SelectCustomerSheet
                     isOpen={isCustomerSheetOpen}
@@ -1800,7 +1802,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         {isSaving ? "Salvando..." : primaryActionLabel}
                     </Button>
                 </div>
-            </Tabs>
+            </div>
         </FadeIn>
     )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button, InfoCard } from "@/components/reusable"
 import { Card, CardContent } from "@/components/ui/card"
@@ -37,6 +37,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
   const isDirty = currentSnapshot !== initialSnapshot
 
   const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
+  const handleBack = useCallback(() => handleNavigation("/erp/servicos" as any), [handleNavigation])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,9 +61,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
     }
   }
 
-  const handleCancel = () => {
-    handleNavigation("/erp/servicos" as any)
-  }
+
 
   return (
     <form onSubmit={handleSubmit}>
@@ -104,7 +103,7 @@ export function ServiceForm({ partnerId }: ServiceFormProps) {
           {error && <InfoCard message={error} color="red" />}
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={handleCancel}>
+            <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={handleBack}>
               Cancelar
             </Button>
             <Button type="submit" className="flex-1" disabled={isLoading}>
