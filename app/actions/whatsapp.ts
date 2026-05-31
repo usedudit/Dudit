@@ -3,6 +3,7 @@
 import { randomBytes } from "crypto"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireUser, requirePartnerRouteAccess, requireMinimumPlan } from "@/lib/auth/authorization"
+import { decrypt } from "@/lib/cryptoService"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import {
@@ -10,8 +11,12 @@ import {
     deactivateWhatsappConnection,
     setWhatsappConnectionActive,
     getActiveWhatsappConnection,
-    getWebhookUrl,
+    findActiveConnectionByPhoneNumberId,
+    syncWhatsappTemplates,
 } from "@/lib/services/whatsapp-connection.service"
+import { exchangeMetaAuthorizationCode } from "@/lib/meta/graph-client"
+import { MetaWhatsappManagementClient } from "@/lib/whatsapp/providers/meta-management-client"
+import { generateWhatsappOAuthState, validateWhatsappOAuthState } from "@/lib/security/whatsapp-oauth-state"
 import { dispatchWhatsappAutomation } from "@/lib/services/whatsapp-automation.service"
 import { processWhatsappMessageById, queueWhatsappMessage } from "@/lib/services/whatsapp-dispatch.service"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -51,12 +56,22 @@ export type WhatsappConnectionView = {
     phoneNumber: string | null
     phoneNumberId: string | null
     businessAccountId: string | null
+    connectionSource: string
+    wabaName: string | null
+    lastSyncedAt: string | null
     status: string
     isActive: boolean
     connectedAt: string | null
-    webhookUrl: string
-    webhookVerifyToken: string | null
     hasToken: boolean
+}
+
+export type WhatsappTemplateView = {
+    id: string
+    templateName: string
+    language: string
+    category: string
+    approvalStatus: string | null
+    isActive: boolean
 }
 
 export type WhatsappMessageView = {
@@ -80,7 +95,11 @@ async function requireIntegrationsAccess(partnerId: string) {
 }
 
 export async function getWhatsappIntegrationAction(): Promise<
-    ActionResponse<{ connection: WhatsappConnectionView | null; messages: WhatsappMessageView[] }>
+    ActionResponse<{
+        connection: WhatsappConnectionView | null
+        messages: WhatsappMessageView[]
+        templates: WhatsappTemplateView[]
+    }>
 > {
     try {
         const context = await getCurrentPartnerContext()
@@ -104,6 +123,13 @@ export async function getWhatsappIntegrationAction(): Promise<
             .order("created_at", { ascending: false })
             .limit(50)
 
+        const { data: templateRows } = await admin
+            .from("whatsapp_templates")
+            .select("id, template_name, language, category, variables, is_active")
+            .eq("partner_id", context.partnerId)
+            .eq("provider", "meta")
+            .order("template_name", { ascending: true })
+
         const connection: WhatsappConnectionView | null = active
             ? {
                 id: active.id,
@@ -111,11 +137,12 @@ export async function getWhatsappIntegrationAction(): Promise<
                 phoneNumber: active.phone_number,
                 phoneNumberId: active.phone_number_id,
                 businessAccountId: active.business_account_id,
+                connectionSource: active.connection_source || "manual",
+                wabaName: active.waba_name,
+                lastSyncedAt: active.last_synced_at,
                 status: active.status,
                 isActive: active.is_active,
                 connectedAt: active.connected_at,
-                webhookUrl: getWebhookUrl(),
-                webhookVerifyToken: active.webhook_verify_token,
                 hasToken: !!active.access_token_encrypted,
             }
             : null
@@ -124,6 +151,17 @@ export async function getWhatsappIntegrationAction(): Promise<
             success: true,
             data: {
                 connection,
+                templates: (templateRows || []).map((t) => {
+                    const vars = (t.variables || {}) as Record<string, unknown>
+                    return {
+                        id: t.id,
+                        templateName: t.template_name,
+                        language: t.language,
+                        category: t.category,
+                        approvalStatus: typeof vars.meta_status === "string" ? vars.meta_status : null,
+                        isActive: t.is_active,
+                    }
+                }),
                 messages: ((messages || []) as WhatsappMessageRow[]).map((m) => ({
                     id: m.id,
                     phoneNumber: m.phone_number,
@@ -168,6 +206,7 @@ export async function connectWhatsappAction(input: {
             businessAccountId: input.businessAccountId?.trim(),
             phoneNumber: input.phoneNumber?.trim(),
             activate: true,
+            connectionSource: "manual",
         })
 
         revalidatePath("/erp/integrations/whatsapp")
@@ -183,6 +222,134 @@ export async function connectWhatsappAction(input: {
         const msg = extractErrorMessage(error)
         console.error("[WhatsApp] connectWhatsappAction error:", msg, error)
         return { success: false, error: `Erro ao conectar WhatsApp: ${msg}` }
+    }
+}
+
+export async function prepareWhatsappEmbeddedSignupAction(): Promise<ActionResponse<void>> {
+    try {
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+        const user = await requireUser()
+        await generateWhatsappOAuthState(context.partnerId, user.id)
+        return { success: true, data: undefined }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] prepareWhatsappEmbeddedSignupAction error:", msg, error)
+        return { success: false, error: msg }
+    }
+}
+
+export async function completeWhatsappEmbeddedSignupAction(input: {
+    code: string
+    wabaId: string
+    phoneNumberId: string
+}): Promise<ActionResponse<{ connectionId: string }>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const user = await requireUser()
+        const stateValidation = await validateWhatsappOAuthState(user.id)
+        if (!stateValidation.valid) {
+            return { success: false, error: stateValidation.error || "Sessão de conexão inválida ou expirada" }
+        }
+        if (stateValidation.partnerId !== context.partnerId) {
+            return { success: false, error: "Contexto do parceiro não confere com a sessão" }
+        }
+
+        const code = input.code?.trim()
+        const wabaId = input.wabaId?.trim()
+        const phoneNumberId = input.phoneNumberId?.trim()
+        if (!code || !wabaId || !phoneNumberId) {
+            return { success: false, error: "Dados incompletos retornados pela Meta" }
+        }
+
+        const conflict = await findActiveConnectionByPhoneNumberId(phoneNumberId, context.partnerId)
+        if (conflict) {
+            return {
+                success: false,
+                error: "Este número WhatsApp já está conectado a outra conta Dudit",
+            }
+        }
+
+        const accessToken = await exchangeMetaAuthorizationCode(code)
+        const management = new MetaWhatsappManagementClient(accessToken)
+
+        const waba = await management.getWaba(wabaId)
+        const wabaName = typeof waba.name === "string" ? waba.name : null
+
+        const phones = await management.getPhoneNumbers(wabaId)
+        const phoneList = phones.data || []
+        const matchedPhone =
+            phoneList.find((p) => String(p.id) === phoneNumberId) || phoneList[0]
+        const displayPhone =
+            typeof matchedPhone?.display_phone_number === "string"
+                ? matchedPhone.display_phone_number
+                : null
+
+        if (!phoneList.some((p) => String(p.id) === phoneNumberId)) {
+            return { success: false, error: "Número não encontrado na conta WhatsApp selecionada" }
+        }
+
+        await management.subscribeAppToWaba(wabaId)
+
+        const connection = await upsertWhatsappConnection({
+            partnerId: context.partnerId,
+            provider: "meta",
+            accessToken,
+            phoneNumberId,
+            businessAccountId: wabaId,
+            phoneNumber: displayPhone || undefined,
+            connectionSource: "embedded_signup",
+            wabaName: wabaName || undefined,
+            activate: true,
+        })
+
+        await syncWhatsappTemplates({
+            partnerId: context.partnerId,
+            accessToken,
+            wabaId,
+        })
+
+        revalidatePath("/erp/integrations/whatsapp")
+        revalidatePath("/erp/settings")
+
+        return { success: true, data: { connectionId: connection.id } }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] completeWhatsappEmbeddedSignupAction error:", msg, error)
+        return { success: false, error: `Erro ao conectar WhatsApp: ${msg}` }
+    }
+}
+
+export async function syncWhatsappTemplatesAction(): Promise<ActionResponse<{ synced: number }>> {
+    try {
+        await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        const context = await getCurrentPartnerContext()
+        if (!context) return { success: false, error: "Contexto ERP não encontrado" }
+        await requireIntegrationsAccess(context.partnerId)
+
+        const connection = await getActiveWhatsappConnection(context.partnerId)
+        if (!connection?.access_token_encrypted || !connection.business_account_id) {
+            return { success: false, error: "WhatsApp não está conectado" }
+        }
+
+        const accessToken = decrypt(connection.access_token_encrypted, "whatsapp")
+        const result = await syncWhatsappTemplates({
+            partnerId: context.partnerId,
+            accessToken,
+            wabaId: connection.business_account_id,
+        })
+
+        revalidatePath("/erp/integrations/whatsapp")
+        return { success: true, data: result }
+    } catch (error: unknown) {
+        const msg = extractErrorMessage(error)
+        console.error("[WhatsApp] syncWhatsappTemplatesAction error:", msg, error)
+        return { success: false, error: msg }
     }
 }
 

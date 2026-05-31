@@ -7,15 +7,17 @@ import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, CheckCircleIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
+import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
 import {
-  connectWhatsappAction,
   disconnectWhatsappAction,
   toggleWhatsappActiveAction,
   sendWhatsappTestMessageAction,
   resendWhatsappMessageAction,
   getWhatsappIntegrationAction,
+  syncWhatsappTemplatesAction,
   type WhatsappConnectionView,
   type WhatsappMessageView,
+  type WhatsappTemplateView,
 } from "@/app/actions/whatsapp"
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -39,60 +41,43 @@ const STATUS_LABELS: Record<string, string> = {
   error: "Erro",
 }
 
+const TEMPLATE_STATUS_LABELS: Record<string, string> = {
+  APPROVED: "Aprovado",
+  PENDING: "Pendente",
+  REJECTED: "Rejeitado",
+  PAUSED: "Pausado",
+  DISABLED: "Desativado",
+}
+
 export function WhatsAppIntegrationPage({
-  partnerId,
   initialConnection,
   initialMessages,
+  initialTemplates,
 }: {
-  partnerId: string
   initialConnection: WhatsappConnectionView | null
   initialMessages: WhatsappMessageView[]
+  initialTemplates: WhatsappTemplateView[]
 }) {
   const [connection, setConnection] = useState(initialConnection)
   const [messages, setMessages] = useState(initialMessages)
+  const [templates, setTemplates] = useState(initialTemplates)
   const [isLoading, setIsLoading] = useState(false)
-  const [accessToken, setAccessToken] = useState("")
-  const [phoneNumberId, setPhoneNumberId] = useState(connection?.phoneNumberId || "")
-  const [businessAccountId, setBusinessAccountId] = useState(connection?.businessAccountId || "")
-  const [phoneNumber, setPhoneNumber] = useState(connection?.phoneNumber || "")
   const [testPhone, setTestPhone] = useState("")
-  const [provider, setProvider] = useState<"meta" | "evolution" | "twilio">("meta")
 
   const refresh = useCallback(async () => {
     const res = await getWhatsappIntegrationAction()
     if (res.success) {
       setConnection(res.data.connection)
       setMessages(res.data.messages)
+      setTemplates(res.data.templates)
     }
   }, [])
-
-  const handleConnect = async () => {
-    setIsLoading(true)
-    try {
-      const res = await connectWhatsappAction({
-        provider,
-        accessToken,
-        phoneNumberId,
-        businessAccountId: businessAccountId || undefined,
-        phoneNumber: phoneNumber || undefined,
-      })
-      if (!res.success) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("WhatsApp conectado com sucesso")
-      setAccessToken("")
-      await refresh()
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleDisconnect = async () => {
     if (!confirm("Desconectar integração WhatsApp?")) return
     setIsLoading(true)
     try {
-      const res = await disconnectWhatsappAction(provider)
+      const res = await disconnectWhatsappAction("meta")
       if (!res.success) {
         toast.error(res.error)
         return
@@ -105,13 +90,28 @@ export function WhatsAppIntegrationPage({
   }
 
   const handleToggle = async (active: boolean) => {
-    const res = await toggleWhatsappActiveAction(active, provider)
+    const res = await toggleWhatsappActiveAction(active, "meta")
     if (!res.success) {
       toast.error(res.error)
       return
     }
     toast.success(active ? "Automação ativada" : "Automação pausada")
     await refresh()
+  }
+
+  const handleSyncTemplates = async () => {
+    setIsLoading(true)
+    try {
+      const res = await syncWhatsappTemplatesAction()
+      if (!res.success) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(`${res.data.synced} modelo(s) sincronizado(s)`)
+      await refresh()
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleTest = async () => {
@@ -154,7 +154,7 @@ export function WhatsAppIntegrationPage({
         <div>
           <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading">WhatsApp Business</h1>
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-            Automação transacional e lembretes com whatsapp
+            Automação transacional e lembretes com WhatsApp
           </p>
         </div>
         {isConnected && connection?.isActive && (
@@ -166,52 +166,14 @@ export function WhatsAppIntegrationPage({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 max-w-3xl mx-auto w-full">
-        <SectionCard title="Provedor">
+        <SectionCard title="Conexão">
           <p className="text-sm text-brand-inactive-text mb-4">
-            Conecte o número oficial do seu negócio via WhatsApp Cloud API (Meta). Evolution API e Twilio em breve.
+            Conecte o número oficial do seu negócio com um clique. Você será redirecionado para autorizar na Meta — sem
+            precisar copiar tokens ou configurar webhooks.
           </p>
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as typeof provider)}
-            className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 bg-white dark:bg-dark-surface text-sm mb-4"
-            disabled={isConnected}
-          >
-            <option value="meta">WhatsApp Cloud API (Meta)</option>
-            <option value="evolution" disabled>Evolution API (em breve)</option>
-            <option value="twilio" disabled>Twilio WhatsApp (em breve)</option>
-          </select>
 
           {!isConnected ? (
-            <div className="space-y-3">
-              <input
-                type="password"
-                placeholder="Token de acesso permanente"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-              />
-              <input
-                placeholder="Phone Number ID"
-                value={phoneNumberId}
-                onChange={(e) => setPhoneNumberId(e.target.value)}
-                className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-              />
-              <input
-                placeholder="Business Account ID (opcional)"
-                value={businessAccountId}
-                onChange={(e) => setBusinessAccountId(e.target.value)}
-                className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-              />
-              <input
-                placeholder="Número exibido (opcional)"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-              />
-              <Button onClick={handleConnect} disabled={isLoading} className="w-full">
-                Conectar WhatsApp
-              </Button>
-            </div>
+            <WhatsappConnectButton onSuccess={refresh} className="w-full" />
           ) : (
             <div className="space-y-4">
               <div className="text-sm space-y-1">
@@ -219,30 +181,27 @@ export function WhatsAppIntegrationPage({
                   <span className="text-brand-inactive-text">Status:</span>{" "}
                   {STATUS_LABELS[connection.status] || connection.status}
                 </p>
+                {connection.wabaName && (
+                  <p>
+                    <span className="text-brand-inactive-text">Conta WhatsApp:</span> {connection.wabaName}
+                  </p>
+                )}
                 {connection.phoneNumber && (
                   <p>
                     <span className="text-brand-inactive-text">Número:</span> {connection.phoneNumber}
                   </p>
                 )}
-                <p>
-                  <span className="text-brand-inactive-text">Phone Number ID:</span> {connection.phoneNumberId}
-                </p>
+                {connection.lastSyncedAt && (
+                  <p>
+                    <span className="text-brand-inactive-text">Última sincronização:</span>{" "}
+                    {new Date(connection.lastSyncedAt).toLocaleString("pt-BR")}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between py-2 border-t border-brand-border dark:border-dark-border">
                 <span className="text-sm font-medium">Automação ativa</span>
                 <Switch checked={connection.isActive} onCheckedChange={handleToggle} />
-              </div>
-
-              <div className="rounded-lg bg-gray-50 dark:bg-dark-hover p-3 text-xs break-all">
-                <p className="font-semibold mb-1">URL do Webhook</p>
-                <p className="text-brand-inactive-text">{connection.webhookUrl}</p>
-                {connection.webhookVerifyToken && (
-                  <>
-                    <p className="font-semibold mt-2 mb-1">Verify Token</p>
-                    <p className="font-mono">{connection.webhookVerifyToken}</p>
-                  </>
-                )}
               </div>
 
               <div className="flex gap-2">
@@ -263,6 +222,43 @@ export function WhatsAppIntegrationPage({
             </div>
           )}
         </SectionCard>
+
+        {isConnected && (
+          <SectionCard title="Modelos de mensagem">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <p className="text-sm text-brand-inactive-text">
+                Modelos aprovados na sua conta Meta. As automações do Dudit usam nomes específicos — confira se estão
+                listados e aprovados.
+              </p>
+              <Button variant="outline" size="sm" onClick={handleSyncTemplates} disabled={isLoading}>
+                Sincronizar
+              </Button>
+            </div>
+            {templates.length === 0 ? (
+              <p className="text-sm text-brand-inactive-text">Nenhum modelo sincronizado ainda.</p>
+            ) : (
+              <ul className="divide-y divide-brand-border dark:divide-dark-border">
+                {templates.map((t) => (
+                  <li key={t.id} className="py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{t.templateName}</p>
+                      <p className="text-xs text-brand-inactive-text">
+                        {t.language} · {t.category}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        t.approvalStatus === "APPROVED" ? "green" : t.approvalStatus === "REJECTED" ? "red" : "gray"
+                      }
+                    >
+                      {TEMPLATE_STATUS_LABELS[t.approvalStatus || ""] || t.approvalStatus || "—"}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        )}
 
         <SectionCard title="Histórico de mensagens">
           {messages.length === 0 ? (

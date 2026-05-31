@@ -1,5 +1,7 @@
 export type WhatsappProviderId = "meta" | "evolution" | "twilio"
 
+export type WhatsappConnectionSource = "manual" | "embedded_signup"
+
 export type WhatsappConnectionStatus = "disconnected" | "pending" | "connected" | "error"
 
 export type WhatsappMessageStatus = "pending" | "queued" | "sent" | "delivered" | "read" | "failed" | "failed_permanently"
@@ -65,9 +67,21 @@ export interface PartnerWhatsappConnection {
   access_token_encrypted: string | null
   webhook_verify_token: string | null
   webhook_secret: string | null
+  connection_source: WhatsappConnectionSource
+  waba_name: string | null
+  last_synced_at: string | null
   status: WhatsappConnectionStatus
   is_active: boolean
   connected_at: string | null
+}
+
+export interface WhatsappTemplateView {
+  id: string
+  templateName: string
+  language: string
+  category: string
+  approvalStatus: string | null
+  isActive: boolean
 }
 
 export interface QueueMessageInput {

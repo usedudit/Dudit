@@ -8,10 +8,10 @@ import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon }
 import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
 import {
     getWhatsappIntegrationAction,
-    connectWhatsappAction,
     disconnectWhatsappAction,
     type WhatsappConnectionView,
 } from "@/app/actions/whatsapp"
+import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
 import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
@@ -82,14 +82,9 @@ export const IntegrationsSubPage = ({
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
     const [waIsLoading, setWaIsLoading] = useState(false)
-    const [waActiveModal, setWaActiveModal] = useState<"info" | "knowMore" | "connect" | null>(null)
+    const [waActiveModal, setWaActiveModal] = useState<"info" | "knowMore" | null>(null)
     const [waKnowMoreStep, setWaKnowMoreStep] = useState(0)
 
-    // WhatsApp form state
-    const [accessToken, setAccessToken] = useState("")
-    const [phoneNumberId, setPhoneNumberId] = useState("")
-    const [businessAccountId, setBusinessAccountId] = useState("")
-    const [phoneNumber, setPhoneNumber] = useState("")
     const [provider] = useState<"meta">("meta")
 
     const [isScrolled, setIsScrolled] = useState(false)
@@ -112,43 +107,6 @@ export const IntegrationsSubPage = ({
             return
         }
         setWaActiveModal("info")
-    }
-
-    const handleConnectWa = async () => {
-        if (!accessToken.trim() || !phoneNumberId.trim()) {
-            toast.error("Token e Phone Number ID são obrigatórios")
-            return
-        }
-        setWaIsLoading(true)
-        try {
-            console.log("[WhatsApp] Connecting with provider:", provider)
-            const res = await connectWhatsappAction({
-                provider,
-                accessToken,
-                phoneNumberId,
-                businessAccountId: businessAccountId || undefined,
-                phoneNumber: phoneNumber || undefined,
-            })
-            console.log("[WhatsApp] Connect result:", JSON.stringify(res, null, 2))
-            if (!res.success) {
-                console.error("[WhatsApp] Connect failed:", res.error)
-                toast.error(res.error || "Erro ao conectar")
-                return
-            }
-            toast.success("WhatsApp conectado com sucesso")
-            setAccessToken("")
-            setPhoneNumberId("")
-            setBusinessAccountId("")
-            setPhoneNumber("")
-            setWaActiveModal(null)
-            await fetchWaStatus()
-        } catch (err) {
-            console.error("[WhatsApp] Unexpected connect error:", err)
-            const message = err instanceof Error ? err.message : "Erro inesperado ao conectar"
-            toast.error(message)
-        } finally {
-            setWaIsLoading(false)
-        }
     }
 
     const handleDisconnectWa = async () => {
@@ -396,13 +354,13 @@ export const IntegrationsSubPage = ({
                                                     <Badge variant="gray">Desconectado</Badge>
                                                 )}
                                             </div>
-                                            {waConnection?.phoneNumber ? (
+                                            {waConnection?.phoneNumber || waConnection?.wabaName ? (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
-                                                    {waConnection.phoneNumber}
+                                                    {waConnection.phoneNumber || waConnection.wabaName}
                                                 </span>
                                             ) : (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
-                                                    Meta Cloud API
+                                                    WhatsApp Business
                                                 </span>
                                             )}
                                         </div>
@@ -497,93 +455,19 @@ export const IntegrationsSubPage = ({
                                 <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setWaActiveModal(null)}>
                                     Cancelar
                                 </Button>
-                                <Button className="flex-1 h-[46px]" onClick={() => setWaActiveModal("connect")}>
-                                    Conectar agora
-                                </Button>
+                                <WhatsappConnectButton
+                                    className="flex-1 h-[46px]"
+                                    onSuccess={async () => {
+                                        setWaActiveModal(null)
+                                        await fetchWaStatus()
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>
                 </DefaultModal>
 
-                {/* 2. WhatsApp Connection Modal */}
-                <DefaultModal
-                    isOpen={waActiveModal === "connect"}
-                    onClose={() => setWaActiveModal(null)}
-                    title="Configurações do WhatsApp Business"
-                    maxWidth="md"
-                >
-                    <div className="flex flex-col gap-4">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            Insira suas credenciais da API oficial do WhatsApp Cloud (Meta).
-                        </p>
-
-                        <div className="space-y-3">
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Token de acesso permanente
-                                </label>
-                                <input
-                                    type="password"
-                                    placeholder="Token de acesso permanente"
-                                    value={accessToken}
-                                    onChange={(e) => setAccessToken(e.target.value)}
-                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Phone Number ID
-                                </label>
-                                <input
-                                    placeholder="Phone Number ID"
-                                    value={phoneNumberId}
-                                    onChange={(e) => setPhoneNumberId(e.target.value)}
-                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Business Account ID (opcional)
-                                </label>
-                                <input
-                                    placeholder="Business Account ID"
-                                    value={businessAccountId}
-                                    onChange={(e) => setBusinessAccountId(e.target.value)}
-                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Número exibido (opcional)
-                                </label>
-                                <input
-                                    placeholder="Ex: 5511999999999"
-                                    value={phoneNumber}
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                    className="w-full border border-brand-border dark:border-dark-border rounded-lg px-3 py-2 text-sm bg-white dark:bg-dark-surface"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row gap-3 mt-4">
-                            <Button variant="outline" className="flex-1 h-[46px]" onClick={() => setWaActiveModal("info")}>
-                                Voltar
-                            </Button>
-                            <Button
-                                className="flex-1 h-[46px]"
-                                onClick={handleConnectWa}
-                                isLoading={waIsLoading}
-                            >
-                                Conectar
-                            </Button>
-                        </div>
-                    </div>
-                </DefaultModal>
-
-                {/* 3. WhatsApp Know More Modal */}
+                {/* 2. WhatsApp Know More Modal */}
                 <DefaultModal
                     isOpen={waActiveModal === "knowMore"}
                     onClose={() => setWaActiveModal("info")}
@@ -654,22 +538,11 @@ export const IntegrationsSubPage = ({
                                                 Como configurar?
                                             </h3>
                                             <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                                Você precisará de uma conta de desenvolvedor da Meta, um gerenciador de negócios verificado e obter as seguintes credenciais:
+                                                Clique em <strong>Conectar WhatsApp</strong> e autorize com sua conta Meta. O Dudit configura tudo automaticamente — você não precisa acessar o painel de desenvolvedor nem copiar tokens.
                                             </p>
-                                            <ul className="space-y-4 mt-6">
-                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
-                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
-                                                    <strong>Token de acesso permanente:</strong> Permite que nossa plataforma envie mensagens em seu nome.
-                                                </li>
-                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
-                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
-                                                    <strong>Phone Number ID:</strong> Identificador exclusivo do número do seu WhatsApp Cloud API.
-                                                </li>
-                                                <li className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
-                                                    <span className="flex shrink-0 items-center justify-center text-md">●</span>
-                                                    <strong>Business Account ID:</strong> ID do gerenciador de negócios associado à sua conta WhatsApp.
-                                                </li>
-                                            </ul>
+                                            <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed mt-4">
+                                                Após conectar, sincronize os modelos de mensagem aprovados na sua conta para validar as automações do sistema.
+                                            </p>
                                         </div>
                                     )}
                                 </motion.div>

@@ -201,6 +201,9 @@ export async function middleware(request: NextRequest) {
         https://*.cloudflare.com 
         https://accounts.google.com 
         https://apis.google.com
+        https://connect.facebook.net
+        https://www.facebook.com
+        https://*.facebook.com
         https://dudit.com.br
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
@@ -230,7 +233,11 @@ export async function middleware(request: NextRequest) {
         https://*.r2.cloudflarestorage.com
         https://img.dudit.com.br
         https://nominatim.openstreetmap.org
-        https://vimeo.com;
+        https://vimeo.com
+        https://www.facebook.com
+        https://web.facebook.com
+        https://*.facebook.com
+        https://graph.facebook.com;
     frame-src 'self' 
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
@@ -241,7 +248,10 @@ export async function middleware(request: NextRequest) {
         https://www.mercadolibre.com
         https://www.youtube.com
         https://www.youtube-nocookie.com
-        https://player.vimeo.com;
+        https://player.vimeo.com
+        https://www.facebook.com
+        https://web.facebook.com
+        https://*.facebook.com;
     img-src 'self' data: https: blob: 
         https://*.googleapis.com 
         https://*.gstatic.com 

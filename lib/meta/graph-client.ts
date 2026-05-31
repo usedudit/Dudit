@@ -17,6 +17,37 @@ export class MetaGraphError extends Error {
   }
 }
 
+/** Exchange Embedded Signup authorization code for a business access token (server-only). */
+export async function exchangeMetaAuthorizationCode(code: string): Promise<string> {
+  const clientId = process.env.META_APP_ID
+  const clientSecret = process.env.META_APP_SECRET
+  if (!clientId || !clientSecret) {
+    throw new Error("META_APP_ID e META_APP_SECRET devem estar configurados")
+  }
+
+  const url = new URL(`${META_GRAPH_BASE_URL}/${DEFAULT_META_GRAPH_VERSION}/oauth/access_token`)
+  url.searchParams.set("client_id", clientId)
+  url.searchParams.set("client_secret", clientSecret)
+  url.searchParams.set("code", code)
+
+  const res = await fetch(url.toString(), { method: "GET" })
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    const err = (json as { error?: { message?: string } })?.error
+    throw new MetaGraphError(err?.message || res.statusText, {
+      code: (json as { error?: { code?: number } })?.error?.code || res.status,
+      status: res.status,
+      raw: json,
+    })
+  }
+
+  const accessToken = String(json.access_token || "")
+  if (!accessToken) {
+    throw new Error("Meta não retornou access_token")
+  }
+  return accessToken
+}
+
 export class MetaGraphClient {
   constructor(
     private readonly accessToken: string,
