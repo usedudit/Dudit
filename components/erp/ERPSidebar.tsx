@@ -108,6 +108,8 @@ const navItems: NavItem[] = [
         submenu: [
             { label: "Cupons de Desconto", href: "/erp/coupons" },
             { label: "Campanhas e Promoções", href: "/erp/promotions" },
+            { label: "Planos Recorrentes", href: "/erp/recurring/plans" },
+            { label: "Assinaturas", href: "/erp/recurring/subscriptions" },
         ],
     },
     {

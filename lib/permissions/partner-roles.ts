@@ -48,6 +48,10 @@ const fullPdv = {
     view: true, sell: true, open_pdv: true, close_pdv: true, sangria: true, reforco: true, can_apply_discount: true, can_add_delivery: true,
 }
 
+const recurringFull = { view: true, manage: true }
+const recurringViewOnly = { view: true, manage: false }
+const recurringNone = { view: false, manage: false }
+
 export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
     OWNER: {
         orders: { view: true, create: true, edit: true, delete: true, cancel: true, can_apply_discount: true, can_add_delivery: true, delete_cancel: true },
@@ -65,6 +69,8 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         reports: { view_basic: true, view_advanced: true },
         dashboard: { view: true },
         delivery: { view: true, create: true, edit: true, update_status: true },
+        recurring_plans: recurringFull,
+        recurring_subscriptions: recurringFull,
         settings: {
             view: true, settings_negocio: true, settings_team: true, settings_plan: true, settings_payments: true, settings_comissions: true,
             settings_returns: true, settings_vitrine: true, settings_os: true, settings_messages: true, settings_delivery: true, settings_integrations: true,
@@ -92,6 +98,8 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         reports: { view_basic: true, view_advanced: true },
         dashboard: { view: true },
         delivery: { view: true, create: true, edit: true, update_status: true },
+        recurring_plans: recurringFull,
+        recurring_subscriptions: recurringFull,
         settings: {
             view: true, settings_negocio: true, settings_team: true, settings_plan: false, settings_payments: true, settings_comissions: true,
             settings_returns: true, settings_vitrine: true, settings_os: true, settings_messages: true, settings_delivery: true, settings_integrations: false,
@@ -119,6 +127,8 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         reports: { view_basic: true, view_advanced: false },
         dashboard: { view: true },
         delivery: { view: true, create: true, edit: true, update_status: true },
+        recurring_plans: recurringFull,
+        recurring_subscriptions: recurringFull,
         settings: {
             view: true, settings_negocio: true, settings_team: false, settings_plan: false, settings_payments: false, settings_comissions: false,
             settings_returns: true, settings_vitrine: false, settings_os: true, settings_messages: true, settings_delivery: false, settings_integrations: false,
@@ -146,6 +156,8 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         reports: { view_basic: false, view_advanced: false },
         dashboard: { view: true },
         delivery: { view: true, create: false, edit: false, update_status: true },
+        recurring_plans: recurringViewOnly,
+        recurring_subscriptions: recurringViewOnly,
         settings: settingsNone,
         settings_negocio: { edit: false },
         settings_team: { invite: false, edit: false, remove: false, revoke_invite: false },
@@ -170,6 +182,8 @@ export const PERMISSION_PRESETS: Record<PartnerRole, PartnerPermissions> = {
         reports: { view_basic: false, view_advanced: false },
         dashboard: { view: false },
         delivery: { view: true, create: false, edit: false, update_status: true },
+        recurring_plans: recurringNone,
+        recurring_subscriptions: recurringNone,
         settings: settingsNone,
         settings_negocio: { edit: false },
         settings_team: { invite: false, edit: false, remove: false, revoke_invite: false },

@@ -33,6 +33,8 @@ export type PermissionTemplate = {
   reports: { view_basic: boolean; view_advanced: boolean }
   dashboard: { view: boolean }
   delivery: { view: boolean; create: boolean; edit: boolean; update_status: boolean }
+  recurring_plans: { view: boolean; manage: boolean }
+  recurring_subscriptions: { view: boolean; manage: boolean }
   settings: {
     view: boolean
     settings_negocio: boolean

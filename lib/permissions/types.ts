@@ -119,6 +119,8 @@ export interface PartnerPermissions {
     reports: ReportsPermissions
     dashboard: { view: boolean }
     delivery: DeliveryPermissions
+    recurring_plans: { view: boolean; manage: boolean }
+    recurring_subscriptions: { view: boolean; manage: boolean }
     settings: SettingsPermissions
     settings_negocio: SettingsNegocioPermissions
     settings_team: SettingsTeamPermissions
@@ -186,6 +188,8 @@ export type RouteKey =
     | "marketing_coupons"
     | "marketing_promotions"
     | "cadastros_marketing"
+    | "recurring_plans"
+    | "recurring_subscriptions"
     // Configurações
     | "settings"
     | "settings_business"

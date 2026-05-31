@@ -842,6 +842,11 @@ const Header: React.FC<HeaderProps> = ({
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
                         </Link>
 
+                        <Link href="/assinaturas" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                            <Package size={20} />
+                            <span className="text-[13px] font-medium hidden xl:block">Assinaturas</span>
+                        </Link>
+
                         <Link href="/cart" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <div className="relative">
                                 <ShoppingBagIcon size={20} />

@@ -118,6 +118,8 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     marketing_coupons: { key: "marketing_coupons", path: "/erp/coupons", label: "Cupons de Desconto", category: "Marketing" },
     marketing_promotions: { key: "marketing_promotions", path: "/erp/promotions", label: "Campanhas e Promoções", category: "Marketing" },
     cadastros_marketing: { key: "cadastros_marketing", path: "/erp/cadastros-marketing", label: "Cadastros", category: "Marketing" },
+    recurring_plans: { key: "recurring_plans", path: "/erp/recurring/plans", label: "Planos Recorrentes", category: "Marketing" },
+    recurring_subscriptions: { key: "recurring_subscriptions", path: "/erp/recurring/subscriptions", label: "Assinaturas", category: "Marketing" },
 
     // ── Configurações
     settings: { key: "settings", path: "/erp/settings", label: "Configurações", category: "Configurações" },
@@ -223,6 +225,8 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: full,
     marketing_promotions: full,
     cadastros_marketing: full,
+    recurring_plans: full,
+    recurring_subscriptions: full,
     // Configurações
     settings: full,
     settings_business: withSpecific(full, { can_edit_business_data: true }),
@@ -289,6 +293,8 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: full,
     marketing_promotions: full,
     cadastros_marketing: full,
+    recurring_plans: full,
+    recurring_subscriptions: full,
     // Configurações (limitado): pode visualizar; sem assinatura/integrações
     settings: viewOnly,
     settings_business: viewOnly,
@@ -341,6 +347,8 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: noAccess,
     marketing_promotions: noAccess,
     cadastros_marketing: noAccess,
+    recurring_plans: viewOnly,
+    recurring_subscriptions: viewOnly,
     // Config - no access
     settings: noAccess,
     settings_business: noAccess,
@@ -392,6 +400,8 @@ const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
     marketing_coupons: noAccess,
     marketing_promotions: noAccess,
     cadastros_marketing: noAccess,
+    recurring_plans: noAccess,
+    recurring_subscriptions: noAccess,
     // Config - no access
     settings: noAccess,
     settings_business: noAccess,
@@ -545,6 +555,14 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             edit: logistics.edit,
             update_status: hasSpecificPermission(routePerms, "logistics", "can_update_delivery_status"),
         },
+        recurring_plans: {
+            view: routePerms.recurring_plans?.access ?? false,
+            manage: routePerms.recurring_plans?.edit ?? routePerms.recurring_plans?.create ?? false,
+        },
+        recurring_subscriptions: {
+            view: routePerms.recurring_subscriptions?.access ?? false,
+            manage: routePerms.recurring_subscriptions?.edit ?? routePerms.recurring_subscriptions?.create ?? false,
+        },
         team: mapRoute("settings_team"),
         dashboard: { view: mapRoute("dashboard").view },
         settings: {
@@ -692,6 +710,23 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
     if (legacy.coupons) {
         apply("marketing_coupons", mapLegacy(legacy.coupons))
         apply("marketing_promotions", mapLegacy(legacy.coupons))
+    }
+
+    if (legacy.recurring_plans) {
+        apply("recurring_plans", {
+            access: legacy.recurring_plans.view,
+            create: legacy.recurring_plans.manage,
+            edit: legacy.recurring_plans.manage,
+            delete: legacy.recurring_plans.manage,
+        })
+    }
+    if (legacy.recurring_subscriptions) {
+        apply("recurring_subscriptions", {
+            access: legacy.recurring_subscriptions.view,
+            create: legacy.recurring_subscriptions.manage,
+            edit: legacy.recurring_subscriptions.manage,
+            delete: legacy.recurring_subscriptions.manage,
+        })
     }
     if (legacy.categories) apply("cadastros_produtos", mapLegacy(legacy.categories))
     if (legacy.cadastros_categories) apply("cadastros_produtos", mapLegacy(legacy.cadastros_categories))

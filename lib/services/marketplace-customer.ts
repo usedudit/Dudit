@@ -7,6 +7,7 @@ interface CustomerParams {
   email?: string | null
   phone?: string | null
   cpf?: string | null
+  userId?: string | null
 }
 
 export async function ensureMarketplaceCustomer({
@@ -14,7 +15,8 @@ export async function ensureMarketplaceCustomer({
   name,
   email,
   phone,
-  cpf
+  cpf,
+  userId,
 }: CustomerParams): Promise<string | null> {
   const supabase = getAdminClient()
 
@@ -56,6 +58,11 @@ export async function ensureMarketplaceCustomer({
         } catch (e) {
           console.error("Error encrypting CPF during customer update:", e)
         }
+      }
+
+      if (userId) {
+        updateData.user_id = userId
+        needsUpdate = true
       }
 
       if (needsUpdate) {
@@ -136,6 +143,7 @@ export async function ensureMarketplaceCustomer({
         person_type: encryptedCpf ? "pf" : "pf", // default to 'pf'
         status: "ativo",
         source: "marketplace",
+        user_id: userId || null,
       })
       .select("id")
       .single()
