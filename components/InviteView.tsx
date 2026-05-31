@@ -3,8 +3,9 @@
 import React from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Building2, User, CheckCircle2, LogOut, HelpCircleIcon } from "lucide-react"
+import { BriefcaseIcon, UserIcon, CheckCircleIcon, LogoutIcon, AlertCircleIcon } from "@/lib/icons"
 import { Button, InfoCard } from "@/components/reusable"
+import MarketplaceFooter from "./marketplace/MarketplaceFooter"
 
 // ─── Background ──────────────────────────────────────────────────────────────
 const WavesBackground = React.memo(() => (
@@ -22,11 +23,15 @@ WavesBackground.displayName = "WavesBackground"
 function Shell({ children }: { children: React.ReactNode }) {
     return (
         <div className="min-h-screen flex flex-col font-sans bg-brand-gray">
+            {/* HEADER */}
             <header className="w-full bg-white border-b border-gray-100 sticky top-0 z-50 h-[80px] flex items-center shadow-sm">
-                <div className="container mx-auto px-4 max-w-[1300px]">
-                    <Link href="/" prefetch={false}>
+                <div className="container mx-auto px-4 max-w-[1300px] flex justify-between items-center h-full">
+                    <Link href="/" prefetch={false} className="shrink-0 cursor-pointer">
                         <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={110} height={32} className="h-8 w-auto" />
                     </Link>
+                    <nav>
+                        <Button asChild className="h-10 px-6 text-sm font-medium"><Link href="https://dudit.com.br/auth/login?mode=partner">Anuncie grátis</Link></Button>
+                    </nav>
                 </div>
             </header>
 
@@ -38,8 +43,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
                 <div className="w-full flex flex-col items-center pt-[60px] pb-12 z-10 px-4">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial="hidden" animate="visible" exit="exit"
                         className="bg-white rounded-lg shadow-xl w-full max-w-[500px] p-10 flex flex-col items-center text-center space-y-6"
                     >
                         {children}
@@ -47,25 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </div>
             </main>
 
-            <footer className="bg-[#2D2D37] text-white pt-8 pb-8 mt-auto w-full">
-                <div className="container mx-auto px-4 max-w-[1300px] flex flex-col md:flex-row justify-between items-center h-16">
-                    <div className="flex flex-col md:flex-row items-center gap-8">
-                        <div className="shrink-0 bg-white p-1 rounded-full w-10 h-10 flex items-center justify-center">
-                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" width={30} height={10} className="w-full h-auto" />
-                        </div>
-                        <nav>
-                            <ul className="flex flex-wrap justify-center gap-6 text-[13px] font-bold">
-                                {["Comprar", "Vender", "Quem somos", "Atendimento", "Termos e Privacidade"].map((item) => (
-                                    <li key={item}><a href="#" className="hover:underline">{item}</a></li>
-                                ))}
-                            </ul>
-                        </nav>
-                    </div>
-                </div>
-                <div className="container mx-auto px-4 max-w-[1300px] mt-8 pt-6 flex flex-col md:flex-row justify-between items-center text-[11px] text-gray-400 border-t border-gray-700">
-                    <p>© {new Date().getFullYear()} Dudit Inc. Todos os direitos reservados.</p>
-                </div>
-            </footer>
+            <MarketplaceFooter />
         </div>
     )
 }
@@ -101,14 +87,30 @@ export default function InviteView(props: InviteViewProps) {
     if (props.mode === "error") {
         return (
             <Shell>
-                <InfoCard
-                    title="Convite Inválido"
-                    message={props.message}
-                    color="red"
-                />
-                <Button asChild className="w-full h-12">
+                <div className="mx-auto h-20 w-20 bg-brand-red/10 text-brand-red rounded-full flex items-center justify-center">
+                    <AlertCircleIcon size={40} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-brand-dark mb-2">Convite Inválido</h2>
+                    <p className="text-brand-inactive-text text-sm">
+                        Ocorreu um problema ao processar seu convite.
+                    </p>
+                </div>
+
+                <div className="w-full text-left">
+                    <InfoCard
+                        message={props.message}
+                        color="red"
+                    />
+                </div>
+
+                <Button asChild className="w-full h-[44px] text-[15px] font-bold">
                     <Link href="/" prefetch={false}>Ir para a página inicial</Link>
                 </Button>
+
+                <Link href="/" prefetch={false} className="text-sm text-brand-inactive-text hover:text-brand-green mt-4 font-medium">
+                    ← Voltar para o início
+                </Link>
             </Shell>
         )
     }
@@ -119,21 +121,21 @@ export default function InviteView(props: InviteViewProps) {
         return (
             <Shell>
                 <div className="mx-auto h-20 w-20 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center">
-                    <Building2 size={40} />
+                    <BriefcaseIcon size={40} />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Finalizar Convite</h2>
-                    <p className="text-gray-500 text-sm">
-                        Você está prestes a entrar na equipe de <strong className="text-gray-800">{partnerName}</strong>.
+                    <h2 className="text-2xl font-bold text-brand-dark mb-2">Finalizar Convite</h2>
+                    <p className="text-brand-inactive-text text-sm">
+                        Você está prestes a entrar na equipe de <strong className="text-brand-dark">{partnerName}</strong>.
                     </p>
                 </div>
 
-                <div className={`w-full p-4 rounded-xl border text-left ${isMismatch ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}>
+                <div className={`w-full p-4 rounded-xl border text-left ${isMismatch ? "bg-red-50 border-red-200" : "bg-gray-50 border-brand-border"}`}>
                     <div className="flex items-center gap-2 mb-1">
-                        <User size={16} className="text-gray-400" />
-                        <span className="text-xs text-gray-500 font-medium">Conectado como:</span>
+                        <UserIcon size={16} className="text-gray-400" />
+                        <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
                     </div>
-                    <p className={`font-semibold break-all text-sm ${isMismatch ? "text-brand-red" : "text-gray-800"}`}>
+                    <p className={`font-semibold break-all text-sm ${isMismatch ? "text-brand-red" : "text-brand-dark"}`}>
                         {userEmail}
                     </p>
                 </div>
@@ -145,16 +147,16 @@ export default function InviteView(props: InviteViewProps) {
                             color="red"
                         />
                         <form action={onLoginRedirect} className="w-full">
-                            <button type="submit" className="w-full flex items-center justify-center gap-2 h-12 rounded-lg border border-gray-300 text-gray-700 font-bold text-[15px] hover:bg-gray-50 transition-colors">
-                                <LogOut size={18} /> Entrar com outra conta
-                            </button>
+                            <Button variant="outline" type="submit" className="w-full flex h-12" leftIcon={<LogoutIcon size={18} />}>
+                                Entrar com outra conta
+                            </Button>
                         </form>
                     </div>
                 ) : (
                     <form action={onAccept} className="w-full">
-                        <button type="submit" className="w-full flex items-center justify-center gap-2 h-12 rounded-lg bg-brand-green text-white font-bold text-[15px] hover:opacity-90 transition-opacity">
-                            <CheckCircle2 size={18} /> Confirmar Entrada
-                        </button>
+                        <Button type="submit" className="w-full flex h-12" leftIcon={<CheckCircleIcon size={18} />}>
+                            Confirmar Entrada
+                        </Button>
                     </form>
                 )}
             </Shell>
@@ -166,7 +168,7 @@ export default function InviteView(props: InviteViewProps) {
     return (
         <Shell>
             <div className="mx-auto h-20 w-20 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center">
-                <Building2 size={40} />
+                <BriefcaseIcon size={40} />
             </div>
             <div>
                 <h2 className="text-2xl font-bold text-brand-dark mb-2">Convite para equipe</h2>
@@ -175,23 +177,23 @@ export default function InviteView(props: InviteViewProps) {
                 </p>
             </div>
 
-            <div className="w-full p-4 rounded-xl bg-gray-50 border border-gray-200 text-left">
+            <div className="w-full p-4 rounded-xl bg-gray-50 border border-brand-border text-left">
                 <p className="text-xs text-brand-inactive-text mb-1">Este convite foi enviado para:</p>
                 <p className="font-semibold text-brand-dark break-all text-sm">{inviteEmail}</p>
             </div>
 
             {userEmail ? (
                 <>
-                    <div className="w-full p-4 rounded-xl bg-gray-50 border border-gray-200 text-left">
+                    <div className="w-full p-4 rounded-xl bg-gray-50 border border-brand-border text-left">
                         <div className="flex items-center gap-2 mb-1">
-                            <User size={16} className="text-brand-inactive-text" />
+                            <UserIcon size={16} className="text-brand-inactive-text" />
                             <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
                         </div>
                         <p className="font-semibold text-brand-dark break-all text-sm">{userEmail}</p>
                     </div>
                     <form action={onAccept} className="w-full">
                         <Button type="submit" className="w-full flex items-center justify-center gap-2 h-12">
-                            <CheckCircle2 size={18} /> Confirmar Entrada
+                            <CheckCircleIcon size={18} /> Confirmar Entrada
                         </Button>
                     </form>
                 </>
