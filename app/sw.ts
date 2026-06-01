@@ -63,12 +63,24 @@ function isUncacheableRequest(request: Request, url: URL): boolean {
 // Runtime caching customizado para o Dudit
 // A ordem importa: regras mais específicas primeiro
 // ============================================================
+const networkOnlyErrorHandler = {
+  handlerDidError: async ({ request }: { request: Request }) => {
+    if (request.destination === "document") {
+      const offlineFallback = await caches.match("/~offline");
+      if (offlineFallback) return offlineFallback;
+    }
+    return Response.error();
+  },
+};
+
 const duditRuntimeCaching = [
   // BLOQUEIO TOTAL: ERP, API, Auth, Server Actions, rotas privadas
   {
     matcher: ({ request, url }: { request: Request; url: URL }) =>
       isUncacheableRequest(request, url),
-    handler: new NetworkOnly(),
+    handler: new NetworkOnly({
+      plugins: [networkOnlyErrorHandler],
+    }),
   },
 
   // Fontes Google — Stale While Revalidate, 30 dias

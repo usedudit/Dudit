@@ -14,7 +14,7 @@ interface FavoriteButtonProps {
     /** Size variant */
     size?: "sm" | "md" | "lg"
     /** Visual variant */
-    variant?: "overlay" | "inline" | "icon-only"
+    variant?: "overlay" | "inline" | "icon-only" | "outline"
     /** Additional class names */
     className?: string
 }
@@ -68,9 +68,11 @@ export function FavoriteButton({
             case "inline":
                 return `${buttonSize} rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer select-none
                     ${favorited
-                        ? "bg-red-50 border-red-200 hover:bg-red-100"
+                        ? "bg-green-50 border-green-200 hover:bg-green-100"
                         : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                     }`
+            case "outline":
+                return `${buttonSize} rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-brand-gray dark:hover:bg-dark-border transition-all duration-200 cursor-pointer select-none`
             case "icon-only":
                 return `flex items-center justify-center transition-all duration-200 cursor-pointer select-none p-1.5`
             default:
@@ -97,8 +99,8 @@ export function FavoriteButton({
                         size={iconSize}
                         className={`transition-colors duration-200 ${
                             favorited
-                                ? "text-red-500 fill-red-500"
-                                : "text-gray-400 hover:text-gray-600"
+                                ? "text-brand-green fill-brand-green"
+                                : "text-brand-green hover:text-brand-green/80 fill-transparent"
                         }`}
                     />
                 </motion.div>
@@ -110,7 +112,7 @@ export function FavoriteButton({
                     {[...Array(6)].map((_, i) => (
                         <motion.div
                             key={i}
-                            className="absolute w-1 h-1 rounded-full bg-red-400"
+                            className="absolute w-1 h-1 rounded-full bg-brand-green/80"
                             style={{
                                 left: "50%",
                                 top: "50%",

@@ -24,9 +24,11 @@ export function DeliveryRouteMap({
   const markersRef = useRef<any[]>([])
   const [ready, setReady] = useState(false)
 
+  const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+  const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""
+
   useEffect(() => {
     let cancelled = false
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
     const init = async () => {
       if (cancelled || !mapContainerRef.current || !token) return
@@ -119,7 +121,7 @@ export function DeliveryRouteMap({
     }
   }, [points, ready])
 
-  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN) {
+  if (!token) {
     return (
       <div className="w-full h-full rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-surface flex items-center justify-center">
         <span className="text-sm text-brand-inactive-text">Mapa indisponível.</span>

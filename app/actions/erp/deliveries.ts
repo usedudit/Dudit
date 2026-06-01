@@ -900,6 +900,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
       situation,
       delivery_status,
       created_at,
+      order_source,
       order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
     `)
     .eq("partner_id", partnerId)
@@ -939,6 +940,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string) {
         phone: null,
       },
       address: formatAddress(order) || "",
+      orderSource: order.order_source || "Manual",
       items: order.order_items || [],
       alreadyInActiveDelivery: activeOrderIds.has(order.id),
     }))
@@ -1284,7 +1286,10 @@ export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId:
           delivery_fee,
           delivery_address,
           buyer_id,
-          order_source
+          order_source,
+          situation,
+          delivery_status,
+          order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images))
         )
       )
     `)
@@ -1587,5 +1592,155 @@ export async function updateERPDeliveryAction(payload: {
   })
 
   revalidateDeliveryDashboard(payload.partnerId)
+  return { success: true as const }
+}
+
+export async function updateERPSingleOrderDeliveryStatusAction(params: {
+  partnerId: string
+  deliveryId: string
+  orderId: string
+  status: DeliveryStatusValue
+}) {
+  const user = await requireUser()
+  const actor = await getDeliveryActorScope(params.partnerId)
+  await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_update_delivery_status" })
+  const supabase = await getSupabaseServerClient()
+
+  const { data: currentDelivery } = await supabase
+    .from("deliveries")
+    .select("id, delivery_person_id, status")
+    .eq("id", params.deliveryId)
+    .eq("partner_id", params.partnerId)
+    .maybeSingle()
+
+  if (!currentDelivery?.id) return { success: false as const, error: "Entrega não encontrada." }
+  if (actor.roleId === "delivery" && actor.partnerUserId && String(currentDelivery.delivery_person_id || "") !== actor.partnerUserId) {
+    return { success: false as const, error: "Sem permissão para alterar esta entrega." }
+  }
+
+  const nextStatus = normalizeDeliveryStatus(params.status)
+  const allowed = new Set<DeliveryStatusValue>(["pending", "preparing", "sent", "delivered", "cancelled", "delivery_failed"])
+  if (!allowed.has(nextStatus)) {
+    return { success: false as const, error: "Status de entrega inválido." }
+  }
+
+  const nowIso = new Date().toISOString()
+  const childPatch: Record<string, unknown> = {
+    status: nextStatus === "cancelled" ? "cancelled" : nextStatus,
+  }
+  if (nextStatus === "delivered") {
+    childPatch.delivered_at = nowIso
+  } else {
+    childPatch.delivered_at = null
+  }
+
+  const { error: linkError } = await supabase
+    .from("delivery_orders")
+    .update(childPatch)
+    .eq("delivery_id", params.deliveryId)
+    .eq("order_id", params.orderId)
+
+  if (linkError) return { success: false as const, error: linkError.message }
+
+  // Sync order-level delivery status (best-effort)
+  try {
+    const orderPatch: Record<string, unknown> = {
+      delivery_status: nextStatus,
+    }
+    if (nextStatus === "sent") {
+      orderPatch.delivery_departure_at = nowIso
+    }
+    if (nextStatus === "delivered") {
+      orderPatch.delivery_departure_at = nowIso
+      orderPatch.delivery_arrived_at = nowIso
+      orderPatch.delivery_completed_at = nowIso
+    }
+    await supabase.from("orders").update(orderPatch).eq("id", params.orderId).eq("partner_id", params.partnerId)
+  } catch (err) {
+    console.warn("[updateERPSingleOrderDeliveryStatusAction] order patch failed:", err)
+  }
+
+  const orderLabel = `#${String(params.orderId).slice(0, 8).toUpperCase()}`
+  const changeMsg = nextStatus === "delivered"
+    ? `Pedido ${orderLabel} entregue`
+    : nextStatus === "delivery_failed"
+      ? `Falha na entrega do pedido ${orderLabel}`
+      : `Status de entrega do pedido ${orderLabel} alterado para ${nextStatus}`
+
+  // Log on delivery audit
+  await logDeliveryEvent({
+    partnerId: params.partnerId,
+    actorUserId: user?.id || null,
+    deliveryId: params.deliveryId,
+    actionType: "order_delivery_status_changed",
+    changeLines: [changeMsg],
+    metadata: { orderId: params.orderId, newStatus: nextStatus },
+  })
+
+  // Log on order timeline
+  try {
+    await logAuditEvent({
+      partnerId: params.partnerId,
+      actorUserId: user?.id || null,
+      entityType: "order",
+      entityId: params.orderId,
+      actionType: "delivery_status_changed",
+      changeLines: [changeMsg],
+      metadata: { deliveryId: params.deliveryId, status: nextStatus },
+      source: "manual",
+    })
+  } catch (err) {
+    console.warn("[updateERPSingleOrderDeliveryStatusAction] order logAuditEvent failed:", err)
+  }
+
+  // Check if all delivery_orders are now completed
+  const { data: allLinks } = await supabase
+    .from("delivery_orders")
+    .select("status")
+    .eq("delivery_id", params.deliveryId)
+
+  const statuses = (allLinks || []).map((l: any) => l.status)
+  const allFinished = statuses.every((s: string) => ["delivered", "delivery_failed", "cancelled"].includes(s))
+  const anyDelivered = statuses.some((s: string) => s === "delivered")
+
+  if (allFinished) {
+    const finalDeliveryStatus = anyDelivered ? "delivered" : "delivery_failed"
+    const deliveryPatch: Record<string, unknown> = { status: finalDeliveryStatus }
+    if (finalDeliveryStatus === "delivered") {
+      deliveryPatch.departure_time = nowIso
+      deliveryPatch.started_at = nowIso
+      deliveryPatch.delivered_at = nowIso
+      deliveryPatch.completed_at = nowIso
+    }
+
+    await supabase
+      .from("deliveries")
+      .update(deliveryPatch)
+      .eq("id", params.deliveryId)
+
+    if (finalDeliveryStatus === "delivered" && currentDelivery.delivery_person_id) {
+      const { data: deliveryOrders } = await supabase
+        .from("delivery_orders")
+        .select("orders(delivery_fee)")
+        .eq("delivery_id", params.deliveryId)
+
+      const deliveryFeeTotal = (deliveryOrders || []).reduce((sum: number, row: any) => {
+        return sum + Number(row?.orders?.delivery_fee || 0)
+      }, 0)
+
+      await createCommissionExpenseForEntity({
+        supabase,
+        partnerId: params.partnerId,
+        partnerUserId: String(currentDelivery.delivery_person_id),
+        role: "delivery",
+        deliveryFee: deliveryFeeTotal,
+        entityType: "delivery",
+        entityId: params.deliveryId,
+        createdByUserId: user.id,
+      })
+    }
+  }
+
+  revalidateDeliveryDashboard(params.partnerId)
   return { success: true as const }
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -50,6 +51,8 @@ export default function DeliveriesPage({
     initialHasMore: boolean
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
 }) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
     const { openPlanUpgrade } = usePlanUpgrade()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -59,6 +62,38 @@ export default function DeliveriesPage({
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [wrapper, setWrapper] = useState<"list" | "create" | "detail">("list")
     const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null)
+
+    // Sync URL search params -> wrapper state
+    useEffect(() => {
+        const createParam = searchParams.get("create")
+        const viewParam = searchParams.get("view")
+        if (createParam === "true") {
+            setWrapper("create")
+            setSelectedDeliveryId(null)
+        } else if (viewParam) {
+            setWrapper("detail")
+            setSelectedDeliveryId(viewParam)
+        } else {
+            setWrapper("list")
+            setSelectedDeliveryId(null)
+        }
+    }, [searchParams])
+
+    const navigateTo = useCallback((newWrapper: "list" | "create" | "detail", deliveryId: string | null = null) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (newWrapper === "create") {
+            params.set("create", "true")
+            params.delete("view")
+        } else if (newWrapper === "detail" && deliveryId) {
+            params.set("view", deliveryId)
+            params.delete("create")
+        } else {
+            params.delete("create")
+            params.delete("view")
+        }
+        router.push(`?${params.toString()}`, { scroll: false })
+    }, [router, searchParams])
+
     const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const observerTarget = useRef<HTMLDivElement>(null)
@@ -163,13 +198,19 @@ export default function DeliveriesPage({
             const remainingLabel = remainingHoursPart > 0
                 ? `Vence em ${remainingHoursPart}h ${remainingMinutesPart}m`
                 : `Vence em ${remainingMinutes} min`
+            const customerNames = Array.from(new Set(links.map((l: any) => l.orders?.customer_name).filter(Boolean)))
+            const displayCustomerName = customerNames.length > 1 ? "Múltiplos clientes" : (customerNames[0] || "Cliente")
+
+            const addresses = Array.from(new Set(links.map((l: any) => l.orders?.delivery_address).filter(Boolean)))
+            const displayAddress = addresses.length > 1 ? "Múltiplos endereços" : (addresses[0] || "")
+
             return {
                 id: raw.id,
                 orderId: firstLink?.order_id || null,
                 orderCount: links.length,
                 orderDisplayId: order.order_number || (firstLink?.order_id ? `#${String(firstLink.order_id).slice(0, 8).toUpperCase()}` : "-"),
-                customerName: order.customer_name || "Cliente",
-                customerAddress: order.delivery_address || "",
+                customerName: displayCustomerName,
+                customerAddress: displayAddress,
                 orderSource: order.order_source || "Manual",
                 status: effectiveStatus,
                 deliveryPersonName,
@@ -185,7 +226,7 @@ export default function DeliveriesPage({
             }
         })
 
-        list = list.filter((d) => {
+        list = list.filter((d: any) => {
             const matchSearch = !term || d.orderDisplayId.toLowerCase().includes(term) || d.customerName.toLowerCase().includes(term)
             const statusLabel = getDeliveryStatusMeta(d.status).label
             const matchStatus = filters.status.length === 0 || filters.status.includes(statusLabel)
@@ -233,14 +274,14 @@ export default function DeliveriesPage({
                 <FadeIn key="create" className="w-full h-full">
                     <CreateDeliveryPage
                         partnerId={partnerId}
-                        onBack={() => { setCreatePrefillOrderIds(null); setWrapper("list") }}
-                        onSuccess={() => { setCreatePrefillOrderIds(null); setWrapper("list") }}
+                        onBack={() => { setCreatePrefillOrderIds(null); navigateTo("list") }}
+                        onSuccess={() => { setCreatePrefillOrderIds(null); navigateTo("list") }}
                         initialOrderIds={createPrefillOrderIds || undefined}
                     />
                 </FadeIn>
             ) : wrapper === "detail" && selectedDeliveryId ? (
                 <FadeIn key="detail" className="w-full h-full">
-                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => setWrapper("list")} />
+                    <DeliveryDetailPage deliveryId={selectedDeliveryId} partnerId={partnerId} onBack={() => navigateTo("list")} />
                 </FadeIn>
             ) : (
                 <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -262,7 +303,7 @@ export default function DeliveriesPage({
                                 >
                                     Gerar sugestões
                                 </Button>
-                                <Button onClick={() => setWrapper("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
+                                <Button onClick={() => navigateTo("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
                                     Nova entrega
                                 </Button>
                             </div>
@@ -272,7 +313,7 @@ export default function DeliveriesPage({
                             search={search}
                             onSearchChange={setSearch}
                             onOpenFilter={() => setIsFilterOpen(true)}
-                            onAdd={() => setWrapper("create")}
+                            onAdd={() => navigateTo("create")}
                             viewMode={viewMode}
                             onViewModeChange={setViewMode}
                             addDisabled={!!planGate}
@@ -302,7 +343,7 @@ export default function DeliveriesPage({
                                                     action: () => openPlanUpgrade("crescer"),
                                                 } : {
                                                     text: "Adicionar primeira entrega",
-                                                    action: () => setWrapper("create"),
+                                                    action: () => navigateTo("create"),
                                                 }
                                             }
                                         />
@@ -311,13 +352,13 @@ export default function DeliveriesPage({
                                     <FadeIn key="kanban" className="w-full">
                                         <DeliveryKanbanBoard
                                             deliveries={mapped}
-                                            onDetails={(id) => { setSelectedDeliveryId(id); setWrapper("detail") }}
+                                            onDetails={(id) => navigateTo("detail", id)}
                                             onQuickStatusChange={handleQuickStatusChange}
                                         />
                                     </FadeIn>
                                 ) : viewMode === "grid" ? (
                                     <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                        {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />)}
+                                        {paginated.map((delivery) => <DeliveryGridCard key={delivery.id} delivery={delivery} onQuickStatusChange={handleQuickStatusChange} onDetails={() => navigateTo("detail", delivery.id)} />)}
                                     </FadeIn>
                                 ) : (
                                     <FadeIn key="list-table" className="w-full overflow-hidden rounded-xl relative">
@@ -351,7 +392,7 @@ export default function DeliveriesPage({
                                                 </thead>
                                                 <tbody>
                                                     {paginated.map((delivery) => (
-                                                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => { setSelectedDeliveryId(delivery.id); setWrapper("detail") }} />
+                                                        <DeliveryListItem key={delivery.id} delivery={delivery} columns={COLUMNS as any} onQuickStatusChange={handleQuickStatusChange} onDetails={() => navigateTo("detail", delivery.id)} />
                                                     ))}
                                                 </tbody>
                                             </table>
@@ -421,7 +462,7 @@ export default function DeliveriesPage({
                                             const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
                                             setSuggestionsOpen(false)
                                             setCreatePrefillOrderIds(ids)
-                                            setWrapper("create")
+                                            navigateTo("create")
                                         }}
                                     >
                                         Criar entrega

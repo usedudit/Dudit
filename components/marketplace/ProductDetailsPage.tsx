@@ -4,12 +4,12 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox } from "@/components/reusable"
+import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -23,7 +23,9 @@ import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/ac
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { FavoriteButton } from "./FavoriteButton"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { createSlug } from "@/lib/utils/slugify"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 interface ProductDetailsPageClientProps {
     product: any
@@ -79,10 +81,10 @@ function ActionButtons({ productId, onShareClick, className = "" }: { productId:
                 itemId={productId}
                 itemType="produto"
                 size="lg"
-                variant="inline"
+                variant="outline"
             />
             <Button
-                variant="filled"
+                variant="outline"
                 onClick={(e) => { e.stopPropagation(); onShareClick(); }}
                 className="w-9 h-9 flex items-center justify-center"
             >
@@ -174,6 +176,27 @@ export function ProductDetailsPageClient({
             created_at: p?.created_at,
         }
     }, [product])
+
+    const [activePromotions, setActivePromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (partner?.id) {
+            listActivePromotionsForMarketplaceAction(partner.id)
+                .then((res) => {
+                    if (Array.isArray(res)) setActivePromotions(res)
+                })
+                .catch((e) => console.error("Error loading promotions:", e))
+        }
+    }, [partner?.id])
+
+    const activePromo = useMemo(() => {
+        return activePromotions.find((promo) => {
+            if (promo.applyScope === "entire_cart") return true
+            if (promo.applyScope === "specific_products" && promo.applicableProductIds?.includes(product.id)) return true
+            if (promo.applyScope === "category" && product.category_id && promo.applicableCategoryIds?.includes(product.category_id)) return true
+            return false
+        })
+    }, [activePromotions, product.id, product.category_id])
 
     // Load user addresses if logged in
     useEffect(() => {
@@ -821,18 +844,28 @@ export function ProductDetailsPageClient({
                         {product.product_type === "digital" ? "Produto Digital" : product.product_type === "service" ? "Serviço" : "Produto Físico"}
                     </span>
                 </div>
-                <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => reviewsRef.current?.scrollIntoView({ behavior: "smooth" })}>
-                    <StarIcon size={16} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                    <span className="text-[11px] sm:text-xs font-medium text-brand-inactive-text mt-0.5">
-                        {avgRating.toFixed(1)} ({reviews.length} avaliações)
-                    </span>
-                </div>
+                {reviews.length > 0 && (
+                    <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => reviewsRef.current?.scrollIntoView({ behavior: "smooth" })}>
+                        <StarIcon size={16} className="text-brand-green fill-brand-green" strokeWidth={0} />
+                        <span className="text-[11px] sm:text-xs font-medium text-brand-inactive-text mt-0.5">
+                            {avgRating.toFixed(1)} ({reviews.length} {reviews.length === 1 ? "avaliação" : "avaliações"})
+                        </span>
+                    </div>
+                )}
             </div>
 
             <h1 className="text-xl sm:text-2xl md:text-[2rem] leading-[1.1] font-medium text-brand-dark mb-6 tracking-tight">
                 {product.name}
             </h1>
+
+            {activePromo && (
+                <div className="mb-6 flex">
+                    <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
+                        {activePromo.name}
+                    </Badge>
+                </div>
+            )}
 
             {/* Price */}
             <div className="mb-6">
@@ -848,18 +881,18 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                    <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
                                         {formatMoney(pixUnitPrice)}
                                     </p>
-                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                                    <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                     <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.current)} em outros meios
                                 </p>
-                                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                                    ver opções de pagamento
-                                </button>
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                    Ver opções de pagamento
+                                </Button>
                             </div>
                         );
                     }
@@ -873,11 +906,11 @@ export function ProductDetailsPageClient({
                                     <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
                                         {formatMoney(pricing.current)}
                                     </p>
-                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                                    <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
-                                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                                    ver opções de pagamento
-                                </button>
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                    Ver opções de pagamento
+                                </Button>
                             </div>
                         );
                     }
@@ -896,9 +929,9 @@ export function ProductDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.original)} em outros meios
                                 </p>
-                                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                                    ver opções de pagamento
-                                </button>
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                    Ver opções de pagamento
+                                </Button>
                             </div>
                         );
                     }
@@ -909,7 +942,7 @@ export function ProductDetailsPageClient({
                             <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
                                 {formatMoney(pricing.current)}
                             </p>
-                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
                                 Ver opções de pagamento
                             </Button>
                         </div>
@@ -997,7 +1030,7 @@ export function ProductDetailsPageClient({
                                         {deliveryLoading ? (
                                             <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
                                         ) : deliveryError ? (
-                                            <p className="text-xs text-brand-red">{deliveryError}</p>
+                                            <p className="text-xs text-red-500">{deliveryError}</p>
                                         ) : calculatedAddress ? (
                                             <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
                                         ) : (
@@ -1132,7 +1165,7 @@ export function ProductDetailsPageClient({
                                     {/* Store Name and Details */}
                                     <div className="mt-2 min-w-0">
                                         <div className="flex items-center gap-1.5 justify-between">
-                                            <span className="font-bold text-brand-dark group-hover:text-brand-green group-hover:underline text-base truncate">
+                                            <span className="font-bold text-brand-dark text-base truncate">
                                                 {partner.store_name}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
@@ -1602,10 +1635,26 @@ export function ProductDetailsPageClient({
                 <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
-                        <Link href="/" prefetch={true} className="hover:text-brand-dark transition-colors">Início</Link>
+                        {partner.city && partner.state && (
+                            <>
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                    {partner.city} - {partner.state}
+                                </Link>
+                                <ChevronRightIcon size={10} />
+                            </>
+                        )}
+                        <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                            Produtos
+                        </Link>
                         <ChevronRightIcon size={10} />
-                        <Link href="/explorar?type=produtos" prefetch={true} className="hover:text-brand-dark transition-colors">Produtos</Link>
-                        <ChevronRightIcon size={10} />
+                        {product.category && (
+                            <>
+                                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(product.category)}?type=produtos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                                    {product.category}
+                                </Link>
+                                <ChevronRightIcon size={10} />
+                            </>
+                        )}
                         <span className="text-brand-inactive-text truncate max-w-[300px]">{product.name}</span>
                     </div>
 
@@ -1673,17 +1722,16 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
 
-
                                     {/* Desktop Right Column (Actions + Next) */}
-                                    <div className="hidden lg:flex flex-col gap-3 w-10 shrink-0 items-center self-stretch">
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
                                         <FavoriteButton
                                             itemId={product.id}
                                             itemType="produto"
                                             size="lg"
-                                            variant="inline"
+                                            variant="outline"
                                         />
 
-                                        <Button variant="filled" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
+                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
                                             <ShareIcon className="w-5 h-5 text-brand-green" />
                                         </Button>
 
@@ -1696,131 +1744,134 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
                                 </div>
+
                             </div>
-                        </div>
 
-                        {/* Buy panel (mobile/tablet) */}
-                        <div className="lg:hidden mb-6">{BuyPanel}</div>
+                            {/* Buy panel (mobile/tablet) */}
+                            <div className="lg:hidden mb-6">{BuyPanel}</div>
 
-                        {/* Description */}
-                        <div className="mb-10">
-                            <h3 className="text-xl font-medium text-brand-dark mb-4">Descrição</h3>
-                            <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
-                                <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed whitespace-pre-wrap">
-                                    {product.description || "Sem descrição."}
-                                </p>
-                                {!isDescriptionExpanded && product.description?.length > 200 && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
+                            {/* Description */}
+                            <div className="mb-10">
+                                <h3 className="text-xl font-medium text-brand-dark mb-4">Descrição</h3>
+                                <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
+                                    <p className="text-sm md:text-[0.9375rem] text-gray-600 leading-relaxed whitespace-pre-wrap">
+                                        {product.description || "Sem descrição."}
+                                    </p>
+                                    {!isDescriptionExpanded && product.description?.length > 200 && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" />
+                                    )}
+                                </div>
+                                {product.description?.length > 200 && (
+                                    <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                        className="flex items-center gap-1 text-brand-green font-bold text-sm mt-3 hover:underline">
+                                        {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
+                                        <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
+                                    </button>
                                 )}
                             </div>
-                            {product.description?.length > 200 && (
-                                <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                                    className="flex items-center gap-1 text-brand-green font-bold text-sm mt-3 hover:underline">
-                                    {isDescriptionExpanded ? "Ver menos descrição" : "Ver mais descrição"}
-                                    <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
-                                </button>
-                            )}
-                        </div>
 
-                        {/* Technical specs */}
-                        {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
-                            <div className="mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark mb-4">Especificações</h3>
-                                <div className="border border-brand-border rounded-xl overflow-hidden">
-                                    {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
-                                        <div key={i} className={`flex justify-between items-center px-4 py-3
+                            {/* Technical specs */}
+                            {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
+                                <div className="mb-10">
+                                    <h3 className="text-xl font-medium text-brand-dark mb-4">Especificações</h3>
+                                    <div className="border border-brand-border rounded-xl overflow-hidden">
+                                        {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
+                                            <div key={i} className={`flex justify-between items-center px-4 py-3
                         ${i % 2 === 0 ? "bg-brand-gray" : "bg-white"}
                         ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
-                                            <span className="text-sm text-brand-inactive-text font-medium">{spec.label || spec.name || ""}</span>
-                                            <span className="text-sm text-brand-dark font-semibold text-right">{spec.value || ""}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Reviews */}
-                        <div ref={reviewsRef} className="border-t border-brand-border pt-2">
-                            <h3 className="text-xl font-medium text-brand-dark mb-6 mt-8">Avaliações do produto</h3>
-                            {reviews.length > 0 && (
-                                <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
-                                    <div className="text-center shrink-0">
-                                        <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
-                                        <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                                        <p className="text-xs text-brand-inactive-text">média de {reviews.length} avaliações</p>
-                                    </div>
-                                    <div className="flex-1 space-y-2">
-                                        {[5, 4, 3, 2, 1].map((star) => {
-                                            const count = reviews.filter((r) => r.rating === star).length
-                                            const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
-                                            return (
-                                                <div key={star} className="flex items-center gap-2">
-                                                    <span className="text-xs text-brand-inactive-text w-3 shrink-0">{star}</span>
-                                                    <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
-                                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
-                                                    </div>
-                                                    <span className="text-xs text-brand-inactive-text w-4 text-right shrink-0">{count}</span>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                            {reviews.length > 0 ? (
-                                <div className="space-y-6">
-                                    {reviews.map((rev: any, i: number) => (
-                                        <div key={i} className="border-b border-brand-border pb-6 last:border-0">
-                                            <div className="flex items-start gap-3 mb-3">
-                                                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-brand-inactive-text">
-                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                                                    </svg>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="font-semibold text-sm text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
-                                                        <span className="text-xs text-brand-inactive-text shrink-0">
-                                                            {new Date(rev.created_at).toLocaleDateString("pt-BR")}
-                                                        </span>
-                                                    </div>
-                                                    <div className="mt-1"><StarRow rating={rev.rating} size={11} /></div>
-                                                </div>
+                                                <span className="text-sm text-brand-inactive-text font-medium">{spec.label || spec.name || ""}</span>
+                                                <span className="text-sm text-brand-dark font-semibold text-right">{spec.value || ""}</span>
                                             </div>
-                                            <p className="text-gray-600 text-sm leading-relaxed ml-12">{rev.comment}</p>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            ) : (
-                                <IconPlaceholder
-                                    placeholderType="image"
-                                    imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
-                                    imageAlt="Sem avaliações"
-                                    title="Ainda não temos avaliações por aqui"
-                                    subtitle="Seja o primeiro a contar para a comunidade como foi sua experiência!"
-                                />
                             )}
+
+                            {/* Reviews */}
+                            <div ref={reviewsRef} className="border-t border-brand-border pt-2">
+                                <h3 className="text-xl font-medium text-brand-dark mb-6 mt-8">Avaliações do produto</h3>
+                                {reviews.length > 0 && (
+                                    <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
+                                        <div className="text-center shrink-0">
+                                            <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
+                                            <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
+                                            <p className="text-xs text-brand-inactive-text">média de {reviews.length} avaliações</p>
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            {[5, 4, 3, 2, 1].map((star) => {
+                                                const count = reviews.filter((r) => r.rating === star).length
+                                                const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0
+                                                return (
+                                                    <div key={star} className="flex items-center gap-2">
+                                                        <span className="text-xs text-brand-inactive-text w-3 shrink-0">{star}</span>
+                                                        <StarIcon size={10} strokeWidth={0} className="text-brand-inactive-text fill-gray-400 shrink-0" />
+                                                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
+                                                        </div>
+                                                        <span className="text-xs text-brand-inactive-text w-4 text-right shrink-0">{count}</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                {reviews.length > 0 ? (
+                                    <div className="space-y-6">
+                                        {reviews.map((rev: any, i: number) => (
+                                            <div key={i} className="border-b border-brand-border pb-6 last:border-0">
+                                                <div className="flex items-start gap-3 mb-3">
+                                                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-brand-inactive-text">
+                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="font-semibold text-sm text-brand-dark">{rev.profiles?.full_name || "Usuário"}</span>
+                                                            <span className="text-xs text-brand-inactive-text shrink-0">
+                                                                {new Date(rev.created_at).toLocaleDateString("pt-BR")}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-1"><StarRow rating={rev.rating} size={11} /></div>
+                                                    </div>
+                                                </div>
+                                                <p className="text-gray-600 text-sm leading-relaxed ml-12">{rev.comment}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <IconPlaceholder
+                                        placeholderType="image"
+                                        imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
+                                        imageAlt="Sem avaliações"
+                                        title="Ainda não temos avaliações por aqui"
+                                        subtitle="Seja o primeiro a contar para a comunidade como foi sua experiência!"
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Desktop buy panel */}
+                        <div className="hidden lg:block lg:col-span-4 relative">
+                            {BuyPanel}
                         </div>
                     </div>
 
-                    {/* Desktop buy panel */}
-                    <div className="hidden lg:block lg:col-span-4 relative">
-                        {BuyPanel}
-                    </div>
+                    {/* Mobile bottom bar */}
+                    {!isProductOwner && (
+                        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
+                            <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
+                                disabled={isOutOfStock || loading} onClick={handleAddToCart}>
+                                <ShoppingCartIcon size={20} />
+                            </Button>
+                            <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
+                                {isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
-                {/* Mobile bottom bar */}
-                {!isProductOwner && (
-                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
-                        <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
-                            disabled={isOutOfStock || loading} onClick={handleAddToCart}>
-                            <ShoppingCartIcon size={20} />
-                        </Button>
-                        <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
-                            {isOutOfStock ? "Esgotado" : "Comprar Agora"}
-                        </Button>
-                    </div>
-                )}
+                {/* Redundant footer removed */}
             </motion.div>
         </>
     )

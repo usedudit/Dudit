@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
-import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
+import React, { useState, useEffect, useRef, useMemo } from "react"
+import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon } from "@/lib/icons"
 import { FavoriteButton } from "./FavoriteButton"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -11,6 +11,8 @@ import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { Badge } from "@/components/reusable"
+import { useFavorites } from "@/providers/favorites-provider"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -240,12 +242,54 @@ interface ItemCardProps {
     className?: string
 }
 
+// Simple client-side cache for partner promotions to avoid redundant network requests
+const promotionsCache: Record<string, Promise<any[]>> = {}
+
+function getCachedPartnerPromotions(partnerId: string) {
+    if (!promotionsCache[partnerId]) {
+        promotionsCache[partnerId] = listActivePromotionsForMarketplaceAction(partnerId)
+            .then(res => Array.isArray(res) ? res : [])
+            .catch(() => [])
+    }
+    return promotionsCache[partnerId]
+}
+
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]" }) => {
+    const { isFavorited } = useFavorites()
+    const itemType = (product as any).itemType === "servico" ? "servico" : "produto"
+    const favorited = isFavorited(product.id, itemType)
+
     const imageUrl = getPrimaryProductDisplayImage(product)
     const distance = product.partners?.distance_km_formatted || null
     const partner = Array.isArray(product.partners) ? product.partners[0] : product.partners
     const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
+    const partnerId = partner?.id || null
+
+    const [activePromotions, setActivePromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (partnerId) {
+            getCachedPartnerPromotions(partnerId).then(setActivePromotions)
+        }
+    }, [partnerId])
+
+    const activePromo = useMemo(() => {
+        return activePromotions.find((promo) => {
+            if (promo.applyScope === "entire_cart") return true
+            if (itemType === "produto") {
+                if (promo.applyScope === "specific_products" && promo.applicableProductIds?.includes(product.id)) return true
+                if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
+            } else {
+                if (promo.applyScope === "specific_services" && promo.applicableServiceIds?.includes(product.id)) return true
+                if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
+            }
+            return false
+        })
+    }, [activePromotions, product.id, itemType, (product as any).category_id])
+
+    const hasDiscount = !!(product.originalPrice && product.originalPrice > product.price)
+    const discountPercent = hasDiscount ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0
 
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
@@ -261,12 +305,25 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         className="w-full h-full object-cover transition-transform duration-500"
                         loading="lazy"
                     />
+                    <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
+                        {hasDiscount && (
+                            <Badge variant="orange" icon={null} className="whitespace-nowrap">
+                                -{discountPercent}%
+                            </Badge>
+                        )}
+                        {activePromo && (
+                            <span title={activePromo.name}>
+                                <Badge variant="blue" icon={<TagIcon size={10} />} className="whitespace-nowrap p-1.5 w-6 h-6 justify-center" />
+                            </span>
+                        )}
+                    </div>
                     <FavoriteButton
                         itemId={product.id}
-                        itemType={(product as any).itemType === "servico" ? "servico" : "produto"}
+                        itemType={itemType}
                         size="sm"
                         variant="overlay"
-                        className="absolute top-2 right-2 z-10 opacity-0 group-hover/card:opacity-100 transition-opacity"
+                        className={`absolute top-2 right-2 z-10 transition-opacity ${favorited ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
+                            }`}
                     />
                 </div>
 
@@ -286,11 +343,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                                 <span className="text-base font-bold text-brand-dark leading-tight">
                                     {formatCurrency(product.price)}
                                 </span>
-                                {product.originalPrice && product.originalPrice > product.price && (
-                                    <Badge variant="orange" icon={null} className="whitespace-nowrap scale-90 shrink-0">
-                                        -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-                                    </Badge>
-                                )}
                             </div>
                         </div>
 

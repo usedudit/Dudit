@@ -1,41 +1,50 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Button, Badge } from "@/components/reusable"
-import { PlusIcon } from "@/lib/icons"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { AnimatePresence } from "framer-motion"
+import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
+import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useEntityPage } from "@/hooks/use-entity-page"
+
+// Reusable Components
 import {
-  createRecurringPlanAction,
-  getRecurringPlanFormDataAction,
-  listRecurringPlansAction,
-  updateRecurringPlanAction,
-} from "@/app/actions/erp/recurring-plans"
-import type { RecurringPlan, RecurringPlanItem, RecurringFrequencyType } from "@/lib/types/recurring"
+  Button,
+  IconPlaceholder,
+  ThreeDotsLoader,
+  Pagination,
+} from "@/components/reusable"
+
+// Specific Page components
+import NewRecurringPlanPage from "./NewRecurringPlanPage"
+import PlanPageControls from "./PlanPageControls"
+import PlanGridCard from "./PlanGridCard"
+import PlanListRow from "./PlanListRow"
+
+// Icons & Utils
+import {
+  PlusIcon
+} from "@/lib/icons"
+import { FadeIn } from "@/components/animations/FadeIn"
+import { listRecurringPlansAction } from "@/app/actions/erp/recurring-plans"
+import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate } from "@/lib/utils"
 
-type FormData = {
-  products: Array<{ id: string; name: string; price: number }>
-  services: Array<{ id: string; name: string; price: number; duration_minutes?: number }>
-  staff: Array<{ id: string; display_name: string }>
-}
+type SortKey = "name" | "frequency" | "status"
+type SortDirection = "asc" | "desc"
 
-const EMPTY_ITEM: RecurringPlanItem = {
-  itemType: "product",
-  productId: null,
-  variantId: null,
-  serviceId: null,
-  quantity: 1,
-  unitPrice: null,
-  staffPartnerUserId: null,
-  preferredTime: null,
-  durationMinutes: null,
-}
+const COLUMNS = [
+  { id: "name", label: "Plano", align: "left" as const, width: "350px" },
+  { id: "frequency", label: "Frequência", align: "left" as const, width: "250px" },
+  { id: "status", label: "Status", align: "center" as const, width: "150px" },
+  { id: "actions", label: "Ações", align: "center" as const, width: "100px" },
+]
 
 export default function RecurringPlansPage({
   partnerId,
-  initialPlans,
+  initialPlans = [],
   initialHasMore,
   initialNextCursor,
 }: {
@@ -45,299 +54,357 @@ export default function RecurringPlansPage({
   initialNextCursor: string | null
 }) {
   const { toast } = useToast()
+  const isMobile = useMediaQuery("(max-width: 767px)")
   const { canCreate, canEdit } = usePermissions()
   const canManage = canCreate("recurring_plans") || canEdit("recurring_plans")
 
-  const [plans, setPlans] = useState(initialPlans)
-  const [hasMore, setHasMore] = useState(initialHasMore)
-  const [nextCursor, setNextCursor] = useState(initialNextCursor)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [mode, setMode] = useState<"list" | "form">("list")
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<FormData>({ products: [], services: [], staff: [] })
-  const [saving, setSaving] = useState(false)
+  const queryKey = useMemo(() => ["erp", "recurring_plans", partnerId] as const, [partnerId])
 
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    status: "active" as "active" | "inactive" | "archived",
-    frequencyType: "monthly" as RecurringFrequencyType,
-    frequencyInterval: 1,
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: "",
-    showInMarketplace: true,
-    items: [{ ...EMPTY_ITEM }] as RecurringPlanItem[],
+  // useEntityPage Hook for managing URL state and query caching
+  const entityPage = useEntityPage<any, any, string>({
+    entityType: "recurring_plans",
+    partnerId,
+    queryKey,
+    initialItems: initialPlans,
+    initialNextCursor,
+    initialHasMore,
+    fetchPageFn: async ({ cursor }) => {
+      const res = await listRecurringPlansAction(partnerId, { cursor })
+      if (!res.success || !res.data) throw new Error(res.error || "Erro ao carregar planos.")
+      return { items: res.data.items, nextCursor: res.data.nextCursor, hasMore: res.data.hasMore }
+    },
+    dedupeKey: useCallback((p: any) => String(p?.id || ""), []),
+    getDetailFn: async (_id: string) => null,
+    listToDetail: (item: any) => item,
   })
 
+  const {
+    items: rawPlans,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isListLoading,
+    entityState,
+    openEntity,
+    closeEntity,
+    isViewing,
+    isCreating,
+    isEditing,
+    currentEntity,
+    isLoadingDetail,
+    search,
+    setSearch,
+    debouncedSearch,
+    afterMutation,
+  } = entityPage
+
+  // Reset entity view when sidebar resets
   useEffect(() => {
-    if (mode === "form") {
-      getRecurringPlanFormDataAction(partnerId).then((res) => {
-        if (res.success && res.data) setFormData(res.data as FormData)
+    const handleReset = () => closeEntity()
+    window.addEventListener("erp-sidebar-reset", handleReset)
+    return () => window.removeEventListener("erp-sidebar-reset", handleReset)
+  }, [closeEntity])
+
+  // UI States
+  const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
+  const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+  const [page, setPage] = useState(1)
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
+
+  const observerTarget = useRef<HTMLDivElement>(null)
+  const itemsPerPage = 8
+
+  useInfiniteScrollObserver(observerTarget, {
+    enabled: true,
+    hasNextPage: !!hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage: () => fetchNextPage(),
+    rootMargin: "320px",
+    threshold: 0,
+  })
+
+  // Table Scroll indicator logic
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
+
+  const checkScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState({
+      left: scrollLeft > 0,
+      right: scrollLeft < scrollWidth - clientWidth - 2,
+    })
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener("resize", checkScroll)
+    return () => window.removeEventListener("resize", checkScroll)
+  }, [checkScroll, viewMode, rawPlans])
+
+  // Filter plans based on search & active tab
+  const filteredPlans = useMemo(() => {
+    if (!rawPlans) return []
+
+    const term = debouncedSearch.toLowerCase()
+
+    const filtered = rawPlans
+      .filter((p: any) => {
+        const nameMatch = (p.name || "").toLowerCase().includes(term)
+        const descMatch = (p.description || "").toLowerCase().includes(term)
+        return nameMatch || descMatch
+      })
+      .filter((p: any) => {
+        let tabMatch = true
+        if (activeTab === "Ativo") tabMatch = p.status === "active"
+        else if (activeTab === "Inativo") tabMatch = p.status === "inactive"
+        else if (activeTab === "Arquivado") tabMatch = p.status === "archived"
+        return tabMatch
+      })
+
+    const result = [...filtered]
+
+    if (sortConfig) {
+      const { key, direction } = sortConfig
+      result.sort((a, b) => {
+        let aVal = ""
+        let bVal = ""
+
+        if (key === "name") {
+          aVal = a.name || ""
+          bVal = b.name || ""
+        } else if (key === "frequency") {
+          aVal = getRecurringFrequencyLabel(a.frequencyType, a.frequencyInterval)
+          bVal = getRecurringFrequencyLabel(b.frequencyType, b.frequencyInterval)
+        } else if (key === "status") {
+          aVal = a.status || ""
+          bVal = b.status || ""
+        }
+
+        if (aVal === bVal) return 0
+        const comparison = aVal < bVal ? -1 : 1
+        return direction === "asc" ? comparison : -comparison
       })
     }
-  }, [mode, partnerId])
 
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
-    const res = await listRecurringPlansAction(partnerId, { cursor: nextCursor })
-    setLoadingMore(false)
-    if (res.success && res.data) {
-      setPlans((prev) => [...prev, ...res.data.items])
-      setHasMore(res.data.hasMore)
-      setNextCursor(res.data.nextCursor)
+    return result
+  }, [rawPlans, debouncedSearch, activeTab, sortConfig])
+
+  const totalPages = Math.ceil(filteredPlans.length / itemsPerPage)
+  const paginated = filteredPlans.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+
+  const selectedPlan = useMemo(() => {
+    if (!entityState.entityId) return null
+    if (currentEntity) return currentEntity
+    return rawPlans.find((p) => p.id === entityState.entityId) || null
+  }, [entityState.entityId, currentEntity, rawPlans])
+
+  useEffect(() => {
+    if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage()
     }
-  }, [partnerId, nextCursor, loadingMore])
+  }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const resetForm = () => {
-    setForm({
-      name: "",
-      description: "",
-      status: "active",
-      frequencyType: "monthly",
-      frequencyInterval: 1,
-      startDate: new Date().toISOString().slice(0, 10),
-      endDate: "",
-      showInMarketplace: true,
-      items: [{ ...EMPTY_ITEM }],
-    })
-    setEditingId(null)
+  const hasPlans = rawPlans?.length > 0
+
+  // Actions
+  const handleAddPlan = () => openEntity("create")
+  const handleEditPlan = (plan: any) => openEntity("edit", plan.id)
+  const handleDetailsPlan = (plan: any) => openEntity("view", plan.id)
+
+  const statusVariant = (status: string) => {
+    if (status === "active") return "green" as const
+    if (status === "inactive") return "orange" as const
+    return "gray" as const
   }
 
-  const openCreate = () => {
-    resetForm()
-    setMode("form")
-  }
-
-  const openEdit = (plan: RecurringPlan & { items?: RecurringPlanItem[] }) => {
-    setEditingId(plan.id)
-    setForm({
-      name: plan.name,
-      description: plan.description || "",
-      status: plan.status,
-      frequencyType: plan.frequencyType,
-      frequencyInterval: plan.frequencyInterval,
-      startDate: plan.startDate.slice(0, 10),
-      endDate: plan.endDate?.slice(0, 10) || "",
-      showInMarketplace: plan.showInMarketplace,
-      items: (plan.items || []).map((item) => ({
-        itemType: item.itemType,
-        productId: item.productId,
-        variantId: item.variantId,
-        serviceId: item.serviceId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        staffPartnerUserId: item.staffPartnerUserId,
-        preferredTime: item.preferredTime,
-        durationMinutes: item.durationMinutes,
-      })),
-    })
-    setMode("form")
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    const payload = {
-      partnerId,
-      name: form.name,
-      description: form.description || null,
-      status: form.status,
-      frequencyType: form.frequencyType,
-      frequencyInterval: form.frequencyInterval,
-      startDate: `${form.startDate}T12:00:00.000Z`,
-      endDate: form.endDate ? `${form.endDate}T23:59:59.000Z` : null,
-      showInMarketplace: form.showInMarketplace,
-      items: form.items,
-    }
-
-    const res = editingId
-      ? await updateRecurringPlanAction({ ...payload, planId: editingId })
-      : await createRecurringPlanAction(payload)
-
-    setSaving(false)
-    if (!res.success) {
-      toast({ title: "Erro", description: res.error, variant: "destructive" })
-      return
-    }
-
-    toast({ title: editingId ? "Plano atualizado" : "Plano criado" })
-    const listRes = await listRecurringPlansAction(partnerId)
-    if (listRes.success && listRes.data) {
-      setPlans(listRes.data.items)
-      setHasMore(listRes.data.hasMore)
-      setNextCursor(listRes.data.nextCursor)
-    }
-    setMode("list")
-    resetForm()
-  }
-
-  const statusVariant = useMemo(() => ({
-    active: "green" as const,
-    inactive: "orange" as const,
-    archived: "gray" as const,
-  }), [])
-
-  if (mode === "form") {
-    return (
-      <div className="space-y-6 max-w-3xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">{editingId ? "Editar plano" : "Novo plano recorrente"}</h2>
-          <Button variant="outline" onClick={() => { setMode("list"); resetForm() }}>Voltar</Button>
-        </div>
-
-        <div className="grid gap-4">
-          <label className="grid gap-1">
-            <span className="text-sm font-medium">Nome</span>
-            <input className="border rounded-lg px-3 py-2" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm font-medium">Descrição</span>
-            <textarea className="border rounded-lg px-3 py-2 min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium">Frequência</span>
-              <select className="border rounded-lg px-3 py-2" value={form.frequencyType} onChange={(e) => setForm({ ...form, frequencyType: e.target.value as RecurringFrequencyType })}>
-                <option value="daily">Diária</option>
-                <option value="weekly">Semanal</option>
-                <option value="monthly">Mensal</option>
-                <option value="yearly">Anual</option>
-                <option value="custom">Personalizada</option>
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium">Intervalo</span>
-              <input type="number" min={1} className="border rounded-lg px-3 py-2" value={form.frequencyInterval} onChange={(e) => setForm({ ...form, frequencyInterval: Number(e.target.value) })} />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium">Status</span>
-              <select className="border rounded-lg px-3 py-2" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as typeof form.status })}>
-                <option value="active">Ativo</option>
-                <option value="inactive">Inativo</option>
-                <option value="archived">Arquivado</option>
-              </select>
-            </label>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium">Início</span>
-              <input type="date" className="border rounded-lg px-3 py-2" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium">Fim (opcional)</span>
-              <input type="date" className="border rounded-lg px-3 py-2" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.showInMarketplace} onChange={(e) => setForm({ ...form, showInMarketplace: e.target.checked })} />
-            Exibir no marketplace
-          </label>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium">Itens do plano</h3>
-            <Button variant="outline" size="sm" onClick={() => setForm({ ...form, items: [...form.items, { ...EMPTY_ITEM }] })}>Adicionar item</Button>
-          </div>
-          {form.items.map((item, index) => (
-            <div key={index} className="border rounded-xl p-4 grid gap-3">
-              <select className="border rounded-lg px-3 py-2" value={item.itemType} onChange={(e) => {
-                const items = [...form.items]
-                items[index] = { ...EMPTY_ITEM, itemType: e.target.value as "product" | "service" }
-                setForm({ ...form, items })
-              }}>
-                <option value="product">Produto</option>
-                <option value="service">Serviço</option>
-              </select>
-              {item.itemType === "product" ? (
-                <select className="border rounded-lg px-3 py-2" value={item.productId || ""} onChange={(e) => {
-                  const items = [...form.items]
-                  items[index] = { ...items[index], productId: e.target.value }
-                  setForm({ ...form, items })
-                }}>
-                  <option value="">Selecione um produto</option>
-                  {formData.products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              ) : (
-                <>
-                  <select className="border rounded-lg px-3 py-2" value={item.serviceId || ""} onChange={(e) => {
-                    const items = [...form.items]
-                    items[index] = { ...items[index], serviceId: e.target.value }
-                    setForm({ ...form, items })
-                  }}>
-                    <option value="">Selecione um serviço</option>
-                    {formData.services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  <select className="border rounded-lg px-3 py-2" value={item.staffPartnerUserId || ""} onChange={(e) => {
-                    const items = [...form.items]
-                    items[index] = { ...items[index], staffPartnerUserId: e.target.value }
-                    setForm({ ...form, items })
-                  }}>
-                    <option value="">Profissional</option>
-                    {formData.staff.map((s) => <option key={s.id} value={s.id}>{s.display_name}</option>)}
-                  </select>
-                  <input type="time" className="border rounded-lg px-3 py-2" value={(item.preferredTime || "").slice(0, 5)} onChange={(e) => {
-                    const items = [...form.items]
-                    items[index] = { ...items[index], preferredTime: `${e.target.value}:00` }
-                    setForm({ ...form, items })
-                  }} />
-                </>
-              )}
-              <input type="number" min={0.001} step={1} className="border rounded-lg px-3 py-2" placeholder="Quantidade" value={item.quantity} onChange={(e) => {
-                const items = [...form.items]
-                items[index] = { ...items[index], quantity: Number(e.target.value) }
-                setForm({ ...form, items })
-              }} />
-            </div>
-          ))}
-        </div>
-
-        {canManage && (
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : "Salvar plano"}</Button>
-        )}
-      </div>
-    )
+  const statusLabel = (status: string) => {
+    if (status === "active") return "Ativo"
+    if (status === "inactive") return "Inativo"
+    return "Arquivado"
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Planos recorrentes</h2>
-          <p className="text-sm text-muted-foreground">Configure planos que geram pedidos e agendamentos automaticamente.</p>
-        </div>
-        {canManage && (
-          <Button onClick={openCreate}><PlusIcon className="w-4 h-4 mr-2" />Novo plano</Button>
-        )}
-      </div>
-
-      <div className="grid gap-3">
-        {plans.length === 0 ? (
-          <div className="border rounded-xl p-8 text-center text-muted-foreground">Nenhum plano cadastrado.</div>
-        ) : plans.map((plan) => (
-          <div key={plan.id} className="border rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{plan.name}</h3>
-                <Badge variant={statusVariant[plan.status]}>{plan.status}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {getRecurringFrequencyLabel(plan.frequencyType, plan.frequencyInterval)} · Início {formatFullDate(plan.startDate)}
-              </p>
-              {plan.description && <p className="text-sm mt-2">{plan.description}</p>}
+    <>
+      <AnimatePresence mode="wait">
+        {entityState.isOpen && (isViewing || isEditing || isCreating) ? (
+          isLoadingDetail ? (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+              <ThreeDotsLoader />
             </div>
-            {canManage && (
-              <Button variant="outline" onClick={() => openEdit(plan as RecurringPlan & { items?: RecurringPlanItem[] })}>Editar</Button>
-            )}
-          </div>
-        ))}
-      </div>
+          ) : (
+            <NewRecurringPlanPage
+              key="form"
+              partnerId={partnerId}
+              plan={selectedPlan}
+              onBack={() => closeEntity()}
+              onSuccess={() => {
+                afterMutation()
+                closeEntity()
+              }}
+            />
+          )
+        ) : (
+          <FadeIn
+            key="list"
+            className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
+          >
+            <style>{`
+              .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; } 
+              .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+              .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; border: 2px solid #fff; }
+              .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border: 2px solid #1f2937; }
+              .dark .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+              .hide-scrollbar::-webkit-scrollbar { display: none; }
+              .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
 
-      {hasMore && (
-        <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? "Carregando..." : "Carregar mais"}
-        </Button>
-      )}
-    </div>
+            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+
+              {/* Header */}
+              <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                <div className="flex flex-col gap-2 pt-1">
+                  <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                    Planos Recorrentes
+                  </h1>
+                  <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
+                    Configure planos que geram pedidos e agendamentos automaticamente.
+                  </p>
+                </div>
+
+                {canManage && (
+                  <Button onClick={handleAddPlan} leftIcon={<PlusIcon size={18} />}>
+                    Novo plano
+                  </Button>
+                )}
+              </div>
+
+              {/* Controls & Search */}
+              {hasPlans && (
+                <PlanPageControls
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  search={search}
+                  onSearchChange={setSearch}
+                  onAddPlan={handleAddPlan}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewModeState}
+                  canManage={canManage}
+                />
+              )}
+
+              {/* Listing Content */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                <AnimatePresence mode="wait">
+                  {isListLoading ? (
+                    <FadeIn key="loading" className="flex items-center justify-center min-h-[400px]">
+                      <ThreeDotsLoader />
+                    </FadeIn>
+                  ) : !hasPlans ? (
+                    <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                      <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                        imageAlt="Sem planos"
+                        title="Você ainda não tem planos"
+                        subtitle="Crie planos de recorrência para vender produtos ou agendar serviços de forma programada."
+                        itemButton={canManage ? {
+                          text: "Criar Primeiro Plano",
+                          action: handleAddPlan,
+                        } : undefined}
+                      />
+                    </FadeIn>
+                  ) : paginated.length === 0 ? (
+                    <FadeIn key="empty-results" className="w-full h-full flex items-center justify-center min-h-[400px]">
+                      <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
+                        imageAlt="Nenhum plano encontrado"
+                        title="Nenhum plano encontrado"
+                        subtitle="Ajuste os filtros de busca para encontrar o que procura."
+                        itemButton={{
+                          text: "Limpar busca",
+                          action: () => setSearch(""),
+                          variant: "outline"
+                        }}
+                      />
+                    </FadeIn>
+                  ) : (
+                    <FadeIn key={activeTab + viewMode} className="w-full">
+                      {isMobile || viewMode === "grid" ? (
+                        /* Grid & Mobile Layout */
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                          {paginated.map((plan: RecurringPlan) => (
+                            <PlanGridCard
+                              key={plan.id}
+                              plan={plan}
+                              canManage={canManage}
+                              onEdit={handleEditPlan}
+                              onDetails={handleDetailsPlan}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        /* Desktop List Layout */
+                        <div className="w-full overflow-hidden rounded-xl border border-brand-border dark:border-dark-border relative">
+                          <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                          <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                          <div className="overflow-x-auto pb-2 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                            <table className="w-full text-left border-separate border-spacing-0 min-w-[800px]">
+                              <thead>
+                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                  {COLUMNS.map((col) => (
+                                    <th
+                                      key={col.id}
+                                      className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border"
+                                      style={{ width: col.width }}
+                                    >
+                                      <div className={`flex items-center ${col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                        {col.label}
+                                      </div>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {paginated.map((plan: RecurringPlan) => (
+                                  <PlanListRow
+                                    key={plan.id}
+                                    plan={plan}
+                                    columns={COLUMNS}
+                                    canManage={canManage}
+                                    onEdit={handleEditPlan}
+                                    onDetails={handleDetailsPlan}
+                                  />
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </FadeIn>
+                  )}
+                </AnimatePresence>
+                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+              </div>
+
+              {hasPlans && paginated.length > 0 && (
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={(p) => {
+                    setPage(p)
+                    if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                      void fetchNextPage()
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </FadeIn>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

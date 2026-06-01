@@ -54,9 +54,11 @@ export function OptimizedMapbox({
   }, [onBoundsChange])
 
   // Inicializa o Mapbox
+  const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+  const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""
+
   useEffect(() => {
     let cancelled = false
-    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 
     const initMap = async () => {
       if (cancelled || !mapContainerRef.current || !token) return
@@ -203,7 +205,7 @@ export function OptimizedMapbox({
 
   }, [partners, activePartnerId, onMarkerClick])
 
-  if (!process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || !isMapping) {
+  if (!token || !isMapping) {
     return (
       <div className="w-full h-full bg-slate-100 flex items-center justify-center">
         <span className="text-brand-inactive-text text-sm">Mapa indisponível.</span>

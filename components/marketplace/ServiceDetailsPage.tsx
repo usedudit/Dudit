@@ -21,11 +21,12 @@ import {
   TruckIcon,
   ArrowLeftRightIcon,
   PlusIcon,
+  TagIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { FavoriteButton } from "./FavoriteButton"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox } from "@/components/reusable"
+import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { VitrineCard } from "./shared-components"
@@ -39,7 +40,9 @@ import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/ac
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
-import { getPartnerUrl } from "@/lib/utils/url-generator"
+import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
+import { createSlug } from "@/lib/utils/slugify"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -171,6 +174,27 @@ export function ServiceDetailsPageClient({
       created_at: p?.created_at,
     }
   }, [service])
+
+  const [activePromotions, setActivePromotions] = useState<any[]>([])
+
+  useEffect(() => {
+    if (partner?.id) {
+      listActivePromotionsForMarketplaceAction(partner.id)
+        .then((res) => {
+          if (Array.isArray(res)) setActivePromotions(res)
+        })
+        .catch((e) => console.error("Error loading promotions:", e))
+    }
+  }, [partner?.id])
+
+  const activePromo = useMemo(() => {
+    return activePromotions.find((promo) => {
+      if (promo.applyScope === "entire_cart") return true
+      if (promo.applyScope === "specific_services" && promo.applicableServiceIds?.includes(service.id)) return true
+      if (promo.applyScope === "category" && service.category_id && promo.applicableCategoryIds?.includes(service.category_id)) return true
+      return false
+    })
+  }, [activePromotions, service.id, service.category_id])
 
   const handleCepChange = useCallback((e: any) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 8)
@@ -611,16 +635,26 @@ export function ServiceDetailsPageClient({
       </div>
 
       {/* Rating */}
-      <div className="flex items-center gap-1.5 mb-3">
-        <StarIcon size={16} className="text-brand-green fill-brand-green" strokeWidth={0} />
-        <span className="text-xs font-medium text-brand-inactive-text">
-          {avgRating > 0 ? `${avgRating.toFixed(1)} (${reviews.length} avaliações)` : "Novo"}
-        </span>
-      </div>
+      {reviews.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-3">
+          <StarIcon size={16} className="text-brand-green fill-brand-green" strokeWidth={0} />
+          <span className="text-xs font-medium text-brand-inactive-text">
+            {avgRating.toFixed(1)} ({reviews.length} {reviews.length === 1 ? "avaliação" : "avaliações"})
+          </span>
+        </div>
+      )}
 
       <h1 className="text-xl sm:text-2xl md:text-[2rem] leading-[1.1] font-medium text-brand-dark mb-4 tracking-tight">
         {service.name}
       </h1>
+
+      {activePromo && (
+        <div className="mb-4 flex">
+          <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
+            {activePromo.name}
+          </Badge>
+        </div>
+      )}
 
       {/* Price */}
       <div className="mb-6">
@@ -1425,10 +1459,26 @@ export function ServiceDetailsPageClient({
         <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
           {/* Breadcrumb */}
           <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text mb-8">
-            <Link href="/" prefetch={true} className="hover:text-brand-dark transition-colors">Início</Link>
+            {partner.city && partner.state && (
+              <>
+                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                  {partner.city} - {partner.state}
+                </Link>
+                <ChevronRightIcon size={10} />
+              </>
+            )}
+            <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+              Serviços
+            </Link>
             <ChevronRightIcon size={10} />
-            <Link href="/explorar?type=servicos" prefetch={true} className="hover:text-brand-dark transition-colors">Serviços</Link>
-            <ChevronRightIcon size={10} />
+            {categoryName && (
+              <>
+                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(categoryName)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
+                  {categoryName}
+                </Link>
+                <ChevronRightIcon size={10} />
+              </>
+            )}
             <span className="text-brand-inactive-text truncate max-w-[300px]">{service.name}</span>
           </div>
 
@@ -1457,14 +1507,15 @@ export function ServiceDetailsPageClient({
                     itemId={service.id}
                     itemType="servico"
                     size="lg"
-                    variant="overlay"
+                    variant="outline"
                   />
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => setShowShareModal(true)}
-                    className="w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+                    className="w-10 h-10 flex items-center justify-center"
                   >
-                    <ShareIcon className="w-4 h-4 text-brand-green" />
-                  </button>
+                    <ShareIcon className="w-5 h-5 text-brand-green" />
+                  </Button>
                 </div>
 
                 {/* Location pill */}

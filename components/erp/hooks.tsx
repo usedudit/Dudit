@@ -296,5 +296,6 @@ export function usePickerBucket<T extends { id: string }>(
     isLoadingBucket: isLoading && !isLoaded,
     isLoaded,
     totalInBucket: bucket.length,
+    bucket,
   }
 }
