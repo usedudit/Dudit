@@ -11,8 +11,8 @@ export async function GET(req: Request) {
 
     const limit = 200
     const result = await runDueRecurringSubscriptionsAction(limit)
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
+    if (!result.success || !result.data) {
+      return NextResponse.json({ error: result.error || "No data returned" }, { status: 500 })
     }
 
     return NextResponse.json({

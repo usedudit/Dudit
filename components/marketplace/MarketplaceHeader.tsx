@@ -188,7 +188,7 @@ const Header: React.FC<HeaderProps> = ({
                 maxWidth="md"
                 hideHeader={true}
             >
-                <div className="flex flex-col relative text-[#003d32]">
+                <div className="flex flex-col relative text-[#003229]">
                     <button
                         onClick={() => setIsVisitorModalOpen(false)}
                         className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"

@@ -30,7 +30,7 @@ export async function listMarketplaceRecurringPlansAction(partnerId: string) {
 
     return {
       success: true,
-      data: (data || []).map((row) => ({
+      data: (data || []).map((row: any) => ({
         ...mapPlanRow(row as Record<string, unknown>),
         frequencyLabel: getRecurringFrequencyLabel(row.frequency_type, row.frequency_interval),
         items: row.recurring_plan_items || [],
@@ -144,7 +144,7 @@ export async function getMyRecurringSubscriptionsAction() {
       .select("id")
       .eq("user_id", user.id)
 
-    const customerIds = (customers || []).map((c) => c.id)
+    const customerIds = (customers || []).map((c: any) => c.id)
     if (customerIds.length === 0) return { success: true, data: [] }
 
     const { data, error } = await admin
@@ -162,7 +162,7 @@ export async function getMyRecurringSubscriptionsAction() {
 
     return {
       success: true,
-      data: (data || []).map((row) => ({
+      data: (data || []).map((row: any) => ({
         ...mapSubscriptionRow(row as Record<string, unknown>),
         statusLabel: getRecurringStatusLabel(row.status),
         frequencyLabel: row.recurring_plans

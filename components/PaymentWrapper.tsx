@@ -225,7 +225,7 @@ export function PaymentWrapper({
                         style: {
                             theme: "flat",
                             customVariables: {
-                                textPrimaryColor: "#003d32", textSecondaryColor: "#6b7280",
+                                textPrimaryColor: "#003229", textSecondaryColor: "#6b7280",
                                 inputBackgroundColor: "#FFFFFF", formBackgroundColor: "#FFFFFF",
                                 baseColor: "#059669", baseColorFirstVariant: "#059669E6", baseColorSecondVariant: "#059669E6",
                                 errorColor: "#f04438", successColor: "#059669",

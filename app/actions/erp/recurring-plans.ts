@@ -117,7 +117,7 @@ export async function listRecurringPlansAction(
     return {
       success: true,
       data: {
-        items: items.map((row) => ({
+        items: items.map((row: any) => ({
           ...mapPlanRow(row as Record<string, unknown>),
           items: (row.recurring_plan_items || []).map((item: Record<string, unknown>) => ({
             id: String(item.id),
@@ -306,7 +306,7 @@ export async function getRecurringPlanFormDataAction(partnerId: string) {
       supabase.from("partner_users").select("id, user_id, role_id").eq("partner_id", partnerId).order("created_at"),
     ])
 
-    const userIds = (staffRes.data || []).map((pu) => pu.user_id).filter(Boolean)
+    const userIds = (staffRes.data || []).map((pu: any) => pu.user_id).filter(Boolean)
     let profileMap: Record<string, string> = {}
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
@@ -323,7 +323,7 @@ export async function getRecurringPlanFormDataAction(partnerId: string) {
       data: {
         products: productsRes.data || [],
         services: servicesRes.data || [],
-        staff: (staffRes.data || []).map((pu) => ({
+        staff: (staffRes.data || []).map((pu: any) => ({
           id: pu.id,
           display_name: profileMap[pu.user_id] || "Profissional",
         })),

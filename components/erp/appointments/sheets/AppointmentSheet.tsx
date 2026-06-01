@@ -596,7 +596,7 @@ export const AppointmentSheet = ({
         if (s === 'pending' || s === 'aguardando') return 'bg-orange-500';
         if (s === 'ausência' || s === 'absent' || s === 'ausencia') return 'bg-red-500';
         if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600';
-        if (s === 'iniciado' || s === 'in progress') return 'bg-[#003d32]';
+        if (s === 'iniciado' || s === 'in progress') return 'bg-[#003229]';
         if (s === 'pago' || s === 'paid' || s === 'parcialmente pago') return 'bg-green-600';
         if (s === 'finalizado' || s === 'finished') return 'bg-gray-700';
         return 'bg-blue-600';

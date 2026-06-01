@@ -244,7 +244,7 @@ export default function AuthView({
 
             {/* MAIN CONTENT */}
             <main className="flex-grow relative flex flex-col items-center">
-                <div className="w-full bg-[#003d32] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
+                <div className="w-full bg-[#003229] h-[250px] absolute top-0 left-0 z-0 overflow-hidden">
                     <WavesBackground />
                     <div className="absolute inset-0 opacity-5 pointer-events-none" />
                 </div>

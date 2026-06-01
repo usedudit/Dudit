@@ -141,7 +141,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
         setCurrentView(view)
 
         const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
-        window.history.replaceState(null, "", url)
+        window.history.pushState(null, "", url)
     }
 
     const startTimer = (

@@ -10,7 +10,7 @@ const config = {
   secondary: { label: "Período Anterior", color: "#D1D5DB" },
 } satisfies ChartConfig
 
-export const CHART_COLORS = ["#059669", "#003D32", "#f3f9f6", "#bcf49d", "#fff085"]
+export const CHART_COLORS = ["#059669", "#003229", "#f3f9f6", "#bcf49d", "#fff085"]
 
 function formatCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0)

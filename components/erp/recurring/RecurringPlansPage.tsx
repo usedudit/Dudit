@@ -172,9 +172,9 @@ export default function RecurringPlansPage({
   }
 
   const statusVariant = useMemo(() => ({
-    active: "success" as const,
-    inactive: "warning" as const,
-    archived: "secondary" as const,
+    active: "green" as const,
+    inactive: "orange" as const,
+    archived: "gray" as const,
   }), [])
 
   if (mode === "form") {

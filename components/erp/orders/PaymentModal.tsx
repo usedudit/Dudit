@@ -191,7 +191,7 @@ function PaymentPricingTooltipBadge({ calculation, baseAllocated }: { calculatio
                                     row.isTotal && "mt-2 border-t border-white/20 pt-2 font-bold dark:border-black/10",
                                 )}
                             >
-                                <span 
+                                <span
                                     className={cn("truncate min-w-0", !row.isTotal && "text-white/70 dark:text-black/60")}
                                     title={row.label}
                                 >
@@ -646,7 +646,7 @@ const PaymentModal = ({
                         style: {
                             theme: "flat",
                             customVariables: {
-                                textPrimaryColor: "#003d32", textSecondaryColor: "#6b7280",
+                                textPrimaryColor: "#003229", textSecondaryColor: "#6b7280",
                                 inputBackgroundColor: "#FFFFFF", formBackgroundColor: "#FFFFFF",
                                 baseColor: "#059669", baseColorFirstVariant: "#059669E6", baseColorSecondVariant: "#059669E6",
                                 errorColor: "#f04438", successColor: "#059669",

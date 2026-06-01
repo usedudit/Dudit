@@ -215,7 +215,7 @@ async function createRecurringOrder(params: {
   }))
 
   const reserveResult = await reserveOrderInventory({
-    client: supabase,
+    client: supabase as any,
     partnerId: claim.partnerId,
     orderId: order.id,
     items: stockItems,
@@ -385,8 +385,8 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
   if (itemsError) throw itemsError
   if (!planItems?.length) throw new Error("Plano sem itens configurados")
 
-  const productItems = planItems.filter((i) => i.item_type === "product") as PlanItemRow[]
-  const serviceItems = planItems.filter((i) => i.item_type === "service") as PlanItemRow[]
+  const productItems = planItems.filter((i: any) => i.item_type === "product") as PlanItemRow[]
+  const serviceItems = planItems.filter((i: any) => i.item_type === "service") as PlanItemRow[]
 
   let financeAccountId = claim.financeAccountId
   if (!financeAccountId) {

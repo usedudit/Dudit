@@ -23,7 +23,7 @@ export interface TimelineEntry {
   action_type: ActionType | string
   change_lines: string[]
   metadata: Record<string, unknown> | null
-  source: "user" | "system" | "webhook" | "manual"
+  source: "user" | "system" | "webhook" | "manual" | "marketplace"
   created_at: string
 }
 
@@ -68,7 +68,7 @@ interface LogAuditEventInput {
   actionType: ActionType | string
   changeLines: string[]
   metadata?: Record<string, unknown> | null
-  source?: "system" | "webhook" | "manual"
+  source?: "system" | "webhook" | "manual" | "marketplace"
 }
 
 function sanitizeChangeLines(lines: string[]): string[] {

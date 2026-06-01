@@ -75,7 +75,7 @@ export async function listRecurringSubscriptionsAction(
     return {
       success: true,
       data: {
-        items: items.map((row) => ({
+        items: items.map((row: any) => ({
           ...mapSubscriptionRow(row as Record<string, unknown>),
           plan: row.recurring_plans || null,
           customer: row.customers || null,

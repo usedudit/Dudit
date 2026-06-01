@@ -49,10 +49,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
   }
 
   const statusVariant = (status: string) => {
-    if (status === "active") return "success" as const
-    if (status === "paused") return "warning" as const
-    if (status === "cancelled") return "destructive" as const
-    return "secondary" as const
+    if (status === "active") return "green" as const
+    if (status === "paused") return "orange" as const
+    if (status === "cancelled") return "red" as const
+    return "gray" as const
   }
 
   return (
@@ -109,7 +109,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
               ) : executions.map((exec) => (
                 <div key={exec.id} className="text-sm flex flex-wrap gap-2 items-center">
                   <span>{formatFullDate(exec.scheduled_for)}</span>
-                  <Badge variant={exec.status === "completed" ? "success" : exec.status === "failed" ? "destructive" : "secondary"}>
+                  <Badge variant={exec.status === "completed" ? "green" : exec.status === "failed" ? "red" : "gray"}>
                     {exec.status}
                   </Badge>
                   {exec.orders?.order_number && <span>Pedido #{exec.orders.order_number}</span>}

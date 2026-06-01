@@ -643,8 +643,11 @@ export function ServiceDetailsPageClient({
                               <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
                           </div>
                           <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                              ou {formatCurrency(pricing.current)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                              ou {formatCurrency(pricing.current)} em outros meios
                           </p>
+                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                              ver opções de pagamento
+                          </button>
                       </div>
                   );
               }
@@ -661,7 +664,7 @@ export function ServiceDetailsPageClient({
                               <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                           </div>
                           <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                              ver meios de pagamento
+                              ver opções de pagamento
                           </button>
                       </div>
                   );
@@ -679,8 +682,11 @@ export function ServiceDetailsPageClient({
                               <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
                           </div>
                           <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                              ou {formatCurrency(pricing.original)} em outros meios <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-brand-green hover:underline font-bold ml-1">ver meios de pagamento</button>
+                              ou {formatCurrency(pricing.original)} em outros meios
                           </p>
+                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                              ver opções de pagamento
+                          </button>
                       </div>
                   );
               }
@@ -692,7 +698,7 @@ export function ServiceDetailsPageClient({
                           {formatCurrency(pricing.current)}
                       </p>
                       <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                          ver meios de pagamento
+                          ver opções de pagamento
                       </button>
                   </div>
               );
@@ -1062,39 +1068,44 @@ export function ServiceDetailsPageClient({
 
           return (
             <div className="border border-brand-border rounded-2xl overflow-hidden bg-white">
-              {/* Banner */}
-              <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
-                <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/10" />
-              </div>
-              
-              {/* Profile Header */}
-              <div className="px-4 pb-4 pt-0 relative flex flex-col">
-                {/* Avatar Container overlapping the banner */}
-                <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white -mt-8 z-10 self-start">
-                  <UserProfileImage
-                    fullName={partner.store_name}
-                    imageUrl={sellerAvatarImage}
-                    className="w-full h-full object-cover"
-                  />
+              {/* Top clickable block linking to partner profile */}
+              <Link href={getPartnerUrl(partner)} className="block group">
+                {/* Banner */}
+                <div className="h-20 w-full relative bg-gray-100 overflow-hidden select-none">
+                  <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/10" />
                 </div>
                 
-                {/* Store Name and Details */}
-                <div className="mt-2 min-w-0">
-                  <div className="flex items-center gap-1.5 justify-between">
-                    <Link href={getPartnerUrl(partner)} className="font-bold text-brand-dark hover:text-brand-green hover:underline text-base truncate">
-                      {partner.store_name}
-                    </Link>
-                    <div className="flex items-center gap-1 shrink-0 bg-brand-gray border border-brand-border/60 rounded px-1.5 py-0.5">
-                      <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                      <span className="text-xs font-bold text-brand-dark">{displayRating}</span>
-                    </div>
+                {/* Profile Header */}
+                <div className="px-4 pt-0 relative flex flex-col">
+                  {/* Avatar Container overlapping the banner */}
+                  <div className="w-16 h-16 rounded-full border-2 border-white overflow-hidden bg-white -mt-8 z-10 self-start">
+                    <UserProfileImage
+                      fullName={partner.store_name}
+                      imageUrl={sellerAvatarImage}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
-                    {partner.city} - {partner.state}
-                  </p>
+                  
+                  {/* Store Name and Details */}
+                  <div className="mt-2 min-w-0">
+                    <div className="flex items-center gap-1.5 justify-between">
+                      <span className="font-bold text-brand-dark group-hover:text-brand-green group-hover:underline text-base truncate">
+                        {partner.store_name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0 bg-brand-gray border border-brand-border/60 rounded px-1.5 py-0.5">
+                        <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
+                        <span className="text-xs font-bold text-brand-dark">{displayRating}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-brand-inactive-text mt-0.5 font-medium">
+                      {partner.city} - {partner.state}
+                    </p>
+                  </div>
                 </div>
+              </Link>
 
+              <div className="px-4 pb-4">
                 {/* Reputation & Levels Bar (iFood / ML style) */}
                 <div className="mt-3 flex flex-col gap-2 p-3 bg-brand-gray/50 rounded-xl border border-brand-border/60">
                   <div className="flex items-center gap-2">

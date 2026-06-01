@@ -11,25 +11,25 @@ export const parseLocalDate = (dateStr: string): Date => {
 export const isMultiDay = (appointment: Appointment): boolean => {
     // If it has specific start/end dates that differ
     if (appointment.endDate && appointment.date !== appointment.endDate) return true;
-    
+
     // Or if duration is longer than 24 hours (1440 minutes)
     if (appointment.duration >= 1440) return true;
-    
+
     return false;
 }
 
 export const getMultiDayStyle = (status: string) => {
-     // A solid style for multi-day bars similar to Google Calendar
-     const s = status.toLowerCase();
-     if (s === 'confirmed' || s === 'confirmado') return 'bg-emerald-600 border-emerald-700 text-white';
-     if (s === 'pago' || s === 'paid') return 'bg-green-600 border-green-700 text-white';
-     if (s === 'pending' || s === 'aguardando') return 'bg-orange-500 border-orange-600 text-white';
-     if (s === 'reservado' || s === 'reserved') return 'bg-blue-600 border-blue-700 text-white';
-     if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600 border-red-700 text-white';
-     if (s === 'ausência' || s === 'absent') return 'bg-red-500 border-red-600 text-white';
-     if (s === 'indisponível' || s === 'unavailable' || s === 'almoço') return 'bg-gray-500 border-gray-600 text-white';
-     if (s === 'concluído' || s === 'concluido' || s === 'finished' || s === 'completed') return 'bg-emerald-700 border-emerald-800 text-white';
-     return 'bg-gray-500 border-gray-600 text-white';
+    // A solid style for multi-day bars similar to Google Calendar
+    const s = status.toLowerCase();
+    if (s === 'confirmed' || s === 'confirmado') return 'bg-emerald-600 border-emerald-700 text-white';
+    if (s === 'pago' || s === 'paid') return 'bg-green-600 border-green-700 text-white';
+    if (s === 'pending' || s === 'aguardando') return 'bg-orange-500 border-orange-600 text-white';
+    if (s === 'reservado' || s === 'reserved') return 'bg-blue-600 border-blue-700 text-white';
+    if (s === 'cancelado' || s === 'canceled' || s === 'cancelar') return 'bg-red-600 border-red-700 text-white';
+    if (s === 'ausência' || s === 'absent') return 'bg-red-500 border-red-600 text-white';
+    if (s === 'indisponível' || s === 'unavailable' || s === 'almoço') return 'bg-gray-500 border-gray-600 text-white';
+    if (s === 'concluído' || s === 'concluido' || s === 'finished' || s === 'completed') return 'bg-emerald-700 border-emerald-800 text-white';
+    return 'bg-gray-500 border-gray-600 text-white';
 }
 
 export const getAppointmentStyle = (status: string) => {
@@ -46,7 +46,7 @@ export const getAppointmentStyle = (status: string) => {
             dot: 'bg-emerald-500'
         };
     }
-    
+
     // Paid -> Green (Explicit Request)
     if (s === 'paid' || s === 'pago') {
         return {
@@ -83,11 +83,11 @@ export const getAppointmentStyle = (status: string) => {
     // In Progress -> Brand Dark / Teal
     if (s === 'iniciado' || s === 'in progress') {
         return {
-            container: 'bg-[#003d32]/10 dark:bg-[#003d32]/30 border-[#003d32]/20 dark:border-[#003d32]/40',
-            bar: 'bg-[#003d32]',
-            title: 'text-[#003d32] dark:text-[#e0f2f1]',
+            container: 'bg-[#003229]/10 dark:bg-[#003229]/30 border-[#003229]/20 dark:border-[#003229]/40',
+            bar: 'bg-[#003229]',
+            title: 'text-[#003229] dark:text-[#e0f2f1]',
             text: 'text-[#004d40] dark:text-[#b2dfdb]',
-            dot: 'bg-[#003d32]'
+            dot: 'bg-[#003229]'
         };
     }
 
@@ -124,7 +124,7 @@ export const getAppointmentStyle = (status: string) => {
             dot: 'bg-gray-500'
         };
     }
-    
+
     // Partially Paid -> Yellow
     if (s === 'partially paid' || s === 'pago parcialmente') {
         return {
@@ -158,11 +158,11 @@ export const getAppointmentStyle = (status: string) => {
 };
 
 export const getEndTime = (startTime: string, durationMinutes: number) => {
-  const [hours, minutes] = startTime.split(':').map(Number);
-  const totalMinutes = hours * 60 + minutes + durationMinutes;
-  const endHours = Math.floor(totalMinutes / 60) % 24;
-  const endMinutes = totalMinutes % 60;
-  return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + durationMinutes;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
 };
 
 export const formatDuration = (minutes: number) => {
@@ -171,14 +171,14 @@ export const formatDuration = (minutes: number) => {
         const days = Math.round(minutes / 1440);
         return days === 1 ? '1 dia' : `${days} dias`;
     }
-    
+
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    
+
     let parts = [];
     if (hours > 0) parts.push(`${hours}h`);
     if (mins > 0) parts.push(`${mins}m`);
-    
+
     return parts.join(' ');
 };
 
@@ -187,11 +187,11 @@ export const formatDateStr = (date: Date) => {
 };
 
 export const getWeekDays = (date: Date) => {
-    const day = date.getDay(); 
-    const diff = date.getDate() - day; 
+    const day = date.getDay();
+    const diff = date.getDate() - day;
     const startOfWeek = new Date(date);
     startOfWeek.setDate(diff);
-    
+
     const days = [];
     for (let i = 0; i < 7; i++) {
         const d = new Date(startOfWeek);
@@ -207,12 +207,12 @@ export const arrangeAppointments = (items: Appointment[]): LayoutAppointment[] =
         const start = h * 60 + m;
         // Cap visual block for day view so it doesn't break layout if multi-day
         // Real logic would split events across days
-        const visualDuration = Math.min(item.duration, 1440 - start); 
+        const visualDuration = Math.min(item.duration, 1440 - start);
         return { ...item, start, end: start + visualDuration };
     }).sort((a, b) => a.start - b.start || b.duration - a.duration);
 
     const columns: LayoutAppointment[][] = [];
-    
+
     events.forEach(event => {
         let placed = false;
         for (let i = 0; i < columns.length; i++) {
@@ -232,8 +232,8 @@ export const arrangeAppointments = (items: Appointment[]): LayoutAppointment[] =
     });
 
     events.forEach(event => {
-        const overlaps = events.filter(other => 
-            event.id !== other.id && 
+        const overlaps = events.filter(other =>
+            event.id !== other.id &&
             Math.max(event.start, other.start) < Math.min(event.end, other.end)
         );
         let maxCol = event.column || 0;
