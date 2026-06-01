@@ -35,7 +35,7 @@ export const AppointmentListCard: React.FC<AppointmentListCardProps> = ({ appoin
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className={`
-                w-full rounded-xl p-2 border cursor-pointer shadow-sm relative overflow-hidden transition-all active:scale-[0.98]
+                w-full rounded-xl p-2 border cursor-pointer relative overflow-hidden transition-all active:scale-[0.98]
                 ${style.container}
             `}
             onClick={() => onClick(appointment)}

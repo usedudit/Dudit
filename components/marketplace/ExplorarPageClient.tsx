@@ -32,7 +32,7 @@ import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categorie
 interface ExplorarPageClientProps {
     initialResults?: any[]
     query?: string
-    type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo'
+    type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
     cidade?: string
     categoria?: string
     userProfile?: any
@@ -265,7 +265,7 @@ export function ExplorarPageClient({
     const pathCategorySlug = slug[1] || ""
     const pathCategory = pathCategorySlug ? (CATEGORY_SLUG_MAP[pathCategorySlug] || pathCategorySlug) : ""
 
-    const [currentType, setCurrentType] = useState(type)
+    const [currentType, setCurrentType] = useState<any>(type)
     const [sortBy, setSortBy] = useState<SortOption>("relevancia")
     const [selectedCitySlug, setSelectedCitySlug] = useState<string | null>(cidade || pathCity || null)
     const [dbCategories, setDbCategories] = useState<{ id?: string; name: string; icon_url: string | null }[]>([])
@@ -430,6 +430,7 @@ export function ExplorarPageClient({
         if (fetchType === "produtos") return { produtos: 40 } as const
         if (fetchType === "servicos") return { servicos: 40 } as const
         if (fetchType === "vitrines") return { vitrines: 40 } as const
+        if (fetchType === "planos") return { planos: 40 } as const
         return { geral: 40 } as const
     }, [fetchType])
 
@@ -481,6 +482,7 @@ export function ExplorarPageClient({
             }
             if (rawType === "produto" || rawType === "product") return "produto"
             if (rawType === "servico" || rawType === "serviço" || rawType === "service") return "servico"
+            if (rawType === "plano" || rawType === "plan" || rawType === "recorrente" || rawType === "recurring") return "plano"
 
             if (item?.store_name || item?.partners?.store_name) return "loja"
             return rawType
@@ -521,6 +523,11 @@ export function ExplorarPageClient({
 
         if (currentType === 'servicos') {
             const list = normalizedInitialResults.filter(r => r.itemType === 'servico')
+            return { vitrinesDestaque: [], dataToFilter: list }
+        }
+
+        if (currentType === 'planos') {
+            const list = normalizedInitialResults.filter(r => r.itemType === 'plano')
             return { vitrinesDestaque: [], dataToFilter: list }
         }
 
@@ -741,6 +748,7 @@ export function ExplorarPageClient({
         if (selectedCategories.length > 0) return `${selectedCategories[0]}${citySuffix}`
         if (currentType === "produtos") return `Produtos${citySuffix}`
         if (currentType === "servicos") return `Serviços${citySuffix}`
+        if (currentType === "planos") return `Assinaturas e Planos${citySuffix}`
         if (currentType === "vitrines") return `Lojas e Vitrines${citySuffix}`
         return `Explorar`
     }, [query, currentType, selectedCategories, selectedCitySlug])
@@ -756,6 +764,9 @@ export function ExplorarPageClient({
         }
         if (currentType === "servicos") {
             return `Ainda não temos profissionais ou serviços cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a oferecer seus serviços de graça, sem comissão nenhuma?`
+        }
+        if (currentType === "planos") {
+            return `Ainda não temos vendedores ou planos recorrentes cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a oferecer planos de assinatura de graça, sem comissão nenhuma?`
         }
         if (currentType === "vitrines") {
             return `Ainda não temos lojas ou empresas cadastradas em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e criar a vitrine do seu negócio de graça, sem comissão nenhuma?`
@@ -872,7 +883,7 @@ export function ExplorarPageClient({
                                         : "bg-white border-gray-200 text-brand-dark"
                                         }`}
                                 >
-                                    <span>Ver: {currentType === 'tudo' ? 'Tudo' : currentType === 'produtos' ? 'Produtos' : currentType === 'servicos' ? 'Serviços' : 'Lojas'}</span>
+                                    <span>Ver: {currentType === 'tudo' ? 'Tudo' : currentType === 'produtos' ? 'Produtos' : currentType === 'servicos' ? 'Serviços' : currentType === 'planos' ? 'Assinaturas' : 'Lojas'}</span>
                                 </button>
 
                                 {/* CATEGORY FILTER CHIP (SHOWN ONLY WHEN TOP CATEGORIES SLIDER IS HIDDEN) */}
@@ -1343,6 +1354,7 @@ export function ExplorarPageClient({
                         { value: "tudo", label: "Ver Tudo" },
                         { value: "produtos", label: "Produtos" },
                         { value: "servicos", label: "Serviços" },
+                        { value: "planos", label: "Assinaturas Recorrentes" },
                         { value: "vitrines", label: "Lojas e Vitrines" }
                     ].map((opt) => (
                         <RadioButton

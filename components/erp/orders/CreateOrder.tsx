@@ -13,7 +13,7 @@ import { createERPOrderAction, getOrderDetailsAction, updateERPOrderAction } fro
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pdv"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
-import SelectVariantSheet from "../quotes/SelectVariantSheet"
+import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useRouter } from "next/navigation"
@@ -637,11 +637,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }
 
-    const handleVariantsConfirm = (variants: any[]) => {
+    const handleVariantsConfirm = (selections: Array<{ variantId: string; qty: number }>) => {
         const newItems: any[] = []
-        variants.forEach(variant => {
-            if (variant.qty > 0) {
-                if (!selectedProductForVariant.allow_sell_without_stock && variant.qty > Number(variant.stock || 0)) {
+        selections.forEach(sel => {
+            const variant = selectedProductForVariant?.variants?.find((v: any) => String(v.id) === String(sel.variantId))
+            if (!variant) return
+            if (sel.qty > 0) {
+                if (!selectedProductForVariant.allow_sell_without_stock && sel.qty > Number(variant.stock || 0)) {
                     return
                 }
                 const newItem = {
@@ -650,7 +652,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     variantId: variant.id,
                     name: `${selectedProductForVariant.name} - ${variant.name}`,
                     unitPrice: variant.price || selectedProductForVariant.price,
-                    quantity: variant.qty,
+                    quantity: sel.qty,
                     sortOrder: items.length + newItems.length,
                     image: variant.image || selectedProductForVariant.image,
                     sku: variant.sku || selectedProductForVariant.sku,
@@ -1428,7 +1430,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     partnerId={partnerId}
                 />
 
-                <SelectVariantSheet
+                <SelectProductVariantSheet
                     isOpen={isVariantSheetOpen}
                     onClose={() => {
                         if (isSaving) return

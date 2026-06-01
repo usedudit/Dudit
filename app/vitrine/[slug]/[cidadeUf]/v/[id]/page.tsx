@@ -17,6 +17,7 @@ import {
   getPartnerPublicCoupons,
 } from "@/app/actions/marketplace/partners"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { listMarketplaceRecurringPlansAction } from "@/app/actions/marketplace/recurring-subscriptions"
 
 // Removed force-dynamic - getCurrentUser() calls cookies() which already makes this dynamic
 
@@ -65,7 +66,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
 
   // PERFORMANCE: Busca TUDO em paralelo - incluindo auth
-  const [user, partner, products, services, reviews, statsBase, coupons, plan] = await Promise.all([
+  const [user, partner, products, services, reviews, statsBase, coupons, plan, plansRes] = await Promise.all([
     getCurrentUser(),
     getPartnerProfile(id),
     getPartnerProducts(id),
@@ -74,11 +75,56 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     getPartnerStats(id),
     getPartnerPublicCoupons(id),
     getPartnerPlan(id),
+    listMarketplaceRecurringPlansAction(id),
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
   const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null } : null
   const cartCount = sessionData?.cartCount || 0
+
+  const plans = plansRes.success ? (plansRes.data || []) : []
+  const normalizedPlans = plans.map((item: any) => {
+    let computedPrice = 0
+    let firstImage: string | null = null
+
+    if (item.items && Array.isArray(item.items)) {
+      for (const planItem of item.items) {
+        const qty = Number(planItem.quantity || 1)
+        let itemPrice = Number(planItem.unit_price || 0)
+        
+        if (itemPrice <= 0) {
+          if (planItem.item_type === 'product' && planItem.products) {
+            itemPrice = Number(planItem.products.price || 0)
+          } else if (planItem.item_type === 'service' && planItem.services) {
+            itemPrice = Number(planItem.services.price || 0)
+          }
+        }
+        computedPrice += qty * itemPrice
+
+        if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
+          const imgs = planItem.products.images
+          if (Array.isArray(imgs) && imgs.length > 0) {
+            firstImage = imgs[0]
+          }
+        }
+      }
+    }
+
+    const image = firstImage || partner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      price: computedPrice,
+      images: [image],
+      itemType: 'plano',
+      partners: partner,
+      frequency_type: item.frequency_type,
+      frequency_interval: item.frequency_interval,
+      created_at: item.created_at
+    }
+  })
 
   // Se não achou o parceiro no cache/banco, retorna 404
   if (!partner) {
@@ -207,6 +253,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           partner={partnerData}
           products={products || []}
           services={services || []}
+          plans={normalizedPlans}
           reviews={reviews || []}
           stats={stats}
           ratingDistribution={ratingDistribution}

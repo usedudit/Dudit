@@ -14,13 +14,16 @@ import {
   FormDropdown,
   SavingStatusModal,
   AlertModal,
-  UnsavedChangesDialog
+  UnsavedChangesDialog,
+  IconPlaceholder,
+  SelectionBanner,
 } from "@/components/reusable"
-import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon } from "@/lib/icons"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, ClockIcon, SearchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import {
   createRecurringPlanAction,
   updateRecurringPlanAction,
@@ -28,6 +31,8 @@ import {
 } from "@/app/actions/erp/recurring-plans"
 import type { RecurringPlan, RecurringPlanItem, RecurringFrequencyType } from "@/lib/types/recurring"
 import { useSidebar } from "@/lib/sidebar-context"
+import PlanItemFormSheet from "./PlanItemFormSheet"
+import { formatCurrency } from "@/lib/utils/formatters"
 
 interface NewRecurringPlanPageProps {
   onBack: () => void
@@ -43,23 +48,18 @@ type FormData = {
   staff: Array<{ id: string; display_name: string }>
 }
 
-const EMPTY_ITEM: RecurringPlanItem = {
-  itemType: "product",
-  productId: null,
-  variantId: null,
-  serviceId: null,
-  quantity: 1,
-  unitPrice: null,
-  staffPartnerUserId: null,
-  preferredTime: null,
-  durationMinutes: null,
-}
-
 const REQUIRED_FIELDS = [
   { field: "name", tab: "general" },
   { field: "frequencyInterval", tab: "general" },
   { field: "startDate", tab: "general" },
 ]
+
+const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+  <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+    {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+    {children}
+  </div>
+)
 
 export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
   onBack,
@@ -87,7 +87,15 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState("")
   const [showInMarketplace, setShowInMarketplace] = useState(true)
-  const [items, setItems] = useState<RecurringPlanItem[]>([{ ...EMPTY_ITEM }])
+  const [items, setItems] = useState<any[]>([])
+
+  // Search, Selection, Sheets on items tab
+  const [itemSearch, setItemSearch] = useState("")
+  const [debouncedItemSearch, setDebouncedItemSearch] = useState("")
+  const [itemSortConfig, setItemSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(new Set())
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<any | null>(null)
 
   const [formData, setFormData] = useState<FormData>({ products: [], services: [], staff: [] })
   const [isSaving, setIsSaving] = useState(false)
@@ -107,6 +115,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         setIsLoadingData(false)
       })
   }, [partnerId])
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedItemSearch(itemSearch), 300)
+    return () => clearTimeout(handler)
+  }, [itemSearch])
 
   // Populate data when editing
   useEffect(() => {
@@ -132,17 +146,18 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             staffPartnerUserId: item.staffPartnerUserId,
             preferredTime: item.preferredTime,
             durationMinutes: item.durationMinutes,
+            name: item.product?.name || item.service?.name || "Item",
           }))
         )
       } else {
-        setItems([{ ...EMPTY_ITEM }])
+        setItems([])
       }
     }
   }, [plan])
 
   const isDirty = useMemo(() => {
     if (!plan) {
-      return name !== "" || description !== "" || items.length > 1 || items[0]?.productId !== null || items[0]?.serviceId !== null
+      return name !== "" || description !== "" || items.length > 0
     }
     return (
       name !== (plan.name || "") ||
@@ -165,29 +180,55 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
   }, [fieldErrors])
 
-  const handleAddItem = () => {
-    setItems((prev) => [...prev, { ...EMPTY_ITEM }])
+  const handleAddItemTrigger = () => {
+    setEditingItem(null)
+    setIsSheetOpen(true)
+  }
+
+  const handleEditItemTrigger = (item: any, index: number) => {
+    setEditingItem({ ...item, id: String(index) })
+    setIsSheetOpen(true)
+  }
+
+  const handleSaveItemFromSheet = (item: any) => {
+    setItems((prev) => {
+      const next = [...prev]
+      if (item.id !== undefined) {
+        next[Number(item.id)] = item
+      } else {
+        next.push(item)
+      }
+      return next
+    })
+    setSelectedItemIds(new Set())
   }
 
   const handleRemoveItem = (index: number) => {
-    setItems((prev) => {
-      const next = prev.filter((_, i) => i !== index)
-      return next.length === 0 ? [{ ...EMPTY_ITEM }] : next
+    setItems((prev) => prev.filter((_, i) => i !== index))
+    setSelectedItemIds(prev => {
+      const next = new Set(prev)
+      next.delete(index)
+      return next
     })
   }
 
-  const handleItemChange = (index: number, key: keyof RecurringPlanItem, value: any) => {
-    setItems((prev) => {
-      const next = [...prev]
-      next[index] = { ...next[index], [key]: value }
-      if (key === "itemType") {
-        next[index].productId = null
-        next[index].serviceId = null
-        next[index].variantId = null
-        next[index].staffPartnerUserId = null
-        next[index].preferredTime = null
-        next[index].durationMinutes = null
-      }
+  const handleBulkDeleteItems = () => {
+    setItems(prev => prev.filter((_, i) => !selectedItemIds.has(i)))
+    setSelectedItemIds(new Set())
+  }
+
+  const handleSelectAllItems = () => {
+    setSelectedItemIds(prev =>
+      prev.size === filteredAndSortedItems.length
+        ? new Set()
+        : new Set(filteredAndSortedItems.map((_, i) => i))
+    )
+  }
+
+  const handleSelectRowItem = (index: number) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev)
+      next.has(index) ? next.delete(index) : next.add(index)
       return next
     })
   }
@@ -198,23 +239,12 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     if (frequencyInterval <= 0) errors.add("frequencyInterval")
     if (!startDate) errors.add("startDate")
 
-    // Items validation
-    let hasItemsError = false
-    items.forEach((item, index) => {
-      if (item.itemType === "product" && !item.productId) {
-        hasItemsError = true
-      }
-      if (item.itemType === "service") {
-        if (!item.serviceId || !item.staffPartnerUserId) {
-          hasItemsError = true
-        }
-      }
-      if (item.quantity <= 0) {
-        hasItemsError = true
-      }
-    })
+    if (items.length === 0) {
+      notifyError("Adicione ao menos um item ao plano recorrente.")
+      return
+    }
 
-    if (errors.size > 0 || hasItemsError) {
+    if (errors.size > 0) {
       setFieldErrors(errors)
       notifyError("Preencha todos os campos obrigatórios e verifique os itens do plano.")
       return
@@ -235,8 +265,15 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         endDate: endDate ? `${endDate}T23:59:59.000Z` : null,
         showInMarketplace,
         items: items.map((item) => ({
-          ...item,
-          preferredTime: item.preferredTime ? (item.preferredTime.includes(":") && item.preferredTime.split(":").length === 2 ? `${item.preferredTime}:00` : item.preferredTime) : null
+          itemType: item.itemType,
+          productId: item.productId,
+          variantId: item.variantId,
+          serviceId: item.serviceId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          staffPartnerUserId: item.staffPartnerUserId,
+          preferredTime: item.preferredTime ? (item.preferredTime.includes(":") && item.preferredTime.split(":").length === 2 ? `${item.preferredTime}:00` : item.preferredTime) : null,
+          durationMinutes: item.durationMinutes,
         }))
       }
 
@@ -285,6 +322,47 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
     { value: "inactive", label: "Inativo" },
     { value: "archived", label: "Arquivado" }
   ]
+
+  // Filter and sort items locally
+  const filteredAndSortedItems = useMemo(() => {
+    const list = items.map((item, index) => ({ ...item, originalIndex: index }))
+    const term = debouncedItemSearch.toLowerCase()
+
+    const filtered = list.filter(item => {
+      if (!term) return true
+      return item.name.toLowerCase().includes(term)
+    })
+
+    if (itemSortConfig) {
+      filtered.sort((a, b) => {
+        let aVal = a[itemSortConfig.key]
+        let bVal = b[itemSortConfig.key]
+
+        if (itemSortConfig.key === "unitPrice" || itemSortConfig.key === "quantity") {
+          aVal = Number(aVal) || 0
+          bVal = Number(bVal) || 0
+        } else {
+          aVal = String(aVal || "").toLowerCase()
+          bVal = String(bVal || "").toLowerCase()
+        }
+
+        if (aVal === bVal) return 0
+        const comp = aVal < bVal ? -1 : 1
+        return itemSortConfig.direction === "asc" ? comp : -comp
+      })
+    }
+
+    return filtered
+  }, [items, debouncedItemSearch, itemSortConfig])
+
+  const handleSortItem = (key: string) => {
+    setItemSortConfig(prev => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+      }
+      return { key, direction: "asc" }
+    })
+  }
 
   return (
     <FadeIn>
@@ -336,7 +414,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                     </TabsTrigger>
                     <TabsTrigger value="items">
                       Itens do plano
-                      {items.some((i) => i.itemType === "product" ? !i.productId : (!i.serviceId || !i.staffPartnerUserId)) && (
+                      {items.length === 0 && (
                         <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />
                       )}
                     </TabsTrigger>
@@ -354,226 +432,337 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
               )}
 
               <TabsContent value="general" className="mt-0">
-                <FadeIn key="general" className="space-y-10 max-w-4xl">
-                  <section>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Identificação do Plano</h3>
-                    <div className="grid grid-cols-12 gap-5">
-                      <div className="col-span-12 md:col-span-8">
-                        <Input
-                          label="Nome do plano"
-                          placeholder="Ex: Assinatura Mensal de Ração"
-                          value={name}
-                          onChange={(e) => {
-                            setName(e.target.value)
-                            setFieldErrors((prev) => {
-                              const next = new Set(prev)
-                              next.delete("name")
-                              return next
-                            })
-                          }}
-                          required
-                          error={fieldErrors.has("name")}
-                          errorMessage={fieldErrors.has("name") ? "Nome é obrigatório" : undefined}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-4 mt-[1px]">
-                        <FormDropdown
-                          label="Status"
-                          value={status}
-                          setValue={(val) => setStatus(val as any)}
-                          options={statusOptions}
-                        />
-                      </div>
-                      <div className="col-span-12">
-                        <FormTextarea
-                          label="Descrição"
-                          placeholder="Detalhes sobre o que este plano recorrente oferece..."
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          name="description"
-                        />
-                      </div>
-                    </div>
-                  </section>
+                <FadeIn key="general">
+                  <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                    {/* Left Main Column */}
+                    <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
+                      <section className="space-y-6">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Identificação do Plano</h3>
+                        <div className="grid grid-cols-12 gap-5">
+                          <div className="col-span-12 md:col-span-8">
+                            <Input
+                              label="Nome do plano"
+                              placeholder="Ex: Assinatura Mensal de Ração"
+                              value={name}
+                              onChange={(e) => {
+                                setName(e.target.value)
+                                setFieldErrors((prev) => {
+                                  const next = new Set(prev)
+                                  next.delete("name")
+                                  return next
+                                })
+                              }}
+                              required
+                              error={fieldErrors.has("name")}
+                              errorMessage={fieldErrors.has("name") ? "Nome é obrigatório" : undefined}
+                            />
+                          </div>
+                          <div className="col-span-12 md:col-span-4 mt-[1px]">
+                            <FormDropdown
+                              label="Status"
+                              value={status}
+                              setValue={(val) => setStatus(val as any)}
+                              options={statusOptions}
+                            />
+                          </div>
+                          <div className="col-span-12">
+                            <FormTextarea
+                              label="Descrição"
+                              placeholder="Detalhes sobre o que este plano ofereçe..."
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                              name="description"
+                            />
+                          </div>
+                        </div>
 
-                  <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
-
-                  <section>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6">Regra de Recorrência</h3>
-                    <div className="grid grid-cols-12 gap-5">
-                      <div className="col-span-12 md:col-span-6 mt-[1px]">
-                        <FormDropdown
-                          label="Frequência"
-                          value={frequencyType}
-                          setValue={(val) => setFrequencyType(val as any)}
-                          options={frequencyOptions}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-6">
-                        <Input
-                          type="number"
-                          label="Intervalo (Frequência)"
-                          placeholder="Ex: 1"
-                          value={frequencyInterval}
-                          onChange={(e) => {
-                            setFrequencyInterval(Number(e.target.value))
-                            setFieldErrors((prev) => {
-                              const next = new Set(prev)
-                              next.delete("frequencyInterval")
-                              return next
-                            })
-                          }}
-                          required
-                          min={1}
-                          error={fieldErrors.has("frequencyInterval")}
-                          errorMessage={fieldErrors.has("frequencyInterval") ? "Intervalo inválido" : undefined}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-6">
-                        <Input
-                          type="date"
-                          label="Data de Início"
-                          value={startDate}
-                          onChange={(e) => {
-                            setStartDate(e.target.value)
-                            setFieldErrors((prev) => {
-                              const next = new Set(prev)
-                              next.delete("startDate")
-                              return next
-                            })
-                          }}
-                          required
-                          error={fieldErrors.has("startDate")}
-                          errorMessage={fieldErrors.has("startDate") ? "Data de início é obrigatória" : undefined}
-                        />
-                      </div>
-                      <div className="col-span-12 md:col-span-6">
-                        <Input
-                          type="date"
-                          label="Data de Fim (Opcional)"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-12 pt-2">
-                        <Checkbox
-                          label="Exibir este plano no marketplace para venda pública"
-                          checked={showInMarketplace}
-                          onChange={(checked) => setShowInMarketplace(checked)}
-                        />
-                      </div>
+                        <div className="mt-6 pt-6 border-t border-brand-border dark:border-dark-border">
+                          <Checkbox
+                            label="Exibir este plano no marketplace para venda pública"
+                            checked={showInMarketplace}
+                            onChange={(checked) => setShowInMarketplace(checked)}
+                          />
+                        </div>
+                      </section>
                     </div>
-                  </section>
+
+                    {/* Right Sidebar Column */}
+                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                      <SidebarCard hasTopStrip>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Regra de Recorrência</h3>
+                        <div className="space-y-5">
+                          <FormDropdown
+                            label="Frequência"
+                            value={frequencyType}
+                            setValue={(val) => setFrequencyType(val as any)}
+                            options={frequencyOptions}
+                          />
+
+                          <Input
+                            type="number"
+                            label="Intervalo (Frequência)"
+                            placeholder="Ex: 1"
+                            value={frequencyInterval}
+                            onChange={(e) => {
+                              setFrequencyInterval(Number(e.target.value))
+                              setFieldErrors((prev) => {
+                                const next = new Set(prev)
+                                next.delete("frequencyInterval")
+                                return next
+                              })
+                            }}
+                            required
+                            min={1}
+                            error={fieldErrors.has("frequencyInterval")}
+                            errorMessage={fieldErrors.has("frequencyInterval") ? "Intervalo inválido" : undefined}
+                          />
+
+                          <Input
+                            type="date"
+                            label="Data de Início"
+                            value={startDate}
+                            onChange={(e) => {
+                              setStartDate(e.target.value)
+                              setFieldErrors((prev) => {
+                                const next = new Set(prev)
+                                next.delete("startDate")
+                                return next
+                              })
+                            }}
+                            required
+                            error={fieldErrors.has("startDate")}
+                            errorMessage={fieldErrors.has("startDate") ? "Data de início é obrigatória" : undefined}
+                          />
+
+                          <Input
+                            type="date"
+                            label="Data de Fim (Opcional)"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                          />
+                        </div>
+                      </SidebarCard>
+                    </div>
+                  </div>
                 </FadeIn>
               </TabsContent>
 
               <TabsContent value="items" className="mt-0">
-                <FadeIn key="items" className="space-y-6 max-w-4xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Produtos e Serviços inclusos</h3>
-                      <p className="text-sm text-brand-inactive-text dark:text-dark-body">Adicione itens que serão gerados em cada ciclo da assinatura.</p>
-                    </div>
-                    <Button onClick={handleAddItem} leftIcon={<PlusIcon size={16} />}>
-                      Adicionar item
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {items.map((item, index) => (
-                      <div key={index} className="bg-brand-gray/50 dark:bg-dark-surface/50 border border-brand-border dark:border-dark-border rounded-xl p-5 relative flex flex-col gap-4">
-                        
-                        {/* Remove item button */}
-                        <button
-                          onClick={() => handleRemoveItem(index)}
-                          className="absolute right-4 top-4 text-brand-inactive-text hover:text-brand-red transition-colors p-1"
-                          title="Remover Item"
-                        >
-                          <TrashIcon size={18} />
-                        </button>
-
-                        <div className="grid grid-cols-12 gap-4 mr-6">
-                          <div className="col-span-12 md:col-span-4 mt-[1px]">
-                            <FormDropdown
-                              label="Tipo do Item"
-                              value={item.itemType}
-                              setValue={(val) => handleItemChange(index, "itemType", val as any)}
-                              options={[
-                                { value: "product", label: "Produto" },
-                                { value: "service", label: "Serviço" }
-                              ]}
-                            />
-                          </div>
-
-                          {item.itemType === "product" ? (
-                            <div className="col-span-12 md:col-span-8 mt-[1px]">
-                              <FormDropdown
-                                label="Produto"
-                                placeholder="Selecione um produto"
-                                value={item.productId || ""}
-                                setValue={(val) => handleItemChange(index, "productId", val)}
-                                options={formData.products.map((p) => ({ value: p.id, label: `${p.name} - R$ ${p.price.toFixed(2)}` }))}
-                              />
-                            </div>
-                          ) : (
-                            <>
-                              <div className="col-span-12 md:col-span-8 mt-[1px]">
-                                <FormDropdown
-                                  label="Serviço"
-                                  placeholder="Selecione um serviço"
-                                  value={item.serviceId || ""}
-                                  setValue={(val) => handleItemChange(index, "serviceId", val)}
-                                  options={formData.services.map((s) => ({ value: s.id, label: `${s.name} - R$ ${s.price.toFixed(2)}` }))}
-                                />
-                              </div>
-                              <div className="col-span-12 md:col-span-6 mt-[1px]">
-                                <FormDropdown
-                                  label="Profissional"
-                                  placeholder="Selecione o profissional"
-                                  value={item.staffPartnerUserId || ""}
-                                  setValue={(val) => handleItemChange(index, "staffPartnerUserId", val)}
-                                  options={formData.staff.map((st) => ({ value: st.id, label: st.display_name }))}
-                                />
-                              </div>
-                              <div className="col-span-12 md:col-span-6">
-                                <Input
-                                  type="time"
-                                  label="Horário Preferencial (Opcional)"
-                                  value={item.preferredTime ? item.preferredTime.slice(0, 5) : ""}
-                                  onChange={(e) => handleItemChange(index, "preferredTime", e.target.value)}
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-12 gap-4">
-                          <div className="col-span-6 md:col-span-3">
-                            <Input
-                              type="number"
-                              label="Quantidade"
-                              value={item.quantity}
-                              onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
-                              min={1}
-                              required
-                            />
-                          </div>
-                          <div className="col-span-6 md:col-span-3">
-                            <Input
-                              type="number"
-                              label="Preço Unitário Customizado (Opcional)"
-                              placeholder="Preço padrão do item"
-                              value={item.unitPrice !== null ? item.unitPrice : ""}
-                              onChange={(e) => handleItemChange(index, "unitPrice", e.target.value === "" ? null : Number(e.target.value))}
-                              min={0}
-                              step="0.01"
-                            />
-                          </div>
-                        </div>
-
+                <FadeIn key="items">
+                  {items.length === 0 ? (
+                    <div className="space-y-6">
+                      <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                        <IconPlaceholder
+                          icon={BoxIcon}
+                          title="Não há itens no plano"
+                          subtitle="Adicione produtos ou serviços a este plano recorrente."
+                          itemButton={{
+                            text: "Adicionar item",
+                            action: handleAddItemTrigger,
+                            variant: "outline"
+                          }}
+                        />
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="max-w-[1300px] mx-auto pb-20 relative">
+                      {/* Header Section */}
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                          Itens do Plano ({filteredAndSortedItems.length})
+                        </h3>
+                        <Button variant="link" onClick={handleAddItemTrigger} className="flex items-center hidden md:flex">
+                          + Adicionar Item
+                        </Button>
+                      </div>
+
+                      {/* Search & Actions Control Bar */}
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none">
+                        {/* Mobile Header Row */}
+                        <div className="md:hidden flex items-center gap-2 w-full">
+                          <div className="flex-1 min-w-0">
+                            <Input
+                              name="searchItem"
+                              placeholder="Buscar item..."
+                              value={itemSearch}
+                              onChange={(e) => setItemSearch(e.target.value)}
+                              className="h-[42px] w-full"
+                              variant="full-rounded"
+                              prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            />
+                          </div>
+                          <div className="flex-none flex items-center gap-2">
+                            <Button
+                              onClick={handleAddItemTrigger}
+                              className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm"
+                            >
+                              <PlusIcon className="w-5 h-5" strokeWidth={3} />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Desktop Search Bar */}
+                        <div className="hidden md:flex items-center w-full gap-4">
+                          <div className="w-80">
+                            <Input
+                              name="searchItem"
+                              placeholder="Buscar item..."
+                              prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                              value={itemSearch}
+                              onChange={(e) => setItemSearch(e.target.value)}
+                              className="h-[42px]"
+                              variant="full-rounded"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Selection Banner */}
+                      <SelectionBanner
+                        selectedCount={selectedItemIds.size}
+                        totalCount={filteredAndSortedItems.length}
+                        onSelectAll={() => setSelectedItemIds(new Set(filteredAndSortedItems.map((_, i) => i)))}
+                        onClearSelection={() => setSelectedItemIds(new Set())}
+                        itemName="itens"
+                        singularItemName="item"
+                      />
+
+                      {/* Table / Grid Container */}
+                      <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-transparent dark:border-dark-border/20 overflow-hidden">
+
+                        {/* Mobile Layout */}
+                        <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                          {filteredAndSortedItems.map((item, idx) => (
+                            <div key={idx} className="p-4 flex items-center gap-3">
+                              <div className="shrink-0">
+                                <Checkbox
+                                  checked={selectedItemIds.has(item.originalIndex)}
+                                  onChange={() => handleSelectRowItem(item.originalIndex)}
+                                />
+                              </div>
+                              <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                {item.itemType === "product" ? <BoxIcon size={18} className="text-brand-primary" /> : <ClockIcon size={18} className="text-brand-primary" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                  {item.name}
+                                </span>
+                                <span className="block text-xs font-semibold text-brand-primary dark:text-dark-body">
+                                  {item.itemType === "product" ? "Produto" : "Serviço"} • {item.quantity} un
+                                </span>
+                              </div>
+                              <div className="shrink-0 flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => handleEditItemTrigger(item, item.originalIndex)}>
+                                  Editar
+                                </Button>
+                                <Button variant="outline" size="sm" className="border-brand-red text-brand-red" onClick={() => handleRemoveItem(item.originalIndex)}>
+                                  Remover
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block">
+                          <table className="w-full text-left border-separate border-spacing-0">
+                            <thead>
+                              <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                <th className="py-3 px-6 w-12 bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border sticky left-0 z-20">
+                                  <Checkbox
+                                    checked={selectedItemIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0}
+                                    onChange={handleSelectAllItems}
+                                    className="bg-white dark:bg-dark-background"
+                                  />
+                                </th>
+                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortItem("name")}>
+                                  <div className="flex items-center gap-1">
+                                    <span>Item</span>
+                                    <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                </th>
+                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortItem("itemType")}>
+                                  <div className="flex items-center gap-1">
+                                    <span>Tipo</span>
+                                    <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                </th>
+                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortItem("unitPrice")}>
+                                  <div className="flex items-center gap-1">
+                                    <span>Preço Unitário</span>
+                                    <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                </th>
+                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortItem("quantity")}>
+                                  <div className="flex items-center gap-1">
+                                    <span>Quantidade</span>
+                                    <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                  </div>
+                                </th>
+                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border text-center">
+                                  Ações
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredAndSortedItems.map((item, idx) => (
+                                <tr key={idx} className="group hover:bg-brand-gray/30 transition-colors bg-white dark:bg-dark-background border-b border-brand-border last:border-0">
+                                  <td className="py-4 px-6 border-b border-brand-border w-12">
+                                    <Checkbox
+                                      checked={selectedItemIds.has(item.originalIndex)}
+                                      onChange={() => handleSelectRowItem(item.originalIndex)}
+                                    />
+                                  </td>
+                                  <td className="py-4 px-6 border-b border-brand-border">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                        {item.itemType === "product" ? <BoxIcon size={18} className="text-brand-primary" /> : <ClockIcon size={18} className="text-brand-primary" />}
+                                      </div>
+                                      <div className="flex flex-col text-left">
+                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
+                                          {item.name}
+                                        </span>
+                                        {item.itemType === "service" && item.staffPartnerUserId && (
+                                          <span className="text-xs text-brand-inactive-text">
+                                            Profissional: {formData.staff.find(s => s.id === item.staffPartnerUserId)?.display_name || "N/A"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 px-6 border-b border-brand-border">
+                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                      {item.itemType === "product" ? "Produto" : "Serviço"}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 border-b border-brand-border">
+                                    <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
+                                      {item.unitPrice != null ? formatCurrency(item.unitPrice) : "Padrão"}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 border-b border-brand-border">
+                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                      {item.quantity} UN
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 border-b border-brand-border text-center">
+                                    <div className="flex justify-center gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => handleEditItemTrigger(item, item.originalIndex)}>
+                                        Editar
+                                      </Button>
+                                      <Button variant="outline" size="sm" className="border-brand-red text-brand-red hover:bg-red-50" onClick={() => handleRemoveItem(item.originalIndex)}>
+                                        Remover
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </FadeIn>
               </TabsContent>
 
@@ -582,6 +771,18 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
           </div>
         </Tabs>
       </div>
+
+      {/* Floating Action Bar */}
+      <FloatingActionBar selectedCount={selectedItemIds.size} onClearSelection={() => setSelectedItemIds(new Set())}>
+        <Button
+          variant="ghost"
+          onClick={handleBulkDeleteItems}
+          leftIcon={<TrashIcon className="w-4 h-4" />}
+          className="h-10 px-3 text-brand-red"
+        >
+          Remover Selecionados
+        </Button>
+      </FloatingActionBar>
 
       {/* Floating Save/Cancel bar for mobile */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t py-4 px-6 flex items-center justify-between gap-4 z-40">
@@ -593,6 +794,14 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
           Salvar
         </Button>
       </div>
+
+      <PlanItemFormSheet
+        isOpen={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        formData={formData}
+        onSave={handleSaveItemFromSheet}
+        editingItem={editingItem}
+      />
 
       <SavingStatusModal isOpen={isSaving} text="Salvando plano..." />
       <UnsavedChangesDialog open={showConfirmDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />

@@ -1,8 +1,7 @@
 "use client"
 
 import React from "react"
-import { Badge, Button } from "@/components/reusable"
-import { EditIcon } from "@/lib/icons"
+import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
 import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
 
@@ -10,7 +9,11 @@ interface PlanListRowProps {
   plan: RecurringPlan
   columns: Array<{ id: string; label: string; align?: "left" | "center" | "right" }>
   canManage: boolean
+  selected: boolean
+  onSelect: (id: string) => void
   onEdit: (plan: RecurringPlan) => void
+  onDelete: (plan: RecurringPlan) => void
+  onShare?: (plan: RecurringPlan) => void
   onDetails: (plan: RecurringPlan) => void
 }
 
@@ -18,7 +21,11 @@ export const PlanListRow: React.FC<PlanListRowProps> = ({
   plan,
   columns,
   canManage,
+  selected,
+  onSelect,
   onEdit,
+  onDelete,
+  onShare,
   onDetails
 }) => {
   const statusVariant = (status: string) => {
@@ -73,18 +80,18 @@ export const PlanListRow: React.FC<PlanListRowProps> = ({
           </Badge>
         )
       case "actions":
-        return canManage ? (
-          <div onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit(plan)}
-              className="h-8"
-            >
-              <EditIcon size={14} className="mr-1" /> Editar
-            </Button>
+        return (
+          <div
+            className="flex justify-center action-btn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ActionsDropdown
+              onEdit={canManage ? () => onEdit(plan) : undefined}
+              onShare={onShare ? () => onShare(plan) : undefined}
+              onDelete={canManage ? () => onDelete(plan) : undefined}
+            />
           </div>
-        ) : null
+        )
       default:
         return null
     }
@@ -93,8 +100,14 @@ export const PlanListRow: React.FC<PlanListRowProps> = ({
   return (
     <tr
       onClick={() => onDetails(plan)}
-      className="group hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background border-b border-brand-border dark:border-dark-border last:border-0"
+      className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background border-b border-brand-border dark:border-dark-border last:border-0"
     >
+      <td
+        className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Checkbox checked={selected} onChange={() => onSelect(plan.id)} />
+      </td>
       {columns.map((col) => (
         <td
           key={col.id}

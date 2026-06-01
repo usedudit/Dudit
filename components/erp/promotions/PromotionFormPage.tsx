@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, XIcon, CheckCircleIcon } from "@/lib/icons"
+import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, XIcon, CheckCircleIcon, TagIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, IconPlaceholder, ActionsDropdown, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SelectionBanner, Pagination, Separator } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
@@ -118,6 +118,7 @@ export default function PromotionFormPage({
     const [ruleTypeFilter, setRuleTypeFilter] = useState<"all" | string>("all")
     const [rulePage, setRulePage] = useState(1)
     const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set())
+    const [ruleSortConfig, setRuleSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
 
     const pageTitle = useMemo(() => {
         return currentMode === "add" ? "Nova Campanha de Marketing"
@@ -142,6 +143,9 @@ export default function PromotionFormPage({
         return () => setHeaderOverride(null)
     }, [pageTitle, handleBack, setHeaderOverride])
 
+    const lastCampaignIdRef = useRef<string | undefined>(undefined)
+    const lastModeRef = useRef<string | undefined>(undefined)
+
     // Sync initial mode
     useEffect(() => {
         setCurrentMode(initialMode)
@@ -149,37 +153,44 @@ export default function PromotionFormPage({
 
     // Load data based on mode and campaign
     useEffect(() => {
-        if ((currentMode === "edit" || currentMode === "details" || currentMode === "duplicate") && campaign) {
-            setCampName(currentMode === "duplicate" ? `${campaign.name} (Cópia)` : campaign.name || "")
-            setCampDesc(campaign.description || "")
-            setCampScope(campaign.customer_scope || "all")
-            setCampStarts(campaign.starts_at ? new Date(campaign.starts_at).toISOString().slice(0, 16) : "")
-            setCampEnds(campaign.ends_at ? new Date(campaign.ends_at).toISOString().slice(0, 16) : "")
-            setCampActive(campaign.is_active ?? true)
-            setCampCustIds((campaign.campaign_customers || []).map((cc: any) => cc.customer_id))
+        const campaignId = campaign?.id
+        const isNewCampaign = campaignId !== lastCampaignIdRef.current || currentMode !== lastModeRef.current
+        if (isNewCampaign) {
+            lastCampaignIdRef.current = campaignId
+            lastModeRef.current = currentMode
 
-            const campPromos = promotions.filter(p => p.campaign_id === campaign.id)
-            if (currentMode === "duplicate") {
-                setLocalPromotions(campPromos.map(p => ({
-                    ...p,
-                    id: `temp_${Math.random()}`,
-                    campaign_id: undefined,
-                    promotion_products: (p.promotion_products || []).map((prod: any) => prod.product_id || prod),
-                    promotion_categories: (p.promotion_categories || []).map((cat: any) => cat.category_id || cat),
-                    promotion_services: (p.promotion_services || []).map((serv: any) => serv.service_id || serv),
-                })))
-            } else {
-                setLocalPromotions(campPromos)
+            if ((currentMode === "edit" || currentMode === "details" || currentMode === "duplicate") && campaign) {
+                setCampName(currentMode === "duplicate" ? `${campaign.name} (Cópia)` : campaign.name || "")
+                setCampDesc(campaign.description || "")
+                setCampScope(campaign.customer_scope || "all")
+                setCampStarts(campaign.starts_at ? new Date(campaign.starts_at).toISOString().slice(0, 16) : "")
+                setCampEnds(campaign.ends_at ? new Date(campaign.ends_at).toISOString().slice(0, 16) : "")
+                setCampActive(campaign.is_active ?? true)
+                setCampCustIds((campaign.campaign_customers || []).map((cc: any) => cc.customer_id))
+
+                const campPromos = promotions.filter(p => p.campaign_id === campaign.id)
+                if (currentMode === "duplicate") {
+                    setLocalPromotions(campPromos.map(p => ({
+                        ...p,
+                        id: `temp_${Math.random()}`,
+                        campaign_id: undefined,
+                        promotion_products: (p.promotion_products || []).map((prod: any) => prod.product_id || prod),
+                        promotion_categories: (p.promotion_categories || []).map((cat: any) => cat.category_id || cat),
+                        promotion_services: (p.promotion_services || []).map((serv: any) => serv.service_id || serv),
+                    })))
+                } else {
+                    setLocalPromotions(campPromos)
+                }
+            } else if (currentMode === "add") {
+                setCampName("")
+                setCampDesc("")
+                setCampScope("all")
+                setCampStarts("")
+                setCampEnds("")
+                setCampActive(true)
+                setCampCustIds([])
+                setLocalPromotions([])
             }
-        } else {
-            setCampName("")
-            setCampDesc("")
-            setCampScope("all")
-            setCampStarts("")
-            setCampEnds("")
-            setCampActive(true)
-            setCampCustIds([])
-            setLocalPromotions([])
         }
     }, [currentMode, campaign, promotions])
 
@@ -560,7 +571,7 @@ export default function PromotionFormPage({
 
     // Rules filtering & pagination logic
     const filteredRules = useMemo(() => {
-        return localPromotions.filter(promo => {
+        const list = localPromotions.filter(promo => {
             const term = ruleSearch.toLowerCase().trim()
             if (term) {
                 const nameMatch = promo.name?.toLowerCase().includes(term)
@@ -572,7 +583,40 @@ export default function PromotionFormPage({
             if (ruleTypeFilter !== "all" && promo.promotion_type !== ruleTypeFilter) return false
             return true
         })
-    }, [localPromotions, ruleSearch, ruleStatusFilter, ruleTypeFilter])
+
+        if (ruleSortConfig) {
+            list.sort((a, b) => {
+                let aVal = a[ruleSortConfig.key]
+                let bVal = b[ruleSortConfig.key]
+
+                if (ruleSortConfig.key === "priority") {
+                    aVal = Number(aVal) || 0
+                    bVal = Number(bVal) || 0
+                } else if (ruleSortConfig.key === "is_active") {
+                    aVal = aVal ? 1 : 0
+                    bVal = bVal ? 1 : 0
+                } else {
+                    aVal = String(aVal || "").toLowerCase()
+                    bVal = String(bVal || "").toLowerCase()
+                }
+
+                if (aVal === bVal) return 0
+                const comp = aVal < bVal ? -1 : 1
+                return ruleSortConfig.direction === "asc" ? comp : -comp
+            })
+        }
+
+        return list
+    }, [localPromotions, ruleSearch, ruleStatusFilter, ruleTypeFilter, ruleSortConfig])
+
+    const handleSortRule = (key: string) => {
+        setRuleSortConfig(prev => {
+            if (prev?.key === key) {
+                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+            }
+            return { key, direction: "asc" }
+        })
+    }
 
     const rulesPerPage = 8
     const paginatedRules = useMemo(() => {
@@ -1140,538 +1184,646 @@ export default function PromotionFormPage({
                             <AnimatePresence mode="wait">
                                 {/* General Settings Tab */}
                                 {activeTab === "general" && (
-                                    <form onSubmit={handleSaveCampaign} className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
-                                        {/* Left Column */}
-                                        <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
-                                            <FormSection title="Pedido Origem">
-                                                <Input
-                                                    label="Nome da Campanha"
-                                                    name="campName"
-                                                    value={campName}
-                                                    onChange={(e) => setCampName(e.target.value)}
-                                                    required
-                                                    disabled={isReadOnly}
-                                                    placeholder="Ex: Dia dos Namorados"
-                                                />
+                                    <FadeIn key="general" className="block">
+                                        <form onSubmit={handleSaveCampaign} className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
+                                            {/* Left Column */}
+                                            <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
+                                                <FormSection title="Pedido Origem">
+                                                    <Input
+                                                        label="Nome da Campanha"
+                                                        name="campName"
+                                                        value={campName}
+                                                        onChange={(e) => setCampName(e.target.value)}
+                                                        required
+                                                        disabled={isReadOnly}
+                                                        placeholder="Ex: Dia dos Namorados"
+                                                    />
 
-                                                <FormTextarea
-                                                    label="Descrição"
-                                                    name="campDesc"
-                                                    value={campDesc}
-                                                    onChange={(e) => setCampDesc(e.target.value)}
-                                                    disabled={isReadOnly}
-                                                    placeholder="Descrição para controle interno ou exibição pública"
-                                                />
+                                                    <FormTextarea
+                                                        label="Descrição"
+                                                        name="campDesc"
+                                                        value={campDesc}
+                                                        onChange={(e) => setCampDesc(e.target.value)}
+                                                        disabled={isReadOnly}
+                                                        placeholder="Descrição para controle interno ou exibição pública"
+                                                    />
 
-                                                <FormRadioGroup
-                                                    label="Público da Campanha"
-                                                    name="custScope"
-                                                    value={campScope}
-                                                    onChange={(val) => setCampScope(val as "all" | "specific")}
-                                                    disabled={isReadOnly}
-                                                    options={[
-                                                        { value: "all", label: "Todos os Clientes" },
-                                                        { value: "specific", label: "Clientes Específicos" }
-                                                    ]}
-                                                />
+                                                    <FormRadioGroup
+                                                        label="Público da Campanha"
+                                                        name="custScope"
+                                                        value={campScope}
+                                                        onChange={(val) => setCampScope(val as "all" | "specific")}
+                                                        disabled={isReadOnly}
+                                                        options={[
+                                                            { value: "all", label: "Todos os Clientes" },
+                                                            { value: "specific", label: "Clientes Específicos" }
+                                                        ]}
+                                                    />
 
-                                                {campScope === "specific" && (
-                                                    <div className="border border-brand-border dark:border-dark-border p-4 rounded-xl space-y-3 bg-white dark:bg-dark-surface">
-                                                        <label className="text-xs font-bold uppercase text-brand-inactive-text">Selecionar Clientes elegíveis</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Filtrar clientes por nome ou email..."
-                                                            value={custSearch}
-                                                            onChange={(e) => setCustSearch(e.target.value)}
-                                                            disabled={isReadOnly}
-                                                            className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm focus:ring-brand-green focus:border-brand-green dark:focus:ring-brand-green dark:focus:border-brand-green focus:outline-none text-brand-dark dark:text-dark-heading placeholder:text-brand-dark/70 dark:placeholder:text-dark-heading/70 transition-colors disabled:bg-brand-gray dark:disabled:bg-dark-border/30"
+                                                    {campScope === "specific" && (
+                                                        <div className="border border-brand-border dark:border-dark-border p-4 rounded-xl space-y-3 bg-white dark:bg-dark-surface">
+                                                            <label className="text-xs font-bold uppercase text-brand-inactive-text">Selecionar Clientes elegíveis</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Filtrar clientes por nome ou email..."
+                                                                value={custSearch}
+                                                                onChange={(e) => setCustSearch(e.target.value)}
+                                                                disabled={isReadOnly}
+                                                                className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm focus:ring-brand-green focus:border-brand-green dark:focus:ring-brand-green dark:focus:border-brand-green focus:outline-none text-brand-dark dark:text-dark-heading placeholder:text-brand-dark/70 dark:placeholder:text-dark-heading/70 transition-colors disabled:bg-brand-gray dark:disabled:bg-dark-border/30"
+                                                            />
+                                                            <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                                                {filteredCustomers.map((cust) => {
+                                                                    const isChecked = campCustIds.includes(cust.id)
+                                                                    return (
+                                                                        <label key={cust.id} className="flex items-center gap-3 text-sm p-1.5 hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 rounded cursor-pointer transition-colors">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isChecked}
+                                                                                disabled={isReadOnly}
+                                                                                onChange={() => {
+                                                                                    if (isChecked) {
+                                                                                        setCampCustIds(campCustIds.filter((id) => id !== cust.id))
+                                                                                    } else {
+                                                                                        setCampCustIds([...campCustIds, cust.id])
+                                                                                    }
+                                                                                }}
+                                                                                className="text-brand-green focus:ring-brand-green border-brand-border dark:border-dark-border rounded"
+                                                                            />
+                                                                            <div>
+                                                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">{cust.name}</p>
+                                                                                {cust.email && <p className="text-xs text-brand-inactive-text dark:text-dark-body">{cust.email}</p>}
+                                                                            </div>
+                                                                        </label>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </FormSection>
+                                            </div>
+
+                                            {/* Right Column */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                                <SidebarCard hasTopStrip>
+                                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Duração da Campanha</h3>
+                                                    <div className="space-y-5">
+                                                        <DatePicker
+                                                            label="Início da Vigência"
+                                                            value={campStarts}
+                                                            onChange={(d) => setCampStarts(d.toISOString())}
                                                         />
-                                                        <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                                            {filteredCustomers.map((cust) => {
-                                                                const isChecked = campCustIds.includes(cust.id)
-                                                                return (
-                                                                    <label key={cust.id} className="flex items-center gap-3 text-sm p-1.5 hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 rounded cursor-pointer transition-colors">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={isChecked}
-                                                                            disabled={isReadOnly}
-                                                                            onChange={() => {
-                                                                                if (isChecked) {
-                                                                                    setCampCustIds(campCustIds.filter((id) => id !== cust.id))
-                                                                                } else {
-                                                                                    setCampCustIds([...campCustIds, cust.id])
-                                                                                }
-                                                                            }}
-                                                                            className="text-brand-green focus:ring-brand-green border-brand-border dark:border-dark-border rounded"
-                                                                        />
-                                                                        <div>
-                                                                            <p className="font-semibold text-brand-dark dark:text-dark-heading">{cust.name}</p>
-                                                                            {cust.email && <p className="text-xs text-brand-inactive-text dark:text-dark-body">{cust.email}</p>}
-                                                                        </div>
-                                                                    </label>
-                                                                )
-                                                            })}
+                                                        <DatePicker
+                                                            label="Fim da Vigência"
+                                                            value={campEnds}
+                                                            onChange={(d) => setCampEnds(d.toISOString())}
+                                                        />
+
+                                                        <div className="flex items-center gap-2">
+                                                            <Checkbox
+                                                                checked={campActive}
+                                                                onChange={() => setCampActive(!campActive)}
+                                                                disabled={isReadOnly}
+                                                                label="Esta campanha está ativa e válida"
+                                                            />
                                                         </div>
                                                     </div>
-                                                )}
-                                            </FormSection>
-                                        </div>
-
-                                        {/* Right Column */}
-                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <SidebarCard hasTopStrip>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Duração da Campanha</h3>
-                                                <div className="space-y-5">
-                                                    <DatePicker
-                                                        label="Início da Vigência"
-                                                        value={campStarts}
-                                                        onChange={(d) => setCampStarts(d.toISOString())}
-                                                    />
-                                                    <DatePicker
-                                                        label="Fim da Vigência"
-                                                        value={campEnds}
-                                                        onChange={(d) => setCampEnds(d.toISOString())}
-                                                    />
-
-                                                    <div className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            checked={campActive}
-                                                            onChange={() => setCampActive(!campActive)}
-                                                            disabled={isReadOnly}
-                                                            label="Esta campanha está ativa e válida"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </SidebarCard>
-                                        </div>
-                                    </form>
+                                                </SidebarCard>
+                                            </div>
+                                        </form>
+                                    </FadeIn>
                                 )}
 
                                 {/* Rules Tab */}
                                 {activeTab === "rules" && (
-                                    <div className="space-y-6">
-                                        {editingRule ? (
-                                            /* Rule Sub-Form in Two Columns */
-                                            <form onSubmit={handleSaveRule} className="grid grid-cols-12 gap-y-8 lg:gap-y-0 animate-fadeIn">
+                                    <FadeIn key="rules" className="block">
+                                        <div className="space-y-6">
+                                            {editingRule ? (
+                                                /* Rule Sub-Form in Two Columns */
+                                                <form onSubmit={handleSaveRule} className="grid grid-cols-12 gap-y-8 lg:gap-y-0 animate-fadeIn">
 
-                                                {/* Left Column: Rule configuration */}
-                                                <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
-                                                    <FormSection title={editingRule.id && !editingRule.id.toString().startsWith("temp_") ? "Editar Regra de Promoção" : "Nova Regra de Promoção"}>
-                                                        {/* Tipo de Promoção */}
-                                                        <FormDropdown
-                                                            label="Tipo de Promoção"
-                                                            value={editingRule.promotion_type || "discount"}
-                                                            setValue={(val) => setEditingRule({ ...editingRule, promotion_type: val })}
-                                                            options={[
-                                                                { value: "discount", label: "Desconto Direto (Fixo ou %)" },
-                                                                { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
-                                                                { value: "gift", label: "Ganhar Brinde (Freebie)" },
-                                                                { value: "free_shipping", label: "Frete Grátis" }
-                                                            ]}
-                                                        />
-
-                                                        {/* Conditional configurations based on promotion type */}
-                                                        {editingRule.promotion_type === "discount" && (
-                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                                                <FormDropdown
-                                                                    label="Tipo de Desconto"
-                                                                    value={editingRule.discount_type || "percentage"}
-                                                                    setValue={(val) => setEditingRule({ ...editingRule, discount_type: val })}
-                                                                    options={[
-                                                                        { value: "percentage", label: "Porcentagem (%)" },
-                                                                        { value: "fixed", label: "Valor Fixo (R$)" }
-                                                                    ]}
-                                                                />
-                                                                <Input
-                                                                    label="Valor do Desconto"
-                                                                    name="discount_value"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0.01"
-                                                                    required
-                                                                    placeholder="10"
-                                                                    value={editingRule.discount_value ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, discount_value: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                />
-                                                                <Input
-                                                                    label="Teto de Desconto (Opcional)"
-                                                                    name="max_discount_amount"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    placeholder="Ex: 50.00"
-                                                                    value={editingRule.max_discount_amount ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, max_discount_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                />
-                                                            </div>
-                                                        )}
-
-                                                        {editingRule.promotion_type === "buy_x_pay_y" && (
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                                <Input
-                                                                    label="Leve (Qtd a Comprar)"
-                                                                    name="buy_quantity"
-                                                                    type="number"
-                                                                    min="2"
-                                                                    required
-                                                                    placeholder="3"
-                                                                    value={editingRule.buy_quantity ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, buy_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                />
-                                                                <Input
-                                                                    label="Pague (Qtd a Pagar)"
-                                                                    name="pay_quantity"
-                                                                    type="number"
-                                                                    min="1"
-                                                                    required
-                                                                    placeholder="2"
-                                                                    value={editingRule.pay_quantity ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, pay_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                />
-                                                            </div>
-                                                        )}
-
-                                                        {editingRule.promotion_type === "gift" && (
+                                                    {/* Left Column: Rule configuration */}
+                                                    <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
+                                                        <FormSection title={editingRule.id && !editingRule.id.toString().startsWith("temp_") ? "Editar Regra de Promoção" : "Nova Regra de Promoção"}>
+                                                            {/* Tipo de Promoção */}
                                                             <FormDropdown
-                                                                label="Selecione o Brinde"
-                                                                value={editingRule.gift_product_id || ""}
-                                                                setValue={(val) => setEditingRule({ ...editingRule, gift_product_id: val })}
+                                                                label="Tipo de Promoção"
+                                                                value={editingRule.promotion_type || "discount"}
+                                                                setValue={(val) => setEditingRule({ ...editingRule, promotion_type: val })}
                                                                 options={[
-                                                                    { value: "", label: "Escolha o produto que será entregue de brinde..." },
-                                                                    ...scopeData.products.map(p => ({ value: p.id, label: `${p.name} (${formatCurrency(p.price)})` }))
-                                                                ]}
-                                                            />
-                                                        )}
-
-                                                        {/* Escopo de Aplicação */}
-                                                        <FormDropdown
-                                                            label="Escopo de Aplicação"
-                                                            value={editingRule.apply_scope || "entire_cart"}
-                                                            setValue={(val) => setEditingRule({ ...editingRule, apply_scope: val })}
-                                                            options={[
-                                                                { value: "entire_cart", label: "Todo o Carrinho" },
-                                                                { value: "specific_products", label: "Produtos Específicos" },
-                                                                { value: "category", label: "Categorias Específicas" },
-                                                                ...(scopeData.services && scopeData.services.length > 0 ? [{ value: "specific_services", label: "Serviços Específicos" }] : [])
-                                                            ]}
-                                                        />
-
-                                                        {editingRule.apply_scope === "specific_products" && renderSelectedProductsList()}
-                                                        {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
-                                                        {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
-                                                    </FormSection>
-
-                                                    {/* Right Column: Rule limits and status */}
-                                                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                        <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
-                                                            Limitações e Status
-                                                        </h3>
-
-                                                        <SidebarCard hasTopStrip={true}>
-                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
-                                                            <div className="space-y-4">
-                                                                <Input
-                                                                    label="Prioridade de Execução"
-                                                                    name="priority"
-                                                                    type="number"
-                                                                    placeholder="0"
-                                                                    value={editingRule.priority ?? 0}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })}
-                                                                />
-                                                                <Input
-                                                                    label="Mínimo de Compra (R$)"
-                                                                    name="min_spend_amount"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    placeholder="0.00"
-                                                                    value={editingRule.min_spend_amount ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                />
-                                                                <Input
-                                                                    label="Limite Global de Usos"
-                                                                    name="usage_limit"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    placeholder="Sem limite"
-                                                                    value={editingRule.usage_limit ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                />
-                                                                <Input
-                                                                    label="Limite de Usos por Cliente"
-                                                                    name="usage_limit_per_customer"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    placeholder="Sem limite"
-                                                                    value={editingRule.usage_limit_per_customer ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                />
-                                                            </div>
-                                                        </SidebarCard>
-
-                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
-                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
-                                                            <div className="space-y-4">
-                                                                <Checkbox
-                                                                    checked={editingRule.allow_coupon_combination || false}
-                                                                    onChange={() => setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
-                                                                    label="Permitir uso combinado com cupons de desconto"
-                                                                />
-                                                                <Checkbox
-                                                                    checked={editingRule.is_active ?? true}
-                                                                    onChange={() => setEditingRule({ ...editingRule, is_active: !editingRule.is_active })}
-                                                                    label="Regra ativa e disponível"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Desktop sub-form Actions */}
-                                                        <div className="hidden md:flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-4">
-                                                            <Button variant="outline" type="button" onClick={() => setEditingRule(null)}>
-                                                                Voltar para lista
-                                                            </Button>
-                                                            <Button variant="filled" type="submit" disabled={isSaving}>
-                                                                Salvar Regra
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        ) : (
-                                            /* Redesigned Rules List View */
-                                            <div className="space-y-4">
-                                                <div className="flex flex-col md:flex-row gap-4 mb-4 items-center justify-between w-full">
-                                                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto flex-1">
-                                                        <div className="w-full sm:w-72">
-                                                            <Input
-                                                                name="ruleSearch"
-                                                                placeholder="Buscar regras..."
-                                                                value={ruleSearch}
-                                                                onChange={(e) => {
-                                                                    setRuleSearch(e.target.value)
-                                                                    setRulePage(1)
-                                                                }}
-                                                                className="mb-0"
-                                                                variant="full-rounded"
-                                                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                                                label=""
-                                                            />
-                                                        </div>
-                                                        <div className="w-full sm:w-44">
-                                                            <FormDropdown
-                                                                label=""
-                                                                value={ruleStatusFilter}
-                                                                setValue={(val) => {
-                                                                    setRuleStatusFilter(val as any)
-                                                                    setRulePage(1)
-                                                                }}
-                                                                options={[
-                                                                    { value: "all", label: "Todos os status" },
-                                                                    { value: "active", label: "Ativos" },
-                                                                    { value: "inactive", label: "Inativos" }
-                                                                ]}
-                                                            />
-                                                        </div>
-                                                        <div className="w-full sm:w-48">
-                                                            <FormDropdown
-                                                                label=""
-                                                                value={ruleTypeFilter}
-                                                                setValue={(val) => {
-                                                                    setRuleTypeFilter(val)
-                                                                    setRulePage(1)
-                                                                }}
-                                                                options={[
-                                                                    { value: "all", label: "Todos os tipos" },
-                                                                    { value: "discount", label: "Desconto Direto" },
-                                                                    { value: "buy_x_pay_y", label: "Leve X Pague Y" },
-                                                                    { value: "gift", label: "Ganhar Brinde" },
+                                                                    { value: "discount", label: "Desconto Direto (Fixo ou %)" },
+                                                                    { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
+                                                                    { value: "gift", label: "Ganhar Brinde (Freebie)" },
                                                                     { value: "free_shipping", label: "Frete Grátis" }
                                                                 ]}
                                                             />
+
+                                                            {/* Conditional configurations based on promotion type */}
+                                                            {editingRule.promotion_type === "discount" && (
+                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                                    <FormDropdown
+                                                                        label="Tipo de Desconto"
+                                                                        value={editingRule.discount_type || "percentage"}
+                                                                        setValue={(val) => setEditingRule({ ...editingRule, discount_type: val })}
+                                                                        options={[
+                                                                            { value: "percentage", label: "Porcentagem (%)" },
+                                                                            { value: "fixed", label: "Valor Fixo (R$)" }
+                                                                        ]}
+                                                                    />
+                                                                    <Input
+                                                                        label="Valor do Desconto"
+                                                                        name="discount_value"
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0.01"
+                                                                        required
+                                                                        placeholder="10"
+                                                                        value={editingRule.discount_value ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, discount_value: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                    />
+                                                                    <Input
+                                                                        label="Teto de Desconto (Opcional)"
+                                                                        name="max_discount_amount"
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        placeholder="Ex: 50.00"
+                                                                        value={editingRule.max_discount_amount ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, max_discount_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                    />
+                                                                </div>
+                                                            )}
+
+                                                            {editingRule.promotion_type === "buy_x_pay_y" && (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                                    <Input
+                                                                        label="Leve (Qtd a Comprar)"
+                                                                        name="buy_quantity"
+                                                                        type="number"
+                                                                        min="2"
+                                                                        required
+                                                                        placeholder="3"
+                                                                        value={editingRule.buy_quantity ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, buy_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    />
+                                                                    <Input
+                                                                        label="Pague (Qtd a Pagar)"
+                                                                        name="pay_quantity"
+                                                                        type="number"
+                                                                        min="1"
+                                                                        required
+                                                                        placeholder="2"
+                                                                        value={editingRule.pay_quantity ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, pay_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    />
+                                                                </div>
+                                                            )}
+
+                                                            {editingRule.promotion_type === "gift" && (
+                                                                <FormDropdown
+                                                                    label="Selecione o Brinde"
+                                                                    value={editingRule.gift_product_id || ""}
+                                                                    setValue={(val) => setEditingRule({ ...editingRule, gift_product_id: val })}
+                                                                    options={[
+                                                                        { value: "", label: "Escolha o produto que será entregue de brinde..." },
+                                                                        ...scopeData.products.map(p => ({ value: p.id, label: `${p.name} (${formatCurrency(p.price)})` }))
+                                                                    ]}
+                                                                />
+                                                            )}
+
+                                                            {/* Escopo de Aplicação */}
+                                                            <FormDropdown
+                                                                label="Escopo de Aplicação"
+                                                                value={editingRule.apply_scope || "entire_cart"}
+                                                                setValue={(val) => setEditingRule({ ...editingRule, apply_scope: val })}
+                                                                options={[
+                                                                    { value: "entire_cart", label: "Todo o Carrinho" },
+                                                                    { value: "specific_products", label: "Produtos Específicos" },
+                                                                    { value: "category", label: "Categorias Específicas" },
+                                                                    ...(scopeData.services && scopeData.services.length > 0 ? [{ value: "specific_services", label: "Serviços Específicos" }] : [])
+                                                                ]}
+                                                            />
+
+                                                            {editingRule.apply_scope === "specific_products" && renderSelectedProductsList()}
+                                                            {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
+                                                            {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
+                                                        </FormSection>
+
+                                                        {/* Right Column: Rule limits and status */}
+                                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                            <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
+                                                                Limitações e Status
+                                                            </h3>
+
+                                                            <SidebarCard hasTopStrip={true}>
+                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
+                                                                <div className="space-y-4">
+                                                                    <Input
+                                                                        label="Prioridade de Execução"
+                                                                        name="priority"
+                                                                        type="number"
+                                                                        placeholder="0"
+                                                                        value={editingRule.priority ?? 0}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })}
+                                                                    />
+                                                                    <Input
+                                                                        label="Mínimo de Compra (R$)"
+                                                                        name="min_spend_amount"
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        placeholder="0.00"
+                                                                        value={editingRule.min_spend_amount ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                    />
+                                                                    <Input
+                                                                        label="Limite Global de Usos"
+                                                                        name="usage_limit"
+                                                                        type="number"
+                                                                        min="0"
+                                                                        placeholder="Sem limite"
+                                                                        value={editingRule.usage_limit ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    />
+                                                                    <Input
+                                                                        label="Limite de Usos por Cliente"
+                                                                        name="usage_limit_per_customer"
+                                                                        type="number"
+                                                                        min="0"
+                                                                        placeholder="Sem limite"
+                                                                        value={editingRule.usage_limit_per_customer ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                    />
+                                                                </div>
+                                                            </SidebarCard>
+
+                                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
+                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
+                                                                <div className="space-y-4">
+                                                                    <Checkbox
+                                                                        checked={editingRule.allow_coupon_combination || false}
+                                                                        onChange={() => setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
+                                                                        label="Permitir uso combinado com cupons de desconto"
+                                                                    />
+                                                                    <Checkbox
+                                                                        checked={editingRule.is_active ?? true}
+                                                                        onChange={() => setEditingRule({ ...editingRule, is_active: !editingRule.is_active })}
+                                                                        label="Regra ativa e disponível"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Desktop sub-form Actions */}
+                                                            <div className="hidden md:flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-4">
+                                                                <Button variant="outline" type="button" onClick={() => setEditingRule(null)}>
+                                                                    Voltar para lista
+                                                                </Button>
+                                                                <Button variant="filled" type="submit" disabled={isSaving}>
+                                                                    Salvar Regra
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    {!isReadOnly && (
-                                                        <Button onClick={() => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })} leftIcon={<PlusIcon size={16} />}>
-                                                            Nova Regra
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                                </form>
+                                            ) : (
+                                                /* Redesigned Rules List View */
+                                                <div className="space-y-4">
+                                                    {localPromotions.length === 0 ? (
+                                                        <div className="space-y-6">
+                                                            <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                                <IconPlaceholder
+                                                                    icon={TagIcon}
+                                                                    title="Não há regras de promoção"
+                                                                    subtitle="Adicione descontos, brindes ou frete grátis a esta campanha."
+                                                                    itemButton={!isReadOnly ? {
+                                                                        text: "Adicionar regra",
+                                                                        action: () => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' }),
+                                                                        variant: "outline"
+                                                                    } : undefined}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="max-w-[1300px] mx-auto pb-20 relative">
+                                                            {/* Header Section */}
+                                                            <div className="flex justify-between items-center mb-4">
+                                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                                    Regras de Promoção ({filteredRules.length})
+                                                                </h3>
+                                                                {!isReadOnly && (
+                                                                    <Button variant="link" onClick={() => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })} className="flex items-center hidden md:flex">
+                                                                        + Nova Regra
+                                                                    </Button>
+                                                                )}
+                                                            </div>
 
-                                                <SelectionBanner
-                                                    selectedCount={selectedRuleIds.size}
-                                                    totalCount={filteredRules.length}
-                                                    onSelectAll={() => setSelectedRuleIds(new Set(filteredRules.map(v => v.id)))}
-                                                    onClearSelection={() => setSelectedRuleIds(new Set())}
-                                                    itemName="regras"
-                                                    singularItemName="regra"
-                                                />
+                                                            {/* Search & Actions Control Bar */}
+                                                            {/* Mobile Header Row */}
+                                                            <div className="md:hidden flex flex-col gap-2 w-full mb-4">
+                                                                <div className="flex items-center gap-2 w-full">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <Input
+                                                                            name="ruleSearch"
+                                                                            placeholder="Buscar regras..."
+                                                                            value={ruleSearch}
+                                                                            onChange={(e) => {
+                                                                                setRuleSearch(e.target.value)
+                                                                                setRulePage(1)
+                                                                            }}
+                                                                            className="h-[42px] w-full"
+                                                                            variant="full-rounded"
+                                                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                                                        />
+                                                                    </div>
+                                                                    {!isReadOnly && (
+                                                                        <div className="flex-none">
+                                                                            <Button
+                                                                                onClick={() => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })}
+                                                                                className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm"
+                                                                            >
+                                                                                <PlusIcon className="w-5 h-5" strokeWidth={3} />
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <div className="flex-1">
+                                                                        <FormDropdown
+                                                                            label=""
+                                                                            value={ruleStatusFilter}
+                                                                            setValue={(val) => {
+                                                                                setRuleStatusFilter(val as any)
+                                                                                setRulePage(1)
+                                                                            }}
+                                                                            options={[
+                                                                                { value: "all", label: "Todos os status" },
+                                                                                { value: "active", label: "Ativos" },
+                                                                                { value: "inactive", label: "Inativos" }
+                                                                            ]}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <FormDropdown
+                                                                            label=""
+                                                                            value={ruleTypeFilter}
+                                                                            setValue={(val) => {
+                                                                                setRuleTypeFilter(val)
+                                                                                setRulePage(1)
+                                                                            }}
+                                                                            options={[
+                                                                                { value: "all", label: "Todos os tipos" },
+                                                                                { value: "discount", label: "Desconto Direto" },
+                                                                                { value: "buy_x_pay_y", label: "Leve X Pague Y" },
+                                                                                { value: "gift", label: "Ganhar Brinde" },
+                                                                                { value: "free_shipping", label: "Frete Grátis" }
+                                                                            ]}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
-                                                {paginatedRules.length > 0 ? (
-                                                    <>
-                                                        {/* Desktop Table View */}
-                                                        <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
-                                                            <table className="w-full text-left border-collapse text-sm">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
-                                                                        {!isReadOnly && (
-                                                                            <th className="p-3 pl-6 w-12">
-                                                                                <Checkbox
-                                                                                    checked={selectedRuleIds.size === paginatedRules.length && paginatedRules.length > 0}
-                                                                                    onChange={handleSelectAllRules}
-                                                                                />
-                                                                            </th>
-                                                                        )}
-                                                                        <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Regra</th>
-                                                                        <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Escopo</th>
-                                                                        <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center w-28">Prioridade</th>
-                                                                        <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center w-28">Status</th>
-                                                                        {!isReadOnly && <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>}
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedRules.map((promo) => (
-                                                                        <tr key={promo.id} className="border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/35 dark:hover:bg-dark-border/20 transition-colors">
+                                                            {/* Desktop Search Bar */}
+                                                            <div className="hidden md:flex items-center w-full gap-4 mb-4">
+                                                                <div className="w-80">
+                                                                    <Input
+                                                                        name="ruleSearch"
+                                                                        placeholder="Buscar regras..."
+                                                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                                                        value={ruleSearch}
+                                                                        onChange={(e) => {
+                                                                            setRuleSearch(e.target.value)
+                                                                            setRulePage(1)
+                                                                        }}
+                                                                        className="h-[42px]"
+                                                                        variant="full-rounded"
+                                                                    />
+                                                                </div>
+                                                                <div className="w-48">
+                                                                    <FormDropdown
+                                                                        label=""
+                                                                        value={ruleStatusFilter}
+                                                                        setValue={(val) => {
+                                                                            setRuleStatusFilter(val as any)
+                                                                            setRulePage(1)
+                                                                        }}
+                                                                        options={[
+                                                                            { value: "all", label: "Todos os status" },
+                                                                            { value: "active", label: "Ativos" },
+                                                                            { value: "inactive", label: "Inativos" }
+                                                                        ]}
+                                                                    />
+                                                                </div>
+                                                                <div className="w-52">
+                                                                    <FormDropdown
+                                                                        label=""
+                                                                        value={ruleTypeFilter}
+                                                                        setValue={(val) => {
+                                                                            setRuleTypeFilter(val)
+                                                                            setRulePage(1)
+                                                                        }}
+                                                                        options={[
+                                                                            { value: "all", label: "Todos os tipos" },
+                                                                            { value: "discount", label: "Desconto Direto" },
+                                                                            { value: "buy_x_pay_y", label: "Leve X Pague Y" },
+                                                                            { value: "gift", label: "Ganhar Brinde" },
+                                                                            { value: "free_shipping", label: "Frete Grátis" }
+                                                                        ]}
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Selection Banner */}
+                                                            <SelectionBanner
+                                                                selectedCount={selectedRuleIds.size}
+                                                                totalCount={filteredRules.length}
+                                                                onSelectAll={() => setSelectedRuleIds(new Set(filteredRules.map(v => v.id)))}
+                                                                onClearSelection={() => setSelectedRuleIds(new Set())}
+                                                                itemName="regras"
+                                                                singularItemName="regra"
+                                                            />
+
+                                                            {/* Table / Grid Container */}
+                                                            <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-transparent dark:border-dark-border/20 overflow-hidden">
+                                                                {/* Mobile Layout */}
+                                                                <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                                                                    {paginatedRules.map((promo, idx) => (
+                                                                        <div key={promo.id} className="p-4 flex items-center gap-3">
                                                                             {!isReadOnly && (
-                                                                                <td className="p-3 pl-6">
+                                                                                <div className="shrink-0">
                                                                                     <Checkbox
                                                                                         checked={selectedRuleIds.has(promo.id)}
                                                                                         onChange={() => handleSelectRuleRow(promo.id)}
                                                                                     />
-                                                                                </td>
+                                                                                </div>
                                                                             )}
-                                                                            <td className="p-3 pl-6">
-                                                                                <div className="flex flex-col text-left">
-                                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                                        {promo.promotion_type === "gift" && "Ganhar Brinde"}
-                                                                                        {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
-                                                                                        {promo.promotion_type === "discount" && (
-                                                                                            promo.discount_type === "percentage" ? `${promo.discount_value}% de Desconto` : `${formatCurrency(promo.discount_value)} de Desconto`
-                                                                                        )}
-                                                                                        {promo.promotion_type === "free_shipping" && "Frete Grátis"}
-                                                                                    </span>
-                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                                        {promo.name || "Regra sem nome"}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="p-3 text-brand-inactive-text dark:text-dark-body">
-                                                                                {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
-                                                                                {promo.apply_scope === "specific_products" && "Produtos Específicos"}
-                                                                                {promo.apply_scope === "category" && "Categorias Específicas"}
-                                                                                {promo.apply_scope === "specific_services" && "Serviços Específicos"}
-                                                                            </td>
-                                                                            <td className="p-3 text-center">
-                                                                                <Badge variant="blue">{promo.priority || 0}</Badge>
-                                                                            </td>
-                                                                            <td className="p-3 text-center">
-                                                                                <div className="flex justify-center">
-                                                                                    {isReadOnly ? (
-                                                                                        <Badge variant={promo.is_active ? "green" : "gray"}>
-                                                                                            {promo.is_active ? "Ativo" : "Inativo"}
-                                                                                        </Badge>
-                                                                                    ) : (
-                                                                                        <Switch
-                                                                                            checked={!!promo.is_active}
-                                                                                            onCheckedChange={(checked) => !isSaving && handleToggleRuleStatus(promo.id, checked)}
-                                                                                            className={isSaving ? "opacity-50 pointer-events-none" : ""}
-                                                                                        />
+                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                <TagIcon size={18} className="text-brand-primary" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                                    {promo.promotion_type === "gift" && "Ganhar Brinde"}
+                                                                                    {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
+                                                                                    {promo.promotion_type === "discount" && (
+                                                                                        promo.discount_type === "percentage" ? `${promo.discount_value}% Desconto` : `${formatCurrency(promo.discount_value)} Desconto`
                                                                                     )}
-                                                                                </div>
-                                                                            </td>
-                                                                            {!isReadOnly && (
-                                                                                <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
+                                                                                    {promo.promotion_type === "free_shipping" && "Frete Grátis"}
+                                                                                </span>
+                                                                                <span className="block text-xs font-semibold text-brand-primary dark:text-dark-body truncate">
+                                                                                    {promo.name || "Regra sem nome"} • Prioridade {promo.priority || 0}
+                                                                                </span>
+                                                                                <span className="block text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                    Escopo: {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
+                                                                                    {promo.apply_scope === "specific_products" && "Produtos Específicos"}
+                                                                                    {promo.apply_scope === "category" && "Categorias Específicas"}
+                                                                                    {promo.apply_scope === "specific_services" && "Serviços Específicos"}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="shrink-0 flex items-center gap-2">
+                                                                                {!isReadOnly && (
                                                                                     <ActionsDropdown
                                                                                         onEdit={() => setEditingRule(promo)}
                                                                                         onDelete={() => handleDeleteRule(promo)}
                                                                                     />
-                                                                                </td>
-                                                                            )}
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        {/* Mobile/Tablet List View */}
-                                                        <div className="md:hidden border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface space-y-3">
-                                                            {paginatedRules.map((promo, idx) => (
-                                                                <React.Fragment key={promo.id}>
-                                                                    {idx > 0 && <Separator className="my-2" />}
-                                                                    <div className="flex items-center justify-between gap-3">
-                                                                        <div className="flex items-start gap-3 min-w-0">
-                                                                            {!isReadOnly && (
-                                                                                <div className="pt-1">
-                                                                                    <Checkbox
-                                                                                        checked={selectedRuleIds.has(promo.id)}
-                                                                                        onChange={() => handleSelectRuleRow(promo.id)}
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-                                                                            <div className="min-w-0">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                        {promo.promotion_type === "gift" && "Ganhar Brinde"}
-                                                                                        {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
-                                                                                        {promo.promotion_type === "discount" && (
-                                                                                            promo.discount_type === "percentage" ? `${promo.discount_value}% Desconto` : `${formatCurrency(promo.discount_value)} Desconto`
-                                                                                        )}
-                                                                                        {promo.promotion_type === "free_shipping" && "Frete Grátis"}
-                                                                                    </span>
-                                                                                    <div className={`w-2 h-2 rounded-full ${promo.is_active ? "bg-brand-green" : "bg-brand-inactive-text"}`} />
-                                                                                </div>
-                                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                                                                    {promo.name || "Regra sem nome"}
-                                                                                </p>
-                                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                                                                    Escopo: <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                        {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
-                                                                                        {promo.apply_scope === "specific_products" && "Produtos Específicos"}
-                                                                                        {promo.apply_scope === "category" && "Categorias Específicas"}
-                                                                                        {promo.apply_scope === "specific_services" && "Serviços Específicos"}
-                                                                                    </span> • Prioridade: <Badge variant="blue" className="scale-90 px-1 py-0">{promo.priority || 0}</Badge>
-                                                                                </p>
+                                                                                )}
                                                                             </div>
                                                                         </div>
-                                                                        {!isReadOnly && (
-                                                                            <div className="flex shrink-0 items-center gap-2">
-                                                                                <ActionsDropdown
-                                                                                    onEdit={() => setEditingRule(promo)}
-                                                                                    onDelete={() => handleDeleteRule(promo)}
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </React.Fragment>
-                                                            ))}
-                                                        </div>
+                                                                    ))}
+                                                                </div>
 
-                                                        {/* Pagination */}
-                                                        {totalRulePages > 1 && (
-                                                            <div className="flex justify-center pt-4">
-                                                                <Pagination
-                                                                    currentPage={rulePage}
-                                                                    totalPages={totalRulePages}
-                                                                    onPageChange={setRulePage}
-                                                                />
+                                                                {/* Desktop Table View */}
+                                                                <div className="hidden md:block">
+                                                                    <table className="w-full text-left border-separate border-spacing-0">
+                                                                        <thead>
+                                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                {!isReadOnly && (
+                                                                                    <th className="py-3 px-6 w-12 bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border sticky left-0 z-20">
+                                                                                        <Checkbox
+                                                                                            checked={selectedRuleIds.size === paginatedRules.length && paginatedRules.length > 0}
+                                                                                            onChange={handleSelectAllRules}
+                                                                                            className="bg-white dark:bg-dark-background"
+                                                                                        />
+                                                                                    </th>
+                                                                                )}
+                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortRule("promotion_type")}>
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span>Regra</span>
+                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                                                                    </div>
+                                                                                </th>
+                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortRule("apply_scope")}>
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span>Escopo</span>
+                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                                                                    </div>
+                                                                                </th>
+                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors text-center" onClick={() => handleSortRule("priority")}>
+                                                                                    <div className="flex items-center justify-center gap-1">
+                                                                                        <span>Prioridade</span>
+                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                                                                    </div>
+                                                                                </th>
+                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors text-center" onClick={() => handleSortRule("is_active")}>
+                                                                                    <div className="flex items-center justify-center gap-1">
+                                                                                        <span>Status</span>
+                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
+                                                                                    </div>
+                                                                                </th>
+                                                                                {!isReadOnly && (
+                                                                                    <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border text-center w-28">
+                                                                                        Ações
+                                                                                    </th>
+                                                                                )}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {paginatedRules.map((promo) => (
+                                                                                <tr key={promo.id} className="group hover:bg-brand-gray/30 transition-colors bg-white dark:bg-dark-background border-b border-brand-border last:border-0">
+                                                                                    {!isReadOnly && (
+                                                                                        <td className="py-4 px-6 border-b border-brand-border w-12">
+                                                                                            <Checkbox
+                                                                                                checked={selectedRuleIds.has(promo.id)}
+                                                                                                onChange={() => handleSelectRuleRow(promo.id)}
+                                                                                            />
+                                                                                        </td>
+                                                                                    )}
+                                                                                    <td className="py-4 px-6 border-b border-brand-border">
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                                <TagIcon size={18} className="text-brand-primary" />
+                                                                                            </div>
+                                                                                            <div className="flex flex-col text-left">
+                                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
+                                                                                                    {promo.promotion_type === "gift" && "Ganhar Brinde"}
+                                                                                                    {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
+                                                                                                    {promo.promotion_type === "discount" && (
+                                                                                                        promo.discount_type === "percentage" ? `${promo.discount_value}% de Desconto` : `${formatCurrency(promo.discount_value)} de Desconto`
+                                                                                                    )}
+                                                                                                    {promo.promotion_type === "free_shipping" && "Frete Grátis"}
+                                                                                                </span>
+                                                                                                <span className="text-xs text-brand-inactive-text">
+                                                                                                    {promo.name || "Regra sem nome"}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td className="py-4 px-6 border-b border-brand-border">
+                                                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                                            {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
+                                                                                            {promo.apply_scope === "specific_products" && "Produtos Específicos"}
+                                                                                            {promo.apply_scope === "category" && "Categorias Específicas"}
+                                                                                            {promo.apply_scope === "specific_services" && "Serviços Específicos"}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td className="py-4 px-6 border-b border-brand-border text-center">
+                                                                                        <Badge variant="blue">{promo.priority || 0}</Badge>
+                                                                                    </td>
+                                                                                    <td className="py-4 px-6 border-b border-brand-border text-center">
+                                                                                        <div className="flex justify-center">
+                                                                                            {isReadOnly ? (
+                                                                                                <Badge variant={promo.is_active ? "green" : "gray"}>
+                                                                                                    {promo.is_active ? "Ativo" : "Inativo"}
+                                                                                                </Badge>
+                                                                                            ) : (
+                                                                                                <Switch
+                                                                                                    checked={!!promo.is_active}
+                                                                                                    onCheckedChange={(checked) => !isSaving && handleToggleRuleStatus(promo.id, checked)}
+                                                                                                    className={isSaving ? "opacity-50 pointer-events-none" : ""}
+                                                                                                />
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    {!isReadOnly && (
+                                                                                        <td className="py-4 px-6 border-b border-brand-border text-center">
+                                                                                            <div className="flex justify-center">
+                                                                                                <ActionsDropdown
+                                                                                                    onEdit={() => setEditingRule(promo)}
+                                                                                                    onDelete={() => handleDeleteRule(promo)}
+                                                                                                />
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    )}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <IconPlaceholder
-                                                        placeholderType="image"
-                                                        imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                        imageAlt="Sem regras"
-                                                        title="Nenhuma regra cadastrada ou correspondente à busca"
-                                                        subtitle="Tente alterar os termos de busca ou filtros."
-                                                        itemButton={!isReadOnly && localPromotions.length === 0 ? {
-                                                            text: "Cadastrar Primeira Regra",
-                                                            action: () => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })
-                                                        } : undefined}
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+
+                                                            {/* Pagination */}
+                                                            {totalRulePages > 1 && (
+                                                                <div className="flex justify-center pt-4">
+                                                                    <Pagination
+                                                                        currentPage={rulePage}
+                                                                        totalPages={totalRulePages}
+                                                                        onPageChange={setRulePage}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </FadeIn>
                                 )}
                             </AnimatePresence>
                         </div>

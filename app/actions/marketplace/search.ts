@@ -23,6 +23,60 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
     return { fallback_variant_image: image, fallback_variant_price: price }
 }
 
+function normalizePlan(item: any) {
+    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const partner = rawPartner ? {
+        ...rawPartner,
+        store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+        latitude: rawPartner.latitude,
+        longitude: rawPartner.longitude,
+        city: rawPartner.addresses?.[0]?.city || null,
+        state: rawPartner.addresses?.[0]?.state || null
+    } : null
+
+    let computedPrice = 0
+    let firstImage: string | null = null
+
+    if (item.recurring_plan_items && Array.isArray(item.recurring_plan_items)) {
+        for (const planItem of item.recurring_plan_items) {
+            const qty = Number(planItem.quantity || 1)
+            let itemPrice = Number(planItem.unit_price || 0)
+            
+            if (itemPrice <= 0) {
+                if (planItem.item_type === 'product' && planItem.products) {
+                    itemPrice = Number(planItem.products.price || 0)
+                } else if (planItem.item_type === 'service' && planItem.services) {
+                    itemPrice = Number(planItem.services.price || 0)
+                }
+            }
+            computedPrice += qty * itemPrice
+
+            if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
+                const imgs = planItem.products.images
+                if (Array.isArray(imgs) && imgs.length > 0) {
+                    firstImage = imgs[0]
+                }
+            }
+        }
+    }
+
+    const image = firstImage || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+
+    return {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        price: computedPrice,
+        images: [image],
+        itemType: 'plano',
+        partners: partner,
+        frequency_type: item.frequency_type,
+        frequency_interval: item.frequency_interval,
+        created_at: item.created_at,
+        subcategoryName: null
+    }
+}
+
 /**
  * FUNÇÃO DIRETA para uso em Server Components (SSR).
  * Sem rate limiting, sem overhead de serialização de Server Action.
@@ -54,8 +108,8 @@ export type MarketplaceListCursor = { createdAt: string; id: string }
  */
 export const searchMarketplace = async (
     query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: MarketplaceListCursor | null; cidade?: string } = {}
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: MarketplaceListCursor | null; cidade?: string } = {}
 ) => {
     // Rate limit APENAS para chamadas do client (POST / Server Actions)
     const { success } = await requireRateLimit(RateLimitCategory.API_GENERAL)
@@ -72,6 +126,7 @@ export const searchMarketplace = async (
         vitrines: limits.vitrines,
         produtos: limits.produtos,
         servicos: limits.servicos,
+        planos: limits.planos,
         geral: limits.geral,
         cursor: Number.isFinite(cursorMs as any) ? cursorMs : undefined,
         lastId,
@@ -101,7 +156,9 @@ export const searchMarketplace = async (
                 ? (limits.vitrines ?? 40) // Standardizing to 40 for client searches
                 : type === "produtos"
                     ? (limits.produtos ?? 20)
-                    : (limits.servicos ?? 20)
+                    : type === "planos"
+                        ? (limits.planos ?? 20)
+                        : (limits.servicos ?? 20)
 
     const hasMore = !limits.cidade && items.length >= limitCount && !!nextCursor
     return { items, nextCursor, hasMore }
@@ -117,8 +174,8 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
 
 async function _searchMarketplaceCore(
     query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     if (limits.cidade) {
         return searchMarketplaceByCity(query, type, limits.cidade, limits)
@@ -188,10 +245,10 @@ async function _searchMarketplaceCore(
  */
 async function _searchMarketplaceInternal(
     query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
-    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, geral = 40, cursor, lastId } = limits
+    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, cursor, lastId } = limits
 
     // ANTI-SCRAPING / DEPTH RESTRICTION
     if (cursor && Date.now() - cursor > 1000 * 60 * 60 * 24 * 365 * 10) {
@@ -205,7 +262,7 @@ async function _searchMarketplaceInternal(
     }
 
     try {
-        const limitCount = type === 'tudo' ? geral : (type === 'vitrines' ? vitLimit : (type === 'produtos' ? prodLimit : servLimit))
+        const limitCount = type === 'tudo' ? geral : (type === 'vitrines' ? vitLimit : (type === 'produtos' ? prodLimit : (type === 'planos' ? planosLimit : servLimit)))
         const indexKey = type === 'tudo' ? 'explore:index:all' : `explore:index:${type}`
 
         const tRedisZero = performance.now()
@@ -239,6 +296,9 @@ async function _searchMarketplaceInternal(
                     break
                 case 'vitrines':
                     prefix = 'loja'
+                    break
+                case 'planos':
+                    prefix = 'plano'
                     break
             }
             // Buscando o index que foi visto por útimo
@@ -279,6 +339,7 @@ async function _searchMarketplaceInternal(
             const produtosIds = missingIds.filter((id: string) => id.startsWith('produto:')).map((id: string) => id.replace('produto:', ''))
             const servicosIds = missingIds.filter((id: string) => id.startsWith('servico:')).map((id: string) => id.replace('servico:', ''))
             const lojasIds = missingIds.filter((id: string) => id.startsWith('loja:')).map((id: string) => id.replace('loja:', ''))
+            const planosIds = missingIds.filter((id: string) => id.startsWith('plano:')).map((id: string) => id.replace('plano:', ''))
 
             const promises = []
 
@@ -313,6 +374,22 @@ async function _searchMarketplaceInternal(
                     `).in("id", lojasIds)
                 )
             }
+            if (planosIds.length > 0) {
+                promises.push(
+                    supabase.from("recurring_plans").select(`
+                        id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                        recurring_plan_items(
+                            id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+                            products:product_id(id, name, price, images),
+                            services:service_id(id, name, price, duration_minutes)
+                        )
+                    `)
+                        .in("id", planosIds)
+                        .eq("status", "active")
+                        .eq("show_in_marketplace", true)
+                )
+            }
 
             const results = await Promise.all(promises)
             let fallbackRecords: any[] = []
@@ -338,6 +415,10 @@ async function _searchMarketplaceInternal(
                             reviewsCount: item.reviews?.[0]?.count || 0
                         }, created_at: item.created_at
                     }
+                }
+
+                if (item.frequency_type !== undefined) {
+                    return normalizePlan(item)
                 }
 
                 const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -409,10 +490,10 @@ async function _searchMarketplaceInternal(
 // Lógica de FTS (Full-Text Search) antiga preservada
 async function searchMarketplacePostgresFTS(
     query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; cursor?: number; lastId?: string } = {}
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; cursor?: number; lastId?: string } = {}
 ) {
-    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20 } = limits
+    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20 } = limits
     const supabase = getAdminClient()
     let results: any[] = []
 
@@ -527,6 +608,28 @@ async function searchMarketplacePostgresFTS(
             }
         }
 
+        if (type === 'tudo' || type === 'planos') {
+            let req = supabase.from("recurring_plans").select(`
+                id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                recurring_plan_items(
+                    id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+                    products:product_id(id, name, price, images),
+                    services:service_id(id, name, price, duration_minutes)
+                )
+            `).eq("status", "active").eq("show_in_marketplace", true)
+            let reqJoined = req
+            if (qRaw) {
+                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%`
+                reqJoined = reqJoined.or(orFilter)
+            }
+            if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
+            const { data: planData } = await reqJoined.order("created_at", { ascending: false }).limit(planosLimit)
+            if (planData) {
+                results.push(...planData.map((item: any) => normalizePlan(item)))
+            }
+        }
+
         const finalIds = results.map(r => `${r.itemType}:${r.id}`)
         return { results, filteredIds: finalIds }
     } catch (error) {
@@ -537,9 +640,9 @@ async function searchMarketplacePostgresFTS(
 
 async function searchMarketplaceByCity(
     query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo',
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos',
     cidadeSlug: string,
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number }
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number }
 ) {
     const supabase = getAdminClient()
     const parts = cidadeSlug.split("-")
@@ -579,8 +682,9 @@ async function searchMarketplaceByCity(
 
     let rawProducts: any[] = []
     let rawServices: any[] = []
+    let rawPlans: any[] = []
 
-    // Fetch products and services for these partners
+    // Fetch products, services and plans for these partners
     if (partnerIds.length > 0) {
         const promises = []
         if (type === 'tudo' || type === 'produtos') {
@@ -618,6 +722,27 @@ async function searchMarketplaceByCity(
                     .in("partner_id", partnerIds)
             )
         }
+        if (type === 'tudo' || type === 'planos') {
+            promises.push(
+                supabase
+                    .from("recurring_plans")
+                    .select(`
+                        id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+                        partners!inner(
+                            id, store_name, store_image_url, latitude, longitude,
+                            addresses!inner(city, state)
+                        ),
+                        recurring_plan_items(
+                            id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+                            products:product_id(id, name, price, images),
+                            services:service_id(id, name, price, duration_minutes)
+                        )
+                    `)
+                    .eq("status", "active")
+                    .eq("show_in_marketplace", true)
+                    .in("partner_id", partnerIds)
+            )
+        }
 
         const resList = await Promise.all(promises)
         let idx = 0
@@ -626,6 +751,9 @@ async function searchMarketplaceByCity(
         }
         if (type === 'tudo' || type === 'servicos') {
             rawServices = resList[idx++]?.data || []
+        }
+        if (type === 'tudo' || type === 'planos') {
+            rawPlans = resList[idx++]?.data || []
         }
     }
 
@@ -660,7 +788,7 @@ async function searchMarketplaceByCity(
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const partner = rawPartner ? {
             ...rawPartner,
-            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
             city: rawPartner.addresses?.[0]?.city || null,
@@ -682,7 +810,7 @@ async function searchMarketplaceByCity(
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const partner = rawPartner ? {
             ...rawPartner,
-            store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
             latitude: rawPartner.latitude,
             longitude: rawPartner.longitude,
             city: rawPartner.addresses?.[0]?.city || null,
@@ -691,16 +819,20 @@ async function searchMarketplaceByCity(
         return { ...item, itemType: 'servico', partners: partner, subcategoryName: item.category || null }
     })
 
+    const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))
+
     // Combine
     let results: any[] = []
     if (type === 'tudo') {
-        results = [...normalizedPartners, ...normalizedProducts, ...normalizedServices]
+        results = [...normalizedPartners, ...normalizedProducts, ...normalizedServices, ...normalizedPlans]
     } else if (type === 'vitrines') {
         results = normalizedPartners
     } else if (type === 'produtos') {
         results = normalizedProducts
     } else if (type === 'servicos') {
         results = normalizedServices
+    } else if (type === 'planos') {
+        results = normalizedPlans
     }
 
     // Apply text search filter if query is specified

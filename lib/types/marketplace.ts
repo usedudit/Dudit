@@ -1,4 +1,4 @@
-export const MARKETPLACE_TYPES = ["produtos", "servicos", "vitrines", "tudo"] as const
+export const MARKETPLACE_TYPES = ["produtos", "servicos", "vitrines", "tudo", "planos"] as const
 
 export type MarketplaceSearchType = typeof MARKETPLACE_TYPES[number]
 

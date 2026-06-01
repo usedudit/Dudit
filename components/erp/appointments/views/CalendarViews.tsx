@@ -114,14 +114,35 @@ export const MobileView = ({
 
     const selectedDateApps = appointments.filter((a: Appointment) => a.date === formatDateStr(currentDate)).sort((a: Appointment, b: Appointment) => a.time.localeCompare(b.time));
 
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (!scrollContainerRef.current) return;
+        const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
+        if (activeEl) {
+            activeEl.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'center'
+            });
+        }
+    }, [currentDate]);
+
     return (
         <div className="flex flex-col h-full mt-4">
-            <div className="bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border py-4 mb-4">
-                <div className="flex overflow-x-auto gap-4 px-4 no-scrollbar snap-x items-center justify-between text-center">
+            <div className="bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border py-4 mb-4 relative">
+                {/* Left Fade/Shadow */}
+                <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-surface to-transparent pointer-events-none z-10" />
+
+                <div 
+                    ref={scrollContainerRef}
+                    className="flex overflow-x-auto gap-4 px-8 no-scrollbar snap-x items-center justify-between text-center"
+                >
                     {days.map((dayItem, index) => (
                         <div
                             key={index}
                             onClick={() => setCurrentDate(dayItem.date)}
+                            data-active={dayItem.isSelected}
                             className="flex flex-col items-center gap-1 cursor-pointer group min-w-[50px] snap-center"
                         >
                             <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-all relative ${dayItem.isSelected
@@ -139,6 +160,9 @@ export const MobileView = ({
                         </div>
                     ))}
                 </div>
+
+                {/* Right Fade/Shadow */}
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-surface to-transparent pointer-events-none z-10" />
             </div>
             <AnimatePresence mode='wait'>
                 <motion.div key={currentDate.toISOString()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
@@ -281,17 +305,24 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                                             );
                                         })}
                                     </AnimatePresence>
-                                    <AnimatePresence>{activePopover && activePopover.mode === 'resource' && activePopover.staffId === staff.id && (
-                                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.15 }} style={{ position: 'absolute', top: activePopover.top, ...(activePopover.align === 'right' ? { left: '100%', marginLeft: '10px' } : { right: '100%', marginRight: '10px' }), zIndex: 50 }}>
-                                            <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} setIsUnavailableSheetOpen={setIsUnavailableSheetOpen} setActivePopover={setActivePopover} />
-                                        </motion.div>
-                                    )}</AnimatePresence>
+
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
+            <AnimatePresence>{activePopover && activePopover.mode === 'absolute' && (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ position: 'fixed', top: activePopover.top, left: activePopover.align === 'left' ? activePopover.left - 256 : activePopover.left, zIndex: 60 }}
+                >
+                    <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} setIsUnavailableSheetOpen={setIsUnavailableSheetOpen} setActivePopover={setActivePopover} />
+                </motion.div>
+            )}</AnimatePresence>
             {activePopover && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActivePopover(null)}></div>}
         </div>
     )

@@ -25,6 +25,7 @@ import { MapPinIcon, XIcon } from "@/lib/icons"
 interface MarketplaceHomeProps {
     products: any[]
     vitrines?: any[]
+    plans?: any[]
     user?: any
     userProfile?: any
     cartCount?: number
@@ -46,6 +47,7 @@ const TRENDS = [
 export default function MarketplaceHome({
     products = [],
     vitrines = [],
+    plans = [],
     user,
     userProfile,
     cartCount,
@@ -161,6 +163,23 @@ export default function MarketplaceHome({
             category: product.category || null,
         }
     }), [products])
+
+    const displayPlans = useMemo(() => plans.map((plan) => {
+        return {
+            id: plan.id,
+            name: plan.name,
+            price: Number(plan.price),
+            originalPrice: undefined,
+            images: plan.images,
+            rating: plan.rating,
+            reviews: 0,
+            partners: plan.partners,
+            category: "Assinatura Recorrente",
+            itemType: "plano",
+            frequency_type: plan.frequency_type,
+            frequency_interval: plan.frequency_interval
+        }
+    }), [plans])
 
     const recentProducts = displayProducts.slice(0, 10)
     const alsoLikeProducts = displayProducts.slice(10, 20)
@@ -603,6 +622,15 @@ export default function MarketplaceHome({
                         title="Seus queridinhos estão aqui"
                         products={recentProducts}
                         seeMoreLink="/explorar"
+                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                    />
+                )}
+
+                {displayPlans.length > 0 && (
+                    <ProductCarousel
+                        title="Assinaturas e planos na sua cidade"
+                        products={displayPlans}
+                        seeMoreLink="/explorar?type=planos"
                         userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
                     />
                 )}

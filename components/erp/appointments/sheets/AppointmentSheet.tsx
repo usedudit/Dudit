@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, ChevronDownIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Badge, Spinner } from '@/components/reusable';
+import { useRouter } from 'next/navigation';
+import { MoreHorizontal } from 'lucide-react';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
@@ -14,10 +16,19 @@ import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
 import Portal from '@/components/Portal';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
-import PaymentSheet from './PaymentSheet';
+import PaymentModal from '@/components/erp/orders/PaymentModal';
+import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
+import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
+import { createServiceAction } from '@/app/actions/erp/servicos';
+import { createERPOrderAction } from '@/app/actions/erp/orders';
+import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
+import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
+import { updateAppointmentAction } from '@/app/actions/erp/appointments';
+import { useCSRFToken } from '@/hooks/use-csrf-token';
 
 export const AppointmentSheet = ({
     onClose,
+    onDelete,
     mode,
     appointment,
     onSave,
@@ -35,6 +46,7 @@ export const AppointmentSheet = ({
     partnerId
 }: {
     onClose: () => void,
+    onDelete?: (id: string) => Promise<boolean>,
     mode: 'create' | 'view',
     appointment?: Appointment | null,
     onSave: (data: any | any[]) => void,
@@ -70,6 +82,20 @@ export const AppointmentSheet = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
+    const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+
+    const router = useRouter();
+    const csrfToken = useCSRFToken();
+
+    const handleViewSale = () => {
+        const saleId = completedOrderId || appointment?.saleId || (appointment as any)?.sale_id;
+        if (saleId) {
+            router.push(`/erp/orders/${saleId}`);
+            onClose();
+        } else {
+            toast.warning("Venda não encontrada", "Não foi possível encontrar a venda associada a este agendamento.");
+        }
+    };
 
     const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -113,12 +139,21 @@ export const AppointmentSheet = ({
     // Specific Staff Selection for New Appointment
     const [selectedStaffId, setSelectedStaffId] = useState<string>(initialStaffId || (staffSource.length > 0 ? staffSource[0].id : ''));
 
-    // Date Navigation Base
-    const [baseDate, setBaseDate] = useState<Date>(selectedDate || defaultDate);
-    const [dateOffset, setDateOffset] = useState(0);
-
-    // Edit Mode State
-    const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+    // Calendar selection and navigation base
+    const [selectedCalDate, setSelectedCalDate] = useState<Date>(() => {
+        if (mode === 'view' && appointment) {
+            const [y, m, d] = appointment.date.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+        return selectedDate || defaultDate;
+    });
+    const [baseCalDate, setBaseCalDate] = useState<Date>(() => {
+        if (mode === 'view' && appointment) {
+            const [y, m, d] = appointment.date.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+        return selectedDate || defaultDate;
+    });
     const [editTime, setEditTime] = useState<string>('');
 
     // Recurrence State
@@ -130,17 +165,71 @@ export const AppointmentSheet = ({
         return d;
     });
 
-    // Client Selection Search
-    const [clientSearch, setClientSearch] = useState('');
-    const filteredClients = useMemo(() => {
-        if (!clientSearch) return clientsSource;
-        const q = clientSearch.toLowerCase();
-        return clientsSource.filter(c =>
-            (c.name || '').toLowerCase().includes(q) ||
-            (c.email || '').toLowerCase().includes(q) ||
-            (c.phone || '').includes(q)
-        );
-    }, [clientSearch, clientsSource]);
+    // Client Selection State & Search
+    const [localClients, setLocalClients] = useState<any[]>(() => clientsCatalog || []);
+
+    useEffect(() => {
+        setLocalClients(clientsCatalog || []);
+    }, [clientsCatalog]);
+
+    // Client change came from Summary view tracking
+    const [cameFromSummary, setCameFromSummary] = useState(false);
+    const [previousClient, setPreviousClient] = useState<any>(null);
+    const [isSelectCustomerOpen, setIsSelectCustomerOpen] = useState(false);
+    const isSelectingClientRef = useRef(false);
+
+    // Services Catalog selection, search & quick-add states
+    const [localServices, setLocalServices] = useState<any[]>(() => servicesCatalog || []);
+
+    useEffect(() => {
+        setLocalServices(servicesCatalog || []);
+    }, [servicesCatalog]);
+
+    const [serviceSearch, setServiceSearch] = useState('');
+    const filteredServices = useMemo(() => {
+        if (!serviceSearch) return localServices;
+        const q = serviceSearch.toLowerCase();
+        return localServices.map(group => {
+            const filteredItems = (group.items || []).filter((item: any) =>
+                (item.name || '').toLowerCase().includes(q)
+            );
+            return {
+                ...group,
+                items: filteredItems
+            };
+        }).filter(group => group.items.length > 0);
+    }, [serviceSearch, localServices]);
+
+    // Quick-add service states
+    const [isNewServiceSheetOpen, setIsNewServiceSheetOpen] = useState(false);
+    const [isCreatingService, setIsCreatingService] = useState(false);
+    const [newServiceName, setNewServiceName] = useState("");
+    const [newServicePrice, setNewServicePrice] = useState<number>(0);
+    const [newServiceDuration, setNewServiceDuration] = useState("");
+    const [serviceNameError, setServiceNameError] = useState<string | null>(null);
+    const [servicePriceError, setServicePriceError] = useState<string | null>(null);
+    const [serviceDurationError, setServiceDurationError] = useState<string | null>(null);
+
+    const handleCreateService = async (payload: { name: string; price: number; duration: number }) => {
+        if (!partnerId) {
+            throw new Error("ID do parceiro não configurado.");
+        }
+        const result = await createServiceAction({
+            partnerId,
+            name: payload.name,
+            price: payload.price,
+            durationMinutes: payload.duration,
+            billingUnit: 'per_service',
+            category: 'Serviços',
+        });
+        if (!result.success) {
+            throw new Error(result.error || "Não foi possível cadastrar o serviço.");
+        }
+        if (!result.data) {
+            throw new Error("Não foi possível cadastrar o serviço.");
+        }
+        return result.data;
+    };
 
     // Determine if appointment is paid or absence
     const isPaid = ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes((status || '').toLowerCase());
@@ -163,7 +252,7 @@ export const AppointmentSheet = ({
 
         const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 60), 0);
         const maxBuffer = Math.max(0, ...selectedServices.map((s) => Number(s.bufferMinutes) || 0));
-        const targetDate = formatDateStr(editDate || selectedDate || defaultDate);
+        const targetDate = formatDateStr(selectedCalDate);
 
         let cancelled = false;
         setIsLoadingSlots(true);
@@ -181,7 +270,7 @@ export const AppointmentSheet = ({
             });
 
         return () => { cancelled = true; };
-    }, [currentView, selectedStaffId, selectedServices, editDate, selectedDate, defaultDate]);
+    }, [currentView, selectedStaffId, selectedServices, selectedCalDate]);
 
     // Initial State Setup
     useEffect(() => {
@@ -220,13 +309,14 @@ export const AppointmentSheet = ({
             });
 
             setSelectedServices(loadedServices);
-            setSelectedClient({ name: appointment.customer });
+            const foundClient = (clientsSource || []).find(c => c.name === appointment.customer);
+            setSelectedClient(foundClient || { name: appointment.customer });
 
             // Initialize edit state
             const [y, m, d] = appointment.date.split('-').map(Number);
             const aptDate = new Date(y, m - 1, d);
-            setEditDate(aptDate);
-            setBaseDate(aptDate);
+            setSelectedCalDate(aptDate);
+            setBaseCalDate(aptDate);
             setEditTime(appointment.time);
             setStatus(appointment.status);
             setNotes(appointment.notes || '');
@@ -251,7 +341,8 @@ export const AppointmentSheet = ({
             // Init Range Defaults
             const targetDate = selectedDate || defaultDate;
             const todayStr = formatDateStr(targetDate);
-            setBaseDate(targetDate);
+            setSelectedCalDate(targetDate);
+            setBaseCalDate(targetDate);
             setStartDateRange(todayStr);
             setStartTimeRange(initialTimeSlot || '09:00');
             setEndDateRange(todayStr);
@@ -278,7 +369,7 @@ export const AppointmentSheet = ({
                 }
             }
         }
-    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, initialStaffId, staffSource]);
+    }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
     const calculatedPrice = useMemo(() => {
@@ -392,18 +483,9 @@ export const AppointmentSheet = ({
                 setIsAddingMore(false);
                 setCurrentView('summary');
             } else {
-                // Normal Flow: Services -> Client
-                setCurrentView('client');
-            }
-        }
-        else if (currentView === 'client') {
-            if (!selectedClient) return;
-
-            // IF INITIAL PARAMS WERE PASSED, SKIP DATETIME
-            if (initialStaffId && initialTimeSlot && mode === 'create') {
-                setCurrentView('summary');
-            } else {
-                setCurrentView('datetime');
+                // Normal Flow: Services -> Client sheet
+                isSelectingClientRef.current = false;
+                setIsSelectCustomerOpen(true);
             }
         }
         else if (currentView === 'datetime') {
@@ -442,6 +524,7 @@ export const AppointmentSheet = ({
 
         const baseAppointmentData = {
             customerName: selectedClient?.name,
+            customerId: selectedClient?.id,
             serviceName: selectedServices.map(s => s.name).join(', '),
             time: timeStr,
             duration: calculatedDuration,
@@ -517,10 +600,31 @@ export const AppointmentSheet = ({
         onSave(appointmentsToSave);
     };
 
+    const handleCancelClientChange = () => {
+        setSelectedClient(previousClient);
+        setPreviousClient(null);
+        setCameFromSummary(false);
+        setCurrentView('summary');
+    };
+
+    const handleSaveClientChange = () => {
+        setPreviousClient(null);
+        setCameFromSummary(false);
+        setCurrentView('summary');
+    };
+
     const handleBack = () => {
         // Reverse Flow
-        if (currentView === 'client') setCurrentView('services');
-        else if (currentView === 'datetime') setCurrentView('client');
+        if (currentView === 'services') {
+            handleCloseAttempt();
+        }
+        else if (currentView === 'datetime') {
+            if (mode === 'view') {
+                setCurrentView('summary');
+            } else {
+                setCurrentView('services');
+            }
+        }
         else if (currentView === 'summary') {
             if (mode === 'create') {
                 // Creating: Go back to Datetime
@@ -542,6 +646,9 @@ export const AppointmentSheet = ({
     const handleSaveChanges = () => {
         const updatedApp = {
             ...appointment,
+            customer: selectedClient?.name,
+            customerName: selectedClient?.name,
+            customerId: selectedClient?.id,
             status: status,
             price: calculatedPrice,
             notes: notes,
@@ -573,11 +680,6 @@ export const AppointmentSheet = ({
         return (
             <div className="p-6 border-b border-brand-border dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-surface z-20">
                 <div className="flex items-center gap-3">
-                    {currentView !== 'summary' && (
-                        <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-                            <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
-                    )}
                     <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
                         {title}
                     </h2>
@@ -602,23 +704,110 @@ export const AppointmentSheet = ({
         return 'bg-blue-600';
     }
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
+    const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+    const [financeAccountId, setFinanceAccountId] = useState<string>('');
+
+    // Fetch default finance account for order creation
+    useEffect(() => {
+        if (!partnerId) return;
+        getFinanceAccountsAction(partnerId).then(res => {
+            if (res.success && res.data?.accounts) {
+                const active = res.data.accounts.filter((a: any) => a.is_active !== false);
+                const defaultId = pickBankThenCashDefaultFinanceAccountId(active);
+                if (defaultId) setFinanceAccountId(defaultId);
+            }
+        });
+    }, [partnerId]);
+
+    // Handle payment confirmation: create ERP order + update appointment
+    const handleConfirmPayment = async (paymentData: any) => {
+        if (!financeAccountId) {
+            toast.warning("Conta financeira", "Nenhuma conta de recebimento configurada. Configure em Financeiro > Contas.");
+            return { error: "Conta financeira não configurada" };
+        }
+
+        const items = selectedServices.map((s, idx) => ({
+            productId: null as string | null,
+            customName: s.name,
+            quantity: 1,
+            unitPrice: s.price,
+            sortOrder: idx,
+        }));
+
+        const payload = {
+            partnerId: partnerId || '',
+            customerId: selectedClient?.id,
+            customerName: selectedClient?.name || 'Consumidor final',
+            salesChannel: 'Agendamento',
+            deliveryMethod: 'pickup' as const,
+            financeAccountId,
+            paymentStatus: paymentData.paymentStatus as 'paid' | 'partially_paid' | 'unpaid',
+            paymentMethod: paymentData.paymentMethod || 'pendente',
+            paymentBreakdown: paymentData.paymentBreakdown,
+            deliveryStatus: 'delivered' as const,
+            paidAmount: paymentData.paidAmount,
+            items,
+            subtotal: calculatedPrice,
+            discountValue: 0,
+            discountType: 'fixed' as const,
+            shippingCost: 0,
+            additionalCosts: 0,
+            totalAmount: calculatedPrice,
+            notes: notes ? `Agendamento \u2022 ${notes}` : 'Agendamento',
+            csrf_token: csrfToken || undefined,
+            paymentProvider: paymentData.paymentProvider || undefined,
+            mpPaymentId: paymentData.mpPaymentId || undefined,
+        };
+
+        try {
+            const result = await createERPOrderAction(payload);
+            if (!('success' in result) || !result.success) {
+                return { error: ('error' in result ? result.error : 'Erro ao criar venda') || 'Erro ao criar venda' };
+            }
+
+            const orderId = 'orderId' in result ? (result as any).orderId : undefined;
+            const orderNumber = 'orderNumber' in result ? (result as any).orderNumber : undefined;
+
+            if (orderId) setCompletedOrderId(orderId);
+
+            // Update appointment status
+            const newStatus = paymentData.paymentStatus === 'paid' ? 'Pago' : 'Pago Parcialmente';
+            setStatus(newStatus);
+
+            if (appointment?.id) {
+                try {
+                    await updateAppointmentAction(appointment.id, {
+                        status: newStatus,
+                    } as any);
+                } catch { }
+            }
+
+            return { success: true, orderNumber };
+        } catch (error) {
+            return { error: 'Erro ao processar venda do agendamento' };
+        }
+    };
 
     const VIEW_STATUS_OPTIONS = [
         { value: 'Reservado', label: 'Reservado' },
         { value: 'Confirmado', label: 'Confirmado' },
         { value: 'Aguardando', label: 'Aguardando' },
-        { value: 'Iniciado', label: 'Iniciado' },
         { value: 'Concluído', label: 'Concluído' },
         { value: 'Ausência', label: 'Ausência' },
     ] as const;
 
+    const calendarMonthYear = useMemo(() => {
+        const formatted = baseCalDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }, [baseCalDate]);
+
     const dates = useMemo(() => {
         const days = [];
-        const currentSelectedDateStr = formatDateStr(editDate || selectedDate || defaultDate);
+        const currentSelectedDateStr = formatDateStr(selectedCalDate);
 
         for (let i = -2; i < 5; i++) {
-            const d = new Date(baseDate);
-            d.setDate(baseDate.getDate() + i + dateOffset);
+            const d = new Date(baseCalDate);
+            d.setDate(baseCalDate.getDate() + i);
             const dateStr = formatDateStr(d);
             const isSelected = dateStr === currentSelectedDateStr;
             days.push({
@@ -629,14 +818,18 @@ export const AppointmentSheet = ({
             });
         }
         return days;
-    }, [baseDate, dateOffset, editDate, selectedDate, defaultDate]);
+    }, [baseCalDate, selectedCalDate]);
 
     const handleDateNav = (dir: 'prev' | 'next') => {
-        setDateOffset(prev => dir === 'next' ? prev + 7 : prev - 7);
+        setBaseCalDate(prev => {
+            const d = new Date(prev);
+            d.setDate(d.getDate() + (dir === 'next' ? 7 : -7));
+            return d;
+        });
     }
 
     const handleSelectDay = (date: Date) => {
-        setEditDate(date);
+        setSelectedCalDate(date);
     };
 
     const handleServiceEdit = (index: number) => {
@@ -737,7 +930,7 @@ export const AppointmentSheet = ({
     }
 
     const recurrenceText = getRecurrenceText();
-    const finalDateForHeader = needsRangePicker ? startDateRange : (editDate ? formatDateStr(editDate) : formatDateStr(defaultDate));
+    const finalDateForHeader = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
     const headerDateObj = parseLocalDate(finalDateForHeader);
     const formattedHeaderDate = formatDate(headerDateObj);
 
@@ -750,113 +943,76 @@ export const AppointmentSheet = ({
                 <AnimatePresence mode='wait'>
                     {/* SERVICE SELECTION */}
                     {currentView === 'services' && (
-                        <motion.div key="services" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                            {/* ... Service Selection UI ... */}
-                            <div className="relative">
-                                <SearchIcon size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-inactive-text" />
-                                <input type="text" placeholder="Buscar serviço" className="w-full h-[42px] pl-10 pr-4 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-brand-dark dark:focus:ring-dark-heading transition-all" />
+                        <motion.div key="services" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-0 -mx-6 -mt-6">
+                            <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface flex items-center gap-3">
+                                <div className="flex-1">
+                                    <Input
+                                        label=""
+                                        name="serviceSearch"
+                                        placeholder="Buscar serviço"
+                                        value={serviceSearch}
+                                        onChange={(e) => setServiceSearch(e.target.value)}
+                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                        className="mb-0"
+                                        variant="full-rounded"
+                                    />
+                                </div>
+                                <Button
+                                    variant="filled"
+                                    onClick={() => {
+                                        setNewServiceName("");
+                                        setNewServicePrice(0);
+                                        setNewServiceDuration("");
+                                        setServiceNameError(null);
+                                        setServicePriceError(null);
+                                        setServiceDurationError(null);
+                                        setIsNewServiceSheetOpen(true);
+                                    }}
+                                    className="h-11 w-11 shrink-0 rounded-full p-0 flex items-center justify-center bg-brand-primary hover:bg-brand-primary/95 text-white"
+                                    type="button"
+                                >
+                                    <PlusIcon className="h-5 w-5" />
+                                </Button>
                             </div>
-                            {servicesSource.map((group, idx) => (
-                                <div key={idx}>
-                                    {group.category_display && <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>}
-                                    <div className="space-y-3">
-                                        {group.items?.map((item: any) => {
-                                            const isSelected = selectedServices.some(s => s.id === item.id);
-                                            const isEditingMode = editingServiceIndex !== null;
+                            <div className="p-6 space-y-6">
+                                {filteredServices.map((group, idx) => (
+                                    <div key={idx}>
+                                        {group.category_display && <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">{group.category}</h3>}
+                                        <div className="space-y-3">
+                                            {group.items?.map((item: any) => {
+                                                const isSelected = selectedServices.some(s => s.id === item.id);
+                                                const isEditingMode = editingServiceIndex !== null;
 
-                                            return (
-                                                <div
-                                                    key={item.id}
-                                                    onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
-                                                    className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
-                                                >
-                                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
-                                                    <div className="pl-4">
-                                                        <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
-                                                        <div className="text-xs text-brand-inactive-text">
-                                                            {item.pricingUnit === 'Por Serviço' ? `${item.duration} min` : item.pricingUnit}
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        onClick={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
+                                                        className={`relative flex justify-between items-center p-4 rounded-xl cursor-pointer border bg-transparent transition-all ${isSelected && !isEditingMode ? 'border-brand-green' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'}`}
+                                                    >
+                                                        <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
+                                                        <div className="pl-4">
+                                                            <div className="font-bold text-brand-dark dark:text-dark-heading text-[15px] mb-1">{item.name}</div>
+                                                            <div className="text-xs text-brand-inactive-text">
+                                                                {item.pricingUnit === 'Por Serviço' || !item.pricingUnit ? `${item.duration} min` : item.pricingUnit}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            {!isEditingMode && (
+                                                                <div onClick={(e) => e.stopPropagation()}>
+                                                                    <Checkbox
+                                                                        checked={isSelected}
+                                                                        onChange={() => handleServiceSwap({ ...item, colorClass: group.colorClass })}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">{formatCurrency(item.price)}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        {!isEditingMode && (
-                                                            <div className={`w-5 h-5 rounded-full border transition-colors flex items-center justify-center ${isSelected ? 'bg-brand-green border-brand-green' : 'border-gray-300 dark:border-gray-600'}`}>
-                                                                {isSelected && <CheckIcon size={12} className="text-white" strokeWidth={3} />}
-                                                            </div>
-                                                        )}
-                                                        <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">R$ {item.price}</div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </motion.div>
-                    )}
-
-                    {/* CLIENT SELECTION */}
-                    {currentView === 'client' && (
-                        <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-0 -mx-6 -mt-6">
-                            <div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface sticky top-0">
-                                <Input
-                                    label=""
-                                    name="customerSearch"
-                                    placeholder="Buscar por nome, email ou telefone..."
-                                    value={clientSearch}
-                                    onChange={(e) => setClientSearch(e.target.value)}
-                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                    className="mb-0"
-                                    variant="full-rounded"
-                                />
-                            </div>
-
-                            <div className="flex flex-col px-2 pb-2">
-                                {filteredClients.map((customer) => {
-                                    const isSelected = selectedClient?.id === customer.id;
-                                    return (
-                                        <div
-                                            key={customer.id}
-                                            role={isSelected ? undefined : "button"}
-                                            tabIndex={isSelected ? undefined : 0}
-                                            onClick={!isSelected ? () => { setSelectedClient(customer); handleNext(); } : undefined}
-                                            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${isSelected
-                                                ? "bg-brand-primary/5 dark:bg-brand-primary/10"
-                                                : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                                                }`}
-                                        >
-                                            <UserProfileImage
-                                                fullName={customer.name || "Cliente"}
-                                                imageUrl={customer.avatar_url}
-                                                className="h-12 w-12 shrink-0 text-lg"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                                    <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                        {customer.name}
-                                                    </span>
-                                                    {isSelected && (
-                                                        <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
-                                                            Selecionado
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    ID #{customer.id ? customer.id.substring(0, 5).toUpperCase() : "-"}
-                                                </p>
-                                                <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    {customer.email || "Sem e-mail"}
-                                                </p>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-2">
-                                                {!isSelected && (
-                                                    <div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                                                        <PlusIcon size={18} />
-                                                    </div>
-                                                )}
-                                            </div>
+                                                );
+                                            })}
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                ))}
                             </div>
                         </motion.div>
                     )}
@@ -958,7 +1114,7 @@ export const AppointmentSheet = ({
                                 <>
                                     <div>
                                         <div className="flex justify-between items-center mb-4 px-1">
-                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">Janeiro 2026</h3>
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading">{calendarMonthYear}</h3>
                                             <div className="flex gap-4">
                                                 <button onClick={() => handleDateNav('prev')} className="text-brand-inactive-text hover:text-brand-dark"><ChevronLeftIcon size={16} /></button>
                                                 <button onClick={() => handleDateNav('next')} className="text-brand-dark dark:text-dark-heading"><ChevronRightIcon size={16} /></button>
@@ -966,7 +1122,7 @@ export const AppointmentSheet = ({
                                         </div>
                                         <div className="flex justify-between items-center text-center">
                                             {dates.map((d, i) => (
-                                                <div key={i} className="flex flex-col gap-2 cursor-pointer group items-center" onClick={() => { }}>
+                                                <div key={i} className="flex flex-col gap-2 cursor-pointer group items-center" onClick={() => handleSelectDay(d.fullDate)}>
                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${d.active ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-gray-700 hover:border-brand-dark'}`}>
                                                         {d.num}
                                                     </div>
@@ -1049,11 +1205,16 @@ export const AppointmentSheet = ({
                                                 </div>
                                             )}
                                         </div>
-                                        {/* Status Badge Dropdown */}
                                         <Dropdown
+                                            width="w-48"
+                                            fullWidth={false}
                                             trigger={
-                                                <button disabled={isPaid} className={`flex items-center px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-white text-sm font-bold transition-colors ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                                                <button
+                                                    disabled={isPaid}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading rounded-full text-sm font-bold shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-dark-border ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                >
                                                     {status}
+                                                    <ChevronDownIcon size={14} className="text-brand-inactive-text" />
                                                 </button>
                                             }
                                         >
@@ -1073,17 +1234,28 @@ export const AppointmentSheet = ({
                                     <h3 className="font-bold text-brand-dark dark:text-dark-heading">Cliente</h3>
                                 </div>
                                 {selectedClient && (
-                                    <div className="flex items-center justify-between py-2 px-1">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
-                                                <div className="flex flex-col">
-                                                    <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
-                                                    <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
-                                                </div>
+                                    <div className="flex items-center justify-between py-2 px-1 w-full">
+                                        <div className="flex items-center gap-3">
+                                            <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
+                                            <div className="flex flex-col">
+                                                <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
+                                                <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
                                             </div>
-                                            {!isPaid && <Button variant="link" className="font-bold" onClick={() => setCurrentView('client')}>Alterar</Button>}
                                         </div>
+                                        {!isPaid && (
+                                            <Button
+                                                variant="link"
+                                                className="font-bold"
+                                                onClick={() => {
+                                                    setPreviousClient(selectedClient);
+                                                    setCameFromSummary(true);
+                                                    isSelectingClientRef.current = false;
+                                                    setIsSelectCustomerOpen(true);
+                                                }}
+                                            >
+                                                Alterar
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1136,28 +1308,21 @@ export const AppointmentSheet = ({
                     {currentView === 'edit-service' && editingServiceIndex !== null && (
                         <motion.div key="edit-service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
                             {/* Edit Service Content */}
-                            <div
-                                className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                                onClick={() => setCurrentView('services')}
-                            >
+                            <div className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent">
                                 <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
                                 <div className="pl-4 w-full">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
-                                            {selectedServices[editingServiceIndex].name}
-                                        </h4>
-                                        <ChevronRightIcon size={16} className="text-brand-inactive-text" />
-                                    </div>
+                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
+                                        {selectedServices[editingServiceIndex].name}
+                                    </h4>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
-                                <Input
+                                <MoneyInput
                                     label="Preço do serviço"
                                     name="price"
-                                    prefix="BRL"
                                     value={selectedServices[editingServiceIndex].price}
-                                    onChange={(e) => updateEditingService('price', Number(e.target.value))}
+                                    onChange={(val) => updateEditingService('price', val)}
                                 />
 
                                 <Input
@@ -1254,46 +1419,252 @@ export const AppointmentSheet = ({
             {currentView !== 'activity' && currentView !== 'recurrence' && currentView !== 'notes' && (
                 !(currentView === 'services' && editingServiceIndex !== null) && (
                     <div className="absolute bottom-0 left-0 w-full bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-6 z-20">
-                        {mode === 'create' || currentView === 'edit-service' ? (
+                        {mode === 'create' || currentView !== 'summary' ? (
                             <div className="flex gap-3">
-                                {currentView !== 'client' && (
-                                    <Button variant="outline" className="flex-1 h-[48px]" onClick={handleBack}>
-                                        Voltar
-                                    </Button>
-                                )}
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 h-[48px]"
+                                    onClick={handleBack}
+                                >
+                                    {currentView === 'services' ? 'Cancelar' : 'Voltar'}
+                                </Button>
                                 <Button
                                     variant="default"
                                     className={`flex-1 h-[48px] ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    onClick={currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext}
-                                    disabled={(currentView === 'services' && selectedServices.length === 0) || isSaving}
+                                    onClick={
+                                        currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext
+                                    }
+                                    disabled={
+                                        (currentView === 'services' && selectedServices.length === 0) ||
+                                        (currentView === 'datetime' && !needsRangePicker && !selectedTimeSlot) ||
+                                        isSaving
+                                    }
                                 >
                                     {isSaving && currentView === 'summary' ? (
                                         <span className="flex items-center gap-2">
                                             <Spinner size={18} />
                                         </span>
-                                    ) : currentView === 'summary' || (currentView === 'datetime' && (selectedTimeSlot || needsRangePicker)) ? <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span> : currentView === 'edit-service' ? 'Aplicar' : 'Próximo'}
+                                    ) : currentView === 'summary' ? (
+                                        <span className="flex items-center gap-2">Agendar <CheckCircleIcon size={18} /></span>
+                                    ) : currentView === 'edit-service' ? (
+                                        'Aplicar'
+                                    ) : (
+                                        'Próximo'
+                                    )}
                                 </Button>
                             </div>
                         ) : (
                             /* VIEW MODE FOOTER */
-                            isPaid ? (
-                                <Button variant="default" className="w-full font-bold h-[48px]" onClick={handleSaveChanges}>
-                                    Salvar Observações
-                                </Button>
-                            ) : (
-                                <div className="flex gap-3">
-                                    <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
-                                        Checkout
-                                    </Button>
-                                    <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
-                                        Salvar
-                                    </Button>
-                                </div>
-                            )
+                            (() => {
+                                const isFullyPaid = ['pago', 'paid'].includes((status || '').toLowerCase()) || (appointment?.paymentStatus || '').toLowerCase() === 'paid';
+                                const isPartiallyPaid = ['partially paid', 'pago parcialmente', 'parcialmente pago'].includes((status || '').toLowerCase()) || (appointment?.paymentStatus || '').toLowerCase() === 'partially_paid';
+                                const isPaidOrPartiallyPaid = isFullyPaid || isPartiallyPaid;
+
+                                if (isFullyPaid) {
+                                    return (
+                                        <div className="flex gap-3">
+                                            <Dropdown
+                                                width="w-56"
+                                                align="left"
+                                                trigger={
+                                                    <Button variant="outline" className="px-3 h-[48px] shrink-0" type="button">
+                                                        <MoreHorizontal size={18} />
+                                                    </Button>
+                                                }
+                                            >
+                                                <DropdownItem onClick={() => setCurrentView('notes')}>
+                                                    Observações
+                                                </DropdownItem>
+                                                <DropdownItem onClick={() => setCurrentView('activity')}>
+                                                    Histórico do agendamento
+                                                </DropdownItem>
+                                            </Dropdown>
+
+                                            <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
+                                                Ver venda
+                                            </Button>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="flex gap-3">
+                                        <Dropdown
+                                            width="w-56"
+                                            align="left"
+                                            trigger={
+                                                <Button variant="outline" className="px-3 h-[48px] shrink-0" type="button">
+                                                    <MoreHorizontal size={18} />
+                                                </Button>
+                                            }
+                                        >
+                                            <DropdownItem onClick={() => setCurrentView('notes')}>
+                                                Observações
+                                            </DropdownItem>
+                                            <DropdownItem onClick={() => setCurrentView('activity')}>
+                                                Histórico do agendamento
+                                            </DropdownItem>
+                                            {isPartiallyPaid && (
+                                                <DropdownItem onClick={handleViewSale}>
+                                                    Ver venda
+                                                </DropdownItem>
+                                            )}
+                                            {!isPaidOrPartiallyPaid && (
+                                                <>
+                                                    <DropdownItem onClick={() => setCurrentView('recurrence')}>
+                                                        Recorrente
+                                                    </DropdownItem>
+                                                    <DropdownItem onClick={() => setCurrentView('datetime')}>
+                                                        Remarcar
+                                                    </DropdownItem>
+                                                    <DropdownItem className="text-red-500 hover:text-red-600" onClick={() => setIsCancelConfirmOpen(true)}>
+                                                        Cancelar
+                                                    </DropdownItem>
+                                                </>
+                                            )}
+                                        </Dropdown>
+
+                                        {hasChanges && (
+                                            <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                                Salvar
+                                            </Button>
+                                        )}
+
+                                        <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                            Checkout
+                                        </Button>
+                                    </div>
+                                );
+                            })()
                         )}
                     </div>
                 )
             )}
+        </div>
+    );
+
+    const newServiceSheetContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo serviço</h2>
+                <Button variant="filled" onClick={() => { if (!isCreatingService) setIsNewServiceSheetOpen(false); }} size="icon" disabled={isCreatingService}>
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+                <Input
+                    label="Nome"
+                    name="newServiceName"
+                    value={newServiceName}
+                    onChange={(e) => {
+                        setNewServiceName(e.target.value);
+                        setServiceNameError(null);
+                    }}
+                    placeholder="Nome do serviço"
+                    error={!!serviceNameError}
+                    errorMessage={serviceNameError || undefined}
+                />
+                <MoneyInput
+                    label="Preço"
+                    name="newServicePrice"
+                    value={newServicePrice}
+                    onChange={(val) => {
+                        setNewServicePrice(val);
+                        setServicePriceError(null);
+                    }}
+                    placeholder="0,00"
+                    error={!!servicePriceError}
+                    errorMessage={servicePriceError || undefined}
+                />
+                <Input
+                    label="Duração (minutos)"
+                    name="newServiceDuration"
+                    type="number"
+                    value={newServiceDuration}
+                    onChange={(e) => {
+                        setNewServiceDuration(e.target.value);
+                        setServiceDurationError(null);
+                    }}
+                    placeholder="Ex: 60"
+                    error={!!serviceDurationError}
+                    errorMessage={serviceDurationError || undefined}
+                />
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNewServiceSheetOpen(false)} disabled={isCreatingService}>
+                        Voltar
+                    </Button>
+                    <Button
+                        className="h-12 flex-1 bg-brand-primary text-white"
+                        isLoading={isCreatingService}
+                        onClick={async () => {
+                            const name = newServiceName.trim();
+                            const durationStr = newServiceDuration.trim();
+
+                            let hasError = false;
+                            setServiceNameError(null);
+                            setServicePriceError(null);
+                            setServiceDurationError(null);
+
+                            if (!name) {
+                                setServiceNameError("Informe o nome do serviço.");
+                                hasError = true;
+                            }
+
+                            if (newServicePrice <= 0) {
+                                setServicePriceError("Informe um preço válido maior que zero.");
+                                hasError = true;
+                            }
+
+                            const duration = parseInt(durationStr);
+                            if (isNaN(duration) || duration <= 0) {
+                                setServiceDurationError("Informe uma duração válida maior que zero.");
+                                hasError = true;
+                            }
+
+                            if (hasError) return;
+
+                            setIsCreatingService(true);
+                            try {
+                                const created = await handleCreateService({
+                                    name,
+                                    price: newServicePrice,
+                                    duration
+                                });
+                                if (!created) return;
+
+                                setLocalServices(prev => {
+                                    const next = [...prev];
+                                    let group = next.find(g => g.category === 'Serviços');
+                                    if (!group) {
+                                        group = { category: 'Serviços', category_display: true, items: [], colorClass: 'bg-brand-primary' };
+                                        next.push(group);
+                                    }
+                                    group.items = [created, ...group.items];
+                                    return next;
+                                });
+
+                                setSelectedServices(prev => [...prev, { ...created, staff: getSelectedStaffName(), staffId: selectedStaffId }]);
+
+                                setNewServiceName("");
+                                setNewServicePrice(0);
+                                setNewServiceDuration("");
+                                setIsNewServiceSheetOpen(false);
+                            } catch (error) {
+                                const errorMsg = error instanceof Error ? error.message : "Não foi possível criar o serviço.";
+                                setServiceNameError(errorMsg);
+                            } finally {
+                                setIsCreatingService(false);
+                            }
+                        }}
+                    >
+                        Salvar serviço
+                    </Button>
+                </div>
+            </footer>
         </div>
     );
 
@@ -1308,6 +1679,27 @@ export const AppointmentSheet = ({
                 confirmText="Sair sem salvar"
                 cancelText="Continuar editando"
                 variant="warning"
+            />
+            <AlertModal
+                isOpen={isCancelConfirmOpen}
+                onClose={() => setIsCancelConfirmOpen(false)}
+                onConfirm={async () => {
+                    setIsCancelConfirmOpen(false);
+                    if (appointment?.id && onDelete) {
+                        const success = await onDelete(appointment.id);
+                        if (success) {
+                            toast.success("Cancelado", "Agendamento cancelado com sucesso.");
+                        } else {
+                            toast.error("Erro", "Não foi possível cancelar o agendamento.");
+                        }
+                    }
+                }}
+                title="Cancelar agendamento?"
+                message="Tem certeza que deseja cancelar este agendamento? Ele será excluído permanentemente."
+                confirmText="Cancelar agendamento"
+                cancelText="Voltar"
+                variant="danger"
+                isDestructive
             />
             <AlertModal
                 isOpen={isDeleteModalOpen}
@@ -1349,23 +1741,99 @@ export const AppointmentSheet = ({
                 )
             )}
 
+
+            <AnimatePresence>
+                {isNewServiceSheetOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => { if (!isCreatingService) setIsNewServiceSheetOpen(false); }}>
+                            {newServiceSheetContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => { if (!isCreatingService) setIsNewServiceSheetOpen(false); }}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {newServiceSheetContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {isPaymentSheetOpen && (
-                    <PaymentSheet
+                    <PaymentModal
                         isOpen={isPaymentSheetOpen}
-                        onClose={() => setIsPaymentSheetOpen(false)}
-                        appointment={appointment}
-                        partnerId={partnerId || ''}
-                        onSuccess={() => {
+                        onClose={() => {
                             setIsPaymentSheetOpen(false);
-                            onClose();
+                            if (completedOrderId) {
+                                onClose();
+                            }
                         }}
-                        cart={selectedServices.map(s => ({ ...s, qty: 1, productId: s.id }))}
-                        total={calculatedPrice}
+                        partnerId={partnerId || ''}
+                        onConfirm={handleConfirmPayment}
+                        cart={selectedServices.map(s => ({
+                            ...s,
+                            qty: 1,
+                            quantity: 1,
+                            productId: s.id || null,
+                            unitPrice: s.price,
+                            price: s.price,
+                            name: s.name,
+                        }))}
+                        amountDue={calculatedPrice}
                         customer={{ id: selectedClient?.id, name: selectedClient?.name }}
+                        headerSubtitle="Agendamento de Serviço"
                     />
                 )}
             </AnimatePresence>
+
+            <SelectCustomerSheet
+                isOpen={isSelectCustomerOpen}
+                onClose={() => {
+                    setIsSelectCustomerOpen(false);
+                    if (cameFromSummary) {
+                        if (previousClient) {
+                            setSelectedClient(previousClient);
+                        }
+                        setPreviousClient(null);
+                        setCameFromSummary(false);
+                    }
+                }}
+                onSelect={(customer) => {
+                    isSelectingClientRef.current = true;
+                    setSelectedClient(customer);
+                    setLocalClients(prev => {
+                        if (prev.some(c => c.id === customer.id)) return prev;
+                        return [customer, ...prev];
+                    });
+                    setIsSelectCustomerOpen(false);
+                    if (cameFromSummary) {
+                        setPreviousClient(null);
+                        setCameFromSummary(false);
+                    } else if (initialStaffId && initialTimeSlot && mode === 'create') {
+                        setCurrentView('summary');
+                    } else {
+                        setCurrentView('datetime');
+                    }
+                }}
+                partnerId={partnerId || ''}
+                selectedCustomerId={selectedClient?.id}
+                pinnedCustomer={selectedClient}
+            />
         </>
     )
 }

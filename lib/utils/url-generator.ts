@@ -76,3 +76,24 @@ export function getServiceUrl(service: any, partner?: any): string {
     return `/${cityStateSlug}/${serviceSlug}/s/${serviceId}`
 }
 
+/**
+ * Gera a URL canonica do plano recorrente utilizando o formato com cidade e estado
+ * /[cidade-uf]/[slug-do-plano]/sub/[id]
+ */
+export function getPlanUrl(plan: any, partner?: any): string {
+    if (!plan) return "/"
+
+    const planSlug = createSlug(plan.name || "")
+    const planId = plan.id || ""
+
+    const p = partner || (Array.isArray(plan.partners) ? plan.partners[0] : plan.partners) || plan.partner || {}
+    const address = p.addresses?.[0] || p.address || p
+    const city = p.city || address?.city
+    const state = p.state || address?.state
+
+    const cityStateSlug = formatCityStateSlug(city, state)
+
+    return `/${cityStateSlug}/${planSlug}/sub/${planId}`
+}
+
+

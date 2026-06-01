@@ -442,6 +442,34 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     }
   }
 
+  // 3. Fetch recurring plans only for the matching partners in this city
+  let rawPlans: any[] = []
+  if (partnerIds.length > 0) {
+    const plansRes = await supabase
+      .from("recurring_plans")
+      .select(`
+        id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+        partners!inner(
+          id, store_name, store_image_url, latitude, longitude,
+          addresses!inner(city, state)
+        ),
+        recurring_plan_items(
+          id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+          products:product_id(id, name, price, images),
+          services:service_id(id, name, price, duration_minutes)
+        )
+      `)
+      .eq("status", "active")
+      .eq("show_in_marketplace", true)
+      .in("partner_id", partnerIds)
+
+    if (plansRes.error) {
+      console.error("[getHomeDataByCity] Error fetching recurring plans:", plansRes.error)
+    } else {
+      rawPlans = plansRes.data || []
+    }
+  }
+
   // Normalize products data
   const normalizedProducts = rawProducts.map((item: any) => {
     const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -461,6 +489,60 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       itemType: 'produto',
       partners: partner,
       ...variantFallback
+    }
+  })
+
+  // Normalize plans data
+  const normalizedPlans = rawPlans.map((item: any) => {
+    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+    const partner = rawPartner ? {
+      ...rawPartner,
+      store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+      latitude: rawPartner.latitude,
+      longitude: rawPartner.longitude,
+      city: rawPartner.addresses?.[0]?.city || null,
+      state: rawPartner.addresses?.[0]?.state || null
+    } : null
+
+    let computedPrice = 0
+    let firstImage: string | null = null
+
+    if (item.recurring_plan_items && Array.isArray(item.recurring_plan_items)) {
+      for (const planItem of item.recurring_plan_items) {
+        const qty = Number(planItem.quantity || 1)
+        let itemPrice = Number(planItem.unit_price || 0)
+        
+        if (itemPrice <= 0) {
+          if (planItem.item_type === 'product' && planItem.products) {
+            itemPrice = Number(planItem.products.price || 0)
+          } else if (planItem.item_type === 'service' && planItem.services) {
+            itemPrice = Number(planItem.services.price || 0)
+          }
+        }
+        computedPrice += qty * itemPrice
+
+        if (!firstImage && planItem.item_type === 'product' && planItem.products?.images) {
+          const imgs = planItem.products.images
+          if (Array.isArray(imgs) && imgs.length > 0) {
+            firstImage = imgs[0]
+          }
+        }
+      }
+    }
+
+    const image = firstImage || rawPartner?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      price: computedPrice,
+      images: [image],
+      itemType: 'plano',
+      partners: partner,
+      frequency_type: item.frequency_type,
+      frequency_interval: item.frequency_interval,
+      created_at: item.created_at
     }
   })
 
@@ -489,6 +571,6 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     }
   })
 
-  return { products: normalizedProducts, vitrines: normalizedVitrines }
+  return { products: normalizedProducts, vitrines: normalizedVitrines, plans: normalizedPlans }
 }
 

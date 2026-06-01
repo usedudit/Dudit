@@ -333,3 +333,40 @@ export async function getRecurringPlanFormDataAction(partnerId: string) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao carregar dados" }
   }
 }
+
+export async function deleteRecurringPlanAction(partnerId: string, planId: string) {
+  try {
+    const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
+
+    await requirePartnerAccessWithPermission(partnerId, "recurring_plans", "manage")
+    const supabase = await getSupabaseServerClient()
+
+    // 1. Delete items first
+    await supabase.from("recurring_plan_items").delete().eq("plan_id", planId)
+
+    // 2. Delete plan
+    const { error } = await supabase
+      .from("recurring_plans")
+      .delete()
+      .eq("id", planId)
+      .eq("partner_id", partnerId)
+
+    if (error) throw error
+
+    await logAuditEvent({
+      partnerId,
+      actorUserId: null,
+      entityType: "recurring_plan",
+      entityId: planId,
+      actionType: "deleted",
+      changeLines: [`excluiu plano recorrente id "${planId}".`],
+      source: "manual",
+    })
+
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : "Erro ao excluir plano" }
+  }
+}
+

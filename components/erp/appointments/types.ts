@@ -22,6 +22,7 @@ export interface Appointment {
     activityLog?: any[];
     source?: 'unavailable' | 'appointment';
     recurrence?: 'none' | 'daily' | 'weekly';
+    saleId?: string | null;
 }
 
 // Helper interface for layout calculation

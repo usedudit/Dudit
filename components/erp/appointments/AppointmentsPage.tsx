@@ -157,7 +157,8 @@ const AppointmentsPage = ({
         notes: row.notes || undefined,
         partnerId: row.partner_id,
         source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
-        recurrence: (row.recurrence as any) || 'none'
+        recurrence: (row.recurrence as any) || 'none',
+        saleId: row.sale_id || null
     }), []);
 
     // Catalogs come from SSR props - only refresh unavailable types when needed
@@ -308,6 +309,7 @@ const AppointmentsPage = ({
     const handleOpenCreate = (time?: string, date?: Date, staffId?: string) => {
         setSheetMode('create');
         setSelectedAppointment(null);
+        setDraftData(null); // Clear draft data when creating a new appointment
         setIsSheetOpen(true);
         setActivePopover(null);
         setIsSelectionMode(false);
@@ -379,6 +381,26 @@ const AppointmentsPage = ({
         }
     };
 
+    const handleDeleteAppointment = async (id: string) => {
+        setIsSaving(true);
+        try {
+            const res = await deleteAppointmentAction(id);
+            if (res.success) {
+                appointmentCacheRef.current.clear();
+                setAppointments(prev => prev.filter(a => a.id !== id));
+                setIsSheetOpen(false);
+                setSelectedAppointment(null);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(error);
+            return false;
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleOpenMore = (dateStr: string, apps: Appointment[]) => {
         if (isSelectionMode) return;
         setMoreSheetDate(dateStr);
@@ -394,7 +416,8 @@ const AppointmentsPage = ({
         try {
             if (selectedAppointment && sheetMode === 'view') {
                 const updateRes = await updateAppointmentAction(selectedAppointment.id, {
-                    customerName: payload.customer || payload.customerName,
+                    customerName: payload.customerName || payload.customer || selectedAppointment.customer,
+                    customerId: payload.customerId || null,
                     serviceName: payload.service || payload.serviceName,
                     date: payload.date || selectedAppointment.date,
                     time: payload.time || selectedAppointment.time,
@@ -428,7 +451,7 @@ const AppointmentsPage = ({
                     pricingUnit: item.pricingUnit || 'Por Serviço',
                     notes: item.notes || null,
                     status: item.status || 'Reservado',
-                    customerId: realClients.find((c) => c.name === item.customerName)?.id || null,
+                    customerId: item.customerId || realClients.find((c) => c.name === item.customerName)?.id || null,
                 }));
 
                 const createRes = await createAppointmentsAction(rows);
@@ -606,10 +629,11 @@ const AppointmentsPage = ({
                 setActivePopover({
                     staffId,
                     time: timeStr,
-                    top: calendarView === 'week' ? e.clientY : hoverTime.top,
+                    date: currentDate,
+                    top: e.clientY,
                     left: e.clientX,
                     align,
-                    mode: 'resource'
+                    mode: 'absolute'
                 });
             }
         }
@@ -700,28 +724,24 @@ const AppointmentsPage = ({
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full">
 
                                 <AnimatePresence mode="wait">
-                                    {viewMode === 'calendar' ? (
-                                        <motion.div
-                                            key="calendar"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="flex flex-col h-full"
-                                        >
-                                            <div className="block md:hidden h-full">
-                                                <MobileView
-                                                    currentDate={currentDate}
-                                                    appointments={visibleAppointments}
-                                                    setCurrentDate={setCurrentDate}
-                                                    navigateDate={navigateDate}
-                                                    getViewLabel={getViewLabel}
-                                                    handleOpenCreate={handleOpenCreate}
-                                                    handleOpenView={handleOpenView}
-                                                    columns={APPOINTMENT_COLUMNS}
-                                                />
-                                            </div>
-                                            <div className="hidden md:flex flex-1 flex-col overflow-y-auto no-scrollbar">
+                                    {/* Mobile/Tablet View (Always render cards) */}
+                                    <div className="block md:hidden h-full">
+                                        <MobileView
+                                            currentDate={currentDate}
+                                            appointments={visibleAppointments}
+                                            setCurrentDate={setCurrentDate}
+                                            navigateDate={navigateDate}
+                                            getViewLabel={getViewLabel}
+                                            handleOpenCreate={handleOpenCreate}
+                                            handleOpenView={handleOpenView}
+                                            columns={APPOINTMENT_COLUMNS}
+                                        />
+                                    </div>
+
+                                    {/* Desktop view switcher */}
+                                    <div className="hidden md:flex flex-1 flex-col overflow-y-auto no-scrollbar">
+                                        {viewMode === 'calendar' ? (
+                                            <div className="flex flex-col h-full">
                                                 {calendarView === 'month' && (
                                                     <>
                                                         <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
@@ -781,15 +801,7 @@ const AppointmentsPage = ({
                                                     />
                                                 )}
                                             </div>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="list"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                        >
+                                        ) : (
                                             <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden pb-20 md:pb-0">
                                                 <div className="overflow-x-auto pb-4 custom-scrollbar">
                                                     <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
@@ -869,8 +881,8 @@ const AppointmentsPage = ({
                                                     </div>
                                                 )}
                                             </div>
-                                        </motion.div>
-                                    )}
+                                        )}
+                                    </div>
                                 </AnimatePresence>
                             </div>
                         </div>
@@ -906,7 +918,14 @@ const AppointmentsPage = ({
                     <AnimatePresence>
                         {isSheetOpen && (
                             <AppointmentSheet
-                                onClose={() => setIsSheetOpen(false)}
+                                onClose={() => {
+                                    setIsSheetOpen(false);
+                                    setDraftData(null);
+                                    setTempSelectionTime(null);
+                                    setPreSelectedStaffId(undefined);
+                                    setSelectedAppointment(null);
+                                }}
+                                onDelete={handleDeleteAppointment}
                                 mode={sheetMode}
                                 appointment={selectedAppointment}
                                 onSave={handleSaveAppointment}

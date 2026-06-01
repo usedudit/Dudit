@@ -153,6 +153,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const isMarketplaceOrder = true
 
+    // Detect if order has services vs products for dynamic timeline labels
+    const orderItems = order.order_items || []
+    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => !item.product_id && !item.variant_id)
+    const hasAnyService = orderItems.some((item: any) => !item.product_id && !item.variant_id)
+    const hasMixedItems = hasAnyService && !hasOnlyServices
 
     const timelineDate = (isActive: boolean) => {
         if (!isActive) return { date: "", time: "" }
@@ -165,18 +170,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         const baseTime = formatTime(order.created_at)
         if (order.situation === "cancelled") {
             const cancelledAt = order.updated_at || order.created_at
+            const cancelLabel = hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado"
             return [
-                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: cancelLabel, date: baseDate, time: baseTime, active: true },
                 { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true },
             ]
         }
+
+        // Dynamic labels based on item types
+        const stepLabels = hasOnlyServices
+            ? { first: "Agendamento Confirmado", preparing: "Serviço Preparado", sent: "Em Execução", delivered: "Concluído", pickup: "Concluído" }
+            : hasMixedItems
+                ? { first: "Pedido Realizado", preparing: "Preparando Itens", sent: "Em Andamento", delivered: "Concluído", pickup: "Retirado / Concluído" }
+                : { first: "Pedido Realizado", preparing: "Preparando", sent: "Enviado", delivered: "Entregue", pickup: "Pedido Retirado" }
 
         if (isPickupOrder) {
             const pickedUp = ["delivered", "pickup_available"].includes(status)
             const pickedMeta = timelineDate(pickedUp)
             return [
-                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
-                { label: "Pedido Retirado", date: pickedMeta.date, time: pickedMeta.time, active: pickedUp },
+                { label: stepLabels.first, date: baseDate, time: baseTime, active: true },
+                { label: stepLabels.pickup, date: pickedMeta.date, time: pickedMeta.time, active: pickedUp },
             ]
         }
 
@@ -188,10 +201,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         const finalMeta = timelineDate(finalActive)
 
         return [
-            { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
-            { label: "Preparando", date: preparingMeta.date, time: preparingMeta.time, active: preparingActive },
-            { label: status === "pickup_available" ? "Disponível para retirada" : "Enviado", date: sentMeta.date, time: sentMeta.time, active: sentActive },
-            { label: status === "delivery_failed" ? "Entrega não realizada" : "Entregue", date: finalMeta.date, time: finalMeta.time, active: finalActive }
+            { label: stepLabels.first, date: baseDate, time: baseTime, active: true },
+            { label: stepLabels.preparing, date: preparingMeta.date, time: preparingMeta.time, active: preparingActive },
+            { label: status === "pickup_available" ? "Disponível para retirada" : stepLabels.sent, date: sentMeta.date, time: sentMeta.time, active: sentActive },
+            { label: status === "delivery_failed" ? "Entrega não realizada" : stepLabels.delivered, date: finalMeta.date, time: finalMeta.time, active: finalActive }
         ]
     }
 

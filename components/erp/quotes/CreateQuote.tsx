@@ -8,7 +8,7 @@ import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
-import SelectVariantSheet from './SelectVariantSheet';
+import SelectProductVariantSheet from '@/components/erp/pdv/SelectProductVariantSheet';
 import { useNotification } from '@/hooks/use-notification';
 import { useStore } from '@/lib/store-context';
 import { usePermissions } from "@/lib/permission-context";
@@ -476,19 +476,21 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     };
 
     // 3. Add Variants from Sheet
-    const handleConfirmVariants = (selectedVariants: any[]) => {
+    const handleConfirmVariants = (selections: Array<{ variantId: string; qty: number }>) => {
         if (!productToSelectVariant) return;
 
         setQuoteItems(prevItems => {
             const newItems = [...prevItems];
-            selectedVariants.forEach((v: any) => {
-                if (v.qty > 0) {
+            selections.forEach((sel: any) => {
+                const v = productToSelectVariant.variants?.find((x: any) => String(x.id) === String(sel.variantId));
+                if (!v) return;
+                if (sel.qty > 0) {
                     const variantName = v.name;
                     const variantNameForCheck = variantName;
 
                     const existingIndex = newItems.findIndex(i => i.id === productToSelectVariant.id && i.variant === variantNameForCheck);
                     if (existingIndex >= 0) {
-                        const nextQty = newItems[existingIndex].qty + v.qty;
+                        const nextQty = newItems[existingIndex].qty + sel.qty;
                         if (nextQty > Number(newItems[existingIndex].stock ?? 0)) {
                             return;
                         }
@@ -504,7 +506,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             variant: variantNameForCheck,
                             variantId: v.id,
                             stock: v.stock,
-                            qty: v.qty,
+                            qty: sel.qty,
                             isEditing: false,
                             isManual: false
                         });
@@ -1132,7 +1134,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     partnerId={partnerId}
                 />
 
-                <SelectVariantSheet
+                <SelectProductVariantSheet
                     isOpen={isVariantSheetOpen}
                     onClose={() => setIsVariantSheetOpen(false)}
                     product={productToSelectVariant}

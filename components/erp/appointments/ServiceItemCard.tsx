@@ -3,6 +3,7 @@ import React from 'react';
 import { EditIcon, TrashIcon } from '@/lib/icons';
 import { getEndTime } from './utils';
 import { InfoCard } from '@/components/reusable';
+import { formatCurrency } from '@/lib/utils/formatters';
 
 interface ServiceItemCardProps {
     service: any;
@@ -60,7 +61,7 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
                         {service.duration}min
                     </div>
                     {/* Display Individual Service Price, not accumulated total */}
-                    <div className="font-bold text-brand-dark dark:text-dark-heading">R$ {service.price}</div>
+                    <div className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(service.price)}</div>
                 </div>
 
                 <div className="border-t border-brand-border dark:border-dark-border pt-2 mt-1 flex justify-between items-center">

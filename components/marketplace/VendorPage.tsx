@@ -29,6 +29,7 @@ interface VendorPageClientProps {
     partner: any
     products: any[]
     services: any[]
+    plans?: any[]
     reviews: any[]
     stats: any
     ratingDistribution: { star: number; count: number }[]
@@ -54,6 +55,19 @@ const openWhatsApp = (phone?: string, storeName?: string) => {
 }
 
 const normalizeItemForCard = (item: any, partner: any) => {
+    if (item.itemType === 'plano') {
+        return {
+            ...item,
+            partners: {
+                store_name: partner.storeName,
+                store_avatar: partner.storeImageUrl,
+                profile_image_url: partner.profile_image_url,
+                city: partner.city,
+                state: partner.state,
+                distance_km_formatted: partner.distance_km_formatted,
+            }
+        }
+    }
     const price = (!item.promotional_price && item.fallback_variant_price)
         ? item.fallback_variant_price
         : (item.promotional_price || item.price || 0)
@@ -488,7 +502,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
     )
 }
 
-export function VendorPageClient({ partner, products, services, reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
+export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount }: VendorPageClientProps) {
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
         if (calculatedReviewsCount === 0) return 0
@@ -502,7 +516,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
-    const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos">("Produtos")
+    const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
     const [categoryView, setCategoryView] = useState<string | null>(null)
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
@@ -532,7 +546,8 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     const fallbackBanner = partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
     const bannerImage = partner.banner_url ? getImageUrl(partner.banner_url) : fallbackBanner
 
-    const currentItems = activeContext === "Produtos" ? products : services
+    const hasPlans = plans && plans.length > 0
+    const currentItems = activeContext === "Produtos" ? products : (activeContext === "Servicos" ? services : plans)
     const filteredItems = useMemo(() => {
         const search = searchValue.trim().toLowerCase()
         return currentItems.filter(item => !search || item.name?.toLowerCase().includes(search))
@@ -548,6 +563,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
     }, [filteredItems])
 
     const featuredItems = useMemo(() => {
+        if (activeContext === "Planos") return []
         const highlightedProducts = products.filter(item => item.is_featured || item.is_highlighted)
         const highlightedServices = services.filter(item => item.highlight_service || item.is_featured || item.is_highlighted)
         return (activeContext === "Produtos" ? highlightedProducts : highlightedServices)
@@ -776,7 +792,7 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
                         title="Selecionar tipo"
                     >
-                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : <ServiceIcon size={17} />}
+                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
                     </button>
 
                     {canScrollTabsLeft && (
@@ -834,7 +850,31 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
                             </div>
                         </div>
 
-                        <h3 className="font-normal text-brand-dark text-[16px] mb-4">{activeContext}</h3>
+                        {(services.length > 0 || hasPlans) && (
+                            <div className="mb-8 border-t border-brand-border pt-6">
+                                <h3 className="font-normal text-brand-dark text-[16px] mb-3">Catálogo</h3>
+                                <div className="flex flex-col gap-1">
+                                    <button onClick={() => { setActiveContext("Produtos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Produtos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                        <span>Produtos</span>
+                                        {activeContext === "Produtos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                    </button>
+                                    {services.length > 0 && (
+                                        <button onClick={() => { setActiveContext("Servicos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Servicos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <span>Serviços</span>
+                                            {activeContext === "Servicos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                    )}
+                                    {hasPlans && (
+                                        <button onClick={() => { setActiveContext("Planos"); setActiveSection("products"); setActiveTag("todos"); setCategoryView(null) }} className={`w-full text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center gap-3 ${activeContext === "Planos" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
+                                            <span>Assinaturas</span>
+                                            {activeContext === "Planos" && activeSection === "products" && <Check size={16} className="ml-auto" />}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <h3 className="font-normal text-brand-dark text-[16px] mb-4">Seções</h3>
                         <div className="flex flex-col gap-1 mb-8">
                             {featuredItems.length > 0 && (
                                 <button onClick={() => selectTab("featured")} className={`text-left px-3 py-2 rounded-[8px] text-[15px] transition-colors flex items-center justify-between ${activeTag === "featured" && activeSection === "products" ? "bg-[#ecfdf5] text-brand-green font-semibold" : "text-brand-inactive-text hover:bg-brand-gray"}`}>
@@ -932,11 +972,15 @@ export function VendorPageClient({ partner, products, services, reviews, stats, 
 
             <BottomSheet isOpen={isContextModalOpen} onClose={() => setIsContextModalOpen(false)} title="Selecione">
                 <div className="px-5 pb-8">
-                    {["Produtos", "Servicos"].map((opt, i) => (
-                        <div key={opt} onClick={() => { setActiveContext(opt as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i === 0 ? "border-b border-brand-border" : ""}`}>
-                            <span className={`text-[16px] ${activeContext === opt ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt === "Servicos" ? "Servicos" : opt}</span>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt ? "border-brand-green" : "border-brand-border"}`}>
-                                {activeContext === opt && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
+                    {[
+                        { value: "Produtos", label: "Produtos" },
+                        ...(services.length > 0 ? [{ value: "Servicos", label: "Serviços" }] : []),
+                        ...(hasPlans ? [{ value: "Planos", label: "Assinaturas" }] : [])
+                    ].map((opt, i, arr) => (
+                        <div key={opt.value} onClick={() => { setActiveContext(opt.value as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
+                            <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark"}`}>{opt.label}</span>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt.value ? "border-brand-green" : "border-brand-border"}`}>
+                                {activeContext === opt.value && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
                             </div>
                         </div>
                     ))}

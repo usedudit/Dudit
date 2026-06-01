@@ -275,3 +275,88 @@ async function updateMySubscriptionStatus(
     return { success: false, error: e instanceof Error ? e.message : "Erro ao atualizar assinatura" }
   }
 }
+
+export async function getMarketplaceRecurringPlanAction(planId: string) {
+  try {
+    const admin = getAdminClient()
+    const { data, error } = await admin
+      .from("recurring_plans")
+      .select(`
+        *,
+        partners!partner_id (
+          id,
+          user_id,
+          store_name,
+          store_image_url,
+          store_description,
+          phone,
+          rating,
+          banner_url,
+          banner_moderation_status,
+          logo_moderation_status,
+          opening_hours,
+          mp_user_id,
+          mp_public_key,
+          vendas_totais,
+          created_at,
+          addresses (id, street, number, neighborhood, city, state, zip_code),
+          payment_methods (*)
+        ),
+        recurring_plan_items(
+          id, item_type, product_id, variant_id, service_id, quantity, unit_price,
+          products:product_id(id, name, price, images),
+          services:service_id(id, name, price, duration_minutes)
+        )
+      `)
+      .eq("id", planId)
+      .eq("status", "active")
+      .eq("show_in_marketplace", true)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (!data) return null
+
+    let computedPrice = 0
+    let firstImage: string | null = null
+
+    if (data.recurring_plan_items && Array.isArray(data.recurring_plan_items)) {
+      for (const planItem of data.recurring_plan_items) {
+        const qty = Number(planItem.quantity || 1)
+        let itemPrice = Number(planItem.unit_price || 0)
+        
+        if (itemPrice <= 0) {
+          if (planItem.item_type === 'product' && planItem.products) {
+            itemPrice = Number((planItem.products as any).price || 0)
+          } else if (planItem.item_type === 'service' && planItem.services) {
+            itemPrice = Number((planItem.services as any).price || 0)
+          }
+        }
+        computedPrice += qty * itemPrice
+
+        if (!firstImage && planItem.item_type === 'product' && (planItem.products as any)?.images) {
+          const imgs = (planItem.products as any).images
+          if (Array.isArray(imgs) && imgs.length > 0) {
+            firstImage = imgs[0]
+          }
+        }
+      }
+    }
+
+    const partner = data.partners || {}
+    const image = firstImage || partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+
+    return {
+      ...mapPlanRow(data as Record<string, unknown>),
+      frequencyLabel: getRecurringFrequencyLabel(data.frequency_type, data.frequency_interval),
+      items: data.recurring_plan_items || [],
+      partners: data.partners,
+      price: computedPrice,
+      images: [image],
+    }
+  } catch (e: unknown) {
+    console.error("[getMarketplaceRecurringPlanAction] Error:", e)
+    return null
+  }
+}
+

@@ -40,6 +40,7 @@ interface FilterSheetProps {
   filters: Record<string, any>    // Estado dos filtros (genérico)
   setFilters: (filters: any) => void
   onClear: () => void
+  zIndexClass?: string
 }
 
 const FilterSheet: React.FC<FilterSheetProps> = ({
@@ -49,6 +50,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
   filters,
   setFilters,
   onClear,
+  zIndexClass,
 }) => {
   const [localFilters, setLocalFilters] = useState<Record<string, any>>(filters)
   const isMobile = useMediaQuery("(max-width: 768px)")
@@ -289,7 +291,7 @@ const FilterSheet: React.FC<FilterSheetProps> = ({
   return (
     <Portal>
       <div
-        className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 bg-black/50 ${zIndexClass || "z-50"} transition-opacity ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       >
         <div

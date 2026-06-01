@@ -7,7 +7,7 @@ import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { getProductUrl, getPartnerUrl } from "@/lib/utils/url-generator"
+import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { Badge } from "@/components/reusable"
@@ -256,8 +256,8 @@ function getCachedPartnerPromotions(partnerId: string) {
 
 export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]" }) => {
     const { isFavorited } = useFavorites()
-    const itemType = (product as any).itemType === "servico" ? "servico" : "produto"
-    const favorited = isFavorited(product.id, itemType)
+    const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
+    const favorited = itemType !== "plano" ? isFavorited(product.id, itemType) : false
 
     const imageUrl = getPrimaryProductDisplayImage(product)
     const distance = product.partners?.distance_km_formatted || null
@@ -280,7 +280,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
             if (itemType === "produto") {
                 if (promo.applyScope === "specific_products" && promo.applicableProductIds?.includes(product.id)) return true
                 if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
-            } else {
+            } else if (itemType === "servico") {
                 if (promo.applyScope === "specific_services" && promo.applicableServiceIds?.includes(product.id)) return true
                 if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
             }
@@ -291,10 +291,25 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const hasDiscount = !!(product.originalPrice && product.originalPrice > product.price)
     const discountPercent = hasDiscount ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0
 
+    const itemUrl = itemType === "plano"
+        ? getPlanUrl(product, product.partners)
+        : (itemType === "servico"
+            ? getServiceUrl(product, product.partners)
+            : getProductUrl(product, product.partners))
+
+    let frequencyText = ""
+    if (itemType === "plano" && (product as any).frequency_type) {
+        const freq = (product as any).frequency_type
+        if (freq === "monthly") frequencyText = "/mês"
+        else if (freq === "weekly") frequencyText = "/sem"
+        else if (freq === "yearly") frequencyText = "/ano"
+        else if (freq === "daily") frequencyText = "/dia"
+    }
+
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
             <Link
-                href={getProductUrl(product, product.partners)}
+                href={itemUrl}
                 prefetch={false}
                 className="block h-full flex-col hover:no-underline"
             >
@@ -317,14 +332,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                             </span>
                         )}
                     </div>
-                    <FavoriteButton
-                        itemId={product.id}
-                        itemType={itemType}
-                        size="sm"
-                        variant="overlay"
-                        className={`absolute top-2 right-2 z-10 transition-opacity ${favorited ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
-                            }`}
-                    />
+                    {itemType !== "plano" && (
+                        <FavoriteButton
+                            itemId={product.id}
+                            itemType={itemType}
+                            size="sm"
+                            variant="overlay"
+                            className={`absolute top-2 right-2 z-10 transition-opacity ${favorited ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
+                                }`}
+                        />
+                    )}
                 </div>
 
                 <div className="px-1">
@@ -341,7 +358,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                             )}
                             <div className="flex items-center gap-1.5">
                                 <span className="text-base font-bold text-brand-dark leading-tight">
-                                    {formatCurrency(product.price)}
+                                    {formatCurrency(product.price)}{frequencyText}
                                 </span>
                             </div>
                         </div>
@@ -396,7 +413,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
 }) => {
     return (
         <section className="mx-auto mb-12 md:mb-16 max-w-[1400px] overflow-hidden">
-            <div className="flex items-end justify-between px-4 lg:px-0 mb-6 md:mb-8">
+            <div className="flex items-end justify-between px-4 lg:px-0">
                 <div>
                     <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
                     {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}

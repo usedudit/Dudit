@@ -43,6 +43,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
     let products: any[] = []
     let vitrines: any[] = []
+    let plans: any[] = []
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
@@ -50,11 +51,15 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         const cityData = await getHomeDataByCity(cityName, state, isDefaultSP)
         products = cityData.products
         vitrines = cityData.vitrines
+        plans = cityData.plans || []
     }
 
-    const productsWithDistance = enrichMarketplaceDistance(products || [], userProfile?.latitude && userProfile?.longitude
+    const coords = userProfile?.latitude && userProfile?.longitude
         ? { lat: userProfile.latitude, lng: userProfile.longitude }
-        : null)
+        : null
+
+    const productsWithDistance = enrichMarketplaceDistance(products || [], coords)
+    const plansWithDistance = enrichMarketplaceDistance(plans || [], coords)
 
     const tEnd = performance.now()
     console.log(`[SSR] Home (Feed Payload) | END | Time: ${(tEnd - t0).toFixed(2)}ms`)
@@ -63,6 +68,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         <MarketplaceHome
             products={productsWithDistance}
             vitrines={vitrines || []}
+            plans={plansWithDistance}
             user={user}
             userProfile={userProfile}
             cartCount={cartCount}
