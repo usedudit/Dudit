@@ -12,14 +12,8 @@ import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
 import {
     ChevronLeft,
     ChevronRight,
-    SlidersHorizontal,
     MapPin,
-    X,
-    Tag,
-    Star,
-    ArrowUpDown,
     Check,
-    Search
 } from "lucide-react"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"

@@ -313,13 +313,13 @@ const InfoTab = ({ partner, stats }: any) => {
                             )}
                             {creditMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartao de credito</h4>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartão de crédito</h4>
                                     {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
                                 </div>
                             )}
                             {debitMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartao de debito</h4>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark mb-2">Cartão de débito</h4>
                                     {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text">Bandeiras não informadas.</p>}
                                 </div>
                             )}
@@ -464,8 +464,8 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: 
     if (!items.length) return null
     return (
         <section id={sectionId} data-category-section={sectionId} className="scroll-mt-[150px] mb-10 lg:mb-12">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg lg:text-xl font-semibold text-brand-dark">{title}</h2>
+            <div className="flex items-end justify-between px-4 lg:px-0">
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
                 <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
             </div>
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">

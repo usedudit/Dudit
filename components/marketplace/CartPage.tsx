@@ -62,9 +62,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const renderPromoBanners = (partnerId: string, partnerItemsTotal: number) => {
         const promos = partnerPromotions[partnerId] || []
-        const pendingPromos = promos.filter(p => 
-            p.minSpendAmount && 
-            p.minSpendAmount > partnerItemsTotal && 
+        const pendingPromos = promos.filter(p =>
+            p.minSpendAmount &&
+            p.minSpendAmount > partnerItemsTotal &&
             (p.promotionType === "gift" || p.promotionType === "free_shipping")
         )
 
@@ -76,8 +76,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                     const diff = promo.minSpendAmount - partnerItemsTotal
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
                     const isFreeShipping = promo.promotionType === "free_shipping"
-                    const label = isFreeShipping 
-                        ? `Falta ${formatCurrency(diff)} para você ganhar Frete Grátis nesta loja!` 
+                    const label = isFreeShipping
+                        ? `Falta ${formatCurrency(diff)} para você ganhar Frete Grátis nesta loja!`
                         : `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
 
                     return (
@@ -87,8 +87,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 <span className="text-brand-green">{pct.toFixed(0)}%</span>
                             </div>
                             <div className="w-full bg-brand-gray dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                                <div 
-                                    className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out" 
+                                <div
+                                    className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
                                     style={{ width: `${pct}%` }}
                                 />
                             </div>
@@ -496,7 +496,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                     const itemQty = getItemQuantity(item)
 
                                                                     return (
-                                                                        <div key={item.id} className={`pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"}`}>
+                                                                        <div key={item.id} className={`lg:pb-6 ${index !== data.items.length - 1 ? "border-b border-brand-border dark:border-dark-border mb-6" : "mb-2"}`}>
 
                                                                             {/* Mobile/Tablet Layout (< md) */}
                                                                             {(() => {
@@ -701,20 +701,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                         className="w-full"
                                                                         disabled={partnerItemsTotal === 0}
                                                                     >
-                                                                        Finalizar Pedido desta Loja
+                                                                        Finalizar pedido
                                                                     </Button>
-                                                                </div>
-
-                                                                {/* Desktop: "Escolher mais itens" abaixo do separator */}
-                                                                <div className="hidden md:block mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                                                                    <Link
-                                                                        href={getPartnerUrl(data.partner)}
-                                                                        prefetch={false}
-                                                                        onClick={() => setDirection("back")}
-                                                                        className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px]"
-                                                                    >
-                                                                        <ChevronLeftIcon size={16} />Escolher mais itens
-                                                                    </Link>
                                                                 </div>
                                                             </div>
                                                         </motion.div>
@@ -775,17 +763,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                         )}
                                     </Fragment>)
                             })}
-
-                            {/* Mobile: "Voltar para as compras" abaixo de tudo */}
-                            <Link
-                                href="/"
-                                prefetch={false}
-                                onClick={() => setDirection("back")}
-                                className="flex items-center gap-2 text-brand-green hover:underline font-medium text-[14px] mt-2 md:hidden"
-                            >
-                                <ChevronLeftIcon size={18} />Voltar para as compras
-                            </Link>
-
                         </div>
                     </div>
                 )}

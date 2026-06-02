@@ -97,6 +97,11 @@ function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
     return message.includes("is_pos_sale") && message.includes("orders")
 }
 
+// P5: cache em memória (por processo) indicando se a coluna orders.is_pos_sale existe.
+// Evita que TODA listagem dispare uma 1ª query que sempre falha quando a coluna não
+// existe. null = ainda desconhecido; true/false = resultado já detectado.
+let ordersHasPosSaleColumn: boolean | null = null
+
 function isMissingOrdersPaymentMethodDeltaColumnsError(error: unknown): boolean {
     const message = String((error as any)?.message || "").toLowerCase()
     return (
@@ -1594,58 +1599,61 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
     if (error) return { error: error.message }
     if (data) {
-        let customers = null
-        if (data.buyer_id) {
+        // P3: resolve cliente e vendedor em paralelo (consultas independentes entre si)
+        // em vez de sequencialmente, reduzindo round-trips na abertura do detalhe.
+        const resolveCustomer = async () => {
+            if (!data.buyer_id) return null
             const { data: customerData } = await supabase
                 .from("customers")
                 .select("id, name, email, phone, addresses(*)")
                 .eq("id", data.buyer_id)
                 .maybeSingle()
-            customers = customerData
+            if (customerData) return customerData
 
-            if (!customers) {
-                try {
-                    const { data: authUserRes } = await supabase.auth.admin.getUser(data.buyer_id)
-                    const user = authUserRes?.user
-                    if (user) {
-                        const email = user.email
-                        const phone = user.phone
-                        
-                        if (email || phone) {
-                            let query = supabase
-                                .from("customers")
-                                .select("id, name, email, phone, addresses(*)")
-                                .eq("partner_id", partnerId)
-                            
-                            if (email && phone) {
-                                query = query.or(`email.eq.${email},phone.eq.${phone}`)
-                            } else if (email) {
-                                query = query.eq("email", email)
-                            } else if (phone) {
-                                query = query.eq("phone", phone)
-                            }
+            try {
+                const { data: authUserRes } = await supabase.auth.admin.getUser(data.buyer_id)
+                const authUser = authUserRes?.user
+                if (authUser) {
+                    const email = authUser.email
+                    const phone = authUser.phone
 
-                            const { data: matchedCustomers } = await query.limit(1)
-                            if (matchedCustomers && matchedCustomers.length > 0) {
-                                customers = matchedCustomers[0]
-                            }
+                    if (email || phone) {
+                        let query = supabase
+                            .from("customers")
+                            .select("id, name, email, phone, addresses(*)")
+                            .eq("partner_id", partnerId)
+
+                        if (email && phone) {
+                            query = query.or(`email.eq.${email},phone.eq.${phone}`)
+                        } else if (email) {
+                            query = query.eq("email", email)
+                        } else if (phone) {
+                            query = query.eq("phone", phone)
+                        }
+
+                        const { data: matchedCustomers } = await query.limit(1)
+                        if (matchedCustomers && matchedCustomers.length > 0) {
+                            return matchedCustomers[0]
                         }
                     }
-                } catch (err) {
-                    console.error("Error looking up customer for marketplace order:", err)
                 }
+            } catch (err) {
+                console.error("Error looking up customer for marketplace order:", err)
             }
+            return null
         }
 
-        let sellerName: string | null = null
-        if (data.created_by) {
+        const resolveSellerName = async () => {
+            if (!data.created_by) return null
             const { data: sellerProfile } = await supabase
                 .from("user_profiles")
                 .select("full_name")
                 .eq("user_id", data.created_by)
                 .single()
-            sellerName = sellerProfile?.full_name || null
+            return sellerProfile?.full_name || null
         }
+
+        const [customers, sellerName] = await Promise.all([resolveCustomer(), resolveSellerName()])
 
         const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
             return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))
@@ -1688,33 +1696,33 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
     if (saleError || !sale) return { error: "Pedido não encontrado" }
 
-    let customers = null
-    if (sale.customer_id) {
-        const { data: customerData } = await supabase
-            .from("customers")
-            .select("id, name, email, phone, addresses(*)")
-            .eq("id", sale.customer_id)
-            .single()
-        customers = customerData
-    }
-
-    let saleSellerName: string | null = null
-    if ((sale as any).finalized_by_user_id) {
-        const { data: sellerProfile } = await supabase
-            .from("user_profiles")
-            .select("full_name")
-            .eq("user_id", (sale as any).finalized_by_user_id)
-            .single()
-        saleSellerName = sellerProfile?.full_name || null
-    }
-
-    const { data: saleDraft } = await supabase
-        .from("pre_sales")
-        .select("shipping_fee, other_costs, discount_amount, coupon_discount_amount")
-        .eq("id", sale.pre_sale_id)
-        .eq("partner_id", partnerId)
-        .limit(1)
-        .maybeSingle()
+    // P3: cliente, vendedor e pre_sale são independentes — resolve em paralelo.
+    const [customers, saleSellerName, saleDraft] = await Promise.all([
+        sale.customer_id
+            ? supabase
+                .from("customers")
+                .select("id, name, email, phone, addresses(*)")
+                .eq("id", sale.customer_id)
+                .single()
+                .then((res: any) => res.data)
+            : Promise.resolve(null),
+        (sale as any).finalized_by_user_id
+            ? supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", (sale as any).finalized_by_user_id)
+                .single()
+                .then((res: any) => res.data?.full_name || null)
+            : Promise.resolve(null),
+        supabase
+            .from("pre_sales")
+            .select("shipping_fee, other_costs, discount_amount, coupon_discount_amount")
+            .eq("id", sale.pre_sale_id)
+            .eq("partner_id", partnerId)
+            .limit(1)
+            .maybeSingle()
+            .then((res: any) => res.data),
+    ])
 
     const shippingCost = Number(saleDraft?.shipping_fee || 0)
     const otherCosts = Number((saleDraft as any)?.other_costs || 0)
@@ -2363,6 +2371,29 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const processingWarnings: string[] = []
         let processedCount = 0
 
+        // P2: Pré-carrega o mapa user_id -> partner_user_id de TODOS os vendedores
+        // dos pedidos em UMA única query, evitando N+1 (1 SELECT por pedido no loop).
+        const sellerPartnerUserIdMap = new Map<string, string>()
+        const creatorUserIds = Array.from(
+            new Set(
+                (currentOrders || [])
+                    .map((o: any) => o.created_by)
+                    .filter((id: any): id is string => Boolean(id)),
+            ),
+        )
+        if (creatorUserIds.length > 0) {
+            const { data: partnerUsersRows } = await supabase
+                .from("partner_users")
+                .select("id, user_id")
+                .eq("partner_id", payload.partnerId)
+                .in("user_id", creatorUserIds)
+            for (const row of partnerUsersRows || []) {
+                if (row.user_id && row.id) {
+                    sellerPartnerUserIdMap.set(String(row.user_id), String(row.id))
+                }
+            }
+        }
+
         for (const order of currentOrders || []) {
             if (payload.actionType === "cancel") {
                 if (order.situation === "cancelled") continue
@@ -2450,11 +2481,9 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     }
                 }
 
-                const sellerPartnerUserId = await resolvePartnerUserIdFromUserId(
-                    supabase,
-                    payload.partnerId,
-                    order.created_by || null,
-                )
+                const sellerPartnerUserId = order.created_by
+                    ? sellerPartnerUserIdMap.get(String(order.created_by)) ?? null
+                    : null
                 if (sellerPartnerUserId) {
                     await reverseCommissionForEntity({
                         supabase,
@@ -2706,6 +2735,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         const deliveryWarnings: string[] = []
         let deliveryProcessedCount = 0
+
+        // P4: separa os pedidos elegíveis em dois grupos para evitar N UPDATEs sequenciais:
+        // - finalizeOrders: precisam finalizar o estoque antes do update (efeito colateral, loop individual)
+        // - simpleOrders: apenas mudança de status idêntica -> um único UPDATE em massa via .in()
+        const eligibleDeliveryOrders: any[] = []
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
                 deliveryWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o status de entrega alterado.`)
@@ -2715,27 +2749,35 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 deliveryWarnings.push(`Pedido ${order.order_number || order.id}: já está entregue e não pode ter o status de entrega alterado.`)
                 continue
             }
-            const shouldFinalizeNow = !order.inventory_deducted && shouldDeductInventory(payload.statusValue)
+            eligibleDeliveryOrders.push(order)
+        }
 
-            if (shouldFinalizeNow) {
-                const finalizeResult = await finalizeOrderInventory({
-                    client: supabase,
-                    partnerId: payload.partnerId,
-                    orderId: order.id,
-                    createdBy: user.id,
-                    reason: "Venda de Produtos",
-                    notes: normalizeOrderNotes(order.notes) || undefined,
-                    items: order.order_items || [],
-                })
+        const finalizeDeliveryOrders = eligibleDeliveryOrders.filter(
+            (order) => !order.inventory_deducted && shouldDeductInventory(payload.statusValue),
+        )
+        const simpleDeliveryOrders = eligibleDeliveryOrders.filter(
+            (order) => !(!order.inventory_deducted && shouldDeductInventory(payload.statusValue)),
+        )
 
-                if ("error" in finalizeResult) return { error: finalizeResult.error }
-            }
+        // Pedidos com efeito colateral: finaliza estoque e atualiza individualmente (marca inventory_deducted).
+        for (const order of finalizeDeliveryOrders) {
+            const finalizeResult = await finalizeOrderInventory({
+                client: supabase,
+                partnerId: payload.partnerId,
+                orderId: order.id,
+                createdBy: user.id,
+                reason: "Venda de Produtos",
+                notes: normalizeOrderNotes(order.notes) || undefined,
+                items: order.order_items || [],
+            })
+
+            if ("error" in finalizeResult) return { error: finalizeResult.error }
 
             const { error } = await supabase
                 .from("orders")
                 .update({
                     delivery_status: payload.statusValue,
-                    ...(shouldFinalizeNow ? { inventory_deducted: true } : {}),
+                    inventory_deducted: true,
                 })
                 .eq("id", order.id)
                 .eq("partner_id", payload.partnerId)
@@ -2743,6 +2785,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             deliveryProcessedCount += 1
         }
+
+        // Pedidos simples (mesmo valor de status, sem efeito colateral): um único UPDATE em massa.
+        if (simpleDeliveryOrders.length > 0) {
+            const { error } = await supabase
+                .from("orders")
+                .update({ delivery_status: payload.statusValue })
+                .in("id", simpleDeliveryOrders.map((order) => order.id))
+                .eq("partner_id", payload.partnerId)
+
+            if (error) return { error: error.message }
+            deliveryProcessedCount += simpleDeliveryOrders.length
+        }
+
         if (deliveryProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de entrega." }
         }
@@ -2855,7 +2910,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 }
             }
         })
-        .catch(() => {})
+        .catch(() => { })
 
     if (overallWarnings.length > 0) {
         return { success: true, warning: overallWarnings.join(" | ") }
@@ -2932,9 +2987,17 @@ export async function getERPOrdersPageAction(
                 .limit(fetchLimit)
         }
 
-        let queryResult = await buildQuery(selectWithPosSale)
+        // P5: usa o resultado da detecção em cache para escolher o select correto de
+        // primeira, sem depender de tentativa-e-erro a cada request. Só faz o fallback
+        // (e custa 2 queries) na primeira vez que a coluna ausente é detectada.
+        let queryResult = await buildQuery(
+            ordersHasPosSaleColumn === false ? selectWithoutPosSale : selectWithPosSale,
+        )
         if (queryResult.error && isMissingOrdersIsPosSaleColumnError(queryResult.error)) {
+            ordersHasPosSaleColumn = false
             queryResult = await buildQuery(selectWithoutPosSale)
+        } else if (!queryResult.error && ordersHasPosSaleColumn === null) {
+            ordersHasPosSaleColumn = true
         }
 
         const { data, error } = queryResult

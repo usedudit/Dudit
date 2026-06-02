@@ -890,7 +890,7 @@ export function ProductDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.current)} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 block text-left px-0 py-0">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -903,12 +903,12 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
                                 <div className="flex items-center gap-2">
-                                    <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                                    <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {formatMoney(pricing.current)}
                                     </p>
                                     <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 px-0 py-0 block text-left">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -929,7 +929,7 @@ export function ProductDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.original)} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 px-0 py-0 block text-left">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -939,10 +939,10 @@ export function ProductDetailsPageClient({
                     // Caso 4: Sem promoção e sem Pix
                     return (
                         <div className="space-y-1">
-                            <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                            <p className="text-3xl leading-none font-bold text-brand-dark">
                                 {formatMoney(pricing.current)}
                             </p>
-                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 block text-left">
+                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
                                 Ver opções de pagamento
                             </Button>
                         </div>

@@ -9,7 +9,7 @@ import { getUserFavoritesAction, getFavoritesCountAction } from "@/app/actions/m
 import { ItemCard } from "./shared-components"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { Button, IconPlaceholder, DefaultModal, SkeletonLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, DefaultModal, SkeletonLoader, Input } from "@/components/reusable"
 import { RadioButton } from "@/components/reusable/RadioButton"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -135,25 +135,14 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
 
     return (
         <>
-            <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
-            <div className="min-h-screen bg-white font-sans pt-2">
-                <div className="container mx-auto px-4 max-w-[1400px] pb-24 lg:pb-12">
+            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+                <AnimatePresence mode="wait">
                     {/* Header */}
-                    <div className="mt-6 mb-6">
-                        <div className="flex items-center gap-3 mb-1">
-                            <HeartIcon size={24} className="text-red-500 fill-red-500" />
-                            <h1 className="text-xl lg:text-3xl font-medium text-brand-dark">
-                                Favoritos
-                                {counts.total > 0 && (
-                                    <span className="text-brand-inactive-text font-normal text-base lg:text-lg ml-2">
-                                        ({counts.total})
-                                    </span>
-                                )}
-                            </h1>
+                    <div className="hidden lg:block items-center mb-8">
+                        <div>
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">Favoritos {counts.total > 0 && (<span className="text-brand-inactive-text font-bold text-base lg:text-lg ml-2">({counts.total})</span>)}</h1>
+                            <p className="text-md text-brand-inactive-text mt-1">Seus produtos e serviços salvos em um só lugar</p>
                         </div>
-                        <p className="text-sm text-brand-inactive-text mt-1">
-                            Seus produtos e serviços salvos em um só lugar
-                        </p>
                     </div>
 
                     {/* Tabs */}
@@ -162,16 +151,14 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                             <button
                                 key={tab.value}
                                 onClick={() => setActiveTab(tab.value)}
-                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 cursor-pointer select-none ${
-                                    activeTab === tab.value
-                                        ? "bg-brand-dark text-white shadow-sm"
-                                        : "bg-gray-100 text-brand-dark hover:bg-gray-200"
-                                }`}
+                                className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 cursor-pointer select-none ${activeTab === tab.value
+                                    ? "bg-brand-dark text-white shadow-sm"
+                                    : "bg-gray-100 text-brand-dark hover:bg-gray-200"
+                                    }`}
                             >
                                 {tab.label}
-                                <span className={`ml-1.5 text-xs ${
-                                    activeTab === tab.value ? "text-white/70" : "text-brand-inactive-text"
-                                }`}>
+                                <span className={`ml-1.5 text-xs ${activeTab === tab.value ? "text-white/70" : "text-brand-inactive-text"
+                                    }`}>
                                     {tabCount(tab.value)}
                                 </span>
                             </button>
@@ -183,27 +170,27 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                         <div className="flex items-center gap-3 mb-6">
                             {/* Search */}
                             <div className="relative flex-1 max-w-md">
-                                <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-inactive-text" />
-                                <input
-                                    type="text"
+                                <Input
+                                    label=""
+                                    name="searchQuery"
                                     placeholder="Buscar nos favoritos..."
+                                    value={searchQuery}
                                     onChange={(e) => handleSearchChange(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-all"
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                    className="mb-0"
+                                    variant="full-rounded"
                                 />
                             </div>
 
                             {/* Sort */}
-                            <button
+                            <Button
                                 onClick={() => setIsSortModalOpen(true)}
-                                className={`px-4 py-2.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 whitespace-nowrap select-none cursor-pointer transition-all ${
-                                    sortBy !== "recentes"
-                                        ? "bg-[#ecfdf5] border-brand-green text-brand-green"
-                                        : "bg-white border-gray-200 text-brand-dark hover:border-gray-300"
-                                }`}
+                                variant="outline"
+                                className="flex items-center gap-2 w-fit"
+                                rightIcon={<ChevronDownIcon size={14} />}
                             >
-                                <span>{SORT_OPTIONS.find((s) => s.value === sortBy)?.label}</span>
-                                <ChevronDownIcon size={14} />
-                            </button>
+                                {SORT_OPTIONS.find((s) => s.value === sortBy)?.label}
+                            </Button>
                         </div>
                     )}
 
@@ -237,15 +224,14 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                             )}
                         </motion.div>
                     </AnimatePresence>
-                </div>
-
-                <MarketplaceFooter />
-            </div>
+                </AnimatePresence >
+            </div >
 
             {/* Sort Modal */}
-            <DefaultModal
+            < DefaultModal
                 isOpen={isSortModalOpen}
-                onClose={() => setIsSortModalOpen(false)}
+                onClose={() => setIsSortModalOpen(false)
+                }
                 title="Ordenar por"
                 maxWidth="md"
             >
@@ -264,7 +250,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
                         />
                     ))}
                 </div>
-            </DefaultModal>
+            </DefaultModal >
         </>
     )
 }

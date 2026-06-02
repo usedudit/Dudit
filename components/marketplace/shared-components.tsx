@@ -82,9 +82,9 @@ export const VitrineCard: React.FC<VitrineCardProps> = ({ vitrine, hideCity = fa
         <Link
             href={getPartnerUrl(partner)}
             prefetch={false}
-            className={`flex flex-col group cursor-pointer hover:-translate-y-1 active:scale-[0.98] transition-all duration-300 ${className}`}
+            className={`flex flex-col group cursor-pointer active:scale-[0.98] transition-all duration-300 ${className}`}
         >
-            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 shadow-sm group-hover:shadow-md transition-all duration-300">
+            <div className="relative w-full aspect-[16/7] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 transition-all duration-300">
                 <img
                     src={bannerImage}
                     alt={vitrine.name}

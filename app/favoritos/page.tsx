@@ -3,6 +3,8 @@ import { FavoritesPageClient } from "@/components/marketplace/FavoritesPageClien
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { redirect } from "next/navigation"
+import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader"
+import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
 export const metadata: Metadata = {
     title: "Favoritos | Dudit",
@@ -30,11 +32,15 @@ export default async function FavoritosPage() {
     const cartCount = sessionData?.cartCount || 0
 
     return (
-        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[60px]">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+            <MarketplaceHeader simpleTitle="Meus favoritos" userProfile={userProfile} cartCount={cartCount} />
+
             <FavoritesPageClient
                 userProfile={userProfile}
                 cartCount={cartCount}
             />
+
+            <MarketplaceFooter />
         </div>
     )
 }

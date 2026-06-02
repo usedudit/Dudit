@@ -292,7 +292,7 @@ export function CheckoutPageClient() {
         }
 
         const updatedProducts = [...products, newProductItem]
-        
+
         const updatedCartItems = sessionData.source === "cart"
             ? [...(sessionData.cartItems || [])]
             : products.map((item) => ({
@@ -301,7 +301,7 @@ export function CheckoutPageClient() {
                 variantId: item.variant || undefined,
                 quantity: item.quantity
             }))
-        
+
         updatedCartItems.push({
             cartItemId: "bump-" + p.id,
             productId: p.id,
@@ -1248,9 +1248,7 @@ export function CheckoutPageClient() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
                         <div className="lg:col-span-8 space-y-4">
-
                             {/* ENTREGA */}
                             <FormSection title="Entrega">
                                 <div className="space-y-6">
