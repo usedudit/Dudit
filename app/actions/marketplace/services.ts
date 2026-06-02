@@ -45,11 +45,31 @@ async function _getMarketplaceService(serviceId: string) {
       service_categories:service_categories!category_id (name)
     `)
     .eq("id", serviceId)
-    .eq("is_active", true)
     .maybeSingle()
 
   if (error || !data) {
     console.error("[Service] Fetch error:", error?.message)
+    return null
+  }
+
+  const user = await getCurrentUser()
+  const rawPartner = Array.isArray(data.partners) ? data.partners[0] : data.partners
+  const partnerId = rawPartner?.id || data.partner_id
+  const isOwner = !!(user && rawPartner?.user_id === user.id)
+  let isTeamMember = false
+
+  if (user && !isOwner && partnerId) {
+    const { data: membership } = await supabase
+      .from("partner_users")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("user_id", user.id)
+      .maybeSingle()
+    isTeamMember = !!membership
+  }
+
+  const isPubliclyVisible = data.is_active && data.show_in_marketplace !== false
+  if (!isPubliclyVisible && !isOwner && !isTeamMember) {
     return null
   }
 
@@ -161,31 +181,6 @@ export async function getPublicAvailableTimeSlots(
 
     const supabase = getAdminClient()
 
-    // Fetch partner opening hours for the day
-    const { data: partnerData } = await supabase
-      .from("partners")
-      .select("opening_hours")
-      .eq("id", partnerId)
-      .single()
-
-    const dayOfWeek = new Date(date + "T12:00:00").getDay()
-    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-    const dayKey = dayNames[dayOfWeek]
-
-    let bh = DEFAULT_BUSINESS_HOURS
-    if (partnerData?.opening_hours && typeof partnerData.opening_hours === "object") {
-      const dayConfig = (partnerData.opening_hours as any)[dayKey]
-      if (dayConfig && !dayConfig.closed) {
-        const open = String(dayConfig.open || "08:00")
-        const close = String(dayConfig.close || "19:00")
-        const [oh, om] = open.split(":").map(Number)
-        const [ch, cm] = close.split(":").map(Number)
-        bh = { startHour: oh || 8, startMinute: om || 0, endHour: ch || 19, endMinute: cm || 0 }
-      } else if (dayConfig?.closed) {
-        return { success: true, slots: [] } // Closed on this day
-      }
-    }
-
     // Fetch existing appointments for this staff on this date
     const { data: existingAppts, error } = await supabase
       .from("appointments")
@@ -215,9 +210,9 @@ export async function getPublicAvailableTimeSlots(
       return { start: startMin, end: endMin + bufferMinutes }
     })
 
-    // Generate available slots within business hours
-    const dayStartMin = bh.startHour * 60 + bh.startMinute
-    const dayEndMin = bh.endHour * 60 + bh.endMinute
+    // Generate available slots with the same rule used by the ERP agenda.
+    const dayStartMin = DEFAULT_BUSINESS_HOURS.startHour * 60 + DEFAULT_BUSINESS_HOURS.startMinute
+    const dayEndMin = DEFAULT_BUSINESS_HOURS.endHour * 60 + DEFAULT_BUSINESS_HOURS.endMinute
     const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
 
     const slots: string[] = []

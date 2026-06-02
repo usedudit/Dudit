@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -16,7 +17,6 @@ import {
   CheckIcon,
   ShareIcon,
   HeartIcon,
-  MapPinIcon,
   XIcon,
   TruckIcon,
   ArrowLeftRightIcon,
@@ -29,7 +29,6 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
-import { VitrineCard } from "./shared-components"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -41,7 +40,6 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
-import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -60,6 +58,12 @@ type BookingStep = "info" | "schedule" | "confirm"
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
+
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? "-100%" : "100%", opacity: 0 }),
+}
 
 function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
@@ -123,6 +127,11 @@ export function ServiceDetailsPageClient({
   const [showShareModal, setShowShareModal] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [activeImgIndex, setActiveImgIndex] = useState(0)
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
+  const lightboxJustOpened = useRef(false)
 
   // Redesign states
   const [cep, setCep] = useState("")
@@ -147,7 +156,7 @@ export function ServiceDetailsPageClient({
   const [loadingAddresses, setLoadingAddresses] = useState(false)
   const [loadingCep, setLoadingCep] = useState(false)
   const [newAddressData, setNewAddressData] = useState({
-      zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
+    zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
   })
 
   const partner = useMemo(() => {
@@ -228,208 +237,208 @@ export function ServiceDetailsPageClient({
 
   // Load user addresses if logged in
   useEffect(() => {
-      if (userId) {
-          loadUserAddresses()
-      } else {
-          setUserAddresses([])
-          setSelectedAddressId("")
-      }
+    if (userId) {
+      loadUserAddresses()
+    } else {
+      setUserAddresses([])
+      setSelectedAddressId("")
+    }
   }, [userId])
 
   const loadUserAddresses = async () => {
-      if (!userId) return
-      setLoadingAddresses(true)
-      try {
-          const result = await getAddressesAction(userId, "user")
-          if (result.addresses) {
-              const list = result.addresses as any[]
-              setUserAddresses(list)
-              const defaultAddress = list.find((a: any) => a.is_default)
-              if (defaultAddress) {
-                  setSelectedAddressId(defaultAddress.id)
-              } else if (list.length > 0) {
-                  setSelectedAddressId(list[0].id)
-              }
-          }
-      } catch (err) {
-          console.error("Error loading addresses:", err)
-      } finally {
-          setLoadingAddresses(false)
+    if (!userId) return
+    setLoadingAddresses(true)
+    try {
+      const result = await getAddressesAction(userId, "user")
+      if (result.addresses) {
+        const list = result.addresses as any[]
+        setUserAddresses(list)
+        const defaultAddress = list.find((a: any) => a.is_default)
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id)
+        } else if (list.length > 0) {
+          setSelectedAddressId(list[0].id)
+        }
       }
+    } catch (err) {
+      console.error("Error loading addresses:", err)
+    } finally {
+      setLoadingAddresses(false)
+    }
   }
 
   const buildAddressString = (a: any) =>
-      `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
+    `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
   const handleAddressSelect = (addressId: string) => {
-      setSelectedAddressId(addressId)
+    setSelectedAddressId(addressId)
   }
 
   const handleCepBlur = async () => {
-      const zip = newAddressData.zipCode.replace(/\D/g, "")
-      if (zip.length !== 8) return
-      setLoadingCep(true)
-      try {
-          const response = await fetch(`/api/cep?cep=${zip}`)
-          const data = await response.json()
-          if (!data.erro && !data.error) {
-              setNewAddressData(prev => ({
-                  ...prev,
-                  street: data.logradouro || prev.street,
-                  neighborhood: data.bairro || prev.neighborhood,
-                  city: data.localidade || data.municipio || prev.city,
-                  state: data.uf || prev.state,
-              }))
-          }
-      } catch (err) {
-          console.error("Erro ao buscar CEP:", err)
-      } finally {
-          setLoadingCep(false)
+    const zip = newAddressData.zipCode.replace(/\D/g, "")
+    if (zip.length !== 8) return
+    setLoadingCep(true)
+    try {
+      const response = await fetch(`/api/cep?cep=${zip}`)
+      const data = await response.json()
+      if (!data.erro && !data.error) {
+        setNewAddressData(prev => ({
+          ...prev,
+          street: data.logradouro || prev.street,
+          neighborhood: data.bairro || prev.neighborhood,
+          city: data.localidade || data.municipio || prev.city,
+          state: data.uf || prev.state,
+        }))
       }
+    } catch (err) {
+      console.error("Erro ao buscar CEP:", err)
+    } finally {
+      setLoadingCep(false)
+    }
   }
 
   const handleSaveNewAddress = async () => {
-      if (!userId) return
-      const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
-      const finalNumber = noNumber ? "S/N" : number
-      if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-          setDeliveryError("Preencha todos os campos obrigatórios do endereço")
-          return
-      }
-      setDeliveryLoading(true)
-      let csrfToken = ""
-      try {
-          const csrfRes = await fetch("/api/csrf-token")
-          const csrfData = await csrfRes.json()
-          csrfToken = csrfData.token || ""
-      } catch {
-          notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
-          setDeliveryLoading(false)
-          return
-      }
-      const result = await createAddressAction({
-          entityId: userId, entityType: "user",
-          street, number: finalNumber, complement: newAddressData.complement,
-          neighborhood, city, state, zipCode,
-          isDefault: userAddresses.length === 0,
-          csrf_token: csrfToken,
-      })
-      if (result.error) {
-          setDeliveryError(result.error)
-      } else {
-          if (result.address) {
-              setUserAddresses(prev => [...prev, result.address])
-              setSelectedAddressId(result.address.id)
-          } else {
-              await loadUserAddresses()
-          }
-          setShowAddressForm(false)
-          setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
-          setDeliveryError(null)
-      }
+    if (!userId) return
+    const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+    const finalNumber = noNumber ? "S/N" : number
+    if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
+      setDeliveryError("Preencha todos os campos obrigatórios do endereço")
+      return
+    }
+    setDeliveryLoading(true)
+    let csrfToken = ""
+    try {
+      const csrfRes = await fetch("/api/csrf-token")
+      const csrfData = await csrfRes.json()
+      csrfToken = csrfData.token || ""
+    } catch {
+      notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
       setDeliveryLoading(false)
+      return
+    }
+    const result = await createAddressAction({
+      entityId: userId, entityType: "user",
+      street, number: finalNumber, complement: newAddressData.complement,
+      neighborhood, city, state, zipCode,
+      isDefault: userAddresses.length === 0,
+      csrf_token: csrfToken,
+    })
+    if (result.error) {
+      setDeliveryError(result.error)
+    } else {
+      if (result.address) {
+        setUserAddresses(prev => [...prev, result.address])
+        setSelectedAddressId(result.address.id)
+      } else {
+        await loadUserAddresses()
+      }
+      setShowAddressForm(false)
+      setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false })
+      setDeliveryError(null)
+    }
+    setDeliveryLoading(false)
   }
 
   // Automatically calculate delivery when selectedAddress changes (for logged in users)
   useEffect(() => {
-      if (!selectedAddress || !partner.id) return
-      let active = true
+    if (!selectedAddress || !partner.id) return
+    let active = true
 
-      async function calculateForAddress() {
-          setDeliveryLoading(true)
+    async function calculateForAddress() {
+      setDeliveryLoading(true)
+      setDeliveryError(null)
+      try {
+        const addressStr = buildAddressString(selectedAddress)
+        setCalculatedAddress(`${selectedAddress.city} - ${selectedAddress.state}`)
+        setShippingState("calculated")
+        setCep(selectedAddress.zip_code || "")
+
+        const quote = await quoteDeliveryFeeAction({
+          partnerId: partner.id,
+          destinationAddress: addressStr,
+        })
+        if (!active) return
+        if (quote.success) {
+          setDeliveryFee(Number(quote.fee || 0))
           setDeliveryError(null)
-          try {
-              const addressStr = buildAddressString(selectedAddress)
-              setCalculatedAddress(`${selectedAddress.city} - ${selectedAddress.state}`)
-              setShippingState("calculated")
-              setCep(selectedAddress.zip_code || "")
-
-              const quote = await quoteDeliveryFeeAction({
-                  partnerId: partner.id,
-                  destinationAddress: addressStr,
-              })
-              if (!active) return
-              if (quote.success) {
-                  setDeliveryFee(Number(quote.fee || 0))
-                  setDeliveryError(null)
-              } else {
-                  setDeliveryFee(null)
-                  setDeliveryError(quote.error || "Não realizamos entrega para este endereço.")
-              }
-          } catch (err) {
-              if (active) {
-                  setDeliveryError("Erro ao calcular o frete.")
-                  setDeliveryFee(null)
-                  setCalculatedAddress(null)
-              }
-          } finally {
-              if (active) setDeliveryLoading(false)
-          }
+        } else {
+          setDeliveryFee(null)
+          setDeliveryError(quote.error || "Não realizamos entrega para este endereço.")
+        }
+      } catch (err) {
+        if (active) {
+          setDeliveryError("Erro ao calcular o frete.")
+          setDeliveryFee(null)
+          setCalculatedAddress(null)
+        }
+      } finally {
+        if (active) setDeliveryLoading(false)
       }
+    }
 
-      calculateForAddress()
-      return () => { active = false }
+    calculateForAddress()
+    return () => { active = false }
   }, [selectedAddress, partner.id])
 
   // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
   useEffect(() => {
-      if (userId) return // If logged in, use selectedAddress useEffect
-      const cleanedCep = cep.replace(/\D/g, "")
-      if (cleanedCep.length !== 8) {
-          if (cleanedCep.length === 0) {
-              setDeliveryFee(null)
-              setDeliveryError(null)
-              setCalculatedAddress(null)
-              setShippingState("initial")
-          }
+    if (userId) return // If logged in, use selectedAddress useEffect
+    const cleanedCep = cep.replace(/\D/g, "")
+    if (cleanedCep.length !== 8) {
+      if (cleanedCep.length === 0) {
+        setDeliveryFee(null)
+        setDeliveryError(null)
+        setCalculatedAddress(null)
+        setShippingState("initial")
+      }
+      return
+    }
+
+    let active = true
+    async function calculateForCep() {
+      setDeliveryLoading(true)
+      setDeliveryError(null)
+      try {
+        const response = await fetch(`/api/cep?cep=${cleanedCep}`)
+        const data = await response.json()
+        if (!active) return
+
+        if (data.erro || data.error) {
+          setDeliveryError("CEP não encontrado.")
+          setDeliveryFee(null)
+          setCalculatedAddress(null)
           return
-      }
+        }
 
-      let active = true
-      async function calculateForCep() {
-          setDeliveryLoading(true)
+        const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
+        setCalculatedAddress(`${data.localidade} - ${data.uf}`)
+        setShippingState("calculated")
+
+        const quote = await quoteDeliveryFeeAction({
+          partnerId: partner.id,
+          destinationAddress: addressStr,
+        })
+        if (!active) return
+        if (quote.success) {
+          setDeliveryFee(Number(quote.fee || 0))
           setDeliveryError(null)
-          try {
-              const response = await fetch(`/api/cep?cep=${cleanedCep}`)
-              const data = await response.json()
-              if (!active) return
-
-              if (data.erro || data.error) {
-                  setDeliveryError("CEP não encontrado.")
-                  setDeliveryFee(null)
-                  setCalculatedAddress(null)
-                  return
-              }
-
-              const addressStr = `${data.logradouro || "Rua"}, S/N - ${data.bairro || "Bairro"}, ${data.localidade || "Cidade"} - ${data.uf || "UF"}, ${cleanedCep}`
-              setCalculatedAddress(`${data.localidade} - ${data.uf}`)
-              setShippingState("calculated")
-
-              const quote = await quoteDeliveryFeeAction({
-                  partnerId: partner.id,
-                  destinationAddress: addressStr,
-              })
-              if (!active) return
-              if (quote.success) {
-                  setDeliveryFee(Number(quote.fee || 0))
-                  setDeliveryError(null)
-              } else {
-                  setDeliveryFee(null)
-                  setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
-              }
-          } catch (err) {
-              if (active) {
-                  setDeliveryError("Erro ao calcular o frete.")
-                  setDeliveryFee(null)
-                  setCalculatedAddress(null)
-              }
-          } finally {
-              if (active) setDeliveryLoading(false)
-          }
+        } else {
+          setDeliveryFee(null)
+          setDeliveryError(quote.error || "Não realizamos entrega para este CEP.")
+        }
+      } catch (err) {
+        if (active) {
+          setDeliveryError("Erro ao calcular o frete.")
+          setDeliveryFee(null)
+          setCalculatedAddress(null)
+        }
+      } finally {
+        if (active) setDeliveryLoading(false)
       }
+    }
 
-      calculateForCep()
-      return () => { active = false }
+    calculateForCep()
+    return () => { active = false }
   }, [cep, partner.id, userId])
 
   useEffect(() => { setIsMounted(true) }, [])
@@ -444,48 +453,79 @@ export function ServiceDetailsPageClient({
     return images.length > 0 ? images : [PLACEHOLDER]
   }, [service.images])
 
+  const galleryItems = useMemo(() => {
+    return serviceImages.map((src: any) => ({ type: "image" as const, src }))
+  }, [serviceImages])
+
+  const goToImage = useCallback((index: number) => {
+    setSlideDirection(index > activeImgIndex ? 1 : -1)
+    setActiveImgIndex(index)
+  }, [activeImgIndex])
+
+  const goToPrev = useCallback(() => {
+    setSlideDirection(-1)
+    setActiveImgIndex((p: number) => (p - 1 + galleryItems.length) % galleryItems.length)
+  }, [galleryItems.length])
+
+  const goToNext = useCallback(() => {
+    setSlideDirection(1)
+    setActiveImgIndex((p: number) => (p + 1) % galleryItems.length)
+  }, [galleryItems.length])
+
+  const lightboxNav = useCallback((dir: 1 | -1) => {
+    lightboxJustOpened.current = false
+    setSlideDirection(dir)
+    setLightboxActiveImg((p: number) => (p + dir + galleryItems.length) % galleryItems.length)
+  }, [galleryItems.length])
+
+  const openLightbox = useCallback((index: number) => {
+    lightboxJustOpened.current = true
+    setLightboxActiveImg(index)
+    setIsLightboxOpen(true)
+  }, [])
+
   const durationMinutes = Number(service.duration_minutes || 60)
   const bufferMinutes = Number(service.buffer_minutes || 0)
   const price = Number(service.price || 0)
   const categoryName = (service as any).service_categories?.name || "Serviço"
 
   const pricing = useMemo(() => {
-      const base = Number(service.price) || 0
-      const promo = Number(service.promotional_price) || 0
-      const hasPromo = promo > 0 && promo < base
-      const current = hasPromo ? promo : base
-      const total = current
+    const base = Number(service.price) || 0
+    const promo = Number(service.promotional_price) || 0
+    const hasPromo = promo > 0 && promo < base
+    const current = hasPromo ? promo : base
+    const total = current
 
-      // Real Pix Discount from Partner's payment methods
-      const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
-      const pixDiscountPercent = pixMethod?.discount_percent || 0
-      const pixTotal = total * (1 - (pixDiscountPercent / 100))
+    // Real Pix Discount from Partner's payment methods
+    const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
+    const pixDiscountPercent = pixMethod?.discount_percent || 0
+    const pixTotal = total * (1 - (pixDiscountPercent / 100))
 
-      // Real Installments from Partner's credit card method
-      const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
-      const hasCC = !!ccMethod
-      const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-      const installmentPrice = total / maxInstallments
+    // Real Installments from Partner's credit card method
+    const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
+    const hasCC = !!ccMethod
+    const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
+    const installmentPrice = total / maxInstallments
 
-      return {
-          current, original: base, hasPromo, total,
-          pix: pixTotal,
-          pixDiscountPercent,
-          hasCC,
-          maxInstallments,
-          installment: installmentPrice,
-          discountPercent: Math.round(((base - promo) / base) * 100),
-      }
+    return {
+      current, original: base, hasPromo, total,
+      pix: pixTotal,
+      pixDiscountPercent,
+      hasCC,
+      maxInstallments,
+      installment: installmentPrice,
+      discountPercent: Math.round(((base - promo) / base) * 100),
+    }
   }, [service, partner])
 
   const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
-      products: [{
-          availability_value: Number(service.availability_value || 0),
-          availability_unit: service.availability_unit || "Minutos",
-      }],
-      openingHours: partner.opening_hours || null,
-      pickupWindowMinutes: 30,
-      deliveryTimeEstimateMinutes: 0,
+    products: [{
+      availability_value: Number(service.availability_value || 0),
+      availability_unit: service.availability_unit || "Minutos",
+    }],
+    openingHours: partner.opening_hours || null,
+    pickupWindowMinutes: 30,
+    deliveryTimeEstimateMinutes: 0,
   }), [service, partner.opening_hours])
 
   const isProductOwner = !!(userId && (userId === partner.user_id || isTeamMember))
@@ -658,86 +698,86 @@ export function ServiceDetailsPageClient({
 
       {/* Price */}
       <div className="mb-6">
-          {(() => {
-              const hasPromo = pricing.hasPromo;
-              const hasPix = pricing.pixDiscountPercent > 0;
-              const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
-              const totalDiscountPercent = pricing.original > 0 ? Math.round(((pricing.original - pixUnitPrice) / pricing.original) * 100) : 0;
+        {(() => {
+          const hasPromo = pricing.hasPromo;
+          const hasPix = pricing.pixDiscountPercent > 0;
+          const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
+          const totalDiscountPercent = pricing.original > 0 ? Math.round(((pricing.original - pixUnitPrice) / pricing.original) * 100) : 0;
 
-              // Caso 3: Promoção + Pix (melhor opção)
-              if (hasPromo && hasPix) {
-                  return (
-                      <div className="space-y-1">
-                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                          <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                                  {formatCurrency(pixUnitPrice)}
-                              </p>
-                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
-                              <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
-                          </div>
-                          <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                              ou {formatCurrency(pricing.current)} em outros meios
-                          </p>
-                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                              ver opções de pagamento
-                          </button>
-                      </div>
-                  );
-              }
+          // Caso 3: Promoção + Pix (melhor opção)
+          if (hasPromo && hasPix) {
+            return (
+              <div className="space-y-1">
+                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                    {formatCurrency(pixUnitPrice)}
+                  </p>
+                  <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                  <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
+                </div>
+                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                  ou {formatCurrency(pricing.current)} em outros meios
+                </p>
+                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                  ver opções de pagamento
+                </button>
+              </div>
+            );
+          }
 
-              // Caso 1: Só promoção
-              if (hasPromo && !hasPix) {
-                  return (
-                      <div className="space-y-1">
-                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                          <div className="flex items-center gap-2">
-                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                                  {formatCurrency(pricing.current)}
-                              </p>
-                              <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
-                          </div>
-                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                              ver opções de pagamento
-                          </button>
-                      </div>
-                  );
-              }
+          // Caso 1: Só promoção
+          if (hasPromo && !hasPix) {
+            return (
+              <div className="space-y-1">
+                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                <div className="flex items-center gap-2">
+                  <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                    {formatCurrency(pricing.current)}
+                  </p>
+                  <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
+                </div>
+                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                  ver opções de pagamento
+                </button>
+              </div>
+            );
+          }
 
-              // Caso 2: Só desconto no Pix
-              if (!hasPromo && hasPix) {
-                  return (
-                      <div className="space-y-1">
-                          <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
-                          <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                                  {formatCurrency(pixUnitPrice)}
-                              </p>
-                              <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
-                          </div>
-                          <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                              ou {formatCurrency(pricing.original)} em outros meios
-                          </p>
-                          <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                              ver opções de pagamento
-                          </button>
-                      </div>
-                  );
-              }
+          // Caso 2: Só desconto no Pix
+          if (!hasPromo && hasPix) {
+            return (
+              <div className="space-y-1">
+                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                    {formatCurrency(pixUnitPrice)}
+                  </p>
+                  <span className="text-brand-green font-bold text-xs">{pricing.pixDiscountPercent}% no Pix</span>
+                </div>
+                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                  ou {formatCurrency(pricing.original)} em outros meios
+                </p>
+                <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                  ver opções de pagamento
+                </button>
+              </div>
+            );
+          }
 
-              // Caso 4: Sem promoção e sem Pix
-              return (
-                  <div className="space-y-1">
-                      <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
-                          {formatCurrency(pricing.current)}
-                      </p>
-                      <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
-                          ver opções de pagamento
-                      </button>
-                  </div>
-              );
-          })()}
-        
+          // Caso 4: Sem promoção e sem Pix
+          return (
+            <div className="space-y-1">
+              <p className="text-xl sm:text-2xl md:text-[2.25rem] leading-none font-bold text-brand-dark">
+                {formatCurrency(pricing.current)}
+              </p>
+              <button type="button" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs md:text-[0.875rem] text-brand-green hover:underline font-bold mt-1 block text-left">
+                ver opções de pagamento
+              </button>
+            </div>
+          );
+        })()}
+
         <div className="flex items-center gap-2 text-sm text-brand-inactive-text mt-3">
           <ClockIcon size={14} />
           <span>{formatDuration(durationMinutes)}</span>
@@ -756,11 +796,10 @@ export function ServiceDetailsPageClient({
               <button
                 key={member.id}
                 onClick={() => setSelectedStaffId(member.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all ${
-                  selectedStaffId === member.id
-                    ? "border-brand-green bg-green-50 text-brand-green"
-                    : "border-brand-border text-brand-dark hover:border-gray-300 bg-white"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all ${selectedStaffId === member.id
+                  ? "border-brand-green bg-green-50 text-brand-green"
+                  : "border-brand-border text-brand-dark hover:border-gray-300 bg-white"
+                  }`}
               >
                 <UserProfileImage fullName={member.name} className="w-6 h-6" />
                 {member.name}
@@ -800,16 +839,14 @@ export function ServiceDetailsPageClient({
                 className="flex flex-col gap-2 cursor-pointer group items-center"
                 onClick={() => { setSelectedDate(d.dateStr); setSelectedTime("") }}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                  isSelected
-                    ? "bg-brand-dark text-white"
-                    : "text-brand-dark border border-gray-200 hover:border-brand-dark"
-                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${isSelected
+                  ? "bg-brand-dark text-white"
+                  : "text-brand-dark border border-gray-200 hover:border-brand-dark"
+                  }`}>
                   {d.num}
                 </div>
-                <span className={`text-xs font-medium ${
-                  isSelected ? "text-brand-dark" : "text-brand-inactive-text"
-                }`}>
+                <span className={`text-xs font-medium ${isSelected ? "text-brand-dark" : "text-brand-inactive-text"
+                  }`}>
                   {d.day}
                 </span>
               </div>
@@ -851,11 +888,10 @@ export function ServiceDetailsPageClient({
               <button
                 key={slot}
                 onClick={() => setSelectedTime(slot)}
-                className={`p-2.5 rounded-xl border text-sm font-bold transition-all text-center ${
-                  selectedTime === slot
-                    ? "border-brand-dark bg-brand-dark text-white"
-                    : "border-brand-border hover:border-gray-300 text-brand-dark"
-                }`}
+                className={`p-2.5 rounded-xl border text-sm font-bold transition-all text-center ${selectedTime === slot
+                  ? "border-brand-dark bg-brand-dark text-white"
+                  : "border-brand-border hover:border-gray-300 text-brand-dark"
+                  }`}
               >
                 {slot}
               </button>
@@ -1109,7 +1145,7 @@ export function ServiceDetailsPageClient({
                   <img src={sellerBannerImage} alt="" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/10" />
                 </div>
-                
+
                 {/* Profile Header */}
                 <div className="px-4 pt-0 relative flex flex-col">
                   {/* Avatar Container overlapping the banner */}
@@ -1120,7 +1156,7 @@ export function ServiceDetailsPageClient({
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  
+
                   {/* Store Name and Details */}
                   <div className="mt-2 min-w-0">
                     <div className="flex items-center gap-1.5 justify-between">
@@ -1149,15 +1185,14 @@ export function ServiceDetailsPageClient({
                       <span className="text-[10px] text-brand-inactive-text">Nível do profissional baseado em reputação e vendas</span>
                     </div>
                   </div>
-                  
+
                   {/* Horizontal segment bars */}
                   <div className="flex gap-1 h-1.5 w-full bg-transparent rounded-full overflow-hidden mt-1 select-none">
                     {[1, 2, 3, 4, 5].map((lvl) => (
                       <div
                         key={lvl}
-                        className={`flex-1 h-full rounded-sm transition-all duration-300 ${
-                          reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200"
-                        }`}
+                        className={`flex-1 h-full rounded-sm transition-all duration-300 ${reputationLevel.level >= lvl ? "bg-brand-green" : "bg-gray-200"
+                          }`}
                       />
                     ))}
                   </div>
@@ -1318,11 +1353,10 @@ export function ServiceDetailsPageClient({
                 handleAddressSelect(address.id)
                 setShowAddressModal(false)
               }}
-              className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${
-                selectedAddressId === address.id
-                  ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                  : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
-              }`}
+              className={`flex items-start border py-4 rounded-xl transition-all cursor-pointer ${selectedAddressId === address.id
+                ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
+                }`}
             >
               <div className="mt-2.5 shrink-0 px-4">
                 <RadioButton
@@ -1450,6 +1484,104 @@ export function ServiceDetailsPageClient({
         }
       />
 
+      {isMounted && createPortal(
+        <AnimatePresence>
+          {isLightboxOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[9999] bg-black/95 flex flex-col"
+            >
+              <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
+                <button onClick={() => setIsLightboxOpen(false)}
+                  className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                  <XIcon size={20} />
+                </button>
+                <span className="text-white text-sm font-semibold">
+                  {lightboxActiveImg + 1}/{galleryItems.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                    <HeartIcon size={20} />
+                  </button>
+                  <button onClick={() => setShowShareModal(true)} className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                    <ShareIcon size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="hidden lg:flex flex-1 min-h-0 relative">
+                <button onClick={() => setIsLightboxOpen(false)}
+                  className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                  <XIcon size={22} />
+                </button>
+
+                <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
+                  {galleryItems.map((item: { src: string | Blob | undefined }, i: number) => (
+                    <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
+                      className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
+                            ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
+                      <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
+                  <AnimatePresence mode="wait" custom={slideDirection}
+                    onExitComplete={() => { lightboxJustOpened.current = false }}>
+                    <motion.img
+                      key={lightboxActiveImg}
+                      src={galleryItems[lightboxActiveImg]?.src || PLACEHOLDER}
+                      className="max-w-full max-h-full object-contain"
+                      alt={`Foto principal de ${service.name} em ${partner.city} - ${partner.state}`}
+                      custom={slideDirection}
+                      variants={slideVariants}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{ duration: 0.2 }}
+                    />
+                  </AnimatePresence>
+                  {galleryItems.length > 1 && (
+                    <>
+                      <Button variant="filled" onClick={() => lightboxNav(-1)}
+                        className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
+                        <ChevronLeftIcon size={26} />
+                      </Button>
+                      <Button variant="filled" onClick={() => lightboxNav(1)}
+                        className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
+                        <ChevronRightIcon size={26} />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
+                <AnimatePresence mode="wait" custom={slideDirection}
+                  onExitComplete={() => { lightboxJustOpened.current = false }}>
+                  <motion.img
+                    key={lightboxActiveImg}
+                    src={galleryItems[lightboxActiveImg]?.src || PLACEHOLDER}
+                    className="max-w-full max-h-full object-contain px-4"
+                    alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
+                    custom={slideDirection}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.2 }}
+                  />
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -1471,60 +1603,95 @@ export function ServiceDetailsPageClient({
               Serviços
             </Link>
             <ChevronRightIcon size={10} />
-            {categoryName && (
-              <>
-                <Link href={`/explorar/${formatCityStateSlug(partner.city, partner.state)}/${createSlug(categoryName)}?type=servicos`} prefetch={true} className="hover:text-brand-dark transition-colors">
-                  {categoryName}
-                </Link>
-                <ChevronRightIcon size={10} />
-              </>
-            )}
             <span className="text-brand-inactive-text truncate max-w-[300px]">{service.name}</span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
             {/* ── Left Column: Gallery + Description ── */}
-            <div className="lg:col-span-7">
-              {/* Hero Image */}
-              <div className="relative bg-brand-gray rounded-2xl overflow-hidden mb-6" style={{ aspectRatio: "4/3" }}>
-                <img
-                  src={serviceImages[0]}
-                  alt={`${service.name} - Serviço disponível em ${partner.city}`}
-                  className="w-full h-full object-cover"
-                />
-
-                {/* Overlay badges */}
-                <div className="absolute top-4 left-4 flex flex-col gap-2">
-                  <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
-                    <ClockIcon size={12} className="text-brand-dark" />
-                    <span className="text-xs font-bold text-brand-dark">{formatDuration(durationMinutes)}</span>
-                  </div>
+            <div className="lg:col-span-8">
+              {/* Gallery */}
+              <div className="flex gap-3 mb-6">
+                <div className="hidden lg:flex flex-col gap-2 w-[70px] shrink-0">
+                  {galleryItems.map((item: { src: string | Blob | undefined }, i: number) => (
+                    <div key={i} onClick={() => goToImage(i)}
+                      className={`w-full aspect-square rounded-md border cursor-pointer overflow-hidden transition-all
+                        ${activeImgIndex === i ? "border-brand-green ring-1 ring-brand-green" : "border-brand-border hover:border-brand-border"}`}>
+                      <img src={item.src} className="w-full h-full object-cover" alt={`Foto de ${service.name} em ${partner.city}`} />
+                    </div>
+                  ))}
                 </div>
 
-                {/* Desktop action buttons */}
-                <div className="hidden lg:flex absolute top-4 right-4 gap-2">
-                  <FavoriteButton
-                    itemId={service.id}
-                    itemType="servico"
-                    size="lg"
-                    variant="outline"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowShareModal(true)}
-                    className="w-10 h-10 flex items-center justify-center"
-                  >
-                    <ShareIcon className="w-5 h-5 text-brand-green" />
-                  </Button>
-                </div>
-
-                {/* Location pill */}
-                {partner.city && partner.city !== "Brasil" && (
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
-                    <MapPinIcon size={12} className="text-brand-green" />
-                    <span className="text-xs font-bold text-brand-dark">{partner.city} - {partner.state}</span>
+                <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
+                  <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                    {galleryItems.length > 1 && (
+                      <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray transition-colors shadow-sm">
+                        <ChevronLeftIcon size={20} className="text-brand-dark" />
+                      </button>
+                    )}
                   </div>
-                )}
+
+                  <div className="relative flex-1 min-w-0">
+                    <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
+                      <div
+                        className="absolute inset-0 bg-brand-gray overflow-hidden rounded-2xl cursor-zoom-in"
+                        onClick={() => openLightbox(activeImgIndex)}
+                      >
+                        <AnimatePresence mode="popLayout" custom={slideDirection}>
+                          <motion.img
+                            key={activeImgIndex}
+                            src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
+                            className="absolute inset-0 w-full h-full object-contain cursor-pointer"
+                            alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
+                            custom={slideDirection}
+                            variants={slideVariants}
+                            initial="enter"
+                            animate="center"
+                            exit="exit"
+                            transition={{ duration: 0.2 }}
+                          />
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    <div className="lg:hidden relative bg-white rounded-xl overflow-hidden" style={{ aspectRatio: "1/1" }}>
+                      <AnimatePresence mode="wait" custom={slideDirection}>
+                        <motion.img
+                          key={activeImgIndex}
+                          src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
+                          className="absolute inset-0 w-full h-full object-contain"
+                          alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
+                          custom={slideDirection}
+                          variants={slideVariants}
+                          initial="enter"
+                          animate="center"
+                          exit="exit"
+                          transition={{ duration: 0.2 }}
+                        />
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
+                    <FavoriteButton
+                      itemId={service.id}
+                      itemType="servico"
+                      size="lg"
+                      variant="outline"
+                    />
+
+                    <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center" title="Compartilhar">
+                      <ShareIcon className="w-5 h-5 text-brand-green" />
+                    </Button>
+
+                    <div className="flex-1 flex items-center">
+                      {galleryItems.length > 1 && (
+                        <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                          <ChevronRightIcon size={20} className="text-brand-dark" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Mobile booking panel */}
@@ -1614,7 +1781,7 @@ export function ServiceDetailsPageClient({
             </div>
 
             {/* ── Right Column: Booking Panel (Desktop) ── */}
-            <div className="hidden lg:block lg:col-span-5 relative">
+            <div className="hidden lg:block lg:col-span-4 relative">
               {BookingPanel}
             </div>
           </div>

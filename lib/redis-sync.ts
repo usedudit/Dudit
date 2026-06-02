@@ -128,7 +128,8 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("services")
           .select(`
-            id, name, price, promotional_price, images, rating, category, created_at, updated_at, is_active,
+            id, name, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
+            service_categories:service_categories!category_id(name),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
           `)
           .eq("id", id)
@@ -138,7 +139,7 @@ export async function syncToExploreRedis({
           return await removeFromExploreRedis(id, type)
         }
 
-        if (dbData.is_active === false) {
+        if (dbData.is_active === false || dbData.show_in_marketplace !== true) {
           return await removeFromExploreRedis(id, type)
         }
 
@@ -151,7 +152,8 @@ export async function syncToExploreRedis({
           city: rawPartner.addresses?.[0]?.city || null,
           state: rawPartner.addresses?.[0]?.state || null
         } : null
-        finalData = { ...dbData, partners: partner }
+        const serviceCategoryName = dbData.service_categories?.name || dbData.category || null
+        finalData = { ...dbData, category: serviceCategoryName, partners: partner, subcategoryName: serviceCategoryName }
       }
       else if (type === 'loja') {
         const { data: dbData } = await admin
@@ -243,6 +245,7 @@ export async function syncPartnerItemsToExploreRedis(partnerId: string): Promise
     .select("id")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
+    .eq("show_in_marketplace", true)
 
   const promises: Promise<void>[] = []
 

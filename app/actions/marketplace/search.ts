@@ -360,11 +360,13 @@ async function _searchMarketplaceInternal(
             if (servicosIds.length > 0) {
                 promises.push(
                     supabase.from("services").select(`
-                        id, name, description, price, images, rating, category, created_at,
+                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                        service_categories:service_categories!category_id(name),
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
                     `)
                         .in("id", servicosIds)
                         .eq("is_active", true)
+                        .eq("show_in_marketplace", true)
                 )
             }
             if (lojasIds.length > 0) {
@@ -442,7 +444,8 @@ async function _searchMarketplaceInternal(
                     }
                 }
 
-                return { ...item, itemType: 'servico', partners: partner, subcategoryName: null }
+                const serviceCategoryName = item.service_categories?.name || item.category || null
+                return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
             }
 
             for (const idx of missingIndices) {
@@ -584,9 +587,10 @@ async function searchMarketplacePostgresFTS(
 
         if (type === 'tudo' || type === 'servicos') {
             let req = supabase.from("services").select(`
-                id, name, description, price, images, rating, category, created_at,
+                id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                service_categories:service_categories!category_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
-            `).eq("is_active", true)
+            `).eq("is_active", true).eq("show_in_marketplace", true)
             let reqJoined = req
             if (qRaw) {
                 let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%,category.ilike.%${qRaw}%`
@@ -603,7 +607,8 @@ async function searchMarketplacePostgresFTS(
                         latitude: rawPartner.latitude, longitude: rawPartner.longitude,
                         city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
                     } : null
-                    return { ...item, itemType: 'servico', partners: partner, subcategoryName: item.category || null }
+                    const serviceCategoryName = item.service_categories?.name || item.category || null
+                    return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
                 }))
             }
         }
@@ -712,13 +717,15 @@ async function searchMarketplaceByCity(
                 supabase
                     .from("services")
                     .select(`
-                        id, name, description, price, images, rating, category, created_at,
+                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                        service_categories:service_categories!category_id(name),
                         partners!inner(
                             id, store_name, store_image_url, latitude, longitude,
                             addresses!inner(city, state)
                         )
                     `)
                     .eq("is_active", true)
+                    .eq("show_in_marketplace", true)
                     .in("partner_id", partnerIds)
             )
         }
@@ -816,7 +823,8 @@ async function searchMarketplaceByCity(
             city: rawPartner.addresses?.[0]?.city || null,
             state: rawPartner.addresses?.[0]?.state || null
         } : null
-        return { ...item, itemType: 'servico', partners: partner, subcategoryName: item.category || null }
+        const serviceCategoryName = item.service_categories?.name || item.category || null
+        return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
     })
 
     const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))

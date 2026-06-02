@@ -55,6 +55,8 @@ const openWhatsApp = (phone?: string, storeName?: string) => {
 }
 
 const normalizeItemForCard = (item: any, partner: any) => {
+    const itemType = item.itemType || (item.duration_minutes !== undefined ? "servico" : undefined)
+
     if (item.itemType === 'plano') {
         return {
             ...item,
@@ -74,10 +76,12 @@ const normalizeItemForCard = (item: any, partner: any) => {
 
     return {
         ...item,
+        itemType,
         price,
         originalPrice: item.promotional_price ? item.price : undefined,
         images: getProductDisplayImages(item),
         partners: {
+            id: partner.id,
             store_name: partner.storeName,
             store_avatar: partner.storeImageUrl,
             profile_image_url: partner.profile_image_url,
