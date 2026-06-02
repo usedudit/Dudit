@@ -97,6 +97,11 @@ function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
     return message.includes("is_pos_sale") && message.includes("orders")
 }
 
+// P5: cache em memória (por processo) indicando se a coluna orders.is_pos_sale existe.
+// Evita que TODA listagem dispare uma 1ª query que sempre falha quando a coluna não
+// existe. null = ainda desconhecido; true/false = resultado já detectado.
+let ordersHasPosSaleColumn: boolean | null = null
+
 function isMissingOrdersPaymentMethodDeltaColumnsError(error: unknown): boolean {
     const message = String((error as any)?.message || "").toLowerCase()
     return (
@@ -2730,6 +2735,11 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
         const deliveryWarnings: string[] = []
         let deliveryProcessedCount = 0
+
+        // P4: separa os pedidos elegíveis em dois grupos para evitar N UPDATEs sequenciais:
+        // - finalizeOrders: precisam finalizar o estoque antes do update (efeito colateral, loop individual)
+        // - simpleOrders: apenas mudança de status idêntica -> um único UPDATE em massa via .in()
+        const eligibleDeliveryOrders: any[] = []
         for (const order of currentOrders || []) {
             if (order.situation === "cancelled") {
                 deliveryWarnings.push(`Pedido ${order.order_number || order.id}: está cancelado e não pode ter o status de entrega alterado.`)
@@ -2739,27 +2749,35 @@ export async function updateOrdersStatusInBatchAction(payload: {
                 deliveryWarnings.push(`Pedido ${order.order_number || order.id}: já está entregue e não pode ter o status de entrega alterado.`)
                 continue
             }
-            const shouldFinalizeNow = !order.inventory_deducted && shouldDeductInventory(payload.statusValue)
+            eligibleDeliveryOrders.push(order)
+        }
 
-            if (shouldFinalizeNow) {
-                const finalizeResult = await finalizeOrderInventory({
-                    client: supabase,
-                    partnerId: payload.partnerId,
-                    orderId: order.id,
-                    createdBy: user.id,
-                    reason: "Venda de Produtos",
-                    notes: normalizeOrderNotes(order.notes) || undefined,
-                    items: order.order_items || [],
-                })
+        const finalizeDeliveryOrders = eligibleDeliveryOrders.filter(
+            (order) => !order.inventory_deducted && shouldDeductInventory(payload.statusValue),
+        )
+        const simpleDeliveryOrders = eligibleDeliveryOrders.filter(
+            (order) => !(!order.inventory_deducted && shouldDeductInventory(payload.statusValue)),
+        )
 
-                if ("error" in finalizeResult) return { error: finalizeResult.error }
-            }
+        // Pedidos com efeito colateral: finaliza estoque e atualiza individualmente (marca inventory_deducted).
+        for (const order of finalizeDeliveryOrders) {
+            const finalizeResult = await finalizeOrderInventory({
+                client: supabase,
+                partnerId: payload.partnerId,
+                orderId: order.id,
+                createdBy: user.id,
+                reason: "Venda de Produtos",
+                notes: normalizeOrderNotes(order.notes) || undefined,
+                items: order.order_items || [],
+            })
+
+            if ("error" in finalizeResult) return { error: finalizeResult.error }
 
             const { error } = await supabase
                 .from("orders")
                 .update({
                     delivery_status: payload.statusValue,
-                    ...(shouldFinalizeNow ? { inventory_deducted: true } : {}),
+                    inventory_deducted: true,
                 })
                 .eq("id", order.id)
                 .eq("partner_id", payload.partnerId)
@@ -2767,6 +2785,19 @@ export async function updateOrdersStatusInBatchAction(payload: {
             if (error) return { error: error.message }
             deliveryProcessedCount += 1
         }
+
+        // Pedidos simples (mesmo valor de status, sem efeito colateral): um único UPDATE em massa.
+        if (simpleDeliveryOrders.length > 0) {
+            const { error } = await supabase
+                .from("orders")
+                .update({ delivery_status: payload.statusValue })
+                .in("id", simpleDeliveryOrders.map((order) => order.id))
+                .eq("partner_id", payload.partnerId)
+
+            if (error) return { error: error.message }
+            deliveryProcessedCount += simpleDeliveryOrders.length
+        }
+
         if (deliveryProcessedCount === 0) {
             return { error: "Nenhum pedido elegível para alteração de entrega." }
         }
@@ -2956,9 +2987,17 @@ export async function getERPOrdersPageAction(
                 .limit(fetchLimit)
         }
 
-        let queryResult = await buildQuery(selectWithPosSale)
+        // P5: usa o resultado da detecção em cache para escolher o select correto de
+        // primeira, sem depender de tentativa-e-erro a cada request. Só faz o fallback
+        // (e custa 2 queries) na primeira vez que a coluna ausente é detectada.
+        let queryResult = await buildQuery(
+            ordersHasPosSaleColumn === false ? selectWithoutPosSale : selectWithPosSale,
+        )
         if (queryResult.error && isMissingOrdersIsPosSaleColumnError(queryResult.error)) {
+            ordersHasPosSaleColumn = false
             queryResult = await buildQuery(selectWithoutPosSale)
+        } else if (!queryResult.error && ordersHasPosSaleColumn === null) {
+            ordersHasPosSaleColumn = true
         }
 
         const { data, error } = queryResult
