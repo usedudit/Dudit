@@ -247,14 +247,16 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
         const match = allAccess.find(a => a.partnerId === activePartnerId)
         if (match) {
             // Real-time DB check: verify the user still has access (defense against stale cache)
-            // This prevents removed users from accessing the ERP during the cache TTL window
+            // This prevents removed users from accessing the ERP during the cache TTL window.
+            // P1: usa uma única RPC (owner OR membro) em vez de 2 queries separadas por request.
             const admin = createAdminClient()
-            const [ownerCheck, memberCheck] = await Promise.all([
-                admin.from("partners").select("id").eq("id", activePartnerId).eq("user_id", user.id).maybeSingle(),
-                admin.from("partner_users").select("id").eq("partner_id", activePartnerId).eq("user_id", user.id).maybeSingle(),
-            ])
+            const { data: stillHasAccess, error: accessError } = await admin.rpc("user_has_partner_access", {
+                p_partner_id: activePartnerId,
+                p_user_id: user.id,
+            })
 
-            if (!ownerCheck.data && !memberCheck.data) {
+            // Em caso de erro inesperado na RPC, não bloqueamos o acesso já validado pelo cache.
+            if (!accessError && stillHasAccess === false) {
                 // Access revoked — clear stale cookie and invalidate cached access
                 await clearActivePartner()
                 const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
