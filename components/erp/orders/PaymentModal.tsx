@@ -94,12 +94,12 @@ const CompactPaymentStatusAlert = ({ totalPaid, totalNeed }: { totalPaid: number
     let message = "";
     let barClass = "bg-gray-400";
 
-    if (diff < -0.01) {
+    if (diff < -0.005) {
         bgClass = "bg-red-50 dark:bg-red-900/20";
         textClass = "text-red-600 dark:text-red-400";
         message = `Falta Pagar: ${formatCurrency(absDiff)}`;
         barClass = "bg-red-500";
-    } else if (diff > 0.01) {
+    } else if (diff > 0.005) {
         bgClass = "bg-green-50 dark:bg-green-900/20";
         textClass = "text-green-700 dark:text-green-400";
         message = `Troco: ${formatCurrency(absDiff)}`;
@@ -968,9 +968,9 @@ const PaymentModal = ({
     }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
 
     // Compara o valor que o operador digitou contra o valor final a cobrar (já com desconto/taxa)
-    const isAllocationUnderpaid = paymentBaseAmount < finalDueForLeg - 0.01;
-    const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.01 : isAllocationUnderpaid;
-    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.01;
+    const isAllocationUnderpaid = paymentBaseAmount < finalDueForLeg - 0.005;
+    const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
+    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.005;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
@@ -1264,7 +1264,7 @@ const PaymentModal = ({
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
                     amount: legFinalCharged != null && Number.isFinite(legFinalCharged)
-                        ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.01 ? calcBaseAmount : getBaseAmountFromFinal(paymentBaseAmount))
+                        ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.005 ? calcBaseAmount : getBaseAmountFromFinal(paymentBaseAmount))
                         : Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),

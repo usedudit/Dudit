@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Checkbox, IconPlaceholder, Badge, DropdownItem, FormDropdown, MoneyInput, ThreeDotsLoader } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -20,6 +19,10 @@ import {
     FileIcon,
     MoneyIcon,
     EditIcon,
+    ClockIcon,
+    InstallmentIcon,
+    CheckCircleIcon,
+    CashierIcon,
 } from "@/lib/icons"
 import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListRow"
@@ -27,10 +30,10 @@ import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
+import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
 import type {
     ERPTransaction,
     FinancialTransactionCursor,
-    FinancialTransactionsPageSuccess,
     TransactionTab,
 } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
@@ -116,6 +119,7 @@ const financialTransactionsQueryKey = (partnerId: string) => ["erp-financial-tra
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
     { id: "transaction", label: "Descrição", align: "left", width: "300px" },
     { id: "category", label: "Categoria", align: "left", width: "170px" },
+    { id: "originSource", label: "Origem", align: "left", width: "150px" },
     { id: "contact", label: "Contato", align: "left", width: "220px" },
     { id: "date", label: "Data", align: "left", width: "170px" },
     { id: "dueDate", label: "Vencimento", align: "left", width: "170px" },
@@ -1076,6 +1080,218 @@ export default function TransactionsPage({
         refreshTransactionsNow,
     ])
 
+    const renderSharedModals = () => {
+        return (
+            <>
+                <DefaultModal
+                    isOpen={!!confirmCancelTransaction}
+                    onClose={() => {
+                        if (cancellingTransaction) return
+                        setConfirmCancelTransaction(null)
+                        setCancelReason("")
+                    }}
+                    title="Cancelar transação pendente"
+                    maxWidth="md"
+                >
+                    {confirmCancelTransaction ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text">
+                                Esta ação marca a transação como cancelada e salva o histórico automaticamente.
+                            </p>
+                            <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 text-sm">
+                                <p className="font-semibold text-brand-dark dark:text-dark-heading">{confirmCancelTransaction.description}</p>
+                                <p className="text-brand-inactive-text mt-1">
+                                    Valor: {formatCurrency(confirmCancelTransaction.amount)} • Status atual: {confirmCancelTransaction.status}
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo (opcional)</label>
+                                <textarea
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    rows={3}
+                                    maxLength={120}
+                                    className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-white dark:bg-dark-surface/50 text-sm outline-none focus:border-brand-primary"
+                                    placeholder="Ex: cobrança duplicada"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setConfirmCancelTransaction(null)} disabled={cancellingTransaction}>
+                                    Voltar
+                                </Button>
+                                <Button variant="destructive" onClick={() => void handleConfirmCancelPending()} disabled={cancellingTransaction}>
+                                    Confirmar cancelamento
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={!!confirmRegularMarkAsPaid}
+                    onClose={() => {
+                        if (markingRegularAsPaid) return
+                        setConfirmRegularMarkAsPaid(null)
+                    }}
+                    title={`Confirmar ${confirmRegularMarkAsPaid?.ledgerDirection === "in" ? "recebimento" : "pagamento"}`}
+                    maxWidth="md"
+                >
+                    {confirmRegularMarkAsPaid ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text">
+                                Deseja marcar esta transação como {confirmRegularMarkAsPaid.ledgerDirection === "in" ? "recebida" : "paga"}?
+                            </p>
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                                <p className="font-semibold">{confirmRegularMarkAsPaid.description}</p>
+                                <p className="text-brand-inactive-text mt-1">
+                                    Valor: {formatCurrency(confirmRegularMarkAsPaid.amount)} • Vencimento: {confirmRegularMarkAsPaid.dueDate}
+                                </p>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setConfirmRegularMarkAsPaid(null)} disabled={markingRegularAsPaid}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={() => void handleConfirmRegularMarkAsPaid()} disabled={markingRegularAsPaid}>
+                                    Confirmar
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={!!confirmRecurringPayment}
+                    onClose={() => {
+                        if (markingAsPaid) return
+                        setConfirmRecurringPayment(null)
+                    }}
+                    title="Confirmar pagamento da ocorrência"
+                    maxWidth="md"
+                >
+                    {confirmRecurringPayment ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text">
+                                Deseja marcar esta ocorrência recorrente como paga/recebida?
+                            </p>
+                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
+                                <p className="font-semibold">{confirmRecurringPayment.description}</p>
+                                <p className="text-brand-inactive-text mt-1">
+                                    Valor: {formatCurrency(confirmRecurringPayment.amount)} • Data: {confirmRecurringPayment.occurrenceDate}
+                                </p>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setConfirmRecurringPayment(null)} disabled={markingAsPaid}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={() => void handleConfirmRecurringMarkAsPaid()} disabled={markingAsPaid}>
+                                    Confirmar
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </DefaultModal>
+
+                <DefaultModal
+                    isOpen={paymentModalOpen}
+                    onClose={() => {
+                        if (payingInstallment) return
+                        setPaymentModalOpen(false)
+                        setSelectedInstallmentForPayment(null)
+                    }}
+                    title="Registrar pagamento da parcela"
+                    maxWidth="md"
+                >
+                    {selectedInstallmentForPayment ? (
+                        <div className="space-y-4">
+                            <div className="space-y-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                            {selectedInstallmentForPayment.description}
+                                        </h3>
+                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                            <Badge variant="gray">
+                                                Parcela {selectedInstallmentForPayment.installmentNumber}
+                                            </Badge>
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                Vence em {selectedInstallmentForPayment.dueDate || "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
+                                        <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <MoneyInput
+                                        label="Valor do pagamento"
+                                        value={Number(paymentAmount || 0)}
+                                        onChange={(value) => setPaymentAmount(String(value))}
+                                        min={0}
+                                    />
+                                    <FormDropdown
+                                        label="Meio de pagamento"
+                                        value={paymentMethodId}
+                                        setValue={setPaymentMethodId}
+                                        options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                            value: pm.id,
+                                            label: pm.name,
+                                        }))}
+                                        placeholder="Selecione"
+                                    />
+                                    <MoneyInput
+                                        label="Juros"
+                                        value={Number(interestAmount || 0)}
+                                        onChange={(value) => setInterestAmount(String(value))}
+                                        min={0}
+                                    />
+                                    <MoneyInput
+                                        label="Desconto"
+                                        value={Number(discountAmount || 0)}
+                                        onChange={(value) => setDiscountAmount(String(value))}
+                                        min={0}
+                                    />
+                                </div>
+
+                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Total a processar</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Valor final com juros e desconto aplicados.
+                                        </p>
+                                    </div>
+                                    <p className="font-bold text-[20px] text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        if (payingInstallment) return
+                                        setPaymentModalOpen(false)
+                                        setSelectedInstallmentForPayment(null)
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
+                                    Confirmar pagamento
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
+                </DefaultModal>
+            </>
+        )
+    }
+
     if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
         if (isLoadingDetail) {
             return (
@@ -1100,8 +1316,350 @@ export default function TransactionsPage({
                     onEdit={handleEditFromTransactionDetail}
                     initialDetail={currentEntity as TransactionDetailPayload | null}
                     loading={!currentEntity}
+                    onEditInstallment={handleEditInstallment}
+                    onPayInstallment={handlePayInstallment}
                 />
+                {renderSharedModals()}
             </motion.div>
+        )
+    }
+
+    if (confirmSettleGroup) {
+        const total = Number(installmentDetail?.group?.total_amount || 0)
+        const rows = installmentDetail?.installments || []
+        const paid = rows.reduce((acc: number, row: any) => acc + Number(row.paidAmount || 0), 0)
+        const pending = Math.max(0, total - paid)
+        const pendingInstallments = rows.filter((row: any) => row.status !== "paid")
+        const pendingCount = pendingInstallments.length
+
+        return (
+            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+                {/* Sticky Header */}
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out px-4 md:px-6">
+                    <div className="max-w-[1300px] mx-auto flex items-center justify-between py-4">
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Button>
+                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                <h1 className="font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 text-xl md:text-3xl">
+                                    <span className="truncate">Quitar todas as parcelas</span>
+                                </h1>
+                                <div className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden max-h-20">
+                                    Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Scrollable Body */}
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-[1300px] mx-auto w-full custom-scrollbar">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shrink-0">
+                                    <FileIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                    Total
+                                </span>
+                            </div>
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                {formatCurrency(total)}
+                            </span>
+                        </div>
+
+                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                    Pago
+                                </span>
+                            </div>
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                {formatCurrency(paid)}
+                            </span>
+                        </div>
+
+                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                    <ClockIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                    Restante
+                                </span>
+                            </div>
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                {formatCurrency(pending)}
+                            </span>
+                        </div>
+
+                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 shrink-0">
+                                    <InstallmentIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                    Parcelas a quitar
+                                </span>
+                            </div>
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                {pendingCount}
+                            </span>
+                        </div>
+
+                        <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 shrink-0">
+                                    <CashierIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                    Valor total da quitação
+                                </span>
+                            </div>
+                            <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none text-brand-green">
+                                {formatCurrency(settleModalTotalToPay)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Table / List Container */}
+                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 md:p-6">
+                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Parcelas pendentes</h2>
+
+                        {pendingInstallments.length === 0 ? (
+                            <p className="text-sm text-brand-inactive-text">Nenhuma parcela pendente encontrada neste grupo.</p>
+                        ) : (
+                            <>
+                                {/* Desktop Table */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full text-left border-separate border-spacing-0">
+                                        <thead>
+                                            <tr className="bg-brand-gray dark:bg-dark-border/30 text-brand-inactive-text uppercase text-[10px] font-bold tracking-wider">
+                                                <th className="py-3 px-4 rounded-l-lg">Parcela</th>
+                                                <th className="py-3 px-4">Vencimento</th>
+                                                <th className="py-3 px-4">Restante</th>
+                                                <th className="py-3 px-4 w-40">Valor Pagamento</th>
+                                                <th className="py-3 px-4 w-44">Meio de Pagamento</th>
+                                                <th className="py-3 px-4 w-28">Juros</th>
+                                                <th className="py-3 px-4 w-28">Desconto</th>
+                                                <th className="py-3 px-4 rounded-r-lg text-right">Total a Pagar</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                            {pendingInstallments.map((row: any) => {
+                                                const values = settlePaymentsByInstallment[row.id] || {
+                                                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                    interestAmount: "0",
+                                                    discountAmount: "0",
+                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                }
+                                                const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                return (
+                                                    <tr key={row.id} className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
+                                                        <td className="py-4 px-4 align-middle">
+                                                            <div className="font-semibold text-brand-dark dark:text-dark-heading text-sm">
+                                                                {row.description}
+                                                            </div>
+                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide mt-1 inline-block">
+                                                                Parcela {row.installmentNumber}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle text-sm text-brand-inactive-text">
+                                                            {row.dueDate || "-"}
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(Number(row.remainingAmount || 0))}
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={values.paymentAmount}
+                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                    ...prev,
+                                                                    [row.id]: { ...values, paymentAmount: e.target.value }
+                                                                }))}
+                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold transition-all focus:border-brand-primary outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle">
+                                                            <select
+                                                                value={values.paymentMethodId}
+                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                    ...prev,
+                                                                    [row.id]: { ...values, paymentMethodId: e.target.value }
+                                                                }))}
+                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
+                                                            >
+                                                                {(resolvedPaymentMethods || []).map((pm: any) => (
+                                                                    <option key={pm.id} value={pm.id}>{pm.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={values.interestAmount}
+                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                    ...prev,
+                                                                    [row.id]: { ...values, interestAmount: e.target.value }
+                                                                }))}
+                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={values.discountAmount}
+                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                    ...prev,
+                                                                    [row.id]: { ...values, discountAmount: e.target.value }
+                                                                }))}
+                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
+                                                            />
+                                                        </td>
+                                                        <td className="py-4 px-4 align-middle text-right">
+                                                            <span className="text-sm font-bold text-brand-green bg-brand-green/5 px-3 py-1 rounded-full border border-brand-green/10">
+                                                                {formatCurrency(finalPaid)}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile Stacked View */}
+                                <div className="md:hidden space-y-4 divide-y divide-brand-border dark:divide-dark-border">
+                                    {pendingInstallments.map((row: any) => {
+                                        const values = settlePaymentsByInstallment[row.id] || {
+                                            paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                            interestAmount: "0",
+                                            discountAmount: "0",
+                                            paymentMethodId: paymentMethods?.[0]?.id || "",
+                                        }
+                                        const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                        return (
+                                            <div key={row.id} className="pt-4 first:pt-0 space-y-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="font-semibold text-brand-dark dark:text-dark-heading text-sm">
+                                                            {row.description}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase">
+                                                                Parcela {row.installmentNumber}
+                                                            </span>
+                                                            <span className="text-[11px] text-brand-inactive-text">
+                                                                Venc: {row.dueDate || "-"}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider block">Restante</span>
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{formatCurrency(Number(row.remainingAmount || 0))}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Valor Pagamento</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={values.paymentAmount}
+                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, paymentAmount: e.target.value }
+                                                            }))}
+                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold focus:border-brand-primary outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Meio</label>
+                                                        <select
+                                                            value={values.paymentMethodId}
+                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, paymentMethodId: e.target.value }
+                                                            }))}
+                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
+                                                        >
+                                                            {(resolvedPaymentMethods || []).map((pm: any) => (
+                                                                <option key={pm.id} value={pm.id}>{pm.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Juros</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={values.interestAmount}
+                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, interestAmount: e.target.value }
+                                                            }))}
+                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Desconto</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={values.discountAmount}
+                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, discountAmount: e.target.value }
+                                                            }))}
+                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-between items-center bg-brand-green/5 px-3 py-2 rounded-lg border border-brand-green/10">
+                                                    <span className="text-xs font-semibold text-brand-inactive-text uppercase">Total a Pagar</span>
+                                                    <span className="text-sm font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer Action Buttons */}
+                <div className="border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-4 py-3 md:px-6 md:py-4">
+                    <div className="max-w-[1300px] mx-auto flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup}>
+                            Confirmar quitação
+                        </Button>
+                    </div>
+                </div>
+
+                {renderSharedModals()}
+            </FadeIn>
         )
     }
 
@@ -1136,6 +1694,7 @@ export default function TransactionsPage({
                             </div>
                         </div>
 
+                        {/* Cells grid */}
                         {installmentDetailLoading ? (
                             <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
                         ) : installmentDetail ? (
@@ -1200,6 +1759,7 @@ export default function TransactionsPage({
                         )}
                     </div>
                 </div>
+                {renderSharedModals()}
             </FadeIn>
         )
     }
@@ -1235,6 +1795,7 @@ export default function TransactionsPage({
                     editTransaction={editingTx || undefined}
                     editRecurringTemplateId={editingRecurringTemplateId || undefined}
                     editRecurringTemplate={editingRecurringTemplateId ? recurringTemplates?.find((t: any) => t.id === editingRecurringTemplateId) : undefined}
+                    forcedTab={forcedTab}
                     onClose={() => {
                         closeEntity()
                         setEditingRecurringTemplateId(null)
@@ -1406,6 +1967,9 @@ export default function TransactionsPage({
                                                                 {formatCurrency(transaction.amount)}
                                                             </span>
                                                         </div>
+                                                        <div className="mt-1 flex items-center">
+                                                            <PaymentMethodIndicator label={transaction.paymentType} />
+                                                        </div>
 
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                                                             <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
@@ -1413,7 +1977,7 @@ export default function TransactionsPage({
                                                             </span>
                                                             <span className="text-brand-inactive-text">•</span>
                                                             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {transaction.category}
+                                                                {transaction.category} ({transaction.originSource || "Manual"})
                                                             </span>
                                                             <span className="text-brand-inactive-text">•</span>
                                                             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
@@ -1583,316 +2147,7 @@ export default function TransactionsPage({
                 </Button>
             </FloatingActionBar>
 
-            <DefaultModal
-                isOpen={!!confirmCancelTransaction}
-                onClose={() => {
-                    if (cancellingTransaction) return
-                    setConfirmCancelTransaction(null)
-                    setCancelReason("")
-                }}
-                title="Cancelar transação pendente"
-                maxWidth="md"
-            >
-                {confirmCancelTransaction ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text">
-                            Esta ação marca a transação como cancelada e salva o histórico automaticamente.
-                        </p>
-                        <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 text-sm">
-                            <p className="font-semibold text-brand-dark dark:text-dark-heading">{confirmCancelTransaction.description}</p>
-                            <p className="text-brand-inactive-text mt-1">
-                                Valor: {formatCurrency(confirmCancelTransaction.amount)} • Status atual: {confirmCancelTransaction.status}
-                            </p>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo (opcional)</label>
-                            <textarea
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                rows={3}
-                                maxLength={120}
-                                className="w-full rounded-lg border border-brand-border dark:border-dark-border px-3 py-2 bg-white dark:bg-dark-surface/50 text-sm outline-none focus:border-brand-primary"
-                                placeholder="Ex: cobrança duplicada"
-                            />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmCancelTransaction(null)} disabled={cancellingTransaction}>
-                                Voltar
-                            </Button>
-                            <Button variant="destructive" onClick={() => void handleConfirmCancelPending()} disabled={cancellingTransaction}>
-                                Confirmar cancelamento
-                            </Button>
-                        </div>
-                    </div>
-                ) : null}
-            </DefaultModal>
-
-            <DefaultModal
-                isOpen={!!confirmRegularMarkAsPaid}
-                onClose={() => {
-                    if (markingRegularAsPaid) return
-                    setConfirmRegularMarkAsPaid(null)
-                }}
-                title={`Confirmar ${confirmRegularMarkAsPaid?.ledgerDirection === "in" ? "recebimento" : "pagamento"}`}
-                maxWidth="md"
-            >
-                {confirmRegularMarkAsPaid ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text">
-                            Deseja marcar esta transação como {confirmRegularMarkAsPaid.ledgerDirection === "in" ? "recebida" : "paga"}?
-                        </p>
-                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                            <p className="font-semibold">{confirmRegularMarkAsPaid.description}</p>
-                            <p className="text-brand-inactive-text mt-1">
-                                Valor: {formatCurrency(confirmRegularMarkAsPaid.amount)} • Vencimento: {confirmRegularMarkAsPaid.dueDate}
-                            </p>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmRegularMarkAsPaid(null)} disabled={markingRegularAsPaid}>
-                                Cancelar
-                            </Button>
-                            <Button onClick={() => void handleConfirmRegularMarkAsPaid()} disabled={markingRegularAsPaid}>
-                                Confirmar
-                            </Button>
-                        </div>
-                    </div>
-                ) : null}
-            </DefaultModal>
-
-
-            <DefaultModal
-                isOpen={!!confirmRecurringPayment}
-                onClose={() => {
-                    if (markingAsPaid) return
-                    setConfirmRecurringPayment(null)
-                }}
-                title="Confirmar pagamento da ocorrência"
-                maxWidth="md"
-            >
-                {confirmRecurringPayment ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text">
-                            Deseja marcar esta ocorrência recorrente como paga/recebida?
-                        </p>
-                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                            <p className="font-semibold">{confirmRecurringPayment.description}</p>
-                            <p className="text-brand-inactive-text mt-1">
-                                Valor: {formatCurrency(confirmRecurringPayment.amount)} • Data: {confirmRecurringPayment.occurrenceDate}
-                            </p>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmRecurringPayment(null)} disabled={markingAsPaid}>
-                                Cancelar
-                            </Button>
-                            <Button onClick={() => void handleConfirmRecurringMarkAsPaid()} disabled={markingAsPaid}>
-                                Confirmar
-                            </Button>
-                        </div>
-                    </div>
-                ) : null}
-            </DefaultModal>
-
-            <DefaultModal
-                isOpen={!!confirmSettleGroup}
-                onClose={() => {
-                    if (settlingGroup) return
-                    setConfirmSettleGroup(null)
-                }}
-                title="Quitar todas as parcelas"
-                maxWidth="md"
-            >
-                {confirmSettleGroup ? (
-                    <div className="space-y-4">
-                        <p className="text-sm text-brand-inactive-text">
-                            Confirma quitar todas as parcelas pendentes deste grupo? Esta ação irá registrar pagamentos, marcar as parcelas como pagas/recebidas e salvar histórico.
-                        </p>
-                        <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                            <p className="font-semibold">{confirmSettleGroup.description}</p>
-                            <p className="text-brand-inactive-text mt-1">
-                                Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
-                                <p className="text-brand-inactive-text">Parcelas a quitar</p>
-                                <p className="font-semibold">{settleSummary?.pendingCount ?? 0}</p>
-                            </div>
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3">
-                                <p className="text-brand-inactive-text">Valor total da quitação</p>
-                                <p className="font-semibold">{formatCurrency(settleModalTotalToPay)}</p>
-                            </div>
-                        </div>
-                        <div className="flex flex-col w-full max-h-[50vh] overflow-y-auto px-1 pr-1 custom-scrollbar border-y border-brand-border dark:border-dark-border divide-y divide-brand-border dark:divide-dark-border">
-                            {(installmentDetail?.installments || [])
-                                .filter((row: any) => row.status !== "paid")
-                                .map((row: any) => {
-                                    const values = settlePaymentsByInstallment[row.id] || {
-                                        paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                        interestAmount: "0",
-                                        discountAmount: "0",
-                                        paymentMethodId: paymentMethods?.[0]?.id || "",
-                                    }
-                                    const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                    return (
-                                        <div key={row.id} className="py-6 flex flex-col gap-4">
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                        {row.description}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide">
-                                                            Parcela {row.installmentNumber}
-                                                        </span>
-                                                        <span className="text-[11px] font-medium text-brand-inactive-text">
-                                                            Venc: {row.dueDate || "-"}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-[11px] text-brand-inactive-text font-bold uppercase tracking-wider">Restante</span>
-                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">{formatCurrency(Number(row.remainingAmount || 0))}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                <div className="flex flex-col gap-1.5">
-                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Pagamento</label>
-                                                    <input type="number" step="0.01" min="0" value={values.paymentAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold transition-all focus:border-brand-primary outline-none" />
-                                                </div>
-                                                <div className="flex flex-col gap-1.5">
-                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Meio</label>
-                                                    <select value={values.paymentMethodId} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, paymentMethodId: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none">
-                                                        {(resolvedPaymentMethods || []).map((pm: any) => (<option key={pm.id} value={pm.id}>{pm.name}</option>))}
-                                                    </select>
-                                                </div>
-                                                <div className="flex flex-col gap-1.5">
-                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Juros</label>
-                                                    <input type="number" step="0.01" min="0" value={values.interestAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, interestAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none" />
-                                                </div>
-                                                <div className="flex flex-col gap-1.5">
-                                                    <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Desc.</label>
-                                                    <input type="number" step="0.01" min="0" value={values.discountAmount} onChange={(e) => setSettlePaymentsByInstallment((prev) => ({ ...prev, [row.id]: { ...values, discountAmount: e.target.value } }))} className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none" />
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-end pt-1">
-                                                <p className="text-[13px] font-bold text-brand-green bg-brand-green/5 px-3 py-1 rounded-full border border-brand-green/10">
-                                                    Final: {formatCurrency(finalPaid)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
-                                Cancelar
-                            </Button>
-                            <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup}>
-                                Confirmar quitação
-                            </Button>
-                        </div>
-                    </div>
-                ) : null}
-            </DefaultModal>
-
-            <DefaultModal
-                isOpen={paymentModalOpen}
-                onClose={() => {
-                    if (payingInstallment) return
-                    setPaymentModalOpen(false)
-                    setSelectedInstallmentForPayment(null)
-                }}
-                title="Registrar pagamento da parcela"
-                maxWidth="md"
-            >
-                {selectedInstallmentForPayment ? (
-                    <div className="space-y-4">
-                        <div className="space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="min-w-0">
-                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                        {selectedInstallmentForPayment.description}
-                                    </h3>
-                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                        <Badge variant="gray">
-                                            Parcela {selectedInstallmentForPayment.installmentNumber}
-                                        </Badge>
-                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            Vence em {selectedInstallmentForPayment.dueDate || "-"}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
-                                    <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
-                                        {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <MoneyInput
-                                    label="Valor do pagamento"
-                                    value={Number(paymentAmount || 0)}
-                                    onChange={(value) => setPaymentAmount(String(value))}
-                                    min={0}
-                                />
-                                <FormDropdown
-                                    label="Meio de pagamento"
-                                    value={paymentMethodId}
-                                    setValue={setPaymentMethodId}
-                                    options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                        value: pm.id,
-                                        label: pm.name,
-                                    }))}
-                                    placeholder="Selecione"
-                                />
-                                <MoneyInput
-                                    label="Juros"
-                                    value={Number(interestAmount || 0)}
-                                    onChange={(value) => setInterestAmount(String(value))}
-                                    min={0}
-                                />
-                                <MoneyInput
-                                    label="Desconto"
-                                    value={Number(discountAmount || 0)}
-                                    onChange={(value) => setDiscountAmount(String(value))}
-                                    min={0}
-                                />
-                            </div>
-
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 flex items-center justify-between gap-4">
-                                <div>
-                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Total a processar</p>
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Valor final com juros e desconto aplicados.
-                                    </p>
-                                </div>
-                                <p className="font-bold text-[20px] text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    if (payingInstallment) return
-                                    setPaymentModalOpen(false)
-                                    setSelectedInstallmentForPayment(null)
-                                }}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
-                                Confirmar pagamento
-                            </Button>
-                        </div>
-                    </div>
-                ) : null}
-            </DefaultModal>
+            {renderSharedModals()}
         </FadeIn>
     )
 }

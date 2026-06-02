@@ -45,7 +45,7 @@ export default async function FinancialRecebimentosRoute() {
 
   return (
     <>
-      <ERPPageHeader title="Recebimentos" />
+      <ERPPageHeader title="Contas a receber" />
       <FadeIn className="p-4">
         <TransactionsPage
           initialItems={txResult.items}
@@ -58,7 +58,7 @@ export default async function FinancialRecebimentosRoute() {
           recurringTemplates={recurringTemplates as any}
           paymentMethods={paymentMethods as any}
           forcedTab="A receber"
-          pageTitle="Recebimentos"
+          pageTitle="Contas a receber"
           pageSubtitle="Receitas, valores a receber e cobranças pendentes."
         />
       </FadeIn>

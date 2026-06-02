@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -111,6 +112,7 @@ function DesktopPOSSheet({
 }
 
 export default function POSPage({ partnerId, initialData, initialActiveSession }: Props) {
+    const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -894,6 +896,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             notifySuccess("Venda finalizada com sucesso.")
             setPreSales((prev) => prev.filter((draft) => draft.id !== preSaleIdToFinalize))
             clearCartAfterPaymentModalClosesRef.current = true
+            router.refresh()
             return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId }
         } finally {
             setIsFinalizing(false)

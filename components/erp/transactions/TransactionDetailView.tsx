@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard } from "@/components/reusable"
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, DropdownItem } from "@/components/reusable"
 import { getTransactionDetailsAction, getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
@@ -22,9 +22,11 @@ interface TransactionDetailViewProps {
     onEdit: (transactionId: string) => void
     initialDetail?: TransactionDetailPayload | null
     loading?: boolean
+    onEditInstallment?: (id: string) => void
+    onPayInstallment?: (id: string) => void
 }
 
-export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading }: TransactionDetailViewProps) {
+export default function TransactionDetailView({ transactionId, partnerId, onBack, onEdit, initialDetail, loading: externalLoading, onEditInstallment, onPayInstallment }: TransactionDetailViewProps) {
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     // Render whatever the parent provides (starts with partial, updates to full)
@@ -273,6 +275,19 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                 }),
                                                             )
                                                         }
+                                                        getActionsSlot={(row) => {
+                                                            if (row.status === "paid") return null;
+                                                            return (
+                                                                <>
+                                                                    {onEditInstallment && (
+                                                                        <DropdownItem onClick={() => onEditInstallment(row.id)}>Editar</DropdownItem>
+                                                                    )}
+                                                                    {onPayInstallment && (
+                                                                        <DropdownItem onClick={() => void onPayInstallment(row.id)}>Registrar pagamento</DropdownItem>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        }}
                                                     />
                                                 ) : detail.transactionDetailKind === "transfer" && detail.transferAccounts ? (
                                                     <div className="space-y-3">

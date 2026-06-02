@@ -45,7 +45,7 @@ export default async function FinancialPagamentosRoute() {
 
   return (
     <>
-      <ERPPageHeader title="Pagamentos" />
+      <ERPPageHeader title="Contas a pagar" />
       <FadeIn className="p-4">
         <TransactionsPage
           initialItems={txResult.items}
@@ -58,7 +58,7 @@ export default async function FinancialPagamentosRoute() {
           recurringTemplates={recurringTemplates as any}
           paymentMethods={paymentMethods as any}
           forcedTab="A pagar"
-          pageTitle="Pagamentos"
+          pageTitle="Contas a pagar"
           pageSubtitle="Despesas, contas a pagar e obrigações financeiras."
         />
       </FadeIn>

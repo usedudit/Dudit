@@ -84,6 +84,7 @@ interface CreateTransactionPageProps {
     onSuccess?: () => void
     /** When set, the page operates in edit mode with pre-filled data */
     editTransaction?: import("../../../lib/services/transactions.types").ERPTransaction
+    forcedTab?: "Transações" | "A pagar" | "A receber"
 }
 
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"
@@ -189,6 +190,7 @@ export default function CreateTransactionPage({
     editRecurringTemplateId,
     editRecurringTemplate,
     paymentMethods = [],
+    forcedTab,
 }: CreateTransactionPageProps & { editRecurringTemplateId?: string, editRecurringTemplate?: any, paymentMethods?: any[] }) {
     const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
@@ -213,7 +215,13 @@ export default function CreateTransactionPage({
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
     const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
 
-    const [txKind, setTxKind] = useState<TxKind>(() => editRecurringTemplate ? (editRecurringTemplate.type || "income") : editTransaction?.transactionType || "income")
+    const [txKind, setTxKind] = useState<TxKind>(() => {
+        if (editRecurringTemplate) return editRecurringTemplate.type || "income"
+        if (editTransaction) return editTransaction.transactionType || "income"
+        if (forcedTab === "A pagar") return "expense"
+        if (forcedTab === "A receber") return "income"
+        return "income"
+    })
     const [amount, setAmount] = useState(() => editRecurringTemplate ? editRecurringTemplate.amount : editTransaction ? editTransaction.amount : 0)
     const [description, setDescription] = useState(() => editRecurringTemplate?.description || editTransaction?.description || "")
     const [categoryId, setCategoryId] = useState<string | undefined>(() => editRecurringTemplate?.category_id ?? editTransaction?.categoryId ?? undefined)
@@ -1783,77 +1791,81 @@ export default function CreateTransactionPage({
                                             animate={{ opacity: 1 }}
                                             className="space-y-10"
                                         >
-                                            <section>
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                    Tipo de lançamento
-                                                </h3>
-                                                <div className="lg:hidden -mx-4 px-4">
-                                                    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-0.5 no-scrollbar scroll-pl-4 pl-4 pr-2">
-                                                        {typeButtons.map((b) => (
-                                                            <button
-                                                                key={b.id}
-                                                                type="button"
-                                                                disabled={isEditMode}
-                                                                onClick={() => !isEditMode && setTxKind(b.id)}
-                                                                className={`snap-start shrink-0 flex-[0_0_calc(85%-0.5rem)] max-w-[320px] sm:flex-[0_0_280px] flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
-                                                                    ? b.activeClass
-                                                                    : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
-                                                                    }`}
-                                                            >
-                                                                <div className="flex items-center gap-3 min-w-0">
-                                                                    <div
-                                                                        className={`w-11 h-11 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-200 ${txKind === b.id
-                                                                            ? b.iconActiveClass
-                                                                            : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text"
+                                            {(!forcedTab || forcedTab === "Transações") && (
+                                                <>
+                                                    <section>
+                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Tipo de lançamento
+                                                        </h3>
+                                                        <div className="lg:hidden -mx-4 px-4">
+                                                            <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 pt-0.5 no-scrollbar scroll-pl-4 pl-4 pr-2">
+                                                                {typeButtons.map((b) => (
+                                                                    <button
+                                                                        key={b.id}
+                                                                        type="button"
+                                                                        disabled={isEditMode}
+                                                                        onClick={() => !isEditMode && setTxKind(b.id)}
+                                                                        className={`snap-start shrink-0 flex-[0_0_calc(85%-0.5rem)] max-w-[320px] sm:flex-[0_0_280px] flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
+                                                                            ? b.activeClass
+                                                                            : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
                                                                             }`}
                                                                     >
-                                                                        {b.icon}
-                                                                    </div>
-                                                                    <div className="min-w-0">
-                                                                        <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {b.label}
+                                                                        <div className="flex items-center gap-3 min-w-0">
+                                                                            <div
+                                                                                className={`w-11 h-11 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-200 ${txKind === b.id
+                                                                                    ? b.iconActiveClass
+                                                                                    : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text"
+                                                                                    }`}
+                                                                            >
+                                                                                {b.icon}
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                    {b.label}
+                                                                                </div>
+                                                                                <div className="text-xs text-brand-inactive-text truncate">{b.sub}</div>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="text-xs text-brand-inactive-text truncate">{b.sub}</div>
-                                                                    </div>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div className="hidden lg:grid lg:grid-cols-3 gap-3">
-                                                    {typeButtons.map((b) => (
-                                                        <button
-                                                            key={b.id}
-                                                            type="button"
-                                                            disabled={isEditMode}
-                                                            onClick={() => !isEditMode && setTxKind(b.id)}
-                                                            className={`flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
-                                                                ? b.activeClass
-                                                                : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-3 min-w-0">
-                                                                <div
-                                                                    className={`w-11 h-11 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-200 ${txKind === b.id
-                                                                        ? b.iconActiveClass
-                                                                        : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text"
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div className="hidden lg:grid lg:grid-cols-3 gap-3">
+                                                            {typeButtons.map((b) => (
+                                                                <button
+                                                                    key={b.id}
+                                                                    type="button"
+                                                                    disabled={isEditMode}
+                                                                    onClick={() => !isEditMode && setTxKind(b.id)}
+                                                                    className={`flex items-center justify-between p-4 rounded-2xl transition-all border text-left ${isEditMode ? "opacity-60 cursor-not-allowed" : ""} ${txKind === b.id
+                                                                        ? b.activeClass
+                                                                        : "bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border"
                                                                         }`}
                                                                 >
-                                                                    {b.icon}
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                        {b.label}
+                                                                    <div className="flex items-center gap-3 min-w-0">
+                                                                        <div
+                                                                            className={`w-11 h-11 rounded-full border flex items-center justify-center shrink-0 transition-colors duration-200 ${txKind === b.id
+                                                                                ? b.iconActiveClass
+                                                                                : "border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text"
+                                                                                }`}
+                                                                        >
+                                                                            {b.icon}
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                {b.label}
+                                                                            </div>
+                                                                            <div className="text-xs text-brand-inactive-text truncate">{b.sub}</div>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-xs text-brand-inactive-text truncate">{b.sub}</div>
-                                                                </div>
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </section>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </section>
 
-                                            <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                    <div className="h-px bg-brand-border dark:bg-dark-border w-full" />
+                                                </>
+                                            )}
 
                                             {renderTypeSpecificLeft()}
                                         </motion.div>

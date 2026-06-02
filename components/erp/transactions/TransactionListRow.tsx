@@ -6,7 +6,8 @@ import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reu
 import { CreditCardIcon, FileIcon, InstallmentIcon, MoneyIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
-import type { ERPTransaction } from "../../../lib/services/transactions.types"
+import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
+import type { ERPTransaction } from "@/lib/services/transactions.types"
 
 interface ColumnDef {
     id: string
@@ -65,9 +66,8 @@ const TransactionListItem = React.memo(
                                     </Badge>
                                 )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                {getPaymentIcon(transaction.paymentType)({ className: "w-3.5 h-3.5" })}
-                                <span>{transaction.paymentType}</span>
+                            <div className="mt-1 flex items-center">
+                                <PaymentMethodIndicator label={transaction.paymentType} />
                             </div>
                         </div>
                     )
@@ -76,6 +76,13 @@ const TransactionListItem = React.memo(
                     return (
                         <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
                             {transaction.category}
+                        </span>
+                    )
+
+                case "originSource":
+                    return (
+                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-slate text-xs font-semibold text-brand-dark dark:bg-dark-border dark:text-dark-heading whitespace-nowrap">
+                            {transaction.originSource || "Manual"}
                         </span>
                     )
 

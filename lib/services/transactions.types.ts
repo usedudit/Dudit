@@ -19,6 +19,7 @@ export interface ERPTransaction {
   dueDateShort: string
   dueDateTime?: string
   dateNote: string
+  originSource?: string
   createdAtDate: string
   createdAtTime: string
   createdAtRaw?: string | null

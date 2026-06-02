@@ -157,9 +157,15 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
         installmentNumber: recalculated.adjustedRows[i]?.installmentNumber ?? splitRows[i]?.installmentNumber ?? 1,
     }))
 
+    const sumBase = splitRows.reduce((acc, r) => acc + r.amount, 0)
+    const isPartial = sumBase < baseTotal - 0.005
+    const finalTotal = isPartial
+        ? Math.max(0, Math.round((baseTotal + recalculated.feeAmount + recalculated.interestAmount - recalculated.paymentMethodDiscountAmount) * 100) / 100)
+        : recalculated.finalTotal
+
     return {
         ok: true,
-        totalAmount: recalculated.finalTotal,
+        totalAmount: finalTotal,
         adjustedBreakdown,
     }
 }
@@ -746,7 +752,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     // Ensure the sale's final_amount, paid_amount and payment_status match the recalculated paymentAware totals
     const updatedPaidAmount = Math.min(paymentAware.totalAmount, paidAmountForRpc)
-    const isPaid = updatedPaidAmount >= paymentAware.totalAmount - 0.01
+    const isPaid = updatedPaidAmount >= paymentAware.totalAmount - 0.005
     const newStatus = isPaid ? "paid" : (updatedPaidAmount > 0 ? "partially_paid" : "unpaid")
     await supabase
         .from("sales")

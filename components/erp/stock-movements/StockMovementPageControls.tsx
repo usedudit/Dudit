@@ -1,8 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Button, Input } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import DropdownItem from "@/components/reusable/DropdownItem"
 import FilterChip from "@/components/reusable/FilterChip"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 
@@ -12,8 +10,6 @@ import {
     GridIcon,
     ListIcon,
     PlusIcon,
-    FileIcon,
-    Settings2Icon,
     ArrowUpDownIcon,
     ArrowUpIcon,
     ArrowDownIcon,

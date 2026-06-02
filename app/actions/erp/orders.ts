@@ -155,19 +155,19 @@ function resolvePaymentState(params: {
     let paidAmount = requestedPaidAmount
 
     if (situation === "paid") {
-        if (paidAmount >= totalAmount - 0.009) {
+        if (paidAmount >= totalAmount - 0.005) {
             paidAmount = totalAmount
-        } else if (paidAmount > 0.009) {
+        } else if (paidAmount > 0.005) {
             situation = "partially_paid"
         } else {
             situation = "pending"
             paidAmount = 0
         }
     } else if (situation === "partially_paid") {
-        if (paidAmount >= totalAmount - 0.009) {
+        if (paidAmount >= totalAmount - 0.005) {
             situation = "paid"
             paidAmount = totalAmount
-        } else if (paidAmount <= 0.009) {
+        } else if (paidAmount <= 0.005) {
             situation = "pending"
             paidAmount = 0
         }
@@ -283,9 +283,15 @@ async function applyPaymentMethodPricingToTotal(
         installmentNumber: splitRows[i]?.installmentNumber || 1,
     }))
 
+    const sumBase = splitRows.reduce((acc, r) => acc + r.amount, 0)
+    const isPartial = sumBase < safeBase - 0.005
+    const finalTotal = isPartial
+        ? Math.max(0, Math.round((safeBase + recalculated.feeAmount + recalculated.interestAmount - recalculated.paymentMethodDiscountAmount) * 100) / 100)
+        : recalculated.finalTotal
+
     return {
         ok: true,
-        finalTotal: recalculated.finalTotal,
+        finalTotal,
         feeAmount: recalculated.feeAmount,
         interestAmount: recalculated.interestAmount,
         paymentMethodDiscountAmount: recalculated.paymentMethodDiscountAmount,
@@ -959,7 +965,38 @@ async function createRefundTransactionForCancelledOrderSafe(params: {
     const paidAmount = Math.max(0, Number(params.paidAmount || 0))
     if (paidAmount <= 0.009) return { success: true as const }
 
-    const financeAccountId = params.financeAccountId || null
+    let financeAccountId = params.financeAccountId || null
+    if (!financeAccountId) {
+        // Fallback 1: Try to query the partner's default active financial account
+        const { data: defaultAccount } = await params.supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .eq("is_default", true)
+            .eq("is_active", true)
+            .maybeSingle()
+
+        if (defaultAccount?.id) {
+            financeAccountId = defaultAccount.id
+        }
+    }
+
+    if (!financeAccountId) {
+        // Fallback 2: Try to query any active financial account for the partner
+        const { data: anyAccount } = await params.supabase
+            .from("finance_accounts")
+            .select("id")
+            .eq("partner_id", params.partnerId)
+            .eq("is_active", true)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+        if (anyAccount?.id) {
+            financeAccountId = anyAccount.id
+        }
+    }
+
     if (!financeAccountId) {
         const message =
             "Não foi possível gerar o reembolso automático: o pedido não tem conta financeira de origem. Atualize o pedido com a conta correta antes de cancelar."

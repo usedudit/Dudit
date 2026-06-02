@@ -130,7 +130,7 @@ import {
     Rocket01Icon,
     Briefcase01Icon,
     File02Icon as File02Icon01,
-    Key01Icon,
+    Key01Icon
 } from "@hugeicons/core-free-icons"
 
 

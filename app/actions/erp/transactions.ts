@@ -366,11 +366,11 @@ export async function getFinancialTransactionsAction(
         const ordersPromise = uniqueSaleRefs.length > 0
             ? supabase
                 .from("orders")
-                .select("order_number, buyer_id, customer_name")
+                .select("order_number, buyer_id, customer_name, order_source")
                 .eq("partner_id", partnerId)
                 .in("order_number", uniqueSaleRefs)
                 .then((r: any) => r.data || [])
-            : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null }[])
+            : Promise.resolve([] as { order_number: string; buyer_id: string | null; customer_name: string | null; order_source: string | null }[])
 
         const salesPromise = uniqueSaleRefs.length > 0
             ? supabase
@@ -434,9 +434,9 @@ export async function getFinancialTransactionsAction(
         }
 
         // Build order lookup and collect buyer IDs into the customer set
-        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null }>()
+        const orderByNumber = new Map<string, { buyer_id: string | null; customer_name: string | null; order_source: string | null }>()
         for (const o of orders) {
-            orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name })
+            orderByNumber.set(String(o.order_number), { buyer_id: o.buyer_id, customer_name: o.customer_name, order_source: o.order_source || null })
             if (o.buyer_id) allCustomerIds.add(o.buyer_id)
         }
 
@@ -540,10 +540,32 @@ export async function getFinancialTransactionsAction(
                 createdAtRaw: t.created_at || now.toISOString(),
                 daysUntilDue,
                 isOverdue,
-                paymentType:
-                    (t.payment_method_id && paymentMethodLabelById.get(t.payment_method_id)) ||
-                    (t.payment_type ? formatPaymentMethodLabel(t.payment_type, null) : "") ||
-                    "Não informado",
+                originSource: (() => {
+                    if (t.payment_type === "Agendamento" || (t.reference_note && t.reference_note.startsWith("appointment:"))) {
+                        return "Agendamento";
+                    }
+                    if (t.category === "Vendas" && order) {
+                        const src = String(order.order_source || "Manual").toLowerCase();
+                        if (src === "presencial") return "PDV";
+                        if (src === "vitrine online") return "Site";
+                        if (src === "assinatura") return "Assinatura";
+                        if (src === "manual") return "Venda Manual";
+                        return order.order_source || "Venda Manual";
+                    }
+                    const o = String(t.origin || "").toLowerCase();
+                    if (o === "system") return "Sistema";
+                    if (o === "gateway") return "Gateway";
+                    return "Manual";
+                })(),
+                paymentType: (() => {
+                    if (t.payment_method_id) {
+                        return paymentMethodLabelById.get(t.payment_method_id) || "Não informado";
+                    }
+                    if (t.payment_type && t.payment_type !== "Agendamento") {
+                        return formatPaymentMethodLabel(t.payment_type, null) || "Não informado";
+                    }
+                    return "Não informado";
+                })(),
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
                 amount: Math.abs(Number(t.amount || 0)),
@@ -1505,6 +1527,18 @@ export async function recordInstallmentPaymentAction(input: {
         }
         if (fullyPaid) {
             updatePayload.status = "paid"
+            // Query all payments for this transaction to calculate final amount
+            const { data: allPayments, error: sumErr } = await supabase
+                .from("transaction_payments")
+                .select("amount")
+                .eq("partner_id", input.partnerId)
+                .eq("transaction_id", input.transactionId)
+            if (!sumErr && allPayments) {
+                const totalPaid = allPayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
+                if (totalPaid > 0) {
+                    updatePayload.amount = totalPaid
+                }
+            }
         }
         const { error: updateErr } = await supabase
             .from("transactions")

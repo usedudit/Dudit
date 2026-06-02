@@ -941,6 +941,7 @@ export const AppointmentSheet = ({
                 } catch { }
             }
 
+            router.refresh();
             return { success: true, orderNumber };
         } catch (error) {
             return { error: 'Erro ao processar venda do agendamento' };
