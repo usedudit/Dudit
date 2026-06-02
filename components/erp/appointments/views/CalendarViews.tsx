@@ -1,36 +1,115 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase } from 'lucide-react';
-import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon } from '@/lib/icons';
+import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase, AlertTriangle } from 'lucide-react';
+import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon, BlockedIcon } from '@/lib/icons';
 import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
 import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
-import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate } from '../utils';
+import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate, checkAppointmentCollision } from '../utils';
 import { AppointmentListRow } from '../AppointmentListRow';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
+const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, durationMinutes: number, openingHours: any) => {
+    if (!openingHours) return false;
+    const parseLocalDate = (dateStr: string): Date => {
+        if (!dateStr) return new Date();
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    };
+    const dateObj = parseLocalDate(aptDateStr);
+    const dName = DAYS_OF_WEEK[dateObj.getDay()];
+    const dConfig = openingHours[dName];
+    if (!dConfig || !dConfig.enabled) return true;
+    
+    const parseTimeToMinutes = (timeStr: string) => {
+        if (!timeStr || !timeStr.includes(':')) return -1;
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const fromMin = parseTimeToMinutes(dConfig.from);
+    const toMin = parseTimeToMinutes(dConfig.to);
+    
+    const aptStartMin = parseTimeToMinutes(aptTimeStr);
+    const aptEndMin = aptStartMin + durationMinutes;
+    
+    return aptStartMin < fromMin || aptEndMin > toMin;
+};
+
+const getClosedBlocks = (date: Date, openingHours: any, startHour: number, endHour: number) => {
+    if (!openingHours) return [];
+    const dName = DAYS_OF_WEEK[date.getDay()];
+    const dConfig = openingHours[dName];
+    
+    const startMin = startHour * 60; // e.g. 8 * 60 = 480
+    const endMin = (endHour + 1) * 60; // e.g. 20 * 60 = 1200
+    
+    if (!dConfig || !dConfig.enabled) {
+        return [{
+            top: 0,
+            height: ((endMin - startMin) / 60) * 80,
+            label: "Fechado"
+        }];
+    }
+    
+    const parseTimeToMinutes = (timeStr: string) => {
+        if (!timeStr || !timeStr.includes(':')) return -1;
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    };
+    
+    const fromMin = parseTimeToMinutes(dConfig.from);
+    const toMin = parseTimeToMinutes(dConfig.to);
+    
+    const blocks = [];
+    
+    if (fromMin > startMin) {
+        const duration = fromMin - startMin;
+        blocks.push({
+            top: 0,
+            height: (duration / 60) * 80,
+            label: "Fora do Expediente"
+        });
+    }
+    
+    if (toMin < endMin) {
+        const duration = endMin - toMin;
+        const top = ((toMin - startMin) / 60) * 80;
+        blocks.push({
+            top,
+            height: (duration / 60) * 80,
+            label: "Fora do Expediente"
+        });
+    }
+    
+    return blocks;
+};
+
+
 // --- HELPER COMPONENTS ---
 
-const PopoverContent = ({ activePopover, handleOpenCreate, setIsUnavailableSheetOpen, setActivePopover }: any) => (
+const PopoverContent = ({ activePopover, handleOpenCreate, handleOpenUnavailable, setActivePopover }: any) => (
     <div className="bg-white dark:bg-dark-surface rounded-xl shadow-xl border border-brand-border dark:border-dark-border w-64 overflow-hidden origin-center animate-in fade-in zoom-in-95 duration-100">
         <div className="bg-gray-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-brand-border dark:border-dark-border flex justify-between items-center">
             <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
                 {activePopover?.date && <span className="ml-0 text-xs font-normal opacity-75">{activePopover.date.toLocaleDateString('pt-BR')}</span>}
-                {activePopover?.mode === 'resource' && <span className="ml-2">{activePopover.time}</span>}
+                {activePopover?.time && <span className="ml-2">{activePopover.time}</span>}
             </span>
             <button onClick={(e) => { e.stopPropagation(); setActivePopover(null); }} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
                 <X size={14} />
             </button>
         </div>
         <div className="p-1">
-            <button className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-3 transition-colors group" onClick={(e) => { e.stopPropagation(); handleOpenCreate(activePopover?.mode === 'resource' ? activePopover?.time : undefined, activePopover?.date, activePopover?.staffId); }}>
+            <button className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-3 transition-colors group" onClick={(e) => { e.stopPropagation(); handleOpenCreate(activePopover?.time, activePopover?.date, activePopover?.staffId); }}>
                 <div className="w-8 h-8 rounded-full bg-brand-dark dark:bg-white flex items-center justify-center text-white dark:text-brand-dark">
                     <CalendarPlus size={16} />
                 </div>
                 <span className="text-sm font-medium text-brand-dark dark:text-dark-heading group-hover:translate-x-1 transition-transform">Adicionar agendamento</span>
             </button>
-            <button className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-3 transition-colors group" onClick={(e) => { e.stopPropagation(); setIsUnavailableSheetOpen(true); setActivePopover(null); }}>
+            <button className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-3 transition-colors group" onClick={(e) => { e.stopPropagation(); if (handleOpenUnavailable) handleOpenUnavailable(activePopover?.time, activePopover?.date, activePopover?.staffId); else setActivePopover(null); }}>
                 <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-700 flex items-center justify-center text-brand-inactive-text dark:text-dark-body">
                     <CalendarOff size={16} />
                 </div>
@@ -87,12 +166,14 @@ const LongEventBar: React.FC<{ appointment: Appointment, onClick: () => void }> 
 export const MobileView = ({
     currentDate,
     appointments,
+    allAppointments = [],
     setCurrentDate,
     navigateDate,
     getViewLabel,
     handleOpenCreate,
     handleOpenView,
-    columns
+    columns,
+    openingHours
 }: any) => {
     // ... Mobile View implementation same as previous ...
 
@@ -173,6 +254,8 @@ export const MobileView = ({
                                     key={apt.id}
                                     appointment={apt}
                                     onClick={handleOpenView}
+                                    openingHours={openingHours}
+                                    appointments={allAppointments}
                                 />
                             ))}
                         </div>
@@ -191,7 +274,7 @@ export const MobileView = ({
 };
 
 // ... DayView ...
-export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, handleGridMouseMove, handleGridMouseLeave, handleGridClick, hoverColIndex, hoverTime, activePopover, setActivePopover, handleOpenCreate, setIsUnavailableSheetOpen }: any) => {
+export const DayView = ({ appointments, allAppointments = [], currentDate, staffMembers, onOpenView, handleGridMouseMove, handleGridMouseLeave, handleGridClick, hoverColIndex, hoverTime, activePopover, setActivePopover, handleOpenCreate, handleOpenUnavailable, openingHours }: any) => {
     const startHour = 8;
     const endHour = 19;
     const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => i + startHour);
@@ -209,6 +292,8 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
     });
 
     const hourlyEvents = appointments.filter((a: Appointment) => a.date === currentDateStr && !isMultiDay(a));
+
+    const closedBlocks = getClosedBlocks(currentDate, openingHours, startHour, endHour);
 
     return (
         <div className="flex flex-col h-full overflow-hidden relative">
@@ -246,8 +331,19 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                                     <div className="flex items-center gap-2"><UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-8 h-8 shrink-0 text-[10px]" /><div className="flex flex-col"><span className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">{staff.name}</span><span className="text-[10px] text-brand-inactive-text dark:text-dark-body truncate max-w-[100px]">{staff.role}</span></div></div>
                                 </div>
                                 <div className="relative" onMouseMove={(e) => handleGridMouseMove(e, colIndex)} onMouseLeave={handleGridMouseLeave} onClick={(e) => handleGridClick(e, staff.id)}>
+                                    {/* Closed Blocks */}
+                                    {closedBlocks.map((block, bIdx) => (
+                                        <div
+                                            key={bIdx}
+                                            className="absolute left-0 right-0 z-0 bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.04),rgba(239,68,68,0.04)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5 border-y border-red-100/10 dark:border-red-900/10 flex items-center justify-center pointer-events-none"
+                                            style={{ top: `${block.top}px`, height: `${block.height}px` }}
+                                        >
+                                            <span className="text-[9px] font-bold text-red-500/30 uppercase tracking-widest">{block.label}</span>
+                                        </div>
+                                    ))}
+
                                     {hours.map(h => (
-                                        <div key={h} className="h-20 border-b border-brand-border dark:border-dark-border border-dashed dark:border-zinc-800 pointer-events-none relative">
+                                        <div key={h} className="h-20 border-b border-brand-border dark:border-dark-border border-dashed dark:border-zinc-800 pointer-events-none relative z-10">
                                             <div className="absolute top-[25%] left-0 w-full border-t border-brand-border/30 dark:border-dark-border/20 border-dashed"></div>
                                             <div className="absolute top-[50%] left-0 w-full border-t border-brand-border/30 dark:border-dark-border/20 border-dashed"></div>
                                             <div className="absolute top-[75%] left-0 w-full border-t border-brand-border/30 dark:border-dark-border/20 border-dashed"></div>
@@ -262,6 +358,17 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                                             const style = getAppointmentStyle(apt.status);
                                             const endTime = getEndTime(apt.time, apt.duration);
 
+                                            const s = apt.status.toLowerCase();
+                                            let StatusIcon = ClockIcon;
+                                            if (s === 'confirmed' || s === 'confirmado' || s === 'completed' || s === 'concluído' || s === 'concluido' || s === 'finished') StatusIcon = LikeIcon;
+                                            else if (s === 'iniciado' || s === 'in progress') StatusIcon = PlayIcon;
+                                            else if (s === 'ausência' || s === 'absent' || s === 'ausencia') StatusIcon = EyeOffIcon;
+                                            else if (s === 'canceled' || s === 'cancelado') StatusIcon = BlockedIcon;
+
+                                            const isOutsideHours = checkOutsideOperatingHours(apt.date, apt.time, apt.duration, openingHours);
+                                            const hasCollision = checkAppointmentCollision(apt, allAppointments);
+                                            const isCompact = height < 50;
+
                                             return (
                                                 <motion.div
                                                     key={apt.id}
@@ -273,33 +380,73 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                                                     style={{ top: `${top}px`, height: `${height}px`, left: `${(apt.column || 0) * (100 / (apt.totalColumns || 1))}%`, width: `${100 / (apt.totalColumns || 1)}%`, marginRight: '2px', boxSizing: 'border-box' }}
                                                     onClick={(e) => { e.stopPropagation(); onOpenView(apt); }}
                                                 >
-                                                    <div className="flex h-full gap-2"><div className={`w-1 rounded-full flex-shrink-0 ${style.bar}`}></div>
-                                                        <div className="flex-1 min-w-0 flex flex-col">
-                                                            <div className="flex items-center justify-between mb-0.5">
-                                                                <span className={`font-bold text-[10px] ${style.title} truncate`}>{apt.time} - {endTime}</span>
-                                                                <div className="flex items-center gap-1">
+                                                    <div className="flex h-full gap-2 items-center">
+                                                        <div className={`w-1 h-full rounded-full flex-shrink-0 ${style.bar}`}></div>
+                                                        {isCompact ? (
+                                                            <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5">
+                                                                <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                                                    <span className={`font-bold text-[9px] ${style.title} shrink-0`}>{apt.time}</span>
+                                                                    <span className={`font-bold text-[10px] ${style.title} truncate`}>{apt.customer}</span>
+                                                                    <span className={`text-[9px] ${style.text} truncate opacity-90`}>• {apt.service}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    {hasCollision && (
+                                                                        <span title="Conflito de horário detectado">
+                                                                            <AlertTriangle size={11} className="text-red-500 shrink-0" />
+                                                                        </span>
+                                                                    )}
+                                                                    {isOutsideHours && (
+                                                                        <span title="Fora do horário de expediente">
+                                                                            <AlertTriangle size={11} className="text-orange-500 shrink-0" />
+                                                                        </span>
+                                                                    )}
                                                                     {apt.paymentStatus && ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes(apt.paymentStatus.toLowerCase()) && (
                                                                         <div className={`${style.text} opacity-70`}>
-                                                                            {['paid', 'pago'].includes(apt.paymentStatus.toLowerCase()) ? <MoneyIcon size={12} /> : <PartiallyPaidIcon size={12} />}
+                                                                            {['paid', 'pago'].includes(apt.paymentStatus.toLowerCase()) ? <MoneyIcon size={11} /> : <PartiallyPaidIcon size={11} />}
                                                                         </div>
                                                                     )}
                                                                     <div className={`${style.text} opacity-70`}>
-                                                                        {apt.status.toLowerCase() === 'confirmado' || apt.status.toLowerCase() === 'confirmed' ? <LikeIcon size={12} /> :
-                                                                         apt.status.toLowerCase() === 'iniciado' || apt.status.toLowerCase() === 'in progress' ? <PlayIcon size={12} /> :
-                                                                         ['ausência', 'absent', 'ausencia'].includes(apt.status.toLowerCase()) ? <EyeOffIcon size={12} /> :
-                                                                         <ClockIcon size={12} />}
+                                                                        <StatusIcon size={11} />
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className={`font-bold text-[11px] ${style.title} truncate leading-tight mb-0.5`}>{apt.customer}</div>
-                                                            <div className={`text-[9px] ${style.text} truncate opacity-90 mb-1`}>{apt.service}</div>
-
-                                                            {height > 50 && (
-                                                                <div className="border-t border-black/5 dark:border-white/5 pt-1 mt-auto">
-                                                                    <span className={`text-[9px] font-bold ${style.text} truncate block`}>{apt.staff}</span>
+                                                        ) : (
+                                                            <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+                                                                <div className="flex flex-col">
+                                                                    <div className="flex items-center justify-between mb-0.5">
+                                                                        <span className={`font-bold text-[10px] ${style.title} truncate`}>{apt.time} - {endTime}</span>
+                                                                        <div className="flex items-center gap-1">
+                                                                            {hasCollision && (
+                                                                                <span title="Conflito de horário detectado">
+                                                                                    <AlertTriangle size={12} className="text-red-500 shrink-0" />
+                                                                                </span>
+                                                                            )}
+                                                                            {isOutsideHours && (
+                                                                                <span title="Fora do horário de expediente">
+                                                                                    <AlertTriangle size={12} className="text-orange-500 shrink-0" />
+                                                                                </span>
+                                                                            )}
+                                                                            {apt.paymentStatus && ['paid', 'pago', 'partially paid', 'parcialmente pago'].includes(apt.paymentStatus.toLowerCase()) && (
+                                                                                <div className={`${style.text} opacity-70`}>
+                                                                                    {['paid', 'pago'].includes(apt.paymentStatus.toLowerCase()) ? <MoneyIcon size={12} /> : <PartiallyPaidIcon size={12} />}
+                                                                                </div>
+                                                                            )}
+                                                                            <div className={`${style.text} opacity-70`}>
+                                                                                <StatusIcon size={12} />
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className={`font-bold text-[11px] ${style.title} truncate leading-tight mb-0.5`}>{apt.customer}</div>
+                                                                    <div className={`text-[9px] ${style.text} truncate opacity-90 mb-1`}>{apt.service}</div>
                                                                 </div>
-                                                            )}
-                                                        </div>
+
+                                                                {height >= 70 && (
+                                                                    <div className="border-t border-black/5 dark:border-white/5 pt-1 mt-auto">
+                                                                        <span className={`text-[9px] font-bold ${style.text} truncate block`}>{apt.staff}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </motion.div>
                                             );
@@ -312,6 +459,7 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                     })}
                 </div>
             </div>
+
             <AnimatePresence>{activePopover && activePopover.mode === 'absolute' && (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
@@ -320,7 +468,7 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
                     transition={{ duration: 0.15 }}
                     style={{ position: 'fixed', top: activePopover.top, left: activePopover.align === 'left' ? activePopover.left - 256 : activePopover.left, zIndex: 60 }}
                 >
-                    <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} setIsUnavailableSheetOpen={setIsUnavailableSheetOpen} setActivePopover={setActivePopover} />
+                    <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} handleOpenUnavailable={handleOpenUnavailable} setActivePopover={setActivePopover} />
                 </motion.div>
             )}</AnimatePresence>
             {activePopover && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActivePopover(null)}></div>}
@@ -329,7 +477,7 @@ export const DayView = ({ appointments, currentDate, staffMembers, onOpenView, h
 };
 
 // ... TimelineView (Week) ...
-export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenView, handleTimelineMouseMove, handleGridMouseLeave, handleGridClick, hoverStaffId, hoverTime, activePopover, setActivePopover, handleOpenCreate, setIsUnavailableSheetOpen, handleOpenMore }: any) => {
+export const TimelineView = ({ appointments, allAppointments = [], currentDate, staffMembers, onOpenView, handleTimelineMouseMove, handleGridMouseLeave, handleGridClick, hoverStaffId, hoverTime, activePopover, setActivePopover, handleOpenCreate, handleOpenUnavailable, handleOpenMore, openingHours }: any) => {
 
     const days = getWeekDays(currentDate);
     const staffCount = staffMembers.length;
@@ -361,7 +509,7 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
                         return (
                             <div key={idx} className="flex-1 border-r border-brand-border dark:border-dark-border flex flex-col items-center justify-center bg-white dark:bg-dark-surface relative min-w-[140px]">
                                 <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isToday ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'}`}>
-                                    {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                     {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
                                 </span>
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isToday ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading'}`}>
                                     {day.getDate()}
@@ -419,10 +567,16 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
                                     const displayApps = cellApps.slice(0, maxItems);
                                     const remainingCount = cellApps.length - maxItems;
 
+                                    const dName = DAYS_OF_WEEK[day.getDay()];
+                                    const dConfig = openingHours ? openingHours[dName] : null;
+                                    const isClosed = openingHours && (!dConfig || !dConfig.enabled);
+
                                     return (
                                         <div
                                             key={dIdx}
-                                            className="flex-1 border-r border-brand-border dark:border-dark-border relative min-w-[140px] p-2 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group"
+                                            className={`flex-1 border-r border-brand-border dark:border-dark-border relative min-w-[140px] p-2 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group ${
+                                                isClosed ? 'bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.03),rgba(239,68,68,0.03)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5' : ''
+                                            }`}
                                             onClick={(e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const x = e.clientX;
@@ -440,21 +594,41 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
                                                 });
                                             }}
                                         >
-                                            <div className="flex flex-col gap-1.5 h-full overflow-hidden">
+                                            {isClosed && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                                                    <span className="text-[9px] font-bold text-red-500/20 uppercase tracking-widest">Fechado</span>
+                                                </div>
+                                            )}
+                                            <div className="flex flex-col gap-1.5 h-full overflow-hidden relative z-10">
                                                 {displayApps.map((apt: Appointment) => {
                                                     const style = getAppointmentStyle(apt.status);
                                                     const endTime = getEndTime(apt.time, apt.duration);
+                                                    const isOutsideHours = checkOutsideOperatingHours(apt.date, apt.time, apt.duration, openingHours);
+                                                    const hasCollision = checkAppointmentCollision(apt, allAppointments);
+                                                    const s = apt.status.toLowerCase();
+                                                    const isCompleted = s === 'completed' || s === 'concluído' || s === 'concluido' || s === 'finished';
 
                                                     return (
                                                         <motion.div
                                                             key={apt.id}
                                                             initial={{ opacity: 0, scale: 0.9 }}
                                                             animate={{ opacity: 1, scale: 1 }}
-                                                            className={`text-[10px] px-1.5 py-1 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1.5 font-bold ${style.container} ${style.title}`}
+                                                            className={`text-[10px] px-1.5 py-1 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-between gap-1.5 font-bold ${style.container} ${style.title}`}
                                                             onClick={(e) => { e.stopPropagation(); onOpenView(apt); }}
                                                         >
-                                                            <div className={`w-0.5 h-2 rounded-full ${style.bar}`}></div>
-                                                            {apt.time}-{endTime} {apt.customer}
+                                                            <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                                                <div className={`w-0.5 h-2 rounded-full ${style.bar} shrink-0`}></div>
+                                                                <span className="truncate">{apt.time}-{endTime} {apt.customer}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-0.5 shrink-0">
+                                                                {hasCollision && (
+                                                                    <span title="Conflito de horário detectado">
+                                                                        <AlertTriangle size={10} className="text-red-500 shrink-0" />
+                                                                    </span>
+                                                                )}
+                                                                {isOutsideHours && <AlertTriangle size={10} className="text-orange-500" />}
+                                                                {isCompleted && <LikeIcon size={10} />}
+                                                            </div>
                                                         </motion.div>
                                                     )
                                                 })}
@@ -484,7 +658,7 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
                     transition={{ duration: 0.15 }}
                     style={{ position: 'fixed', top: activePopover.top, left: activePopover.left, zIndex: 60 }}
                 >
-                    <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} setIsUnavailableSheetOpen={setIsUnavailableSheetOpen} setActivePopover={setActivePopover} />
+                    <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} handleOpenUnavailable={handleOpenUnavailable} setActivePopover={setActivePopover} />
                 </motion.div>
             )}</AnimatePresence>
             {activePopover && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActivePopover(null)}></div>}
@@ -493,7 +667,7 @@ export const TimelineView = ({ appointments, currentDate, staffMembers, onOpenVi
 };
 
 // ... MonthView ...
-export const MonthView = ({ appointments, currentDate, handleGenericCellClick, activePopover, handleOpenCreate, setIsUnavailableSheetOpen, setActivePopover, handleOpenView, handleOpenMore }: any) => {
+export const MonthView = ({ appointments, currentDate, handleGenericCellClick, activePopover, handleOpenCreate, handleOpenUnavailable, setActivePopover, handleOpenView, handleOpenMore }: any) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -572,7 +746,7 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
             <AnimatePresence>
                 {activePopover && activePopover.mode === 'absolute' && (
                     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.15 }} style={{ position: 'fixed', top: activePopover.top, left: activePopover.align === 'left' ? activePopover.left : (activePopover.left ? activePopover.left - 256 : 0), zIndex: 60 }}>
-                        <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} setIsUnavailableSheetOpen={setIsUnavailableSheetOpen} setActivePopover={setActivePopover} />
+                        <PopoverContent activePopover={activePopover} handleOpenCreate={handleOpenCreate} handleOpenUnavailable={handleOpenUnavailable} setActivePopover={setActivePopover} />
                     </motion.div>
                 )}
             </AnimatePresence>

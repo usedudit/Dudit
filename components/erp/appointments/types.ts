@@ -14,6 +14,7 @@ export interface Appointment {
     duration: number;   // minutes (calculated total)
     status: 'Reservado' | 'Confirmado' | 'Aguardando' | 'Iniciado' | 'Concluído' | 'Pago' | 'Ausência' | 'Cancelado' | 'Indisponível' | 'Partially Paid' | 'Pago Parcialmente';
     paymentStatus?: string;
+    paidAmount?: number;
     staff: string;
     staffId: string;
     price: number;

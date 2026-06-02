@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Utensils, Briefcase } from 'lucide-react';
-import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton } from '@/components/reusable';
+import { Button, Input as FormInput, Checkbox, Dropdown, DropdownItem, DatePicker, TimePicker, FormTextarea, RadioButton, FormDropdown } from '@/components/reusable';
 import AlertModal from "@/components/reusable/AlertModal"
 import { Appointment } from '../types';
 import { AppointmentListCard } from '../AppointmentListCard';
@@ -91,7 +91,9 @@ export const AddUnavailableSheet = ({
     defaultDate = new Date(),
     unavailableTypes = [],
     partnerId,
-    onRefreshServices
+    onRefreshServices,
+    initialTimeSlot,
+    initialStaffId,
 }: {
     onClose: () => void,
     onSave?: (data: any) => void,
@@ -101,7 +103,9 @@ export const AddUnavailableSheet = ({
     defaultDate?: Date,
     unavailableTypes?: any[],
     partnerId?: string,
-    onRefreshServices?: () => void
+    onRefreshServices?: () => void,
+    initialTimeSlot?: string,
+    initialStaffId?: string,
 }) => {
     const isMobile = useMediaQuery("(max-width: 768px)");
     const isEditing = !!appointment;
@@ -110,12 +114,22 @@ export const AddUnavailableSheet = ({
     const [selectedType, setSelectedType] = useState(appointment?.service || 'Personalizar');
     const [title, setTitle] = useState(appointment?.service || '');
     const [date, setDate] = useState(appointment?.date || formatDateStr(defaultDate));
-    const [startTime, setStartTime] = useState(appointment?.time || '11:00');
-    const [endTime, setEndTime] = useState(appointment ? getEndTime(appointment.time, appointment.duration) : '12:00');
+    const [startTime, setStartTime] = useState(appointment?.time || initialTimeSlot || '11:00');
+    const [endTime, setEndTime] = useState(
+        appointment
+            ? getEndTime(appointment.time, appointment.duration)
+            : initialTimeSlot
+            ? getEndTime(initialTimeSlot, 60)
+            : '12:00'
+    );
 
     // MULTI-STAFF SELECTION
     const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(
-        appointment?.staffId ? [appointment.staffId] : []
+        appointment?.staffId
+            ? [appointment.staffId]
+            : initialStaffId
+            ? [initialStaffId]
+            : []
     );
 
     const [description, setDescription] = useState(appointment?.notes || '');
@@ -343,51 +357,31 @@ export const AddUnavailableSheet = ({
                 {/* Recurrence with End Logic */}
                 <div className="space-y-4">
                     <div className="flex flex-col gap-1.5">
-                        <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Repetição</label>
-                        <Dropdown
-                            width="w-full"
-                            showChevron={false}
-                            trigger={
-                                <button
-                                    className="flex items-center text-brand-dark dark:text-dark-heading bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm transition-colors duration-150 w-full text-left justify-between"
-                                >
-                                    <span className="truncate block">
-                                        {recurrence === 'none' ? 'Não se repete' : recurrence === 'daily' ? 'Diariamente' : 'Semanalmente'}
-                                    </span>
-                                    <ChevronDownIcon size={16} className="text-brand-inactive-text" />
-                                </button>
-                            }
-                        >
-                            <div className="p-1">
-                                <DropdownItem onClick={() => setRecurrence('none')}>Não se repete</DropdownItem>
-                                <DropdownItem onClick={() => setRecurrence('daily')}>Diariamente</DropdownItem>
-                                <DropdownItem onClick={() => setRecurrence('weekly')}>Semanalmente</DropdownItem>
-                            </div>
-                        </Dropdown>
+                        <FormDropdown
+                            label="Repetição"
+                            value={recurrence}
+                            setValue={(val) => setRecurrence(val as any)}
+                            options={[
+                                { value: 'none', label: 'Não se repete' },
+                                { value: 'daily', label: 'Diariamente' },
+                                { value: 'weekly', label: 'Semanalmente' }
+                            ]}
+                        />
                     </div>
 
                     {recurrence !== 'none' && (
                         <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-zinc-900/20 space-y-4">
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">Termina em</label>
-                                <Dropdown
-                                    width="w-full"
-                                    showChevron={false}
-                                    trigger={
-                                        <Button variant="ghost" className="w-full h-10 justify-between px-0 hover:bg-transparent">
-                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                {recurrenceEndType === 'never' ? 'Nunca' : recurrenceEndType === 'date' ? 'Em uma data' : 'Após ocorrências'}
-                                            </span>
-                                            <ChevronDownIcon size={14} />
-                                        </Button>
-                                    }
-                                >
-                                    <div className="p-1">
-                                        <DropdownItem onClick={() => setRecurrenceEndType('never')}>Nunca</DropdownItem>
-                                        <DropdownItem onClick={() => setRecurrenceEndType('date')}>Em uma data específica</DropdownItem>
-                                        <DropdownItem onClick={() => setRecurrenceEndType('count')}>Após um número de vezes</DropdownItem>
-                                    </div>
-                                </Dropdown>
+                                <FormDropdown
+                                    label="Termina em"
+                                    value={recurrenceEndType}
+                                    setValue={(val) => setRecurrenceEndType(val as any)}
+                                    options={[
+                                        { value: 'never', label: 'Nunca' },
+                                        { value: 'date', label: 'Em uma data específica' },
+                                        { value: 'count', label: 'Após um número de vezes' }
+                                    ]}
+                                />
                             </div>
 
                             {recurrenceEndType === 'date' && (

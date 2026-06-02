@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
     PlusIcon,
 } from '@/lib/icons';
-import { Button, Checkbox, IconPlaceholder, Pagination } from '@/components/reusable';
+import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
+import { Settings, CalendarOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -73,12 +74,14 @@ const AppointmentsPage = ({
     initialCustomers = [],
     initialServices = [],
     initialUnavailableTypes = [],
+    openingHours = null,
 }: {
     partnerId: string;
     initialTeam?: Array<{ id: string; name: string; role: string }>;
     initialCustomers?: Array<{ id: string; name: string; email?: string }>;
     initialServices?: Array<{ id: string; name: string; price: number; duration: string; bufferMinutes: number; category: string; billingUnit: string }>;
     initialUnavailableTypes?: any[];
+    openingHours?: any;
 }) => {
     const APPOINTMENT_COLUMNS = useMemo<Array<{
         id: string;
@@ -139,6 +142,7 @@ const AppointmentsPage = ({
     const [tempSelectionTime, setTempSelectionTime] = useState<string | null>(null);
     const [draftData, setDraftData] = useState<{ services: any[], client: any, staffId?: number } | null>(null);
     const [preSelectedStaffId, setPreSelectedStaffId] = useState<string | undefined>(undefined);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
     const mapDbAppointment = useCallback((row: any): Appointment => ({
         id: String(row.id),
@@ -158,7 +162,8 @@ const AppointmentsPage = ({
         partnerId: row.partner_id,
         source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
         recurrence: (row.recurrence as any) || 'none',
-        saleId: row.sale_id || null
+        saleId: row.sale_id || null,
+        paidAmount: Number(row.paid_amount || 0)
     }), []);
 
     // Catalogs come from SSR props - only refresh unavailable types when needed
@@ -321,6 +326,24 @@ const AppointmentsPage = ({
         setPreSelectedStaffId(staffId);
 
         if (time && time !== "09:00") {
+            setTempSelectionTime(time);
+        } else {
+            setTempSelectionTime(null);
+        }
+    };
+
+    const handleOpenUnavailable = (time?: string, date?: Date, staffId?: string) => {
+        setSelectedAppointment(null);
+        setIsUnavailableSheetOpen(true);
+        setActivePopover(null);
+
+        if (date) {
+            setCurrentDate(date);
+        }
+
+        setPreSelectedStaffId(staffId);
+
+        if (time) {
             setTempSelectionTime(time);
         } else {
             setTempSelectionTime(null);
@@ -549,11 +572,38 @@ const AppointmentsPage = ({
     }, [appointments, appointmentFilters.teamIds]);
 
     const sortedAppointments = useMemo(() => {
+        if (!sortConfig) {
+            return [...visibleAppointments].sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return a.time.localeCompare(b.time);
+            });
+        }
         return [...visibleAppointments].sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return a.time.localeCompare(b.time);
+            let comparison = 0;
+            switch (sortConfig.key) {
+                case 'customer':
+                    comparison = (a.customer || '').localeCompare(b.customer || '');
+                    break;
+                case 'datetime':
+                    const dateA = (a.date || '') + 'T' + (a.time || '');
+                    const dateB = (b.date || '') + 'T' + (b.time || '');
+                    comparison = dateA.localeCompare(dateB);
+                    break;
+                case 'staff':
+                    comparison = (a.staff || '').localeCompare(b.staff || '');
+                    break;
+                case 'price':
+                    comparison = (a.price || 0) - (b.price || 0);
+                    break;
+                case 'status':
+                    comparison = (a.status || '').localeCompare(b.status || '');
+                    break;
+                default:
+                    break;
+            }
+            return sortConfig.direction === 'asc' ? comparison : -comparison;
         });
-    }, [visibleAppointments]);
+    }, [visibleAppointments, sortConfig]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -701,6 +751,34 @@ const AppointmentsPage = ({
                                     <Button onClick={() => handleOpenCreate()} leftIcon={<PlusIcon size={18} />}>
                                         Novo agendamento
                                     </Button>
+                                    <Dropdown
+                                        width="w-56"
+                                        align="right"
+                                        showChevron={false}
+                                        trigger={
+                                            <Button variant="outline" className="h-[42px] px-3">
+                                                <Settings size={18} className="text-brand-dark dark:text-dark-heading" />
+                                            </Button>
+                                        }
+                                    >
+                                        <DropdownItem 
+                                            className="gap-2 text-brand-dark dark:text-dark-heading"
+                                            onClick={() => handleOpenUnavailable()}
+                                        >
+                                            <CalendarOff size={16} /> Horário indisponível
+                                        </DropdownItem>
+                                        <DropdownItem 
+                                            className="gap-2 text-brand-dark dark:text-dark-heading"
+                                            onClick={() => {
+                                                setCurrentDate(new Date());
+                                                setViewMode('calendar');
+                                                setCalendarView('day');
+                                                setAppointmentFilters({ teamIds: [] });
+                                            }}
+                                        >
+                                            <RefreshCw size={16} /> Redefinir visualização
+                                        </DropdownItem>
+                                    </Dropdown>
                                 </div>
                             </div>
 
@@ -729,12 +807,14 @@ const AppointmentsPage = ({
                                         <MobileView
                                             currentDate={currentDate}
                                             appointments={visibleAppointments}
+                                            allAppointments={appointments}
                                             setCurrentDate={setCurrentDate}
                                             navigateDate={navigateDate}
                                             getViewLabel={getViewLabel}
                                             handleOpenCreate={handleOpenCreate}
                                             handleOpenView={handleOpenView}
                                             columns={APPOINTMENT_COLUMNS}
+                                            openingHours={openingHours}
                                         />
                                     </div>
 
@@ -757,10 +837,11 @@ const AppointmentsPage = ({
                                                             handleGenericCellClick={handleGenericCellClick}
                                                             activePopover={activePopover}
                                                             handleOpenCreate={handleOpenCreate}
-                                                            setIsUnavailableSheetOpen={setIsUnavailableSheetOpen}
+                                                            handleOpenUnavailable={handleOpenUnavailable}
                                                             setActivePopover={setActivePopover}
                                                             handleOpenView={handleOpenView}
                                                             handleOpenMore={handleOpenMore}
+                                                            openingHours={openingHours}
                                                         />
                                                     </>
                                                 )}
@@ -768,6 +849,7 @@ const AppointmentsPage = ({
                                                 {calendarView === 'week' && (
                                                     <TimelineView
                                                         appointments={visibleAppointments}
+                                                        allAppointments={appointments}
                                                         currentDate={currentDate}
                                                         staffMembers={visibleStaffMembers}
                                                         onOpenView={handleOpenView}
@@ -779,13 +861,15 @@ const AppointmentsPage = ({
                                                         activePopover={activePopover}
                                                         setActivePopover={setActivePopover}
                                                         handleOpenCreate={handleOpenCreate}
-                                                        setIsUnavailableSheetOpen={setIsUnavailableSheetOpen}
+                                                        handleOpenUnavailable={handleOpenUnavailable}
+                                                        openingHours={openingHours}
                                                     />
                                                 )}
 
                                                 {calendarView === 'day' && (
                                                     <DayView
                                                         appointments={visibleAppointments}
+                                                        allAppointments={appointments}
                                                         currentDate={currentDate}
                                                         staffMembers={visibleStaffMembers}
                                                         onOpenView={handleOpenView}
@@ -797,7 +881,8 @@ const AppointmentsPage = ({
                                                         activePopover={activePopover}
                                                         setActivePopover={setActivePopover}
                                                         handleOpenCreate={handleOpenCreate}
-                                                        setIsUnavailableSheetOpen={setIsUnavailableSheetOpen}
+                                                        handleOpenUnavailable={handleOpenUnavailable}
+                                                        openingHours={openingHours}
                                                     />
                                                 )}
                                             </div>
@@ -819,15 +904,35 @@ const AppointmentsPage = ({
                                                                         }}
                                                                     />
                                                                 </th>
-                                                                {APPOINTMENT_COLUMNS.map((column) => (
-                                                                    <th
-                                                                        key={column.id}
-                                                                        className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${column.id === "actions" ? "rounded-r-lg" : ""}`}
-                                                                        style={{ width: column.width, minWidth: column.minWidth }}
-                                                                    >
-                                                                        {column.label}
-                                                                    </th>
-                                                                ))}
+                                                                {APPOINTMENT_COLUMNS.map((column) => {
+                                                                    const isSorted = sortConfig?.key === column.id;
+                                                                    return (
+                                                                        <th
+                                                                            key={column.id}
+                                                                            className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${column.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                                            style={{ width: column.width, minWidth: column.minWidth }}
+                                                                            onClick={() => {
+                                                                                if (column.id === "actions") return;
+                                                                                setSortConfig((prev) => ({
+                                                                                    key: column.id,
+                                                                                    direction: prev?.key === column.id && prev.direction === "asc" ? "desc" : "asc",
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            <div className={`relative flex items-center ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <span>{column.label}</span>
+                                                                                {column.id !== "actions" && (
+                                                                                    <div className={`flex items-center ${column.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
+                                                                                        <ArrowUpDown
+                                                                                            size={14}
+                                                                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                                                                        />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </th>
+                                                                    );
+                                                                })}
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -836,6 +941,8 @@ const AppointmentsPage = ({
                                                                     <AppointmentListRow
                                                                         key={appointment.id}
                                                                         appointment={appointment}
+                                                                        appointments={appointments}
+                                                                        openingHours={openingHours}
                                                                         columns={APPOINTMENT_COLUMNS}
                                                                         selected={selectedIds.has(appointment.id)}
                                                                         onSelect={handleSelectRow}
@@ -941,6 +1048,13 @@ const AppointmentsPage = ({
                                 clientsCatalog={realClients}
                                 partnerId={partnerId}
                                 isSaving={isSaving}
+                                openingHours={openingHours}
+                                appointmentsList={appointments}
+                                onAppointmentUpdated={(dbItem) => {
+                                    const mapped = mapDbAppointment(dbItem);
+                                    setAppointments(prev => prev.map(a => a.id === mapped.id ? mapped : a));
+                                    setSelectedAppointment(mapped);
+                                }}
                             />
                         )}
                     </AnimatePresence>
@@ -979,6 +1093,8 @@ const AppointmentsPage = ({
                                 onDelete={handleDeleteUnavailable}
                                 staffMembers={realStaffMembers}
                                 defaultDate={currentDate}
+                                initialTimeSlot={tempSelectionTime || undefined}
+                                initialStaffId={preSelectedStaffId}
                                 unavailableTypes={unavailableTypes}
                                 partnerId={partnerId}
                                 onRefreshServices={refreshUnavailableTypes}

@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 
@@ -20,7 +19,7 @@ export function OrderHistoryTab({ entries, loading = false }: OrderHistoryTabPro
 
     return (
         <FadeIn>
-            <HistoryTimeline 
+            <HistoryTimeline
                 entries={entries}
                 title="Histórico do Pedido"
                 subtitle="Acompanhe todas as movimentações e alterações realizadas neste pedido."

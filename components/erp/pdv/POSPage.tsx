@@ -1187,8 +1187,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                     />
                 ))}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-[#F5F6F7] to-transparent dark:from-dark-border/60" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-[#F5F6F7] to-transparent dark:from-dark-border/60" />
         </div>
     )
 

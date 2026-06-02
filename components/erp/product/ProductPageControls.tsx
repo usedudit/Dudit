@@ -114,11 +114,10 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                     activeRef.current?.focus()
                 }, 50)
             }}
-            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${
-                focusLock
-                    ? "text-brand-primary bg-brand-primary/15"
-                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
-            }`}
+            className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
+                ? "text-brand-primary bg-brand-primary/15"
+                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+                }`}
             title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
         >
             {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
@@ -252,6 +251,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                             }
                             align="right"
                             showChevron={false}
+                            className="w-fit"
                         >
                             <DropdownItem onClick={onOpenCamera}>
                                 <CameraIcon size={14} /> Escanear Câmera
@@ -266,9 +266,8 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                         <Button
                             onClick={onAddProduct}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"
-                        >
-                            <PlusIcon size={18} />
-                        </Button>
+                            leftIcon={<PlusIcon size={18} />}
+                        />
                     </div>
                 </div>
 

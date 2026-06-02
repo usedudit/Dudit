@@ -26,7 +26,7 @@ async function loadCatalogs(partnerId: string) {
       .limit(100),
     supabase
       .from("partners")
-      .select("user_id")
+      .select("user_id, opening_hours")
       .eq("id", partnerId)
       .single(),
     supabase
@@ -110,6 +110,7 @@ async function loadCatalogs(partnerId: string) {
       billingUnit: String(s.billing_unit || "per_service"),
     })),
     unavailableTypes: unavailableRes.data || [],
+    openingHours: partner?.opening_hours || null,
   }
 }
 
@@ -135,6 +136,7 @@ export default async function AgendamentosPage() {
           initialCustomers={catalogs.customers}
           initialServices={catalogs.services}
           initialUnavailableTypes={catalogs.unavailableTypes}
+          openingHours={catalogs.openingHours}
         />
       </FadeIn>
     </>

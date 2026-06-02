@@ -125,7 +125,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
   const [{ data: existingSale }, { data: existingPaymentTx }] = await Promise.all([
     params.supabase
       .from("sales")
-      .select("id")
+      .select("id, sale_number")
       .eq("partner_id", params.partnerId)
       .eq("notes", saleRefNote)
       .limit(1)
@@ -140,10 +140,12 @@ async function createAppointmentSaleAndSyncGoals(params: {
   ])
 
   let saleId = existingSale?.id || null
+  let activeSaleNumber = existingSale?.sale_number || null
 
   if (!saleId) {
     const { data: saleNumberData } = await params.supabase.rpc("generate_sale_number")
     const saleNumber = String(saleNumberData || "").trim() || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+    activeSaleNumber = saleNumber
     const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
     const { data: sale, error: saleError } = await params.supabase
@@ -184,6 +186,8 @@ async function createAppointmentSaleAndSyncGoals(params: {
     }
   }
 
+  const fallbackSaleNumber = activeSaleNumber || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+
   let paymentTransactionId = existingPaymentTx?.id || null
   if (!paymentTransactionId) {
     const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
@@ -192,7 +196,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
       .from("transactions")
       .insert({
         partner_id: params.partnerId,
-        description: params.appointment.service_name || "Serviço",
+        description: fallbackSaleNumber,
         category: "Vendas",
         customer_id: params.appointment.customer_id || null,
         contact_type: "customer",
@@ -256,6 +260,17 @@ async function syncAppointmentReceivable(params: {
   const shouldBePending = !isPaidStatus(status) && remaining > 0.009
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
+  const saleRefNote = `appointment:${params.appointment.id}:sale`
+  const { data: existingSale } = await params.supabase
+    .from("sales")
+    .select("sale_number")
+    .eq("partner_id", params.partnerId)
+    .eq("notes", saleRefNote)
+    .limit(1)
+    .maybeSingle()
+
+  const saleNumber = existingSale?.sale_number || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+
   const existingId = params.currentReceivableId || (await params.supabase
     .from("transactions")
     .select("id")
@@ -269,6 +284,7 @@ async function syncAppointmentReceivable(params: {
       await params.supabase
         .from("transactions")
         .update({
+          description: saleNumber,
           amount: remaining,
           original_amount: remaining,
           status: "pending",
@@ -285,7 +301,7 @@ async function syncAppointmentReceivable(params: {
       .from("transactions")
       .insert({
         partner_id: params.partnerId,
-        description: params.appointment.service_name || "Serviço",
+        description: saleNumber,
         category: "Vendas",
         customer_id: params.appointment.customer_id || null,
         contact_type: "customer",
@@ -315,6 +331,7 @@ async function syncAppointmentReceivable(params: {
     await params.supabase
       .from("transactions")
       .update({
+        description: saleNumber,
         amount: totalAmount,
         original_amount: totalAmount,
         status: "paid",

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
@@ -10,7 +10,7 @@ import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
 import { ServiceItemCard } from '../ServiceItemCard';
-import { formatDateStr, formatDuration, parseLocalDate } from '../utils';
+import { formatDateStr, formatDuration, parseLocalDate, checkAppointmentCollision } from '../utils';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { useMediaQuery } from '@/components/erp/hooks';
 import BottomSheet from '@/components/BottomSheet';
@@ -43,7 +43,10 @@ export const AppointmentSheet = ({
     clientsCatalog,
     staffCatalog,
     isSaving,
-    partnerId
+    partnerId,
+    openingHours,
+    onAppointmentUpdated,
+    appointmentsList,
 }: {
     onClose: () => void,
     onDelete?: (id: string) => Promise<boolean>,
@@ -56,7 +59,7 @@ export const AppointmentSheet = ({
     defaultDate: Date,
     initialDraft?: any,
     initialStaffId?: string,
-    onCheckout: (data: any) => void,
+    onCheckout?: (data: any) => void,
     onViewSale?: () => void,
     onStatusChangeRequest?: (type: 'cancel' | 'absence', appointment: Appointment) => void,
     servicesCatalog?: any[],
@@ -64,17 +67,24 @@ export const AppointmentSheet = ({
     staffCatalog?: any[],
     isSaving?: boolean,
     partnerId?: string,
+    openingHours?: any,
+    onAppointmentUpdated?: (item: any) => void,
+    appointmentsList?: Appointment[],
 }) => {
     const servicesSource = servicesCatalog || [];
     const clientsSource = clientsCatalog || [];
     const staffSource = staffCatalog || [];
     const { canEdit, hasSpecific, canDelete } = usePermissions();
     const [currentView, setCurrentView] = useState<'summary' | 'services' | 'client' | 'datetime' | 'activity' | 'edit-service' | 'recurrence' | 'notes'>(() => {
-        if (mode === 'create' && initialStaffId && selectedDate && initialTimeSlot) {
+        if (mode === 'create') {
             return 'services';
         }
         return 'summary';
     });
+    const [isClientOverlayOpen, setIsClientOverlayOpen] = useState(false);
+    const [isHistoryOverlayOpen, setIsHistoryOverlayOpen] = useState(false);
+    const [isNotesOverlayOpen, setIsNotesOverlayOpen] = useState(false);
+    const [isRecurrenceOverlayOpen, setIsRecurrenceOverlayOpen] = useState(false);
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [selectedClient, setSelectedClient] = useState<any>(null);
     const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
@@ -83,6 +93,54 @@ export const AppointmentSheet = ({
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+    
+    // Inline Client Selection and Overlay Editing states
+    const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
+    const [isNewClientOpen, setIsNewClientOpen] = useState(false);
+    const [clientSearch, setClientSearch] = useState('');
+    const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+    const [newCustomerName, setNewCustomerName] = useState('');
+    const [newCustomerEmail, setNewCustomerEmail] = useState('');
+    const [newCustomerPhone, setNewCustomerPhone] = useState('');
+
+    const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, durationMinutes: number) => {
+        if (!openingHours) return false;
+        const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        const parseLocalDate = (dateStr: string): Date => {
+            if (!dateStr) return new Date();
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        };
+        const dateObj = parseLocalDate(aptDateStr);
+        const dName = DAYS_OF_WEEK[dateObj.getDay()];
+        const dConfig = openingHours[dName];
+        if (!dConfig || !dConfig.enabled) return true;
+        
+        const parseTimeToMinutes = (timeStr: string) => {
+            if (!timeStr || !timeStr.includes(':')) return -1;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        };
+
+        const fromMin = parseTimeToMinutes(dConfig.from);
+        const toMin = parseTimeToMinutes(dConfig.to);
+        
+        const aptStartMin = parseTimeToMinutes(aptTimeStr);
+        const aptEndMin = aptStartMin + durationMinutes;
+        
+        return aptStartMin < fromMin || aptEndMin > toMin;
+    };
+
+    const filteredClients = useMemo(() => {
+        if (!clientSearch) return clientsSource;
+        const q = clientSearch.toLowerCase();
+        return clientsSource.filter(c =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.phone || '').toLowerCase().includes(q)
+        );
+    }, [clientSearch, clientsSource]);
+
 
     const router = useRouter();
     const csrfToken = useCSRFToken();
@@ -102,30 +160,6 @@ export const AppointmentSheet = ({
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
     const [notes, setNotes] = useState(appointment?.notes || '');
-
-    // Check for changes
-    const hasChanges = useMemo(() => {
-        if (mode === 'create') {
-            return selectedServices.length > 0 || !!selectedClient || !!notes;
-        }
-        if (mode === 'view' && appointment) {
-            const hasStatusChanged = status !== appointment.status;
-            const hasNotesChanged = notes !== (appointment.notes || '');
-            const initialServiceNames = appointment.service.split(',').map(s => s.trim()).join(',');
-            const currentServiceNames = selectedServices.map(s => s.name).join(',');
-            const hasServicesChanged = initialServiceNames !== currentServiceNames;
-            return hasStatusChanged || hasNotesChanged || hasServicesChanged;
-        }
-        return false;
-    }, [mode, selectedServices, selectedClient, notes, status, appointment]);
-
-    const handleCloseAttempt = () => {
-        if (hasChanges) {
-            setIsUnsavedModalOpen(true);
-        } else {
-            onClose();
-        }
-    };
 
     // Time & Date State
     const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(initialTimeSlot || null);
@@ -155,6 +189,41 @@ export const AppointmentSheet = ({
         return selectedDate || defaultDate;
     });
     const [editTime, setEditTime] = useState<string>('');
+
+    // Check for changes
+    const hasChanges = useMemo(() => {
+        if (mode === 'create') {
+            return selectedServices.length > 0 || !!selectedClient || !!notes;
+        }
+        if (mode === 'view' && appointment) {
+            const hasStatusChanged = status !== appointment.status;
+            const hasNotesChanged = notes !== (appointment.notes || '');
+            const initialServiceNames = appointment.service.split(',').map(s => s.trim()).join(',');
+            const currentServiceNames = selectedServices.map(s => s.name).join(',');
+            const hasServicesChanged = initialServiceNames !== currentServiceNames;
+
+            const hasClientChanged = (selectedClient?.name || '') !== appointment.customer;
+            
+            const currentDateStr = formatDateStr(selectedCalDate);
+            const hasDateChanged = currentDateStr !== appointment.date;
+            
+            const currentTimeStr = editTime || selectedTimeSlot || appointment.time;
+            const hasTimeChanged = currentTimeStr !== appointment.time;
+
+            const hasStaffChanged = (selectedServices[0]?.staffId || '') !== appointment.staffId;
+
+            return hasStatusChanged || hasNotesChanged || hasServicesChanged || hasClientChanged || hasDateChanged || hasTimeChanged || hasStaffChanged;
+        }
+        return false;
+    }, [mode, selectedServices, selectedClient, notes, status, appointment, selectedCalDate, editTime, selectedTimeSlot]);
+
+    const handleCloseAttempt = () => {
+        if (hasChanges) {
+            setIsUnsavedModalOpen(true);
+        } else {
+            onClose();
+        }
+    };
 
     // Recurrence State
     const [recurrenceFreq, setRecurrenceFreq] = useState('Não se repete');
@@ -483,9 +552,19 @@ export const AppointmentSheet = ({
                 setIsAddingMore(false);
                 setCurrentView('summary');
             } else {
-                // Normal Flow: Services -> Client sheet
-                isSelectingClientRef.current = false;
-                setIsSelectCustomerOpen(true);
+                // Normal Flow: Services -> Client inline step
+                setCurrentView('client');
+            }
+        }
+        else if (currentView === 'client') {
+            if (!selectedClient) return;
+            if (cameFromSummary) {
+                setCurrentView('summary');
+                setCameFromSummary(false);
+            } else if (initialTimeSlot) {
+                setCurrentView('summary');
+            } else {
+                setCurrentView('datetime');
             }
         }
         else if (currentView === 'datetime') {
@@ -522,82 +601,122 @@ export const AppointmentSheet = ({
         const baseDateStr = needsRangePicker ? startDateRange : formatDateStr(finalDateObj);
         const timeStr = needsRangePicker ? startTimeRange : (selectedTimeSlot || '09:00');
 
-        const baseAppointmentData = {
-            customerName: selectedClient?.name,
-            customerId: selectedClient?.id,
-            serviceName: selectedServices.map(s => s.name).join(', '),
+        const isOutsideHours = checkOutsideOperatingHours(baseDateStr, timeStr, calculatedDuration);
+        const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
+            ...appointment,
+            date: baseDateStr,
             time: timeStr,
             duration: calculatedDuration,
-            staffName: selectedServices[0]?.staff,
-            staffId: selectedServices[0]?.staffId,
-            price: calculatedPrice,
-            notes: notes,
-            pricingUnit: selectedServices[0]?.pricingUnit,
+            staffId: selectedServices[0]?.staffId || '',
             status: status
+        } as Appointment, appointmentsList) : false;
+
+        let finalNotes = notes;
+        if (isOutsideHours) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Marcado fora do horário de funcionamento]`;
+        }
+        if (hasCollision) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Conflito de horário detectado]`;
+        }
+
+        // Apply staff assignments to generated payload
+        const baseItem = {
+            customerName: selectedClient?.name || 'Cliente Sem Nome',
+            customerId: selectedClient?.id || null,
+            serviceName: selectedServices.map(s => s.name).join(', '),
+            date: baseDateStr,
+            time: timeStr,
+            duration: calculatedDuration,
+            price: calculatedPrice,
+            pricingUnit: selectedServices[0]?.pricingUnit || 'Por Serviço',
+            notes: finalNotes,
+            status: status,
         };
 
-        const appointmentsToSave = [];
-
-        // Use local date parsing to avoid timezone issues
-        const [y, m, d] = baseDateStr.split('-').map(Number);
-        // Set hour to noon to avoid DST shifts when adding days
-        let currentDateLoop = new Date(y, m - 1, d, 12, 0, 0);
-
-        // Determine limits
-        let maxOccurrences = 1;
-        let limitDate = null;
-        let isRecurrenceEnabled = false;
-
-        if (recurrenceFreq !== 'Não se repete') {
-            isRecurrenceEnabled = true;
-            if (recurrenceTerm === 'Data específica') {
-                limitDate = recurrenceEndDate;
-                maxOccurrences = 999; // Cap safety
-            } else if (recurrenceTerm.startsWith('Após')) {
-                const parts = recurrenceTerm.split(' ');
-                maxOccurrences = parseInt(parts[1]) || 1;
-            } else {
-                maxOccurrences = 52;
-            }
-        }
-
-        let occurrences = 0;
-
-        while (occurrences < maxOccurrences) {
-            // Check date limit if set (compare beginning of day)
-            if (limitDate) {
-                // Clone to avoid mutation and set to midnight for comparison
-                const currentCheck = new Date(currentDateLoop.getFullYear(), currentDateLoop.getMonth(), currentDateLoop.getDate());
-                const limitCheck = new Date(limitDate.getFullYear(), limitDate.getMonth(), limitDate.getDate());
-                if (currentCheck > limitCheck) break;
-            }
-
-            const dateStr = formatDateStr(currentDateLoop);
-            const endDateStr = needsRangePicker ? endDateRange : dateStr;
-
-            appointmentsToSave.push({
-                ...baseAppointmentData,
-                date: dateStr,
-                endDate: endDateStr,
-                endTime: needsRangePicker ? endTimeRange : addMinutes(timeStr, calculatedDuration),
+        if (recurrenceFreq === 'Não se repete') {
+            // SINGLE APPOINTMENT: Use the selected services mapping (can map multiple services to same professional)
+            const staffGroups: Record<string, typeof selectedServices> = {};
+            selectedServices.forEach(s => {
+                const sId = s.staffId || selectedStaffId;
+                if (!staffGroups[sId]) staffGroups[sId] = [];
+                staffGroups[sId].push(s);
             });
 
-            occurrences++;
+            const rows = Object.entries(staffGroups).map(([sId, svcs]) => {
+                const staff = staffSource.find(sm => sm.id === sId);
+                const combinedName = svcs.map(s => s.name).join(', ');
+                const combPrice = svcs.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+                const combDur = svcs.reduce((acc, curr) => acc + Number(curr.duration || 0), 0);
 
-            if (!isRecurrenceEnabled) break;
+                return {
+                    ...baseItem,
+                    serviceName: combinedName,
+                    price: combPrice,
+                    duration: combDur,
+                    staffId: sId,
+                    staffName: staff ? staff.name : 'Profissional',
+                };
+            });
 
-            // Increment Date based on Frequency
-            if (recurrenceFreq === 'Todos os dias') {
-                currentDateLoop.setDate(currentDateLoop.getDate() + 1);
-            } else if (recurrenceFreq === 'Semanalmente') {
-                currentDateLoop.setDate(currentDateLoop.getDate() + 7);
-            } else if (recurrenceFreq === 'Mensalmente') {
-                currentDateLoop.setMonth(currentDateLoop.getMonth() + 1);
+            onSave(rows);
+        } else {
+            // RECURRING APPOINTMENT SERIES
+            let repeatCount = 1;
+            if (recurrenceTerm === 'Número de ocorrências') {
+                repeatCount = 10; // Default count
+            } else if (recurrenceTerm === 'Data específica' && recurrenceEndDate) {
+                const startD = new Date(baseDateStr + 'T12:00:00');
+                const endD = new Date(recurrenceEndDate.toISOString().split('T')[0] + 'T12:00:00');
+                const stepDays = recurrenceFreq === 'Diário' ? 1 : 7;
+                const diffMs = endD.getTime() - startD.getTime();
+                const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+                repeatCount = Math.floor(diffDays / stepDays) + 1;
             }
-        }
 
-        // Pass array or single object depending on logic (Parent handles array)
-        onSave(appointmentsToSave);
+            const baseDate = new Date(baseDateStr + 'T12:00:00');
+            const recurrenceGroupId = crypto.randomUUID();
+            const payloads: any[] = [];
+
+            // Group by staff for combined recurring rows
+            const staffGroups: Record<string, typeof selectedServices> = {};
+            selectedServices.forEach(s => {
+                const sId = s.staffId || selectedStaffId;
+                if (!staffGroups[sId]) staffGroups[sId] = [];
+                staffGroups[sId].push(s);
+            });
+
+            for (let i = 0; i < repeatCount; i++) {
+                const currD = new Date(baseDate);
+                if (recurrenceFreq === 'Diário') {
+                    currD.setDate(baseDate.getDate() + i);
+                } else if (recurrenceFreq === 'Semanal') {
+                    currD.setDate(baseDate.getDate() + (i * 7));
+                }
+
+                const dateStr = currD.toISOString().split('T')[0];
+
+                Object.entries(staffGroups).forEach(([sId, svcs]) => {
+                    const staff = staffSource.find(sm => sm.id === sId);
+                    const combinedName = svcs.map(s => s.name).join(', ');
+                    const combPrice = svcs.reduce((acc, curr) => acc + Number(curr.price || 0), 0);
+                    const combDur = svcs.reduce((acc, curr) => acc + Number(curr.duration || 0), 0);
+
+                    payloads.push({
+                        ...baseItem,
+                        serviceName: combinedName,
+                        price: combPrice,
+                        duration: combDur,
+                        date: dateStr,
+                        staffId: sId,
+                        staffName: staff ? staff.name : 'Profissional',
+                        recurrenceGroupId,
+                        recurrenceRule: recurrenceFreq === 'Diário' ? 'daily' : 'weekly'
+                    });
+                });
+            }
+
+            onSave(payloads);
+        }
     };
 
     const handleCancelClientChange = () => {
@@ -618,17 +737,29 @@ export const AppointmentSheet = ({
         if (currentView === 'services') {
             handleCloseAttempt();
         }
-        else if (currentView === 'datetime') {
-            if (mode === 'view') {
+        else if (currentView === 'client') {
+            if (cameFromSummary) {
                 setCurrentView('summary');
+                setCameFromSummary(false);
             } else {
                 setCurrentView('services');
             }
         }
+        else if (currentView === 'datetime') {
+            if (mode === 'view') {
+                setCurrentView('summary');
+            } else {
+                setCurrentView('client');
+            }
+        }
         else if (currentView === 'summary') {
             if (mode === 'create') {
-                // Creating: Go back to Datetime
-                setCurrentView('datetime');
+                if (initialTimeSlot) {
+                    setCurrentView('client');
+                } else {
+                    // Creating: Go back to Datetime
+                    setCurrentView('datetime');
+                }
             } else {
                 // Viewing: Close sheet
                 onClose();
@@ -644,6 +775,26 @@ export const AppointmentSheet = ({
     };
 
     const handleSaveChanges = () => {
+        const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
+        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+        const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
+        const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
+            ...appointment,
+            date: finalDateStr,
+            time: timeStr,
+            duration: calculatedDuration,
+            staffId: selectedServices[0]?.staffId || '',
+            status: status
+        } as Appointment, appointmentsList) : false;
+
+        let finalNotes = notes;
+        if (isOutsideHours) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Marcado fora do horário de funcionamento]`;
+        }
+        if (hasCollision) {
+            finalNotes = `${finalNotes ? finalNotes + '\n' : ''}[LOG: Conflito de horário detectado]`;
+        }
+
         const updatedApp = {
             ...appointment,
             customer: selectedClient?.name,
@@ -651,14 +802,16 @@ export const AppointmentSheet = ({
             customerId: selectedClient?.id,
             status: status,
             price: calculatedPrice,
-            notes: notes,
+            notes: finalNotes,
             service: selectedServices.map(s => s.name).join(', '), // Combine names
             duration: calculatedDuration, // Update total duration
             staff: selectedServices[0]?.staff,
             staffId: selectedServices[0]?.staffId,
+            date: finalDateStr,
+            time: timeStr,
         };
         onSave(updatedApp);
-    }
+    };
 
     const getHeaderTitle = () => {
         switch (currentView) {
@@ -770,15 +923,21 @@ export const AppointmentSheet = ({
 
             if (orderId) setCompletedOrderId(orderId);
 
-            // Update appointment status
-            const newStatus = paymentData.paymentStatus === 'paid' ? 'Pago' : 'Pago Parcialmente';
+            // Update appointment status to "Concluído"
+            const newStatus = 'Concluído';
             setStatus(newStatus);
 
             if (appointment?.id) {
                 try {
-                    await updateAppointmentAction(appointment.id, {
+                    const updateRes = await updateAppointmentAction(appointment.id, {
                         status: newStatus,
+                        paymentStatus: paymentData.paymentStatus === 'paid' ? 'Paid' : 'Partially Paid',
+                        saleId: orderId,
+                        paidAmount: paymentData.paidAmount
                     } as any);
+                    if (updateRes.success && updateRes.item && onAppointmentUpdated) {
+                        onAppointmentUpdated(updateRes.item);
+                    }
                 } catch { }
             }
 
@@ -792,7 +951,6 @@ export const AppointmentSheet = ({
         { value: 'Reservado', label: 'Reservado' },
         { value: 'Confirmado', label: 'Confirmado' },
         { value: 'Aguardando', label: 'Aguardando' },
-        { value: 'Concluído', label: 'Concluído' },
         { value: 'Ausência', label: 'Ausência' },
     ] as const;
 
@@ -834,7 +992,7 @@ export const AppointmentSheet = ({
 
     const handleServiceEdit = (index: number) => {
         setEditingServiceIndex(index);
-        setCurrentView('edit-service');
+        setIsEditServiceOpen(true);
     };
 
     const updateEditingService = (field: string, value: any) => {
@@ -899,6 +1057,51 @@ export const AppointmentSheet = ({
         }
         setIsDeleteModalOpen(false);
         setServiceToDeleteIndex(null);
+    };
+
+    const handleQuickCreateCustomer = async () => {
+        const name = newCustomerName.trim();
+        const email = newCustomerEmail.trim();
+        const phone = newCustomerPhone.trim();
+
+        if (!name) {
+            toast.warning("Nome obrigatório", "Por favor, informe o nome do cliente.");
+            return;
+        }
+
+        setIsCreatingCustomer(true);
+        try {
+            const res = await createPOSCustomerQuickAction({
+                partnerId: partnerId || '',
+                name,
+                email: email || undefined,
+                phone: phone || undefined,
+            });
+            if (res.success && res.data) {
+                const newCust = res.data;
+                setSelectedClient(newCust);
+                setLocalClients(prev => [newCust, ...prev]);
+                setIsNewClientOpen(false);
+                setNewCustomerName('');
+                setNewCustomerEmail('');
+                setNewCustomerPhone('');
+                
+                if (cameFromSummary) {
+                    setCurrentView('summary');
+                    setCameFromSummary(false);
+                } else if (initialStaffId && initialTimeSlot && mode === 'create') {
+                    setCurrentView('summary');
+                } else {
+                    setCurrentView('datetime');
+                }
+            } else {
+                toast.error("Erro", res.error || "Não foi possível cadastrar o cliente.");
+            }
+        } catch (err) {
+            toast.error("Erro", "Erro ao cadastrar o cliente.");
+        } finally {
+            setIsCreatingCustomer(false);
+        }
     };
 
     const getSelectedStaffName = () => {
@@ -1177,194 +1380,272 @@ export const AppointmentSheet = ({
                         </motion.div>
                     )}
 
-                    {/* VIEW: SUMMARY */}
-                    {currentView === 'summary' && (
-                        <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                    {/* CLIENT SELECTION INLINE */}
+                    {currentView === 'client' && (
+                        <motion.div key="client" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <Input
+                                        label=""
+                                        name="clientSearch"
+                                        placeholder="Buscar por nome, email ou telefone..."
+                                        value={clientSearch}
+                                        onChange={(e) => setClientSearch(e.target.value)}
+                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                        className="mb-0"
+                                        variant="full-rounded"
+                                    />
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setNewCustomerName("");
+                                        setNewCustomerEmail("");
+                                        setNewCustomerPhone("");
+                                        setIsNewClientOpen(true);
+                                    }}
+                                    className="h-11 px-3 shrink-0 rounded-xl"
+                                    type="button"
+                                >
+                                    <PlusIcon size={16} /> Novo
+                                </Button>
+                            </div>
 
-                            {/* Info Header Card - Adjusted for Ranges */}
-                            {headerDateObj && (
-                                <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 relative overflow-hidden transition-colors duration-300`}>
-                                    <div className="relative z-10 flex justify-between items-start">
-                                        <div>
-                                            <h2 className="text-xl font-bold mb-1">
-                                                {headerDateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                            </h2>
-
-                                            <div className="text-sm opacity-90 font-medium">
-                                                {needsRangePicker ? (
-                                                    <span>{startTimeRange} - {endTimeRange} <span className="text-xs opacity-75">({formatDuration(calculatedDuration)})</span></span>
-                                                ) : (
-                                                    <span>{editTime || selectedTimeSlot} • {formatDuration(calculatedDuration)}</span>
-                                                )}
-                                            </div>
-
-                                            {/* Recurrence Indicator */}
-                                            {recurrenceText && (
-                                                <div className="flex items-center gap-2 text-xs opacity-90 mt-2 font-medium bg-white/20 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
-                                                    <RepeatIcon size={12} /> {recurrenceText}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <Dropdown
-                                            width="w-48"
-                                            fullWidth={false}
-                                            trigger={
-                                                <button
-                                                    disabled={isPaid}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading rounded-full text-sm font-bold shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-dark-border ${isPaid ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                                >
-                                                    {status}
-                                                    <ChevronDownIcon size={14} className="text-brand-inactive-text" />
-                                                </button>
-                                            }
-                                        >
-                                            <div className="min-w-[140px]">
-                                                {VIEW_STATUS_OPTIONS.map(opt => (
-                                                    <DropdownItem key={opt.value} onClick={() => handleStatusChange(opt.value)}>{opt.label}</DropdownItem>
-                                                ))}
-                                            </div>
-                                        </Dropdown>
+                            <div className="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar">
+                                {filteredClients.length === 0 ? (
+                                    <div className="text-center py-8 text-brand-inactive-text">
+                                        Nenhum cliente encontrado.
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Client Section */}
-                            <div>
-                                <div className="flex justify-between items-center mb-3 px-1">
-                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Cliente</h3>
-                                </div>
-                                {selectedClient && (
-                                    <div className="flex items-center justify-between py-2 px-1 w-full">
-                                        <div className="flex items-center gap-3">
-                                            <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
-                                            <div className="flex flex-col">
-                                                <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
-                                                <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
-                                            </div>
-                                        </div>
-                                        {!isPaid && (
-                                            <Button
-                                                variant="link"
-                                                className="font-bold"
+                                ) : (
+                                    filteredClients.map((client) => {
+                                        const isSelected = selectedClient?.id === client.id;
+                                        return (
+                                            <div
+                                                key={client.id}
                                                 onClick={() => {
-                                                    setPreviousClient(selectedClient);
-                                                    setCameFromSummary(true);
-                                                    isSelectingClientRef.current = false;
-                                                    setIsSelectCustomerOpen(true);
+                                                    setSelectedClient(client);
+                                                    if (cameFromSummary) {
+                                                        setCurrentView('summary');
+                                                        setCameFromSummary(false);
+                                                    } else if (initialStaffId && initialTimeSlot && mode === 'create') {
+                                                        setCurrentView('summary');
+                                                    } else {
+                                                        setCurrentView('datetime');
+                                                    }
                                                 }}
-                                            >
-                                                Alterar
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="border-t border-brand-border dark:border-dark-border"></div>
-
-                            {/* Services Section */}
-                            <div>
-                                <div className="flex justify-between items-center mb-3 px-1">
-                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading">Serviços</h3>
-                                </div>
-                                <div className="space-y-3">
-                                    {selectedServices.map((service, idx) => (
-                                        <ServiceItemCard
-                                            key={idx}
-                                            // Pass individual service start time for display
-                                            service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
-                                            onEdit={!isPaid ? () => handleServiceEdit(idx) : undefined}
-                                            onRemove={!isPaid ? () => handleRemoveServiceRequest(idx) : undefined}
-                                            // Pass formatted time range
-                                            timeRange={getServiceTimeRange(idx)}
-                                        />
-                                    ))}
-                                </div>
-                                {!isPaid && (
-                                    <Button
-                                        variant="link"
-                                        onClick={handleAddMoreService}
-                                        className="mt-4"
-                                    >
-                                        <PlusIcon size={18} /> Adicionar serviço
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* Total Row */}
-                            <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4 px-1">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Duração Total</span>
-                                    <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
-                                </div>
-                                <div className="flex flex-col text-right">
-                                    <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Valor Total</span>
-                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {currentView === 'edit-service' && editingServiceIndex !== null && (
-                        <motion.div key="edit-service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                            {/* Edit Service Content */}
-                            <div className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent">
-                                <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
-                                <div className="pl-4 w-full">
-                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
-                                        {selectedServices[editingServiceIndex].name}
-                                    </h4>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <MoneyInput
-                                    label="Preço do serviço"
-                                    name="price"
-                                    value={selectedServices[editingServiceIndex].price}
-                                    onChange={(val) => updateEditingService('price', val)}
-                                />
-
-                                <Input
-                                    label="Duração (minutos)"
-                                    name="duration"
-                                    type="number"
-                                    value={selectedServices[editingServiceIndex].duration}
-                                    onChange={(e) => updateEditingService('duration', e.target.value)}
-                                />
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
-                                    <Dropdown
-                                        width="w-full"
-                                        showChevron={false}
-                                        trigger={
-                                            <Button
-                                                variant="outline"
-                                                className="w-full h-12 rounded-xl"
+                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                                                    isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
+                                                }`}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <UserProfileImage
-                                                        fullName={selectedServices[editingServiceIndex].staff}
-                                                        imageUrl={staffSource.find(s => s.id === selectedServices[editingServiceIndex].staffId)?.avatar}
-                                                        className="w-6 h-6"
-                                                    />
-                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedServices[editingServiceIndex].staff}</span>
+                                                    <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
+                                                        <span className="text-xs text-brand-inactive-text truncate">{client.email || client.phone || 'Cliente'}</span>
+                                                    </div>
                                                 </div>
-                                            </Button>
-                                        }
-                                    >
-                                        {staffSource.map(staff => (
-                                            <DropdownItem key={staff.id} onClick={() => updateEditingService('staffId', staff.id)} className="gap-3">
-                                                <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
-                                                <span className="font-medium">{staff.name}</span>
-                                            </DropdownItem>
-                                        ))}
-                                    </Dropdown>
-                                </div>
+                                                {isSelected && <CheckCircleIcon size={18} className="text-brand-green shrink-0" />}
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </motion.div>
                     )}
+
+                    {/* VIEW: SUMMARY */}
+                    {currentView === 'summary' && (() => {
+                        const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
+                        const isLocked = isPaid || isCompletedStatus;
+                        const currentPaidAmount = completedOrderId ? calculatedPrice : (appointment?.paidAmount || 0);
+                        const remainingToPay = Math.max(0, calculatedPrice - currentPaidAmount);
+
+                        const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
+                        const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
+                        const isOutsideHours = checkOutsideOperatingHours(finalDateStr, timeStr, calculatedDuration);
+                        const hasCollision = appointmentsList && appointment ? checkAppointmentCollision({
+                            ...appointment,
+                            date: finalDateStr,
+                            time: timeStr,
+                            duration: calculatedDuration,
+                            staffId: selectedServices[0]?.staffId || '',
+                            status: status
+                        } as Appointment, appointmentsList) : false;
+
+                        return (
+                            <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+
+                                {/* Info Header Card - Adjusted for Ranges */}
+                                {headerDateObj && (
+                                    <div className={`${getHeaderBgColor()} text-white rounded-2xl p-5 relative overflow-hidden transition-colors duration-300`}>
+                                        <div className="relative z-10 flex justify-between items-start">
+                                            <div>
+                                                <h2 className="text-xl font-bold mb-1">
+                                                    {headerDateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                                </h2>
+
+                                                <div className="text-sm opacity-90 font-medium">
+                                                    {needsRangePicker ? (
+                                                        <span>{startTimeRange} - {endTimeRange} <span className="text-xs opacity-75">({formatDuration(calculatedDuration)})</span></span>
+                                                    ) : (
+                                                        <span>{editTime || selectedTimeSlot} • {formatDuration(calculatedDuration)}</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Recurrence Indicator */}
+                                                {recurrenceText && (
+                                                    <div className="flex items-center gap-2 text-xs opacity-90 mt-2 font-medium bg-white/20 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
+                                                        <RepeatIcon size={12} /> {recurrenceText}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Dropdown
+                                                width="w-48"
+                                                fullWidth={false}
+                                                trigger={
+                                                    <button
+                                                        disabled={isLocked}
+                                                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading rounded-full text-sm font-bold shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-dark-border ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {status}
+                                                        {!isLocked && <ChevronDownIcon size={14} className="text-brand-inactive-text" />}
+                                                    </button>
+                                                }
+                                            >
+                                                <div className="min-w-[140px]">
+                                                    {VIEW_STATUS_OPTIONS.map(opt => (
+                                                        <DropdownItem key={opt.value} onClick={() => handleStatusChange(opt.value)}>{opt.label}</DropdownItem>
+                                                    ))}
+                                                </div>
+                                            </Dropdown>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Outside Hours Alert Banner */}
+                                {isOutsideHours && (
+                                    <div className="p-3.5 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl flex items-start gap-2.5 text-xs text-orange-800 dark:text-orange-300">
+                                        <AlertTriangle size={16} className="text-orange-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold">Atenção: Horário Especial</p>
+                                            <p className="opacity-90">Este agendamento está fora do horário de funcionamento do estabelecimento.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Collision Warning Banner */}
+                                {hasCollision && (
+                                    <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl flex items-start gap-2.5 text-xs text-red-800 dark:text-red-300">
+                                        <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold">Conflito de Horário</p>
+                                            <p className="opacity-90">Este profissional já possui outro agendamento ativo neste mesmo horário.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Client Section */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-3 px-1">
+                                        <h3 className="font-bold text-brand-dark dark:text-dark-heading">Cliente</h3>
+                                    </div>
+                                    {selectedClient && (
+                                        <div className="flex items-center justify-between py-2 px-1 w-full">
+                                            <div className="flex items-center gap-3">
+                                                <UserProfileImage fullName={selectedClient.name} imageUrl={selectedClient.avatar_url} className="w-10 h-10" />
+                                                <div className="flex flex-col">
+                                                    <div className="font-bold text-brand-dark dark:text-dark-heading leading-tight">{selectedClient.name}</div>
+                                                    <div className="text-xs text-brand-inactive-text">{selectedClient.email || 'Cliente'}</div>
+                                                </div>
+                                            </div>
+                                            {!isLocked && (
+                                                <Button
+                                                    variant="link"
+                                                    className="font-bold"
+                                                    onClick={() => {
+                                                        if (mode === 'view') {
+                                                            setIsClientOverlayOpen(true);
+                                                        } else {
+                                                            setPreviousClient(selectedClient);
+                                                            setCameFromSummary(true);
+                                                            setCurrentView('client');
+                                                        }
+                                                    }}
+                                                >
+                                                    Alterar
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-brand-border dark:border-dark-border"></div>
+
+                                {/* Services Section */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-3 px-1">
+                                        <h3 className="font-bold text-brand-dark dark:text-dark-heading">Serviços</h3>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {selectedServices.map((service, idx) => (
+                                            <ServiceItemCard
+                                                key={idx}
+                                                // Pass individual service start time for display
+                                                service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
+                                                onEdit={!isLocked ? () => handleServiceEdit(idx) : undefined}
+                                                onRemove={!isLocked ? () => handleRemoveServiceRequest(idx) : undefined}
+                                                // Pass formatted time range
+                                                timeRange={getServiceTimeRange(idx)}
+                                            />
+                                        ))}
+                                    </div>
+                                    {!isLocked && (
+                                        <Button
+                                            variant="link"
+                                            onClick={handleAddMoreService}
+                                            className="mt-4"
+                                        >
+                                            <PlusIcon size={18} /> Adicionar serviço
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {/* Total Row */}
+                                <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4 px-1">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Duração Total</span>
+                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
+                                    </div>
+                                    <div className="flex flex-col text-right">
+                                        <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Valor Total</span>
+                                        <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Payment Status InfoCard */}
+                                <div className="mt-4">
+                                    {remainingToPay <= 0.009 ? (
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                                            <span>Totalmente pago</span>
+                                            <span>Valor total atingido!</span>
+                                        </div>
+                                    ) : currentPaidAmount > 0 ? (
+                                        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
+                                            <span>Pago parcialmente</span>
+                                            <span>Falta Pagar: {formatCurrency(remainingToPay)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-red-800 dark:text-red-300">
+                                            <span>Não pago</span>
+                                            <span>Falta Pagar: {formatCurrency(remainingToPay)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        );
+                    })()}
+
+
 
                     {/* RECURRENCE VIEW */}
                     {currentView === 'recurrence' && (
@@ -1472,17 +1753,28 @@ export const AppointmentSheet = ({
                                                     </Button>
                                                 }
                                             >
-                                                <DropdownItem onClick={() => setCurrentView('notes')}>
+                                                <DropdownItem onClick={() => setIsNotesOverlayOpen(true)}>
                                                     Observações
                                                 </DropdownItem>
-                                                <DropdownItem onClick={() => setCurrentView('activity')}>
+                                                <DropdownItem onClick={() => setIsHistoryOverlayOpen(true)}>
                                                     Histórico do agendamento
                                                 </DropdownItem>
                                             </Dropdown>
 
-                                            <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
-                                                Ver venda
-                                            </Button>
+                                            {hasChanges ? (
+                                                <>
+                                                    <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
+                                                        Ver venda
+                                                    </Button>
+                                                    <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                                        Salvar
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
+                                                    Ver venda
+                                                </Button>
+                                            )}
                                         </div>
                                     );
                                 }
@@ -1498,10 +1790,10 @@ export const AppointmentSheet = ({
                                                 </Button>
                                             }
                                         >
-                                            <DropdownItem onClick={() => setCurrentView('notes')}>
+                                            <DropdownItem onClick={() => setIsNotesOverlayOpen(true)}>
                                                 Observações
                                             </DropdownItem>
-                                            <DropdownItem onClick={() => setCurrentView('activity')}>
+                                            <DropdownItem onClick={() => setIsHistoryOverlayOpen(true)}>
                                                 Histórico do agendamento
                                             </DropdownItem>
                                             {isPartiallyPaid && (
@@ -1511,7 +1803,7 @@ export const AppointmentSheet = ({
                                             )}
                                             {!isPaidOrPartiallyPaid && (
                                                 <>
-                                                    <DropdownItem onClick={() => setCurrentView('recurrence')}>
+                                                    <DropdownItem onClick={() => setIsRecurrenceOverlayOpen(true)}>
                                                         Recorrente
                                                     </DropdownItem>
                                                     <DropdownItem onClick={() => setCurrentView('datetime')}>
@@ -1524,15 +1816,20 @@ export const AppointmentSheet = ({
                                             )}
                                         </Dropdown>
 
-                                        {hasChanges && (
-                                            <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
-                                                Salvar
+                                        {hasChanges ? (
+                                            <>
+                                                <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                                    Checkout
+                                                </Button>
+                                                <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                                    Salvar
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                                Checkout
                                             </Button>
                                         )}
-
-                                        <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
-                                            Checkout
-                                        </Button>
                                     </div>
                                 );
                             })()
@@ -1668,6 +1965,282 @@ export const AppointmentSheet = ({
         </div>
     );
 
+    const editServiceSheetContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Editar serviço</h2>
+                <Button variant="filled" onClick={() => setIsEditServiceOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+                {editingServiceIndex !== null && selectedServices[editingServiceIndex] && (
+                    <>
+                        <div className="relative flex justify-between items-center p-4 rounded-xl border border-brand-border dark:border-dark-border bg-transparent">
+                            <div className="absolute left-1.5 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-green dark:bg-brand-green"></div>
+                            <div className="pl-4 w-full">
+                                <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[15px]">
+                                    {selectedServices[editingServiceIndex].name}
+                                </h4>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <MoneyInput
+                                label="Preço do serviço"
+                                name="price"
+                                value={selectedServices[editingServiceIndex].price}
+                                onChange={(val) => updateEditingService('price', val)}
+                            />
+
+                            <Input
+                                label="Duração (minutos)"
+                                name="duration"
+                                type="number"
+                                value={selectedServices[editingServiceIndex].duration}
+                                onChange={(e) => updateEditingService('duration', e.target.value)}
+                            />
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-bold text-brand-dark dark:text-dark-heading ml-1">Profissional</label>
+                                <Dropdown
+                                    width="w-full"
+                                    showChevron={false}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            className="w-full h-12 rounded-xl"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <UserProfileImage
+                                                    fullName={selectedServices[editingServiceIndex].staff}
+                                                    imageUrl={staffSource.find(s => s.id === selectedServices[editingServiceIndex].staffId)?.avatar}
+                                                    className="w-6 h-6"
+                                                />
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{selectedServices[editingServiceIndex].staff}</span>
+                                            </div>
+                                        </Button>
+                                    }
+                                >
+                                    {staffSource.map(staff => (
+                                        <DropdownItem key={staff.id} onClick={() => updateEditingService('staffId', staff.id)} className="gap-3">
+                                            <UserProfileImage fullName={staff.name} imageUrl={staff.avatar} className="w-6 h-6" />
+                                            <span className="font-medium">{staff.name}</span>
+                                        </DropdownItem>
+                                    ))}
+                                </Dropdown>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="h-12 flex-1" onClick={() => setIsEditServiceOpen(false)}>
+                        Voltar
+                    </Button>
+                    <Button className="h-12 flex-1 bg-brand-primary text-white" onClick={() => setIsEditServiceOpen(false)}>
+                        Salvar
+                    </Button>
+                </div>
+            </footer>
+        </div>
+    );
+
+    const newClientSheetContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Novo cliente</h2>
+                <Button variant="filled" onClick={() => { if (!isCreatingCustomer) setIsNewClientOpen(false); }} size="icon" disabled={isCreatingCustomer}>
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+                <Input
+                    label="Nome"
+                    name="newCustomerName"
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    placeholder="Nome do cliente"
+                />
+                <EmailInput
+                    label="E-mail"
+                    name="newCustomerEmail"
+                    value={newCustomerEmail}
+                    onChange={(e) => setNewCustomerEmail(e.target.value)}
+                    placeholder="exemplo@email.com"
+                />
+                <PhoneInput
+                    label="Telefone"
+                    name="newCustomerPhone"
+                    value={newCustomerPhone}
+                    onChange={(e) => setNewCustomerPhone(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                />
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNewClientOpen(false)} disabled={isCreatingCustomer}>
+                        Voltar
+                    </Button>
+                    <Button
+                        className="h-12 flex-1 bg-brand-primary text-white"
+                        isLoading={isCreatingCustomer}
+                        onClick={handleQuickCreateCustomer}
+                    >
+                        Salvar cliente
+                    </Button>
+                </div>
+            </footer>
+        </div>
+    );
+
+    const clientOverlayContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Selecionar Cliente</h2>
+                <Button variant="filled" onClick={() => setIsClientOverlayOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
+                <div className="flex gap-2">
+                    <div className="flex-1">
+                        <Input
+                            label=""
+                            name="clientSearchOverlay"
+                            placeholder="Buscar por nome, email ou telefone..."
+                            value={clientSearch}
+                            onChange={(e) => setClientSearch(e.target.value)}
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                            className="mb-0"
+                            variant="full-rounded"
+                        />
+                    </div>
+                    <Button
+                         variant="outline"
+                         onClick={() => {
+                             setNewCustomerName("");
+                             setNewCustomerEmail("");
+                             setNewCustomerPhone("");
+                             setIsNewClientOpen(true);
+                         }}
+                         className="h-11 px-3 shrink-0 rounded-xl"
+                         type="button"
+                    >
+                         <PlusIcon size={16} /> Novo
+                    </Button>
+                </div>
+
+                <div className="space-y-2">
+                    {filteredClients.length === 0 ? (
+                        <div className="text-center py-8 text-brand-inactive-text">
+                            Nenhum cliente encontrado.
+                        </div>
+                    ) : (
+                        filteredClients.map((client) => {
+                            const isSelected = selectedClient?.id === client.id;
+                            return (
+                                <div
+                                    key={client.id}
+                                    onClick={() => {
+                                        setSelectedClient(client);
+                                        setIsClientOverlayOpen(false);
+                                    }}
+                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                                        isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{client.name}</span>
+                                            <span className="text-xs text-brand-inactive-text truncate">{client.email || client.phone || 'Cliente'}</span>
+                                        </div>
+                                    </div>
+                                    {isSelected && <CheckCircleIcon size={18} className="text-brand-green shrink-0" />}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const historyOverlayContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Histórico</h2>
+                <Button variant="filled" onClick={() => setIsHistoryOverlayOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
+                <ActivityLog activity={appointment?.activityLog} />
+            </div>
+        </div>
+    );
+
+    const notesOverlayContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Observações</h2>
+                <Button variant="filled" onClick={() => setIsNotesOverlayOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
+                <FormTextarea
+                    label="Observações"
+                    name="notesOverlay"
+                    placeholder="Adicione observações ao agendamento..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                />
+                <div className="flex justify-end pt-4">
+                    <Button variant="default" className="px-6 h-[42px]" onClick={() => setIsNotesOverlayOpen(false)}>
+                        Salvar Nota
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+
+    const recurrenceOverlayContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Recorrente</h2>
+                <Button variant="filled" onClick={() => setIsRecurrenceOverlayOpen(false)} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-6 custom-scrollbar">
+                <RecurrenceView
+                    frequency={recurrenceFreq}
+                    setFrequency={setRecurrenceFreq}
+                    termination={recurrenceTerm}
+                    setTermination={setRecurrenceTerm}
+                    endDate={recurrenceEndDate}
+                    setEndDate={setRecurrenceEndDate}
+                />
+                <div className="flex justify-end pt-4">
+                    <Button variant="default" className="px-6 h-[42px]" onClick={() => setIsRecurrenceOverlayOpen(false)}>
+                        Salvar Repetição
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <>
             <AlertModal
@@ -1774,6 +2347,192 @@ export const AppointmentSheet = ({
             </AnimatePresence>
 
             <AnimatePresence>
+                {isEditServiceOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsEditServiceOpen(false)}>
+                            {editServiceSheetContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => setIsEditServiceOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {editServiceSheetContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isNewClientOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => { if (!isCreatingCustomer) setIsNewClientOpen(false); }}>
+                            {newClientSheetContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => { if (!isCreatingCustomer) setIsNewClientOpen(false); }}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {newClientSheetContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isClientOverlayOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsClientOverlayOpen(false)}>
+                            {clientOverlayContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => setIsClientOverlayOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {clientOverlayContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isHistoryOverlayOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsHistoryOverlayOpen(false)}>
+                            {historyOverlayContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => setIsHistoryOverlayOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {historyOverlayContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isNotesOverlayOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsNotesOverlayOpen(false)}>
+                            {notesOverlayContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => setIsNotesOverlayOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {notesOverlayContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isRecurrenceOverlayOpen && (
+                    isMobile ? (
+                        <BottomSheet isOpen={true} onClose={() => setIsRecurrenceOverlayOpen(false)}>
+                            {recurrenceOverlayContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[60] bg-black/50"
+                                onClick={() => setIsRecurrenceOverlayOpen(false)}
+                            >
+                                <motion.div
+                                    initial={{ x: '100%', opacity: 1 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    exit={{ x: '100%', opacity: 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                                    className="fixed right-4 top-4 bottom-4 z-[60] w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {recurrenceOverlayContent}
+                                </motion.div>
+                            </motion.div>
+                        </Portal>
+                    )
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
                 {isPaymentSheetOpen && (
                     <PaymentModal
                         isOpen={isPaymentSheetOpen}
@@ -1800,40 +2559,6 @@ export const AppointmentSheet = ({
                     />
                 )}
             </AnimatePresence>
-
-            <SelectCustomerSheet
-                isOpen={isSelectCustomerOpen}
-                onClose={() => {
-                    setIsSelectCustomerOpen(false);
-                    if (cameFromSummary) {
-                        if (previousClient) {
-                            setSelectedClient(previousClient);
-                        }
-                        setPreviousClient(null);
-                        setCameFromSummary(false);
-                    }
-                }}
-                onSelect={(customer) => {
-                    isSelectingClientRef.current = true;
-                    setSelectedClient(customer);
-                    setLocalClients(prev => {
-                        if (prev.some(c => c.id === customer.id)) return prev;
-                        return [customer, ...prev];
-                    });
-                    setIsSelectCustomerOpen(false);
-                    if (cameFromSummary) {
-                        setPreviousClient(null);
-                        setCameFromSummary(false);
-                    } else if (initialStaffId && initialTimeSlot && mode === 'create') {
-                        setCurrentView('summary');
-                    } else {
-                        setCurrentView('datetime');
-                    }
-                }}
-                partnerId={partnerId || ''}
-                selectedCustomerId={selectedClient?.id}
-                pinnedCustomer={selectedClient}
-            />
         </>
     )
 }

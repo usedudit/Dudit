@@ -4,9 +4,20 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
-import { CalendarIcon, ClockIcon } from "@/lib/icons";
+import { 
+    CalendarIcon, 
+    ClockIcon, 
+    LikeIcon, 
+    MoneyIcon, 
+    PartiallyPaidIcon, 
+    PlayIcon, 
+    BlockedIcon, 
+    EyeOffIcon 
+} from "@/lib/icons";
+import { AlertTriangle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils/formatters";
 import { Appointment } from "./types";
+import { getEndTime, checkAppointmentCollision } from "./utils";
 
 interface ColumnDef {
     id: string;
@@ -15,26 +26,76 @@ interface ColumnDef {
 
 interface AppointmentListRowProps {
     appointment: Appointment;
+    appointments: Appointment[];
+    openingHours?: any;
     columns: ColumnDef[];
     selected: boolean;
     onSelect: (id: string) => void;
     onView: (appointment: Appointment) => void;
 }
 
+const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, durationMinutes: number, openingHours: any) => {
+    if (!openingHours) return false;
+    const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const parseLocalDate = (dateStr: string): Date => {
+        if (!dateStr) return new Date();
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    };
+    const dateObj = parseLocalDate(aptDateStr);
+    const dName = DAYS_OF_WEEK[dateObj.getDay()];
+    const dConfig = openingHours[dName];
+    if (!dConfig || !dConfig.enabled) return true;
+
+    const parseTimeToMinutes = (timeStr: string) => {
+        if (!timeStr || !timeStr.includes(':')) return -1;
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const fromMin = parseTimeToMinutes(dConfig.from);
+    const toMin = parseTimeToMinutes(dConfig.to);
+
+    const aptStartMin = parseTimeToMinutes(aptTimeStr);
+    const aptEndMin = aptStartMin + durationMinutes;
+
+    return aptStartMin < fromMin || aptEndMin > toMin;
+};
+
 export const AppointmentListRow = React.memo(
     ({
         appointment,
+        appointments,
+        openingHours,
         columns,
         selected,
         onSelect,
         onView,
     }: AppointmentListRowProps) => {
-        const getStatusVariant = (status: string) => {
-            const normalized = status.toLowerCase();
-            if (normalized.includes("confirm") || normalized === "pago") return "green";
-            if (normalized.includes("cancel") || normalized.includes("aus") || normalized.includes("indis")) return "red";
-            if (normalized.includes("aguard") || normalized.includes("reserv")) return "orange";
-            return "gray";
+        const getStatusBadgeConfig = (status: string) => {
+            const s = status.toLowerCase();
+            if (s === 'confirmado' || s === 'confirmed') {
+                return { variant: "green" as const, icon: <LikeIcon /> };
+            }
+            if (s === 'pago' || s === 'completed' || s === 'concluído' || s === 'concluido' || s === 'finished') {
+                return { variant: "green" as const, icon: <MoneyIcon /> };
+            }
+            if (s === 'pago parcialmente' || s === 'parcialmente pago' || s === 'partially paid') {
+                return { variant: "orange" as const, icon: <PartiallyPaidIcon /> };
+            }
+            if (s === 'pendente' || s === 'pending' || s === 'reservado' || s === 'aguardando') {
+                return { variant: "orange" as const, icon: <ClockIcon /> };
+            }
+            if (s === 'iniciado' || s === 'in progress') {
+                return { variant: "cyan" as const, icon: <PlayIcon /> };
+            }
+            if (s === 'cancelado' || s === 'canceled') {
+                return { variant: "red" as const, icon: <BlockedIcon /> };
+            }
+            if (s === 'ausência' || s === 'ausencia' || s === 'absent' || s === 'indisponível' || s === 'indisponivel' || s === 'unavailable') {
+                return { variant: "gray" as const, icon: <EyeOffIcon /> };
+            }
+            return { variant: "gray" as const, icon: <ClockIcon /> };
         };
 
         const getJustifyClass = (align?: string) => {
@@ -49,6 +110,9 @@ export const AppointmentListRow = React.memo(
             return "text-left";
         };
 
+        const isOutsideHours = checkOutsideOperatingHours(appointment.date, appointment.time, appointment.duration, openingHours);
+        const hasCollision = appointments ? checkAppointmentCollision(appointment, appointments) : false;
+
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "customer":
@@ -59,9 +123,21 @@ export const AppointmentListRow = React.memo(
                                 className="w-10 h-10 text-[14px]"
                             />
                             <div className="flex flex-col">
-                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[200px] xl:max-w-[300px]">
-                                    {appointment.customer}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[150px] xl:max-w-[250px]">
+                                        {appointment.customer}
+                                    </span>
+                                    {hasCollision && (
+                                        <span title="Conflito de horário detectado">
+                                            <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                                        </span>
+                                    )}
+                                    {isOutsideHours && (
+                                        <span title="Fora do horário de expediente">
+                                            <AlertTriangle size={14} className="text-orange-500 shrink-0" />
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                     {appointment.service}
                                 </span>
@@ -70,16 +146,15 @@ export const AppointmentListRow = React.memo(
                     );
 
                 case "datetime":
+                    const endTimeStr = getEndTime(appointment.time, appointment.duration);
                     return (
                         <div className="flex flex-col text-left min-w-0">
-                            <div className="flex items-center gap-1.5 text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                <CalendarIcon size={14} />
-                                <span>{formatDate(appointment.date)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                <ClockIcon size={12} />
-                                <span>{appointment.time}</span>
-                            </div>
+                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                {formatDate(appointment.date)}
+                            </span>
+                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                {appointment.time} - {endTimeStr}
+                            </span>
                         </div>
                     );
 
@@ -101,8 +176,9 @@ export const AppointmentListRow = React.memo(
                     );
 
                 case "status":
+                    const config = getStatusBadgeConfig(appointment.status);
                     return (
-                        <Badge variant={getStatusVariant(appointment.status)}>
+                        <Badge variant={config.variant} icon={config.icon}>
                             {appointment.status}
                         </Badge>
                     );

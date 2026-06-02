@@ -167,9 +167,8 @@ const OrderPageControls: React.FC<OrderPageControlsProps> = ({
                             <Button
                                 onClick={onAddOrder}
                                 leftIcon={<PlusIcon size={18} />}
-                                className="h-[42px]"
+                                className="w-[42px] h-[42px]"
                             >
-                                Nova venda
                             </Button>
                         )}
                     </div>

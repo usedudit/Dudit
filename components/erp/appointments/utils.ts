@@ -136,14 +136,14 @@ export const getAppointmentStyle = (status: string) => {
         };
     }
 
-    // Finished / Completed -> Gray (Solid)
+    // Finished / Completed -> Green (Explicit Request)
     if (s === 'finalizado' || s === 'finished' || s === 'completed' || s === 'concluído' || s === 'concluido') {
         return {
-            container: 'bg-gray-100 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700',
-            bar: 'bg-gray-500',
-            title: 'text-gray-700 dark:text-gray-300',
-            text: 'text-gray-500 dark:text-gray-400',
-            dot: 'bg-gray-500'
+            container: 'bg-[#ecfdf5] dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-900/30',
+            bar: 'bg-emerald-500',
+            title: 'text-emerald-900 dark:text-emerald-100',
+            text: 'text-emerald-700 dark:text-emerald-300/80',
+            dot: 'bg-emerald-500'
         };
     }
 
@@ -245,3 +245,29 @@ export const arrangeAppointments = (items: Appointment[]): LayoutAppointment[] =
 
     return events;
 };
+
+export const checkAppointmentCollision = (apt: Appointment, allApts: Appointment[]): boolean => {
+    if (!apt || !allApts) return false;
+    if (apt.status?.toLowerCase() === 'cancelado') return false;
+
+    // Convert start time to minutes
+    const [sh, sm] = apt.time.split(':').map(Number);
+    const start = sh * 60 + sm;
+    const end = start + (apt.duration || 60);
+
+    return allApts.some(other => {
+        // Skip self
+        if (other.id === apt.id) return false;
+        // Same professional and date
+        if (other.staffId !== apt.staffId || other.date !== apt.date) return false;
+        // Skip cancelled slots
+        if (other.status?.toLowerCase() === 'cancelado') return false;
+
+        const [oh, om] = other.time.split(':').map(Number);
+        const otherStart = oh * 60 + om;
+        const otherEnd = otherStart + (other.duration || 60);
+
+        return start < otherEnd && otherStart < end;
+    });
+};
+
