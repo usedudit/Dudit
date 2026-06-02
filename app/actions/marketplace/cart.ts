@@ -19,6 +19,11 @@ import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import {
+  resolveCheckoutCartLines,
+  buildFulfillmentPayload,
+} from "@/lib/services/marketplace-cart-resolver"
+import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 
 export async function getCartItemCountAction() {
   try {
@@ -41,14 +46,24 @@ export async function getCachedCart(userId: string) {
     .from("cart_items")
     .select(`
       id,
+      item_type,
       product_id,
       variant_id,
+      service_id,
+      recurring_plan_id,
+      booking_metadata,
+      pay_deposit_only,
       partner_id,
       quantity,
       selected,
       created_at,
       products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
+      services(id, name, price, duration_minutes, scheduling_enabled),
+      recurring_plans(
+        id, name, status,
+        recurring_plan_items(unit_price, quantity)
+      ),
       partners(
         id, 
         store_name, 
@@ -134,6 +149,9 @@ export async function getCachedCart(userId: string) {
         acc[partnerId] = {
           partner,
           items: [],
+          products: [],
+          services: [],
+          subscriptions: [],
           paymentMethods: Array.from(
             new Set(
               (paymentMethods || [])
@@ -145,6 +163,10 @@ export async function getCachedCart(userId: string) {
         }
       }
       acc[partnerId].items.push(item)
+      const type = item.item_type || "product"
+      if (type === "product") acc[partnerId].products.push(item)
+      else if (type === "service_booking") acc[partnerId].services.push(item)
+      else if (type === "subscription") acc[partnerId].subscriptions.push(item)
     }
     return acc
   }, {})
@@ -339,10 +361,11 @@ export async function addToCartAction(productId: string, quantity = 1, csrf_toke
       .insert({
         user_id: user.id,
         partner_id: partnerId,
+        item_type: "product",
         product_id: resolvedProductId,
         variant_id: variantId || null,
         quantity,
-        selected: true
+        selected: true,
       })
     error = e
   }
@@ -572,22 +595,30 @@ export async function checkoutCartAction(
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
 
-  // 0. Check subscription limits
-  const firstItem = partnerItems[0]
   const adminClient = getAdminClient()
-  const { data: firstProduct } = await adminClient.from("products").select("partner_id").eq("id", firstItem.productId).single()
-  const partnerIdForLimit = firstProduct?.partner_id
-
-  if (partnerIdForLimit) {
-    const limitCheck = await checkLimit(partnerIdForLimit, "monthly_orders")
-    if (!limitCheck.allowed) {
-      return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
-    }
-  }
 
   if (!partnerItems || partnerItems.length === 0) {
     return { error: "Por favor, selecione pelo menos um item para finalizar o pedido" }
   }
+
+  const cartItemIds = partnerItems.map((item: any) => item.cartItemId).filter(Boolean)
+  const resolved = await resolveCheckoutCartLines(adminClient, user.id, cartItemIds)
+  if (!resolved.success) return { error: resolved.error }
+
+  const { lines: resolvedLines, partnerId, hasProducts } = resolved
+
+  const limitCheck = await checkLimit(partnerId, "monthly_orders")
+  if (!limitCheck.allowed) {
+    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
+  }
+  let totalAmount = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
+  const orderItems = resolvedLines.map((line) => line.orderItemRow)
+  const pricingItems = resolvedLines.map((line) => line.pricingItem)
+  const couponItems = resolvedLines.map((line) => ({
+    productId: line.productId,
+    serviceId: line.serviceId,
+    recurringPlanId: line.recurringPlanId,
+  }))
 
   const { data: buyerProfile } = await supabase
     .from("user_profiles")
@@ -595,61 +626,20 @@ export async function checkoutCartAction(
     .eq("user_id", user.id)
     .single()
 
-  const productIds = [...new Set(partnerItems.map((item: any) => item.productId))]
-  const { data: products } = await adminClient.from("products").select("*").in("id", productIds)
+  const fulfillmentPayload = buildFulfillmentPayload(
+    user.id,
+    partnerId,
+    resolvedLines,
+    deliveryType,
+    deliveryAddress,
+  )
 
-  if (!products || products.length === 0) return { error: "Produtos não encontrados" }
-
-  // Buscar variantes se houver itens com variantId
-  const variantIds = partnerItems.map((item: any) => item.variantId).filter(Boolean) as string[]
-  let variants: any[] = []
-  if (variantIds.length > 0) {
-    const { data: variantData } = await adminClient
-      .from("product_variants")
-      .select("id, variant_name, price_adjustment, stock_available, is_active")
-      .in("id", variantIds)
-    variants = variantData || []
-  }
-
-  let totalAmount = 0
-  const orderItems = []
-
-  for (const item of partnerItems) {
-    const product = products.find((p: any) => p.id === item.productId)
-    if (!product || !product.is_active) return { error: `Produto inativo ou não encontrado: ${product?.name || item.productId}` }
-
-    let itemPrice: number
-    let itemName: string
-    if (item.variantId) {
-      const variant = variants.find((v: any) => v.id === item.variantId)
-      if (!variant || !variant.is_active) return { error: `Variante inativa ou não encontrada.` }
-      if ((variant.stock_available ?? 0) < item.quantity) return { error: `Estoque insuficiente para: ${variant.variant_name}` }
-      // Variante: usar price_adjustment como preço (preço da variante)
-      itemPrice = Number(variant.price_adjustment || product.price)
-      itemName = `${product.name} - ${variant.variant_name}`
-    } else {
-      if ((product.stock_available ?? 0) < item.quantity) return { error: `Estoque insuficiente para o produto: ${product.name}` }
-      // Produto normal: usar preço promocional se disponível
-      const basePrice = Number(product.price)
-      const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
-      itemPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
-      itemName = product.name
-    }
-
-    const subtotal = itemPrice * item.quantity
-    totalAmount += subtotal
-
-    orderItems.push({
-      product_id: product.id, // Always use Parent Product ID
-      variant_id: item.variantId || null, // Explicitly save Variant ID
-      product_name: itemName,
-      product_price: itemPrice,
-      quantity: item.quantity,
-      subtotal,
-    })
-  }
-
-  const partnerId = products[0].partner_id
+  const productIds = resolvedLines
+    .filter((l) => l.productId)
+    .map((l) => l.productId as string)
+  const { data: products } = productIds.length
+    ? await adminClient.from("products").select("*").in("id", productIds)
+    : { data: [] as any[] }
   const { data: partner } = await adminClient
     .from("partners")
     .select("opening_hours")
@@ -658,7 +648,7 @@ export async function checkoutCartAction(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
-  if (deliveryType === "delivery") {
+  if (deliveryType === "delivery" && hasProducts) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       destinationAddress: deliveryAddress,
@@ -681,7 +671,7 @@ export async function checkoutCartAction(
       customerId: user.id,
       subtotal: totalAmount,
       shippingCost: deliveryFee,
-      items: partnerItems.map((item) => ({ productId: item.productId })),
+      items: couponItems,
     }, adminClient)
 
     if (couponResult.valid) {
@@ -695,7 +685,7 @@ export async function checkoutCartAction(
       customerId: user.id,
       subtotal: totalAmount,
       shippingCost: deliveryFee,
-      items: partnerItems.map((item) => ({ productId: item.productId })),
+      items: couponItems,
     }, adminClient)
 
     if (autoResult.valid) {
@@ -723,16 +713,7 @@ export async function checkoutCartAction(
   const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId, user.id)
 
   const pricingResult = calculateOrderPricing({
-    items: orderItems.map((item: any) => {
-      const product = products.find((p: any) => p.id === item.product_id)
-      return {
-        productId: item.product_id,
-        serviceId: null,
-        unitPrice: Number(item.product_price || 0),
-        quantity: Number(item.quantity || 0),
-        categoryId: product?.category_id || null,
-      }
-    }),
+    items: pricingItems,
     shippingCost: deliveryFee,
     coupon: couponPricingData,
     promotions: promotionsData,
@@ -853,12 +834,14 @@ export async function checkoutCartAction(
     }
   }
 
-  const orderPreparation = computeOrderPreparationEstimate({
-    products,
-    openingHours: (partner as any)?.opening_hours || null,
-    pickupWindowMinutes: 30,
-    deliveryTimeEstimateMinutes: 0,
-  })
+  const orderPreparation = hasProducts
+    ? computeOrderPreparationEstimate({
+        products: products || [],
+        openingHours: (partner as any)?.opening_hours || null,
+        pickupWindowMinutes: 30,
+        deliveryTimeEstimateMinutes: 0,
+      })
+    : null
 
   const preparationPayload = orderPreparation ? {
     preparation_time_minutes: orderPreparation.preparationTimeMinutes,
@@ -917,6 +900,8 @@ export async function checkoutCartAction(
       coupon_id: couponIdToSave,
       discount_amount: couponDiscountAmount,
       promotions_applied: promotionsAppliedSnapshot,
+      checkout_fulfillment: fulfillmentPayload,
+      order_source: "Vitrine Online",
       ...preparationPayload,
     })
     .select()
@@ -959,11 +944,13 @@ export async function checkoutCartAction(
   )
 
   const reserveItems = [
-    ...partnerItems.map((item) => ({
-      product_id: item.productId,
-      variant_id: item.variantId || null,
-      quantity: item.quantity,
-    })),
+    ...resolvedLines
+      .filter((line) => line.requiresStock && line.stockProductId)
+      .map((line) => ({
+        product_id: line.stockProductId!,
+        variant_id: line.stockVariantId || null,
+        quantity: line.quantity,
+      })),
     ...orderItems
       .filter((item: any) => item.is_promotional)
       .map((item: any) => ({
@@ -987,8 +974,11 @@ export async function checkoutCartAction(
   }
 
   // SECURITY FIX (MED-02): Scope cart deletion to current user
-  const cartItemIds = partnerItems.map((item: any) => item.cartItemId)
   await supabase.from("cart_items").delete().in("id", cartItemIds).eq("user_id", user.id)
+
+  if (!useMercadoPago && String(order.situation).toLowerCase() === "paid") {
+    await fulfillMarketplaceOrder(adminClient, order.id)
+  }
 
   if (couponIdToSave) {
     await supabase.from("coupon_usages").upsert(
@@ -1024,11 +1014,11 @@ export async function checkoutCartAction(
   }
 
   // Limpa Cache
-  for (const productId of [...new Set(partnerItems.map((item: any) => item.productId))]) {
+  for (const productId of [...new Set(productIds)]) {
     await invalidateProductCache(productId, partnerId, "update", { silent: true })
   }
   await revalidateCart(user.id)
-  await revalidateOrders(products[0].partner_id)
+  await revalidateOrders(partnerId)
 
   return {
     success: true,

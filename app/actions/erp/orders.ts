@@ -684,6 +684,18 @@ function buildInventoryMovementDelta(previousItems: Array<{
     return { outgoing, incoming }
 }
 
+async function fulfillMarketplaceOrderIfNeeded(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    orderId: string,
+) {
+    try {
+        const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+        await fulfillMarketplaceOrder(supabase, orderId)
+    } catch (error) {
+        console.error("[orders_fulfillment] fulfillMarketplaceOrderIfNeeded:", error)
+    }
+}
+
 async function createFinancialTransactionsForPaidOrder(supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>, params: {
     orderNumber: string
     partnerId: string
@@ -1536,6 +1548,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             paymentDate: new Date().toISOString(),
             financeAccountId: order.finance_account_id || data.financeAccountId,
         })
+        await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
         await createSellerCommissionForPaidOrder({
             supabase,
             partnerId,
@@ -2079,6 +2092,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             paymentDate: new Date().toISOString(),
             financeAccountId: data.financeAccountId,
         })
+        await fulfillMarketplaceOrderIfNeeded(supabase, orderId)
         await createSellerCommissionForPaidOrder({
             supabase,
             partnerId: data.partnerId,
@@ -2658,6 +2672,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     paymentDate: new Date().toISOString(),
                     financeAccountId: order.finance_account_id || null,
                 })
+                await fulfillMarketplaceOrderIfNeeded(supabase, order.id)
                 await createSellerCommissionForPaidOrder({
                     supabase,
                     partnerId: payload.partnerId,

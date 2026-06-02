@@ -26,6 +26,7 @@ import { PaymentMethodsSubPage } from "./payments/PaymentMethodsSubPage"
 import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
+import { ServiceCheckoutSettingsSubPage } from "./ServiceCheckoutSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
@@ -57,6 +58,7 @@ type ActivePage =
   | "os"
   | "mensagens"
   | "delivery"
+  | "service-checkout"
   | "resources"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
@@ -80,6 +82,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "os": "os",
     "mensagens": "modelos-de-mensagens",
     "delivery": "entrega",
+    "service-checkout": "servicos-checkout",
     "integrations": "integracoes",
     "resources": "gerenciar-recursos",
   }
@@ -181,6 +184,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessReturns = isOwnerAdminOrManager
   const canAccessMessages = isOwnerAdminOrManager
   const canAccessDelivery = isOwnerOrAdmin
+  const canAccessServiceCheckout = canAccessOS
   const canAccessBusinessData = isOwnerAdminOrManager
   const canAccessResources = isOwnerOrAdmin
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
@@ -367,6 +371,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
+                            {canAccessServiceCheckout && (
+                              <ListItem
+                                icon={WrenchIcon}
+                                title="Serviços — Checkout"
+                                description="Entrada (sinal) e opções de pagamento na vitrine."
+                                onClick={() => setActivePage("service-checkout")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                             {canAccessDelivery && isDeliveriesResourceActive && (
                               <ListItem
                                 icon={PackageReceiveIcon}
@@ -433,6 +447,9 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
           {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "service-checkout" && canAccessServiceCheckout && (
+            <ServiceCheckoutSettingsSubPage key="service-checkout" partnerId={partner.id} onBack={() => setActivePage("home")} />
+          )}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
         </AnimatePresence>
       </div>

@@ -377,6 +377,9 @@ async function processWebhookWithRetry(
             customer_name: fullOrder.customer_name,
           })
 
+          const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+          await fulfillMarketplaceOrder(supabase, orderId)
+
           // Increment partner's total sales count
           await supabase.rpc('increment_partner_sales', { partner_uuid: fullOrder.partner_id })
         }

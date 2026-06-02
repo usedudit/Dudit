@@ -530,7 +530,8 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       *,
       promotion_products(product_id),
       promotion_categories(category_id),
-      promotion_services(service_id)
+      promotion_services(service_id),
+      promotion_subscriptions(recurring_plan_id)
     `)
     .eq("partner_id", partnerId)
     .eq("is_active", true)
@@ -584,6 +585,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
       applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
       applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+      applicableSubscriptionIds: (promo.promotion_subscriptions || []).map((s: any) => s.recurring_plan_id),
     })
   }
 

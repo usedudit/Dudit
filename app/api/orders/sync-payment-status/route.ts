@@ -191,6 +191,9 @@ export async function POST(request: NextRequest) {
               customer_contact_id: fullOrder.buyer_id,
               customer_name: fullOrder.customer_name,
             })
+
+            const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+            await fulfillMarketplaceOrder(supabaseAdmin, orderId)
           }
         } catch (txErr: any) {
           SecureLogger.error("Error creating transaction from order", {

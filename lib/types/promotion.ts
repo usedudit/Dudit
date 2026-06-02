@@ -14,7 +14,8 @@ export enum ApplyScope {
     SPECIFIC_PRODUCTS = "specific_products",
     CATEGORY = "category",
     ENTIRE_CART = "entire_cart",
-    SPECIFIC_SERVICES = "specific_services"
+    SPECIFIC_SERVICES = "specific_services",
+    SPECIFIC_SUBSCRIPTIONS = "specific_subscriptions",
 }
 
 export interface PricingPromotion {
@@ -36,4 +37,5 @@ export interface PricingPromotion {
     applicableProductIds?: string[]
     applicableCategoryIds?: string[]
     applicableServiceIds?: string[]
+    applicableSubscriptionIds?: string[]
 }

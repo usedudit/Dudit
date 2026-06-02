@@ -132,6 +132,14 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 disabled={!isEditing}
                                 width="w-full"
                             />
+                            <FormDropdown
+                                label="Agendamento na vitrine"
+                                options={[{ value: "true", label: "Com horários" }, { value: "false", label: "Compra direta" }]}
+                                value={String(serviceData.scheduling_enabled !== false)}
+                                setValue={(v) => handleFieldChange({ target: { name: "scheduling_enabled", value: v === "true" } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
                         </div>
 
                     </div>

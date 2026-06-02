@@ -205,7 +205,7 @@ export async function validateCouponAction(input: {
     customerId?: string | null
     subtotal: number
     shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
 }) {
     await requireUser()
     await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")
@@ -217,7 +217,7 @@ export async function findAutomaticCouponAction(input: {
     customerId?: string | null
     subtotal: number
     shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
 }) {
     await requireUser()
     await requirePartnerAccessWithPermission(input.partnerId, "orders", "view")

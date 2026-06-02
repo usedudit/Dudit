@@ -17,7 +17,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
-import { listApplicableMarketplaceCouponsAction } from "@/app/actions/shared/coupons"
+import { listApplicableMarketplaceCouponsAction, validateCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction } from "@/app/actions/marketplace/cart"
@@ -65,7 +65,15 @@ export interface CheckoutSessionData {
         store_name?: string
         openingHours?: any
     }
-    cartItems?: { cartItemId: string, productId: string, variantId?: string, quantity: number }[]
+    cartItems?: {
+        cartItemId: string
+        productId?: string
+        variantId?: string
+        serviceId?: string
+        recurringPlanId?: string
+        itemType?: "product" | "service_booking" | "subscription"
+        quantity: number
+    }[]
     itemId?: string
     itemType?: "product" | "service"
     deliverySettings?: {
@@ -174,8 +182,14 @@ export function CheckoutPageClient() {
             acc[p.id] = p.quantity
         }
 
+        for (const item of sessionData?.cartItems || []) {
+            acc[item.cartItemId] = item.quantity
+            const lineKey = item.productId || item.serviceId || item.recurringPlanId
+            if (lineKey) acc[lineKey] = item.quantity
+        }
+
         return acc
-    }, [products])
+    }, [products, sessionData?.cartItems])
 
     const [userId, setUserId] = useState<string | null>(null)
     const [userName, setUserName] = useState<string>("")
@@ -202,6 +216,7 @@ export function CheckoutPageClient() {
     const [showCouponModal, setShowCouponModal] = useState(false)
     const [selectedCouponId, setSelectedCouponId] = useState<string>("")
     const [couponError, setCouponError] = useState<string | null>(null)
+    const [couponPartialWarning, setCouponPartialWarning] = useState(false)
 
     const [formData, setFormData] = useState({
         deliveryType: "pickup" as "delivery" | "pickup",
@@ -516,15 +531,20 @@ export function CheckoutPageClient() {
         paymentOption === "traditional" &&
         formData.paymentMethod
     )
-    const couponItems = useMemo(
-        () =>
-            products.map((product) => (
-                sessionData?.itemType === "service" || sessionData?.source === "service"
-                    ? { serviceId: product.id }
-                    : { productId: product.id }
-            )),
-        [products, sessionData?.itemType, sessionData?.source]
-    )
+    const couponItems = useMemo(() => {
+        if (sessionData?.source === "cart" && sessionData.cartItems?.length) {
+            return sessionData.cartItems.map((item) => ({
+                productId: item.itemType === "product" || !item.itemType ? item.productId : null,
+                serviceId: item.itemType === "service_booking" ? (item.serviceId || item.productId) : null,
+                recurringPlanId: item.itemType === "subscription" ? (item.recurringPlanId || item.productId) : null,
+            }))
+        }
+        return products.map((product) => (
+            sessionData?.itemType === "service" || sessionData?.source === "service"
+                ? { serviceId: product.id }
+                : { productId: product.id }
+        ))
+    }, [products, sessionData])
     const appliedCoupon = useMemo(
         () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
         [availableCoupons, couponCode]
@@ -773,6 +793,11 @@ export function CheckoutPageClient() {
                 {couponError && (
                     <p className="text-xs text-red-500">{couponError}</p>
                 )}
+                {couponPartialWarning && appliedCoupon && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Este cupom não se aplica a alguns itens do seu carrinho. O desconto foi calculado apenas sobre os itens elegíveis.
+                    </p>
+                )}
             </div>
 
             <div className="space-y-3 mb-4">
@@ -948,6 +973,22 @@ export function CheckoutPageClient() {
         void loadApplicableCoupons()
     }, [partnerId, userId, totalAmount, couponItems])
 
+    const refreshCouponPartialWarning = async (code: string) => {
+        if (!partnerId || !code.trim()) {
+            setCouponPartialWarning(false)
+            return
+        }
+        const result = await validateCouponAction({
+            partnerId,
+            code,
+            customerId: userId,
+            subtotal: totalAmount,
+            shippingCost: isPickup ? 0 : deliveryFee,
+            items: couponItems,
+        })
+        setCouponPartialWarning(Boolean(result.valid && result.partialApplicabilityWarning))
+    }
+
     const handleApplySelectedCoupon = () => {
         const selectedCoupon = availableCoupons.find((coupon) => coupon.id === selectedCouponId)
 
@@ -955,6 +996,7 @@ export function CheckoutPageClient() {
             setCouponCode("")
             setCouponDiscount(0)
             setCouponError(null)
+            setCouponPartialWarning(false)
             setShowCouponModal(false)
             return
         }
@@ -962,6 +1004,7 @@ export function CheckoutPageClient() {
         setCouponCode(selectedCoupon.code)
         setCouponDiscount(selectedCoupon.discountAmount)
         setCouponError(null)
+        void refreshCouponPartialWarning(selectedCoupon.code)
         setShowCouponModal(false)
     }
 
@@ -970,6 +1013,7 @@ export function CheckoutPageClient() {
         setCouponDiscount(0)
         setSelectedCouponId("")
         setCouponError(null)
+        setCouponPartialWarning(false)
     }
 
     const handleSubmit = async (e?: React.FormEvent) => {
@@ -1016,6 +1060,10 @@ export function CheckoutPageClient() {
                         couponCode: couponCode || null,
                         couponDiscount: couponDiscount,
                         deliveryFee: isPickup ? 0 : deliveryFee,
+                        cartItemIds:
+                            sessionData?.source === "cart"
+                                ? (sessionData.cartItems || []).map((item) => item.cartItemId)
+                                : undefined,
                     },
                     sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                     mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || "",
@@ -1046,7 +1094,10 @@ export function CheckoutPageClient() {
                             cartItemId: item.cartItemId,
                             productId: item.productId,
                             variantId: item.variantId,
-                            quantity: quantities[item.productId] || item.quantity
+                            quantity:
+                                quantities[item.cartItemId]
+                                || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
+                                || item.quantity,
                         })),
                         formData.deliveryType,
                         formData.deliveryAddress,

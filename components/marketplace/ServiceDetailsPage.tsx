@@ -31,10 +31,13 @@ import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
+import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import {
-  getPublicAvailableTimeSlots,
-  createPublicAppointment,
-} from "@/app/actions/marketplace/services"
+  prepareServiceBookingCheckoutAction,
+  addServiceBookingToCartAction,
+  addPurchasableServiceToCartAction,
+} from "@/app/actions/marketplace/cart-extensions"
+import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
@@ -487,6 +490,7 @@ export function ServiceDetailsPageClient({
   const durationMinutes = Number(service.duration_minutes || 60)
   const bufferMinutes = Number(service.buffer_minutes || 0)
   const price = Number(service.price || 0)
+  const schedulingEnabled = service.scheduling_enabled !== false
   const categoryName = (service as any).service_categories?.name || "Serviço"
 
   const pricing = useMemo(() => {
@@ -624,12 +628,109 @@ export function ServiceDetailsPageClient({
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleBooking = useCallback(async () => {
+  const buildBookingPayload = useCallback(() => ({
+    serviceId: service.id,
+    partnerId: partner.id,
+    booking: {
+      staffId: selectedStaffId,
+      staffName: selectedStaff?.name || "Profissional",
+      date: selectedDate,
+      time: selectedTime,
+      serviceName: service.name,
+      price,
+      durationMinutes,
+    },
+  }), [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, price, durationMinutes])
+
+  const handleBookNowCheckout = useCallback(async () => {
     if (!userId) {
       router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
       return
     }
+    if (schedulingEnabled && (!selectedDate || !selectedTime || !selectedStaffId)) {
+      notifyError("Erro", "Selecione data, horário e profissional.")
+      return
+    }
 
+    setIsBooking(true)
+    try {
+      const { token } = await (await fetch("/api/csrf-token")).json()
+
+      let cartItemId: string | undefined
+      if (!schedulingEnabled) {
+        const cartResult = await addPurchasableServiceToCartAction({
+          serviceId: service.id,
+          partnerId: partner.id,
+          csrf_token: token,
+        })
+        if (cartResult.error) {
+          notifyError("Erro", cartResult.error)
+          return
+        }
+        cartItemId = cartResult.cartItemId
+        invalidateCartCache()
+      } else {
+        const result = await prepareServiceBookingCheckoutAction({
+          ...buildBookingPayload(),
+          csrf_token: token,
+        })
+        if (!result.success) {
+          notifyError("Erro", result.error || "Não foi possível iniciar o checkout.")
+          return
+        }
+        cartItemId = result.cartItemId
+        invalidateCartCache()
+      }
+
+      const lineLabel = schedulingEnabled && selectedDate && selectedTime
+        ? `${service.name} — ${selectedDate} ${selectedTime}`
+        : service.name
+
+      const cartLine = cartItemId
+        ? [{
+            cartItemId,
+            itemType: "service_booking" as const,
+            serviceId: service.id,
+            productId: service.id,
+            quantity: 1,
+          }]
+        : []
+
+      const checkoutData = {
+        source: "cart" as const,
+        partnerId: partner.id,
+        products: [{
+          id: service.id,
+          name: lineLabel,
+          price,
+          quantity: 1,
+        }],
+        partnerInfo: {
+          address: partner.addresses?.[0] || {},
+          paymentMethods: (partner.payment_methods || []).map((m: any) => m.payment_type || m.type).filter(Boolean),
+          mpConnected: !!partner.mp_user_id,
+          mpPublicKey: partner.mp_public_key,
+          store_name: partner.store_name,
+          openingHours: partner.opening_hours || null,
+        },
+        cartItems: cartLine,
+        deliverySettings: null,
+      }
+
+      sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
+      router.push("/checkout")
+    } catch {
+      notifyError("Erro", "Erro inesperado ao iniciar checkout.")
+    } finally {
+      setIsBooking(false)
+    }
+  }, [userId, router, schedulingEnabled, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, price, notifyError])
+
+  const handleAddBookingToCart = useCallback(async () => {
+    if (!userId) {
+      router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
+      return
+    }
     if (!selectedDate || !selectedTime || !selectedStaffId) {
       notifyError("Erro", "Selecione data, horário e profissional.")
       return
@@ -637,31 +738,23 @@ export function ServiceDetailsPageClient({
 
     setIsBooking(true)
     try {
-      const result = await createPublicAppointment({
-        serviceId: service.id,
-        partnerId: partner.id,
-        staffId: selectedStaffId,
-        staffName: selectedStaff?.name || "Profissional",
-        date: selectedDate,
-        time: selectedTime,
-        serviceName: service.name,
-        price,
-        durationMinutes,
+      const { token } = await (await fetch("/api/csrf-token")).json()
+      const result = await addServiceBookingToCartAction({
+        ...buildBookingPayload(),
+        csrf_token: token,
       })
-
       if (result.success) {
-        notifySuccess("Agendamento confirmado!", `Seu horário foi reservado para ${selectedDate} às ${selectedTime}.`)
-        setStep("info")
-        setSelectedTime("")
+        invalidateCartCache()
+        notifySuccess("Adicionado à sacola", "O agendamento foi adicionado ao carrinho.")
       } else {
-        notifyError("Erro ao agendar", result.error || "Tente novamente.")
+        notifyError("Erro", result.error || "Não foi possível adicionar à sacola.")
       }
     } catch {
-      notifyError("Erro", "Erro inesperado ao criar agendamento.")
+      notifyError("Erro", "Erro inesperado.")
     } finally {
       setIsBooking(false)
     }
-  }, [userId, router, selectedDate, selectedTime, selectedStaffId, selectedStaff, service, partner, price, durationMinutes, notifySuccess, notifyError])
+  }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, notifySuccess, notifyError])
 
   // ─── Booking Panel ────────────────────────────────────────────────────────
 
@@ -943,27 +1036,37 @@ export function ServiceDetailsPageClient({
         )}
       </AnimatePresence>
 
-      {/* ── CTA Button ── */}
-      <div className="hidden lg:block">
+      {/* ── CTA Buttons ── */}
+      <div className="hidden lg:block space-y-2 mb-4">
         <Button
-          disabled={!selectedTime || isBooking}
-          onClick={handleBooking}
-          className="w-full mb-4 h-[46px]"
+          disabled={(schedulingEnabled && !selectedTime) || isBooking}
+          onClick={handleBookNowCheckout}
+          className="w-full h-[46px]"
         >
           {isBooking ? (
             <span className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Agendando...
+              Redirecionando...
             </span>
-          ) : !selectedTime ? (
+          ) : schedulingEnabled && !selectedTime ? (
             "Selecione um horário"
           ) : (
             <span className="flex items-center gap-2">
               <CalendarIcon size={18} />
-              Confirmar Agendamento
+              Reservar agora
             </span>
           )}
         </Button>
+        {schedulingEnabled && (
+          <Button
+            variant="outline"
+            disabled={!selectedTime || isBooking}
+            onClick={handleAddBookingToCart}
+            className="w-full h-[46px]"
+          >
+            Adicionar à sacola
+          </Button>
+        )}
       </div>
 
       {/* Shipping */}
@@ -1787,26 +1890,31 @@ export function ServiceDetailsPageClient({
           </div>
 
           {/* Mobile bottom bar */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
-            <div className="flex-1 flex flex-col justify-center">
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-2 lg:hidden shadow-lg">
+            <div className="flex-1 flex flex-col justify-center min-w-0">
               <span className="text-lg font-bold text-brand-dark leading-none">
                 {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
               </span>
-              <span className="text-xs text-brand-inactive-text">
+              <span className="text-xs text-brand-inactive-text truncate">
                 {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
               </span>
             </div>
+            {schedulingEnabled && (
+              <Button
+                variant="outline"
+                className="rounded-full px-3"
+                disabled={!selectedTime || isBooking}
+                onClick={handleAddBookingToCart}
+              >
+                Sacola
+              </Button>
+            )}
             <Button
-              className="flex-1 rounded-full"
-              disabled={!selectedTime || isBooking}
-              onClick={handleBooking}
+              className="flex-1 rounded-full min-w-[120px]"
+              disabled={(schedulingEnabled && !selectedTime) || isBooking}
+              onClick={handleBookNowCheckout}
             >
-              {isBooking ? "Agendando..." : !selectedTime ? "Selecione um horário" : (
-                <span className="flex items-center gap-2">
-                  <CalendarIcon size={16} />
-                  Confirmar
-                </span>
-              )}
+              {isBooking ? "..." : schedulingEnabled && !selectedTime ? "Horário" : "Reservar"}
             </Button>
           </div>
         </div>

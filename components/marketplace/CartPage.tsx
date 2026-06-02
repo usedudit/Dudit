@@ -105,16 +105,31 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         setIsVendorExpanded(prev => ({ ...prev, [partnerId]: !prev[partnerId] }))
 
     const getItemPrice = (item: any) => {
+        const type = item.item_type || "product"
+        if (type === "service_booking") {
+            const meta = item.booking_metadata
+            return Number(meta?.price || item.services?.price || 0)
+        }
+        if (type === "subscription") {
+            const planItems = item.recurring_plans?.recurring_plan_items || []
+            return planItems.reduce(
+                (sum: number, pi: any) => sum + Number(pi.unit_price || 0) * Number(pi.quantity || 1),
+                0,
+            )
+        }
         if (item.variant_id && item.product_variants) {
             const variantPrice = Number(item.product_variants.price_adjustment)
             if (variantPrice > 0) return variantPrice
         }
-        const basePrice = Number(item.products.price)
-        const promoPrice = item.products.promotional_price ? Number(item.products.promotional_price) : 0
+        const basePrice = Number(item.products?.price || 0)
+        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
         return promoPrice > 0 && promoPrice < basePrice ? promoPrice : basePrice
     }
 
     const getItemImage = (item: any) => {
+        if ((item.item_type || "product") !== "product") {
+            return "https://img.dudit.com.br/static/Placeholder.png"
+        }
         if (item.variant_id && item.product_variants?.variant_options) {
             const opts = typeof item.product_variants.variant_options === "string"
                 ? JSON.parse(item.product_variants.variant_options)
@@ -124,12 +139,26 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         return getImageUrl(item.products.images?.[0]) || "https://img.dudit.com.br/static/Placeholder.png"
     }
 
-    const getItemName = (item: any) =>
-        item.variant_id && item.product_variants
+    const getItemName = (item: any) => {
+        const type = item.item_type || "product"
+        if (type === "service_booking") {
+            const meta = item.booking_metadata
+            if (meta?.date && meta?.time) {
+                return `${item.services?.name || meta.serviceName} — ${meta.date} ${meta.time}`
+            }
+            return item.services?.name || meta?.serviceName || "Serviço"
+        }
+        if (type === "subscription") {
+            return item.recurring_plans?.name || "Assinatura"
+        }
+        return item.variant_id && item.product_variants
             ? `${item.products.name} - ${item.product_variants.variant_name}`
-            : item.products.name
+            : item.products?.name || "Item"
+    }
 
     const isItemOutOfStock = (item: any): boolean => {
+        const type = item.item_type || "product"
+        if (type !== "product") return false
         if (item.variant_id && item.product_variants) {
             const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
             return stock <= 0
@@ -293,8 +322,11 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             },
             cartItems: partnerItems.map((item: any) => ({
                 cartItemId: item.id,
-                productId: item.product_id,
+                itemType: item.item_type || "product",
+                productId: item.product_id || undefined,
                 variantId: item.variant_id || undefined,
+                serviceId: item.service_id || undefined,
+                recurringPlanId: item.recurring_plan_id || undefined,
                 quantity: getItemQuantity(item),
             })),
             deliverySettings: partnerData.deliverySettings
@@ -329,8 +361,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         itemsByPartner[partnerId].items
             .filter((item: any) => getItemSelected(item))
             .map((item: any) => ({
-                id: item.variant_id || item.product_id,
-                name: item.products.name,
+                id: item.variant_id || item.product_id || item.service_id || item.recurring_plan_id,
+                name: getItemName(item),
                 variant: item.variant_id && item.product_variants ? `${item.product_variants.variant_type}: ${item.product_variants.variant_name}` : undefined,
                 price: getItemPrice(item),
                 quantity: getItemQuantity(item),
@@ -437,7 +469,29 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                             className="overflow-hidden"
                                                         >
                                                             <div className="pt-2 pb-6">
-                                                                {data.items.map((item: any, index: number) => {
+                                                                {[
+                                                                    { title: "Produtos", items: data.products?.length ? data.products : data.items.filter((i: any) => (i.item_type || "product") === "product") },
+                                                                    { title: "Serviços", items: data.services || [] },
+                                                                    { title: "Assinaturas", items: data.subscriptions || [] },
+                                                                ].flatMap((section) =>
+                                                                    section.items.length === 0
+                                                                        ? []
+                                                                        : [
+                                                                            <div key={`${partnerId}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
+                                                                                <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text">{section.title}</h4>
+                                                                                <span className="text-xs text-brand-inactive-text">
+                                                                                    {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
+                                                                                        section.items
+                                                                                            .filter((i: any) => getItemSelected(i))
+                                                                                            .reduce((s: number, i: any) => s + getItemPrice(i) * getItemQuantity(i), 0),
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>,
+                                                                            ...section.items,
+                                                                        ],
+                                                                ).map((entry: any, index: number) => {
+                                                                    if (!entry?.id) return entry
+                                                                    const item = entry
                                                                     const itemSelected = getItemSelected(item)
                                                                     const itemQty = getItemQuantity(item)
 
@@ -464,7 +518,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                 prefetch={false}
                                                                                                 className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
                                                                                             >
-                                                                                                <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                                <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
                                                                                             </Link>
 
                                                                                             <div className="flex-1 min-w-0">
@@ -474,7 +528,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         prefetch={false}
                                                                                                         className="text-[14px] font-medium text-brand-dark dark:text-dark-heading line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
                                                                                                     >
-                                                                                                        {item.products.name}
+                                                                                                        {getItemName(item)}
                                                                                                     </Link>
                                                                                                     <button
                                                                                                         onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
@@ -558,7 +612,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     prefetch={false}
                                                                                                     className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
                                                                                                 >
-                                                                                                    <img src={getItemImage(item)} alt={item.products.name} className="w-full h-full object-cover" />
+                                                                                                    <img src={getItemImage(item)} alt={getItemName(item)} className="w-full h-full object-cover" />
                                                                                                 </Link>
 
                                                                                                 <div className="flex-1">
@@ -567,7 +621,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         prefetch={false}
                                                                                                         className="text-[16px] font-medium text-brand-dark dark:text-dark-heading mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
                                                                                                     >
-                                                                                                        {item.products.name}
+                                                                                                        {getItemName(item)}
                                                                                                     </Link>
                                                                                                     {item.variant_id && item.product_variants && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text mb-1">

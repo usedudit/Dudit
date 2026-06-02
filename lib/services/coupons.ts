@@ -11,7 +11,7 @@ export type CouponValidationInput = {
   customerId?: string | null
   subtotal: number
   shippingCost?: number
-  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+  items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
   manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
 }
 
@@ -25,6 +25,8 @@ export type CouponValidationResult = {
   pricingCoupon?: PricingCoupon | null
   /** Whether the coupon grants free shipping */
   freeShipping?: boolean
+  /** Some cart lines are not eligible for this coupon */
+  partialApplicabilityWarning?: boolean
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
@@ -46,7 +48,7 @@ export async function validateCouponRow(
     customerId?: string | null
     subtotal: number
     shippingCost?: number
-    items?: Array<{ productId?: string | null; serviceId?: string | null }>
+    items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
     manualDiscount?: { type: "fixed" | "percentage"; value: number } | null
   }
 ): Promise<CouponValidationResult> {
@@ -145,9 +147,11 @@ export async function validateCouponRow(
     }
   }
 
-  // Apply scope (products, categories, services)
+  const items = input.items || []
+  let partialApplicabilityWarning = false
+
+  // Apply scope (products, categories, services, subscriptions)
   if (coupon.apply_scope !== "all") {
-    const items = input.items || []
     if (coupon.apply_scope === "products") {
       const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
       if (productIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para produtos específicos." }
@@ -181,9 +185,31 @@ export async function validateCouponRow(
         .in("service_id", serviceIds)
       if (!links || links.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Nenhum serviço é elegível para este cupom." }
     }
+
+    if (coupon.apply_scope === "subscriptions") {
+      const planIds = Array.from(new Set(items.map((item) => item.recurringPlanId).filter(Boolean))) as string[]
+      if (planIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para assinaturas." }
+      const { data: links } = await supabase
+        .from("coupon_subscriptions")
+        .select("recurring_plan_id")
+        .eq("coupon_id", coupon.id)
+        .in("recurring_plan_id", planIds)
+      if (!links || links.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Nenhuma assinatura é elegível para este cupom." }
+    }
   }
 
-  // Calculate discount amount
+  if (coupon.apply_scope !== "all" && items.length > 0) {
+    const hasIneligible = items.some((item) => {
+      if (coupon.apply_scope === "products") return !item.productId
+      if (coupon.apply_scope === "services") return !item.serviceId
+      if (coupon.apply_scope === "subscriptions") return !item.recurringPlanId
+      if (coupon.apply_scope === "categories") return !item.productId
+      return false
+    })
+    partialApplicabilityWarning = hasIneligible
+  }
+
+  // Calculate discount amount (scoped coupons apply only when at least one eligible line exists)
   let discountAmount = 0
   if (coupon.discount_type === "percentage") {
     discountAmount = safeMoney(subtotal * (Number(coupon.discount_value || 0) / 100))
@@ -216,6 +242,7 @@ export async function validateCouponRow(
     discountAmount,
     pricingCoupon,
     freeShipping: isFreeShipping,
+    partialApplicabilityWarning,
   }
 }
 
@@ -282,7 +309,7 @@ export type AutoCouponInput = {
   customerId?: string | null
   subtotal: number
   shippingCost?: number
-  items?: Array<{ productId?: string | null; serviceId?: string | null }>
+  items?: Array<{ productId?: string | null; serviceId?: string | null; recurringPlanId?: string | null }>
 }
 
 export async function findBestAutomaticCoupon(input: AutoCouponInput, supabaseOverride?: any): Promise<CouponValidationResult> {

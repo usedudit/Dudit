@@ -12,6 +12,10 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { validateCoupon } from "@/lib/services/coupons"
+import {
+  priceMarketplaceCartCheckout,
+  mapOrderItemsForPaymentInsert,
+} from "@/lib/services/marketplace-cart-checkout"
 
 const isDev = process.env.NODE_ENV === "development"
 
@@ -53,6 +57,7 @@ async function handler(request: NextRequest) {
 
     const body: ProcessPaymentRequest = await request.json()
     const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode } = body
+    const normalizedDeliveryType = (deliveryType === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
 
     // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
     if (!paymentFormData?.payment_method_id) {
@@ -103,13 +108,67 @@ async function handler(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // SEGURANÃ‡A: Validar e recalcular preços (NUNCA confiar no frontend)
+    // SEGURANÇA: Validar e recalcular preços (NUNCA confiar no frontend)
     let totalAmount = 0
-    const validatedItems = []
+    let deliveryFee = 0
+    let couponIdToSave: string | null = null
+    let couponDiscountAmount = 0
+    let checkoutFulfillment: Record<string, unknown> | null = null
+    let promotionsApplied: Array<Record<string, unknown>> = []
+    let reserveItems: Array<{ product_id: string; variant_id: string | null; quantity: number }> = []
+    let productIdsForCache: string[] = []
+    let orderItemsForInsert: Record<string, unknown>[] = []
+    const validatedItems: Array<{
+      product_id: string
+      variant_id: string | null
+      product_name: string
+      product_price: number
+      quantity: number
+    }> = []
 
-    if (isDev) console.log("Starting item validation for", items.length, "items")
+    const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
 
-    for (const item of items) {
+    if (useUnifiedCart) {
+      const priced = await priceMarketplaceCartCheckout(adminClient, {
+        userId: buyerId,
+        cartItemIds: cartItemIds!,
+        deliveryType: normalizedDeliveryType,
+        deliveryAddress: deliveryAddress || "",
+        couponCode,
+      })
+
+      if (!priced.success) {
+        return NextResponse.json({ error: priced.error }, { status: 400 })
+      }
+
+      if (priced.data.partnerId !== partnerId) {
+        SecureLogger.error("Cart partner mismatch in process-payment", { partnerId, cartPartner: priced.data.partnerId })
+        return NextResponse.json({ error: "Itens não pertencem a este vendedor" }, { status: 400 })
+      }
+
+      totalAmount = priced.data.totalAmount
+      deliveryFee = priced.data.deliveryFee
+      couponIdToSave = priced.data.couponId
+      couponDiscountAmount = priced.data.couponDiscountAmount
+      checkoutFulfillment = priced.data.fulfillmentPayload as unknown as Record<string, unknown>
+      promotionsApplied = priced.data.promotionsAppliedSnapshot
+      reserveItems = priced.data.reserveItems
+      productIdsForCache = priced.data.productIds
+      orderItemsForInsert = priced.data.orderItems
+
+      for (const row of orderItemsForInsert) {
+        if (!row.product_id) continue
+        validatedItems.push({
+          product_id: row.product_id as string,
+          variant_id: (row.variant_id as string) || null,
+          product_name: String(row.product_name || "Item"),
+          product_price: Number(row.product_price || 0),
+          quantity: Number(row.quantity || 0),
+        })
+      }
+    } else if (isDev) console.log("Starting item validation for", items.length, "items")
+
+    if (!useUnifiedCart) for (const item of items) {
       if (isDev) console.log("Validating item:", item)
 
       // Validar formato do ID
@@ -202,37 +261,49 @@ async function handler(request: NextRequest) {
 
     if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
-    // DELIVERY FEE
-    const deliveryFee = Number(body.deliveryFee || 0)
+    if (!useUnifiedCart) {
+      deliveryFee = Number(body.deliveryFee || 0)
 
-    // SEGURANÇA: Validar cupom se fornecido
-    let couponIdToSave: string | null = null
-    let couponDiscountAmount = 0
+      if (couponCode) {
+        const couponResult = await validateCoupon({
+          partnerId,
+          code: couponCode,
+          customerId: buyerId,
+          subtotal: totalAmount,
+          shippingCost: deliveryFee,
+          items: validatedItems.map(i => ({ productId: i.product_id })),
+        }, adminClient)
 
-    if (couponCode) {
-      const couponResult = await validateCoupon({
-        partnerId,
-        code: couponCode,
-        customerId: buyerId,
-        subtotal: totalAmount,
-        shippingCost: deliveryFee,
-        items: validatedItems.map(i => ({ productId: i.product_id }))
-      }, adminClient)
-
-      if (couponResult.valid) {
-        couponIdToSave = couponResult.couponId || null
-        couponDiscountAmount = couponResult.discountAmount
-        totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
-        if (isDev) console.log("Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
+        if (couponResult.valid) {
+          couponIdToSave = couponResult.couponId || null
+          couponDiscountAmount = couponResult.discountAmount
+          totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
+          if (isDev) console.log("Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
+        }
       }
+
+      if (deliveryFee > 0) {
+        totalAmount += deliveryFee
+        if (isDev) console.log("Delivery fee applied:", deliveryFee, "New total:", totalAmount)
+      }
+
+      orderItemsForInsert = validatedItems.map((item) => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        product_name: item.product_name,
+        product_price: item.product_price,
+        quantity: item.quantity,
+        subtotal: item.product_price * item.quantity,
+      }))
+      reserveItems = validatedItems.map((item) => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+      }))
+      productIdsForCache = [...new Set(validatedItems.map((i) => i.product_id))]
     }
 
-    if (deliveryFee > 0) {
-      totalAmount += deliveryFee
-      if (isDev) console.log("Delivery fee applied:", deliveryFee, "New total:", totalAmount)
-    }
-
-    // SEGURANÃ‡A: Validar que o total é positivo e razoável
+    // SEGURANÇA: Validar que o total é positivo e razoável
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid total amount calculated", { totalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
@@ -329,7 +400,9 @@ async function handler(request: NextRequest) {
     console.log("[MP PAYMENT REQUEST PAYLOAD]:", JSON.stringify(mpPaymentRequest, null, 2))
 
     // SEGURANÃ‡A: Idempotency key determinística (protege contra double-click)
-    const idempotencyKey = generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
+    const idempotencyKey = useUnifiedCart
+      ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
+      : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
 
     // Fazer requisição Ã  API do Mercado Pago
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -466,7 +539,7 @@ async function handler(request: NextRequest) {
         partner_id: partnerId,
         buyer_id: buyerId,
         customer_name: customerName,
-        delivery_type: deliveryType,
+        delivery_type: normalizedDeliveryType,
         delivery_address: deliveryAddress,
         notes: notes,
         total_amount: totalAmount,
@@ -477,6 +550,9 @@ async function handler(request: NextRequest) {
         coupon_id: couponIdToSave,
         discount_amount: couponDiscountAmount,
         delivery_fee: deliveryFee,
+        checkout_fulfillment: checkoutFulfillment,
+        order_source: "Vitrine Online",
+        promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
       })
       .select()
       .single()
@@ -501,16 +577,7 @@ async function handler(request: NextRequest) {
 
     if (isDev) console.log("Order created successfully:", newOrder.id)
 
-    // INSERIR ORDER ITEMS - Preparar dados ANTES do log
-    const itemsWithSubtotal = validatedItems.map(item => ({
-      order_id: newOrder.id,
-      product_id: item.product_id,
-      variant_id: item.variant_id, // âœ… Adicionado
-      product_name: item.product_name,
-      product_price: item.product_price,
-      quantity: item.quantity,
-      subtotal: item.product_price * item.quantity,
-    }))
+    const itemsWithSubtotal = mapOrderItemsForPaymentInsert(newOrder.id, orderItemsForInsert)
 
     const { error: itemsError } = await adminClient.from("order_items").insert(itemsWithSubtotal)
 
@@ -519,16 +586,14 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Erro ao criar itens do pedido" }, { status: 500 })
     }
 
-    const reserveResult = await reserveOrderInventory({
-      client: adminClient,
-      partnerId,
-      orderId: newOrder.id,
-      items: validatedItems.map((item) => ({
-        product_id: item.product_id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-      })),
-    })
+    const reserveResult = reserveItems.length > 0
+      ? await reserveOrderInventory({
+          client: adminClient,
+          partnerId,
+          orderId: newOrder.id,
+          items: reserveItems,
+        })
+      : { success: true as const }
 
     if ("error" in reserveResult) {
       await adminClient.from("order_items").delete().eq("order_id", newOrder.id)
@@ -558,13 +623,15 @@ async function handler(request: NextRequest) {
 
         // Increment partner's total sales count
         await adminClient.rpc('increment_partner_sales', { partner_uuid: partnerId })
+
+        const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
+        await fulfillMarketplaceOrder(adminClient, newOrder.id)
       } catch (txErr: any) {
         console.error("Erro ao criar transaction ou incrementar vendas:", txErr.message)
       }
     }
 
-    // 3. Revalidar cache dos produtos (para atualizar UI com estoque correto)
-    const uniqueProductIds = [...new Set(validatedItems.map(i => i.product_id))]
+    const uniqueProductIds = [...new Set(productIdsForCache)]
     for (const pid of uniqueProductIds) {
       await invalidateProductCache(pid, partnerId, "update", { silent: true })
       revalidateProducts(partnerId, pid)

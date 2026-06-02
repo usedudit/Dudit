@@ -36,6 +36,7 @@ import { PricingPromotion, PromotionType, DiscountType, ApplyScope } from "@/lib
 export type PricingItem = {
   productId?: string | null
   serviceId?: string | null
+  recurringPlanId?: string | null
   unitPrice: number
   quantity: number
   /** Product-level promotional price (used instead of unitPrice when lower) */
@@ -129,7 +130,8 @@ function isItemInScope(
   applyScope: ApplyScope,
   applicableProductIds?: string[] | null,
   applicableCategoryIds?: string[] | null,
-  applicableServiceIds?: string[] | null
+  applicableServiceIds?: string[] | null,
+  applicableSubscriptionIds?: string[] | null,
 ): boolean {
   if (applyScope === ApplyScope.ENTIRE_CART) {
     return true
@@ -143,12 +145,16 @@ function isItemInScope(
   if (applyScope === ApplyScope.SPECIFIC_SERVICES) {
     return Boolean(item.serviceId && applicableServiceIds?.includes(item.serviceId))
   }
+  if (applyScope === ApplyScope.SPECIFIC_SUBSCRIPTIONS) {
+    return Boolean(item.recurringPlanId && applicableSubscriptionIds?.includes(item.recurringPlanId))
+  }
   return false
 }
 
 interface CartUnit {
   productId?: string | null
   serviceId?: string | null
+  recurringPlanId?: string | null
   categoryId?: string | null
   originalPrice: number
   currentPrice: number
@@ -184,6 +190,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
       units.push({
         productId: item.productId || null,
         serviceId: item.serviceId || null,
+        recurringPlanId: item.recurringPlanId || null,
         categoryId: item.categoryId || null,
         originalPrice: effective,
         currentPrice: effective,
@@ -214,7 +221,14 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
     // Filter units in scope
     const eligibleUnits = units.filter((u) =>
-      isItemInScope(u, promo.applyScope, promo.applicableProductIds, promo.applicableCategoryIds, promo.applicableServiceIds)
+      isItemInScope(
+        u,
+        promo.applyScope,
+        promo.applicableProductIds,
+        promo.applicableCategoryIds,
+        promo.applicableServiceIds,
+        promo.applicableSubscriptionIds,
+      )
     )
 
     if (eligibleUnits.length === 0) {

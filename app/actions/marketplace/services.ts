@@ -340,6 +340,8 @@ export async function createPublicAppointment(data: {
         notes: data.notes || null,
         status: "Reservado",
         source: "appointment",
+        sales_channel: "online_storefront",
+        payment_status: data.price > 0.009 ? "unpaid" : "paid",
       })
       .select("id")
       .single()

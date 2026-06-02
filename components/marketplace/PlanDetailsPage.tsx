@@ -13,7 +13,8 @@ import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
-import { subscribeToRecurringPlanAction } from "@/app/actions/marketplace/recurring-subscriptions"
+import { addSubscriptionToCartAction } from "@/app/actions/marketplace/cart-extensions"
+import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 
 interface PlanDetailsPageClientProps {
@@ -191,16 +192,38 @@ export function PlanDetailsPageClient({
         setSubmitting(true)
         try {
             const addressString = selectedAddress ? buildAddressString(selectedAddress) : null
-            const result = await subscribeToRecurringPlanAction({
+            const { token } = await (await fetch("/api/csrf-token")).json()
+            const result = await addSubscriptionToCartAction({
+                recurringPlanId: plan.id,
                 partnerId: partner.id,
-                planId: plan.id,
-                deliveryType,
-                deliveryAddress: deliveryType === "delivery" ? addressString : null,
+                csrf_token: token,
             })
 
             if (result.success) {
-                notifySuccess("Inscrição realizada!", "Sua assinatura foi criada com sucesso.")
-                router.push("/assinaturas")
+                invalidateCartCache()
+                const checkoutData = {
+                    source: "cart",
+                    partnerId: partner.id,
+                    products: [{
+                        id: plan.id,
+                        name: plan.name,
+                        price: planTotal,
+                        quantity: 1,
+                    }],
+                    partnerInfo: {
+                        address: partner.addresses?.[0] || {},
+                        paymentMethods: [],
+                        mpConnected: !!partner.mp_user_id,
+                        mpPublicKey: partner.mp_public_key,
+                        store_name: partner.store_name,
+                    },
+                    cartItems: result.cartItemId
+                        ? [{ cartItemId: result.cartItemId, productId: plan.id, quantity: 1 }]
+                        : [],
+                    deliverySettings: null,
+                }
+                sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
+                router.push("/checkout")
             } else {
                 notifyError(result.error || "Ocorreu um erro ao assinar o plano.")
             }
@@ -220,6 +243,14 @@ export function PlanDetailsPageClient({
         if (type === "monthly") return interval === 1 ? "mensal" : `a cada ${interval} meses`
         if (type === "yearly") return interval === 1 ? "anual" : `a cada ${interval} anos`
         return "recorrente"
+    }, [plan])
+
+    const planTotal = useMemo(() => {
+        const items = plan.items || []
+        return items.reduce(
+            (sum: number, item: any) => sum + Number(item.unit_price || 0) * Number(item.quantity || 1),
+            0,
+        )
     }, [plan])
 
     const planPrice = Number(plan.price || 0)

@@ -29,7 +29,7 @@ import { ServiceMarketplaceTab } from "./ServiceMarketplaceTab"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 
 const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes"])
-const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service"])
+const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "scheduling_enabled"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
