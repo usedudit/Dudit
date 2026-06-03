@@ -769,7 +769,7 @@ export const SubscriptionSubPage = ({ onBack }: { onBack: () => void }) => {
                 <Button
                     variant="outline"
                     onClick={handleBack}
-                    className="flex-1 h-[48px] font-bold"
+                    className="flex-1 h-12 font-bold"
                 >
                     Voltar
                 </Button>

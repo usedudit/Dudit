@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -53,6 +53,7 @@ export default function DeliveriesPage({
 }) {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const pathname = usePathname()
     const { openPlanUpgrade } = usePlanUpgrade()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -91,7 +92,7 @@ export default function DeliveriesPage({
             params.delete("create")
             params.delete("view")
         }
-        router.push(`?${params.toString()}`, { scroll: false })
+        router.push(`${pathname}?${params.toString()}`, { scroll: false })
     }, [router, searchParams])
 
     const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({})

@@ -21,7 +21,25 @@ export async function GET(request: NextRequest) {
       throw new Error("CEP não encontrado na Nuvem Fiscal")
     }
 
-    return NextResponse.json(data, {
+    // Parse logradouro to extract number
+    let cleanLogradouro = data.logradouro || ""
+    let parsedNumber = ""
+    const commaIndex = cleanLogradouro.lastIndexOf(",")
+    if (commaIndex !== -1) {
+      const afterComma = cleanLogradouro.substring(commaIndex + 1).trim()
+      if (/^(\d+|s\/n)/i.test(afterComma)) {
+        cleanLogradouro = cleanLogradouro.substring(0, commaIndex).trim()
+        parsedNumber = afterComma.split(" - ")[0].trim()
+      }
+    }
+
+    const responseData = {
+      ...data,
+      logradouro: cleanLogradouro,
+      numero: parsedNumber,
+    }
+
+    return NextResponse.json(responseData, {
       headers: {
         "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=43200",
       },
@@ -46,9 +64,21 @@ export async function GET(request: NextRequest) {
       }
 
       // Mapear dados do ViaCEP para o formato esperado pela aplicação
+      let cleanLogradouro = viaCepData.logradouro || ""
+      let parsedNumber = ""
+      const commaIndex = cleanLogradouro.lastIndexOf(",")
+      if (commaIndex !== -1) {
+        const afterComma = cleanLogradouro.substring(commaIndex + 1).trim()
+        if (/^(\d+|s\/n)/i.test(afterComma)) {
+          cleanLogradouro = cleanLogradouro.substring(0, commaIndex).trim()
+          parsedNumber = afterComma.split(" - ")[0].trim()
+        }
+      }
+
       const mappedData = {
         cep: viaCepData.cep,
-        logradouro: viaCepData.logradouro,
+        logradouro: cleanLogradouro,
+        numero: parsedNumber,
         complemento: viaCepData.complemento || "",
         bairro: viaCepData.bairro,
         localidade: viaCepData.localidade,

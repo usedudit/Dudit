@@ -161,12 +161,21 @@ export async function createRecurringPlanAction(input: {
   endDate?: string | null
   showInMarketplace?: boolean
   items: RecurringPlanItem[]
+  images?: string[] | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePartnerAccessWithPermission(input.partnerId, "recurring_plans", "manage")
+    
+    // Check images limit
+    const { checkLimit, increment_usage_counter } = await import("@/lib/services/subscription.service")
+    const imagesLimitCheck = await checkLimit(input.partnerId, "images_per_item", (input.images?.length || 0))
+    if (!imagesLimitCheck.allowed) {
+      return { success: false, error: imagesLimitCheck.message || "Limite de imagens por item atingido." }
+    }
+
     const { name, interval } = validatePlanInput(input)
     const supabase = await getSupabaseServerClient()
 
@@ -187,6 +196,7 @@ export async function createRecurringPlanAction(input: {
         start_date: input.startDate,
         end_date: input.endDate || null,
         show_in_marketplace: input.showInMarketplace !== false,
+        images: input.images || [],
       })
       .select("*")
       .single()
@@ -198,6 +208,10 @@ export async function createRecurringPlanAction(input: {
     if (itemsError) {
       await supabase.from("recurring_plans").delete().eq("id", plan.id)
       throw itemsError
+    }
+
+    if (input.images && input.images.length > 0) {
+      increment_usage_counter(input.partnerId, "images_count", input.images.length).catch(console.error)
     }
 
     await logAuditEvent({
@@ -216,6 +230,17 @@ export async function createRecurringPlanAction(input: {
   }
 }
 
+const _deleteFromR2 = async (url: string) => {
+  if (!url || !url.trim()) return;
+  try {
+    const { extractKeyFromR2Url, deleteFileFromR2 } = await import("@/lib/r2/server");
+    const key = url.startsWith('http') ? extractKeyFromR2Url(url) : url;
+    if (key) await deleteFileFromR2(key);
+  } catch (e) {
+    console.error("Failed to delete image: ", url, e);
+  }
+};
+
 export async function updateRecurringPlanAction(input: {
   partnerId: string
   planId: string
@@ -233,13 +258,32 @@ export async function updateRecurringPlanAction(input: {
   endDate?: string | null
   showInMarketplace?: boolean
   items?: RecurringPlanItem[]
+  images?: string[] | null
 }) {
   try {
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
     await requirePartnerAccessWithPermission(input.partnerId, "recurring_plans", "manage")
+    
+    // Check images limit
+    const { checkLimit, increment_usage_counter, decrement_usage_counter } = await import("@/lib/services/subscription.service")
+    if (input.images !== undefined && input.images !== null) {
+      const imagesLimitCheck = await checkLimit(input.partnerId, "images_per_item", input.images.length)
+      if (!imagesLimitCheck.allowed) {
+        return { success: false, error: imagesLimitCheck.message || "Limite de imagens por item atingido." }
+      }
+    }
+
     const supabase = await getSupabaseServerClient()
+
+    // Get old plan for images comparison
+    const { data: oldPlan } = await supabase
+      .from("recurring_plans")
+      .select("images")
+      .eq("id", input.planId)
+      .eq("partner_id", input.partnerId)
+      .maybeSingle()
 
     const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (input.name != null) updatePayload.name = String(input.name).trim()
@@ -255,6 +299,7 @@ export async function updateRecurringPlanAction(input: {
     if (input.startDate) updatePayload.start_date = input.startDate
     if (input.endDate !== undefined) updatePayload.end_date = input.endDate
     if (input.showInMarketplace !== undefined) updatePayload.show_in_marketplace = input.showInMarketplace
+    if (input.images !== undefined) updatePayload.images = input.images
 
     const { data: plan, error } = await supabase
       .from("recurring_plans")
@@ -277,6 +322,24 @@ export async function updateRecurringPlanAction(input: {
       const itemsPayload = mapItemsToDb(input.items).map((item) => ({ ...item, plan_id: input.planId }))
       const { error: itemsError } = await supabase.from("recurring_plan_items").insert(itemsPayload)
       if (itemsError) throw itemsError
+    }
+
+    // Process image changes
+    if (oldPlan && input.images !== undefined) {
+      const oldImages = Array.isArray(oldPlan.images) ? oldPlan.images.filter((img: any) => typeof img === 'string' && img.trim()) : []
+      const newImages = input.images || []
+      const deletedImages = oldImages.filter((img: string) => !newImages.includes(img))
+      const addedImages = newImages.filter((img: string) => !oldImages.includes(img))
+
+      if (deletedImages.length > 0) {
+        Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
+        decrement_usage_counter(input.partnerId, "images_count", deletedImages.length).catch(console.error)
+      }
+      if (addedImages.length > 0) {
+        increment_usage_counter(input.partnerId, "images_count", addedImages.length).catch(console.error)
+      }
+    } else if (input.images && input.images.length > 0) {
+      increment_usage_counter(input.partnerId, "images_count", input.images.length).catch(console.error)
     }
 
     await logAuditEvent({

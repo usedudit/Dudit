@@ -93,7 +93,7 @@ export const AppointmentSheet = ({
     const [serviceToDeleteIndex, setServiceToDeleteIndex] = useState<number | null>(null);
     const [isUnsavedModalOpen, setIsUnsavedModalOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
-    
+
     // Inline Client Selection and Overlay Editing states
     const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
     const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -115,7 +115,7 @@ export const AppointmentSheet = ({
         const dName = DAYS_OF_WEEK[dateObj.getDay()];
         const dConfig = openingHours[dName];
         if (!dConfig || !dConfig.enabled) return true;
-        
+
         const parseTimeToMinutes = (timeStr: string) => {
             if (!timeStr || !timeStr.includes(':')) return -1;
             const [h, m] = timeStr.split(':').map(Number);
@@ -124,10 +124,10 @@ export const AppointmentSheet = ({
 
         const fromMin = parseTimeToMinutes(dConfig.from);
         const toMin = parseTimeToMinutes(dConfig.to);
-        
+
         const aptStartMin = parseTimeToMinutes(aptTimeStr);
         const aptEndMin = aptStartMin + durationMinutes;
-        
+
         return aptStartMin < fromMin || aptEndMin > toMin;
     };
 
@@ -203,10 +203,10 @@ export const AppointmentSheet = ({
             const hasServicesChanged = initialServiceNames !== currentServiceNames;
 
             const hasClientChanged = (selectedClient?.name || '') !== appointment.customer;
-            
+
             const currentDateStr = formatDateStr(selectedCalDate);
             const hasDateChanged = currentDateStr !== appointment.date;
-            
+
             const currentTimeStr = editTime || selectedTimeSlot || appointment.time;
             const hasTimeChanged = currentTimeStr !== appointment.time;
 
@@ -906,7 +906,7 @@ export const AppointmentSheet = ({
             shippingCost: 0,
             additionalCosts: 0,
             totalAmount: calculatedPrice,
-            notes: notes ? `Agendamento \u2022 ${notes}` : 'Agendamento',
+            notes: notes || undefined,
             csrf_token: csrfToken || undefined,
             paymentProvider: paymentData.paymentProvider || undefined,
             mpPaymentId: paymentData.mpPaymentId || undefined,
@@ -1086,7 +1086,7 @@ export const AppointmentSheet = ({
                 setNewCustomerName('');
                 setNewCustomerEmail('');
                 setNewCustomerPhone('');
-                
+
                 if (cameFromSummary) {
                     setCurrentView('summary');
                     setCameFromSummary(false);
@@ -1434,9 +1434,8 @@ export const AppointmentSheet = ({
                                                         setCurrentView('datetime');
                                                     }
                                                 }}
-                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                                                    isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
-                                                }`}
+                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
+                                                    }`}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />
@@ -1705,14 +1704,14 @@ export const AppointmentSheet = ({
                             <div className="flex gap-3">
                                 <Button
                                     variant="outline"
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                     onClick={handleBack}
                                 >
                                     {currentView === 'services' ? 'Cancelar' : 'Voltar'}
                                 </Button>
                                 <Button
                                     variant="default"
-                                    className={`flex-1 h-[48px] ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`flex-1 h-12 ${currentView === 'services' && selectedServices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={
                                         currentView === 'edit-service' ? () => setCurrentView('summary') : handleNext
                                     }
@@ -1749,7 +1748,7 @@ export const AppointmentSheet = ({
                                                 width="w-56"
                                                 align="left"
                                                 trigger={
-                                                    <Button variant="outline" className="px-3 h-[48px] shrink-0" type="button">
+                                                    <Button variant="outline" className="px-3 h-12 shrink-0" type="button">
                                                         <MoreHorizontal size={18} />
                                                     </Button>
                                                 }
@@ -1764,15 +1763,15 @@ export const AppointmentSheet = ({
 
                                             {hasChanges ? (
                                                 <>
-                                                    <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
+                                                    <Button variant="outline" className="flex-1 font-bold h-12" onClick={handleViewSale}>
                                                         Ver venda
                                                     </Button>
-                                                    <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                                    <Button variant="default" className="flex-1 font-bold h-12" onClick={handleSaveChanges}>
                                                         Salvar
                                                     </Button>
                                                 </>
                                             ) : (
-                                                <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleViewSale}>
+                                                <Button variant="default" className="flex-1 font-bold h-12" onClick={handleViewSale}>
                                                     Ver venda
                                                 </Button>
                                             )}
@@ -1786,7 +1785,7 @@ export const AppointmentSheet = ({
                                             width="w-56"
                                             align="left"
                                             trigger={
-                                                <Button variant="outline" className="px-3 h-[48px] shrink-0" type="button">
+                                                <Button variant="outline" className="px-3 h-12 shrink-0" type="button">
                                                     <MoreHorizontal size={18} />
                                                 </Button>
                                             }
@@ -1819,15 +1818,15 @@ export const AppointmentSheet = ({
 
                                         {hasChanges ? (
                                             <>
-                                                <Button variant="outline" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                                <Button variant="outline" className="flex-1 font-bold h-12" onClick={() => setIsPaymentSheetOpen(true)}>
                                                     Checkout
                                                 </Button>
-                                                <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={handleSaveChanges}>
+                                                <Button variant="default" className="flex-1 font-bold h-12" onClick={handleSaveChanges}>
                                                     Salvar
                                                 </Button>
                                             </>
                                         ) : (
-                                            <Button variant="default" className="flex-1 font-bold h-[48px]" onClick={() => setIsPaymentSheetOpen(true)}>
+                                            <Button variant="default" className="flex-1 font-bold h-12" onClick={() => setIsPaymentSheetOpen(true)}>
                                                 Checkout
                                             </Button>
                                         )}
@@ -2124,17 +2123,17 @@ export const AppointmentSheet = ({
                         />
                     </div>
                     <Button
-                         variant="outline"
-                         onClick={() => {
-                             setNewCustomerName("");
-                             setNewCustomerEmail("");
-                             setNewCustomerPhone("");
-                             setIsNewClientOpen(true);
-                         }}
-                         className="h-11 px-3 shrink-0 rounded-xl"
-                         type="button"
+                        variant="outline"
+                        onClick={() => {
+                            setNewCustomerName("");
+                            setNewCustomerEmail("");
+                            setNewCustomerPhone("");
+                            setIsNewClientOpen(true);
+                        }}
+                        className="h-11 px-3 shrink-0 rounded-xl"
+                        type="button"
                     >
-                         <PlusIcon size={16} /> Novo
+                        <PlusIcon size={16} /> Novo
                     </Button>
                 </div>
 
@@ -2153,9 +2152,8 @@ export const AppointmentSheet = ({
                                         setSelectedClient(client);
                                         setIsClientOverlayOpen(false);
                                     }}
-                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                                        isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
-                                    }`}
+                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-brand-green bg-green-50/5' : 'border-brand-border dark:border-dark-border hover:border-gray-300 dark:hover:border-gray-600'
+                                        }`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <UserProfileImage fullName={client.name || "Cliente"} imageUrl={client.avatar_url || client.avatar} className="w-8 h-8 shrink-0 text-[10px]" />

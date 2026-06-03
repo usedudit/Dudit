@@ -226,6 +226,8 @@ export const AddressView = ({
           setForm(f => ({
             ...f,
             street: addr.street || f.street,
+            number: addr.number || f.number,
+            noNumber: addr.number ? addr.number === "S/N" : f.noNumber,
             neighborhood: addr.neighborhood || f.neighborhood,
             city: addr.city || f.city,
             state: addr.state || f.state,

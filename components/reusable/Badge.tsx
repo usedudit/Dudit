@@ -53,48 +53,49 @@ const defaultIconStyles: Partial<Record<BadgeVariant, string>> = {
     gray: "text-brand-inactive-text dark:text-dark-body",
 }
 
-export const Badge: React.FC<BadgeProps> = ({
-    variant,
-    children,
-    icon,
-    className = "",
-}) => {
-    const DefaultIconComponent = defaultIcons[variant]
-    const hasDefaultIcon = !!DefaultIconComponent
+export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
+    ({ variant, children, icon, className = "", ...props }, ref) => {
+        const DefaultIconComponent = defaultIcons[variant]
+        const hasDefaultIcon = !!DefaultIconComponent
 
-    const hasChildren = React.Children.count(children) > 0
-    const paddingClass = hasChildren
-        ? "px-2.5 py-1"
-        : "p-1.5 w-6 h-6 justify-center"
+        const hasChildren = React.Children.count(children) > 0
+        const paddingClass = hasChildren
+            ? "px-2.5 py-1"
+            : "p-1.5 w-6 h-6 justify-center"
 
-    const iconBaseClass = `w-3 h-3 ${defaultIconStyles[variant] ?? ""}`
+        const iconBaseClass = `w-3 h-3 ${defaultIconStyles[variant] ?? ""}`
 
-    const renderIcon = () => {
-        if (icon === null) return null
+        const renderIcon = () => {
+            if (icon === null) return null
 
-        if (icon) {
-            if (React.isValidElement(icon)) {
-                return React.cloneElement(icon, {
-                    className: `${iconBaseClass} ${icon.props.className ?? ""}`,
-                })
+            if (icon) {
+                if (React.isValidElement(icon)) {
+                    return React.cloneElement(icon, {
+                        className: `${iconBaseClass} ${icon.props.className ?? ""}`,
+                    })
+                }
+                return icon
             }
-            return icon
+
+            // 👉 fallback pro default
+            if (hasDefaultIcon && DefaultIconComponent) {
+                return <DefaultIconComponent className={iconBaseClass} />
+            }
+
+            return null
         }
 
-        // 👉 fallback pro default
-        if (hasDefaultIcon && DefaultIconComponent) {
-            return <DefaultIconComponent className={iconBaseClass} />
-        }
-
-        return null
+        return (
+            <span
+                ref={ref}
+                className={`inline-flex items-center gap-1.5 ${paddingClass} rounded-full text-[11px] font-bold border ${variantStyles[variant]} ${className}`}
+                {...props}
+            >
+                {renderIcon()}
+                {children}
+            </span>
+        )
     }
+)
 
-    return (
-        <span
-            className={`inline-flex items-center gap-1.5 ${paddingClass} rounded-full text-[11px] font-bold border ${variantStyles[variant]} ${className}`}
-        >
-            {renderIcon()}
-            {children}
-        </span>
-    )
-}
+Badge.displayName = "Badge"

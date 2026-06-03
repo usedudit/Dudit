@@ -293,14 +293,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
                     variant="outline"
-                    className="flex-1 h-[48px]"
+                    className="flex-1 h-12"
                     onClick={() => setIsUndoModalOpen(true)}
                 >
                     <RotateIcon className="w-4 h-4 mr-2" />
                     Desfazer
                 </Button>
                 <Button
-                    className="flex-1 h-[48px]"
+                    className="flex-1 h-12"
                 >
                     <DownloadIcon className="w-4 h-4 mr-2" />
                     PDF

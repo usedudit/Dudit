@@ -278,10 +278,10 @@ export const ShowcaseSubPage = ({
 
                     {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                             {/* Back button - desktop only */}
-                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                 <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                 </Button>
@@ -456,7 +456,7 @@ export const ShowcaseSubPage = ({
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <Button
                     onClick={handleSubmit}
-                    className="flex-1 h-[48px]"
+                    className="flex-1 h-12"
                     disabled={isLoading}
                     isLoading={isLoading}
                     leftIcon={<SaveIcon size={18} />}

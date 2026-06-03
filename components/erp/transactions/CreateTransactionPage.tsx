@@ -1907,10 +1907,10 @@ export default function CreateTransactionPage({
                     </div>
 
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-                        <Button variant="outline" onClick={requestClose} disabled={isSaving} className="flex-1 h-[48px]">
+                        <Button variant="outline" onClick={requestClose} disabled={isSaving} className="flex-1 h-12">
                             Cancelar
                         </Button>
-                        <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-[48px]">
+                        <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-12">
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : isEditMode ? "Salvar alterações" : "Salvar lançamento"}
                         </Button>

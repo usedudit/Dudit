@@ -340,7 +340,8 @@ export async function createOrderAction(data: {
       name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
       email: user.email,
       phone: buyerProfile?.phone || null,
-      cpf: null
+      cpf: null,
+      userId: buyerId,
     })
   } catch (e) {
     console.error("Error ensuring marketplace customer in createOrderAction:", e)

@@ -761,13 +761,13 @@ const AppointmentsPage = ({
                                             </Button>
                                         }
                                     >
-                                        <DropdownItem 
+                                        <DropdownItem
                                             className="gap-2 text-brand-dark dark:text-dark-heading"
                                             onClick={() => handleOpenUnavailable()}
                                         >
                                             <CalendarOff size={16} /> Horário indisponível
                                         </DropdownItem>
-                                        <DropdownItem 
+                                        <DropdownItem
                                             className="gap-2 text-brand-dark dark:text-dark-heading"
                                             onClick={() => {
                                                 setCurrentDate(new Date());
@@ -892,7 +892,7 @@ const AppointmentsPage = ({
                                                     <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                                         <thead>
                                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                                                <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                                                                     <Checkbox
                                                                         checked={paginatedAppointments.length > 0 && paginatedAppointments.every((appointment) => selectedIds.has(appointment.id))}
                                                                         onChange={(checked: boolean) => {

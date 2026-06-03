@@ -75,14 +75,22 @@ export function ServiceCheckoutSettingsSubPage({
 
         {!depositFeatureAllowed && (
           <InfoCard
-            variant="warning"
+            color="orange"
             title="Recurso do plano Crescer ou Escalar"
-            description="Atualize seu plano para permitir pagamento de entrada em agendamentos."
-            action={{
-              label: "Ver planos",
-              onClick: () => openPlanUpgrade("crescer"),
-              icon: planStarIconForTarget("crescer"),
-            }}
+            message={
+              <div className="flex flex-col gap-2">
+                <span>Atualize seu plano para permitir pagamento de entrada em agendamentos.</span>
+                <div>
+                  <Button
+                    size="sm"
+                    onClick={() => openPlanUpgrade("crescer")}
+                    className="mt-1"
+                  >
+                    Ver planos
+                  </Button>
+                </div>
+              </div>
+            }
           />
         )}
 

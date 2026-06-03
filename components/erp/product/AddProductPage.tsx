@@ -876,14 +876,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     variant="outline"
                                     onClick={handleCancelEdit}
                                     disabled={isSavingProduct || isLoadingDetails}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={handleSaveProduct}
                                     disabled={isSavingProduct || isLoadingDetails}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                     leftIcon={<SaveIcon size={18} />}
                                 >
                                     {isSavingProduct ? "Salvando..." : "Salvar"}
@@ -898,7 +898,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     trigger={
                                         <Button
                                             variant="outline"
-                                            className="flex-1 h-[48px]"
+                                            className="flex-1 h-12"
                                             disabled={isLoadingDetails}
                                             leftIcon={<ThreeDotsIcon size={18} />}
                                         >
@@ -908,7 +908,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 />
                                 <Button
                                     onClick={enterEditMode}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                     disabled={isLoadingDetails}
                                     leftIcon={<EditIcon size={18} />}
                                 >

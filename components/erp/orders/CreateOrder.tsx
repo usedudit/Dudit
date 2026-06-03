@@ -95,6 +95,99 @@ function formatCurrentLocalTime(date = new Date()) {
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
+export function parseAddressString(addressStr: string) {
+    if (!addressStr) return null;
+
+    let zipCode = "";
+    const zipMatch = addressStr.match(/\d{5}-?\d{3}/);
+    if (zipMatch) {
+        zipCode = zipMatch[0];
+        addressStr = addressStr.replace(zipCode, "");
+    }
+
+    // clean up separators at ends
+    addressStr = addressStr.trim().replace(/(^[,\-\s]+)|([,\-\s]+$)/g, "");
+
+    const parts = addressStr.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+
+    const street = parts[0] || "";
+    let number = "";
+    let complement = "";
+    let neighborhood = "";
+    let city = "";
+    let state = "SP";
+
+    // Identify city - state (usually the last part of parts)
+    let cityStateIndex = -1;
+    for (let i = parts.length - 1; i >= 1; i--) {
+        if (parts[i].includes("-")) {
+            const dashParts = parts[i].split("-").map(p => p.trim());
+            // Check if second part looks like a state (2 letters)
+            if (dashParts[dashParts.length - 1].length === 2) {
+                state = dashParts[dashParts.length - 1].toUpperCase();
+                city = dashParts.slice(0, -1).join("-").trim();
+                cityStateIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (cityStateIndex === -1 && parts.length >= 2) {
+        city = parts[parts.length - 1];
+        cityStateIndex = parts.length - 1;
+    }
+
+    const middleParts = parts.slice(1, cityStateIndex > -1 ? cityStateIndex : undefined);
+
+    if (middleParts.length === 1) {
+        const part = middleParts[0];
+        const parenMatch = part.match(/\(([^)]+)\)/);
+        if (parenMatch) {
+            complement = parenMatch[1].trim();
+            number = part.replace(/\([^)]+\)/, "").trim();
+        } else if (part.includes("-")) {
+            const dashParts = part.split("-").map(p => p.trim());
+            number = dashParts[0];
+            neighborhood = dashParts.slice(1).join("-").trim();
+        } else {
+            number = part;
+        }
+    } else if (middleParts.length >= 2) {
+        const numPart = middleParts[0];
+        const parenMatch = numPart.match(/\(([^)]+)\)/);
+        if (parenMatch) {
+            complement = parenMatch[1].trim();
+            number = numPart.replace(/\([^)]+\)/, "").trim();
+        } else {
+            number = numPart;
+        }
+
+        const neighborhoodPart = middleParts[1];
+        if (neighborhoodPart.includes("-")) {
+            const dashParts = neighborhoodPart.split("-").map(p => p.trim());
+            if (!complement) {
+                complement = dashParts[0];
+                neighborhood = dashParts.slice(1).join("-").trim();
+            } else {
+                neighborhood = neighborhoodPart;
+            }
+        } else {
+            neighborhood = neighborhoodPart;
+        }
+    }
+
+    return {
+        street,
+        number,
+        complement,
+        neighborhood,
+        city,
+        state,
+        zipCode
+    };
+}
+
 function normalizeCustomerForCard(customer: any) {
     if (!customer) return null
 
@@ -415,13 +508,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 }
 
                 if (order.delivery_address) {
-                    // try to parse if possible, or just dump to street, but complex logic can be brittle.
-                    // string format: "street, number (complement), neighborhood, city - state, zipcode"
-                    // we'll leave it empty for forms right now as splitting perfectly is hard and might overwrite
-                    const addressParts = order.delivery_address.split(',')
-                    if (addressParts.length >= 4) {
-                        setStreet(addressParts[0].trim())
-                        // rudimentary extraction just so fields aren't completely blank
+                    const parsed = parseAddressString(order.delivery_address)
+                    if (parsed) {
+                        setCep(parsed.zipCode || "")
+                        setStreet(parsed.street || "")
+                        setNumber(parsed.number || "")
+                        setComplement(parsed.complement || "")
+                        setNeighborhood(parsed.neighborhood || "")
+                        setCity(parsed.city || "")
+                        setUf(parsed.state || "SP")
+                        setNoNumber(parsed.number === "S/N")
                     }
                 }
             } else {
@@ -1236,20 +1332,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             {isPaidOrder && (
-                                <div className="mb-6 p-4 rounded-2xl border transition-all duration-300 shadow-sm flex flex-col md:flex-row md:items-center gap-4 bg-brand-light-gray dark:bg-dark-border/10 border-brand-border dark:border-dark-border">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
-                                            <span className="text-xl font-bold text-amber-600 dark:text-amber-400">!</span>
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                Edição Restrita (Pedido Pago)
-                                            </h4>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 leading-relaxed">
-                                                Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas dados de entrega, observações e status de expedição podem ser atualizados.
-                                            </p>
-                                        </div>
-                                    </div>
+                                <div className="mb-6 flex flex-col md:flex-row md:items-center">
+                                    <InfoCard color="orange" title="Edição Restrita (Pedido Pago)" message="Como o pedido já está pago, não é possível editar itens, valores, cliente ou formas de pagamento. Apenas observações podem ser atualizadas." />
                                 </div>
                             )}
                             <TabsContent value="general" className="mt-0">
@@ -1334,6 +1418,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             isMarketplaceOrder={isMarketplaceOrder}
                                             isMarketplaceLocked={isMarketplaceLocked}
                                             isPaidOrder={isPaidOrder}
+                                            originalPaymentMethod={originalPaymentMethod}
+                                            originalPaymentBreakdown={originalPaymentBreakdown}
+                                            originalPaidAmount={originalPaidAmount}
                                             role={role}
                                         />
                                     </div>

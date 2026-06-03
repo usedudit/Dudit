@@ -76,22 +76,22 @@ export function TopCategories({ categoriesData }: { categoriesData: any[] }) {
       <div className="h-[250px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-            <XAxis 
-              dataKey="name" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body', fontSize: 12, fontWeight: 600 }} 
-              dy={10} 
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body', fontSize: 12, fontWeight: 600 }}
+              dy={10}
             />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body', fontSize: 12, fontWeight: 600 }} 
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body', fontSize: 12, fontWeight: 600 }}
               dx={-10}
             />
-            <Tooltip 
+            <Tooltip
               content={<CustomTooltip />}
-              cursor={{fill: 'var(--color-brand-green-light)', opacity: 0.1}}
+              cursor={{ fill: 'var(--color-brand-green-light)', opacity: 0.1 }}
             />
             <Bar dataKey="amount" fill="var(--color-brand-dark)" radius={[6, 6, 6, 6]} barSize={32} />
           </BarChart>
@@ -130,62 +130,99 @@ export function RecentActivities({ activities }: { activities: any[] }) {
     );
   }
 
-  const items = activities.map(item => {
-    const Icon = activityIconMap[item.icon] || AlertCircleIcon;
-    return {
-      id: item.id,
-      time: item.time + (item.user ? ` · ${item.user}` : ""),
-      text: `${item.title}${item.description ? `: ${item.description}` : ""}`,
-      icon: Icon
-    };
-  });
+  // Sort and slice to max 6 activities
+  const sortedActivities = [...activities].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  const limitedActivities = sortedActivities.slice(0, 6);
 
-  const activitiesGroups = [
-    {
-      title: "Atividades do Sistema",
-      items
+  const groups: Record<string, any[]> = {};
+  for (const item of limitedActivities) {
+    if (!item.date) continue;
+    const d = new Date(item.date);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const ymd = `${y}-${m}-${day}`;
+    if (!groups[ymd]) {
+      groups[ymd] = [];
     }
-  ];
+    groups[ymd].push(item);
+  }
+
+  const dNow = new Date();
+  const today = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, "0")}-${String(dNow.getDate()).padStart(2, "0")}`;
+  const yest = new Date();
+  yest.setDate(yest.getDate() - 1);
+  const yesterday = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, "0")}-${String(yest.getDate()).padStart(2, "0")}`;
+
+  const activitiesGroups = Object.keys(groups)
+    .sort((a, b) => b.localeCompare(a))
+    .map(ymd => {
+      let title = "";
+      if (ymd === today) {
+        title = "Hoje";
+      } else if (ymd === yesterday) {
+        title = "Ontem";
+      } else {
+        const [y, m, dayVal] = ymd.split("-").map(Number);
+        const dateObj = new Date(y, m - 1, dayVal);
+        title = dateObj.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+      }
+
+      return {
+        title,
+        items: groups[ymd].map(item => {
+          const Icon = activityIconMap[item.icon] || AlertCircleIcon;
+          return {
+            id: item.id,
+            time: item.time + (item.user ? ` · ${item.user}` : ""),
+            text: `${item.title}${item.description ? `: ${item.description}` : ""}`,
+            icon: Icon
+          };
+        })
+      };
+    });
 
   return (
     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
-       <div className="flex justify-between items-center mb-8">
-          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
-          <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
-            <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
-          </button>
-       </div>
+      <div className="flex justify-between items-center mb-8">
+        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Atividades Recentes</h3>
+        <button className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading flex items-center justify-center">
+          <MoreHorizontal size={20} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading" />
+        </button>
+      </div>
 
-       <div className="space-y-8">
-          {activitiesGroups.map((group, gIdx) => (
-             <div key={gIdx}>
-                <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">{group.title}</div>
-                <div className="space-y-6 relative">
-                   {/* Timeline Line */}
-                   <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
-                   
-                   {group.items.map((item) => {
-                      const ItemIcon = item.icon;
-                      return (
-                        <div key={item.id} className="flex relative z-10 w-full">
-                           <div className="w-8 h-8 rounded-full bg-brand-green-second dark:bg-dark-border/40 flex-shrink-0 flex items-center justify-center mr-4 border-[3px] border-white dark:border-dark-surface shadow-[0_0_0_2px_#ffffff] dark:shadow-[0_0_0_2px_rgba(28,28,30,0.5)]">
-                              <ItemIcon size={14} className="text-brand-green" />
-                           </div>
-                           <div className="flex flex-col justify-start -mt-0.5">
-                              <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">
-                                {item.time}
-                              </div>
-                              <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">
-                                {item.text}
-                              </div>
-                           </div>
-                        </div>
-                      );
-                   })}
-                </div>
-             </div>
-          ))}
-       </div>
+      <div className="space-y-8">
+        {activitiesGroups.map((group, gIdx) => (
+          <div key={group.title}>
+            <div className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">{group.title}</div>
+            <div className="space-y-6 relative">
+              {/* Timeline Line */}
+              {group.items.length > 1 && (
+                <div className="absolute left-[15px] top-4 bottom-[-16px] w-[2px] bg-brand-green-light dark:bg-dark-border/40 z-0" />
+              )}
+
+              {group.items.map((item) => {
+                const ItemIcon = item.icon;
+                return (
+                  <div key={item.id} className="flex relative z-10 w-full">
+                    <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex-shrink-0 flex items-center justify-center mr-4 border-[3px] border-white dark:border-dark-surface shadow-[0_0_0_2px_#ffffff] dark:shadow-[0_0_0_2px_rgba(28,28,30,0.5)]">
+                      <ItemIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                    </div>
+                    <div className="flex flex-col justify-start -mt-0.5">
+                      <div className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">
+                        {item.time}
+                      </div>
+                      <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">
+                        {item.text}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

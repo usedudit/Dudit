@@ -644,14 +644,14 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                         <ActionsDropdown
                             onDelete={() => setShowDeleteModal(true)}
                             trigger={
-                                <Button variant="outline" className="flex-1 h-[48px] font-bold">
+                                <Button variant="outline" className="flex-1 h-12 font-bold">
                                     <ThreeDotsIcon className="w-4 h-4 mr-2" />
                                     Opções
                                 </Button>
                             }
                         />
                         <Button
-                            className="flex-1 h-[48px] font-bold"
+                            className="flex-1 h-12 font-bold"
                             onClick={() => onEdit?.(customer)}
                         >
                             <EditIcon className="w-4 h-4 mr-2" />

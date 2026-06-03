@@ -10,7 +10,7 @@ export function FinancialSummary({ data }: { data: FinancialOverviewData }) {
         <p className="text-brand-inactive-text dark:text-dark-body text-sm">Acompanhe suas métricas financeiras</p>
       </div>
 
-      <div className="flex flex-col gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <TopWidgets data={data} />
         <MainCharts data={data} />
         <BottomWidgets data={data} />

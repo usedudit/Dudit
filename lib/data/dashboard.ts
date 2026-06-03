@@ -809,6 +809,7 @@ async function getCachedGeneralActivity(partnerId: string): Promise<{ activity: 
           icon,
           tone: entityTone[action] || "default",
           user: userName.split(" ")[0], // First name for compact view
+          date: row.created_at,
         }
       })
 

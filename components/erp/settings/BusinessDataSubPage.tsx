@@ -476,7 +476,7 @@ export const BusinessDataSubPage = ({
                                                         </span>
                                                         <ChevronRightIcon className="w-5 h-5 text-gray-400 shrink-0" />
                                                     </button>
-                                                    
+
                                                     {categoryPath && (
                                                         <button
                                                             type="button"
@@ -516,6 +516,7 @@ export const BusinessDataSubPage = ({
                                                             setAddresses(prev => ({
                                                                 ...prev,
                                                                 street: data.street || prev.street,
+                                                                number: data.number || prev.number,
                                                                 neighborhood: data.neighborhood || prev.neighborhood,
                                                                 city: data.city || prev.city,
                                                                 state: data.state || prev.state,
@@ -648,14 +649,14 @@ export const BusinessDataSubPage = ({
                     <Button
                         variant="outline"
                         onClick={handleBack}
-                        className="flex-1 h-[48px]"
+                        className="flex-1 h-12"
                         disabled={isLoading}
                     >
                         Cancelar
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        className="flex-1 h-[48px]"
+                        className="flex-1 h-12"
                         disabled={isLoading}
                         isLoading={isLoading}
                     >

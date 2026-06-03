@@ -1837,14 +1837,14 @@ export default function PromotionFormPage({
                                     variant="outline"
                                     onClick={() => setEditingRule(null)}
                                     disabled={isSaving}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                 >
                                     Voltar
                                 </Button>
                                 <Button
                                     onClick={handleSaveRule}
                                     disabled={isSaving}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                     leftIcon={<SaveIcon size={16} />}
                                 >
                                     Salvar Regra
@@ -1853,7 +1853,7 @@ export default function PromotionFormPage({
                         ) : isReadOnly ? (
                             <Button
                                 onClick={() => setCurrentMode("edit")}
-                                className="flex-1 h-[48px]"
+                                className="flex-1 h-12"
                                 leftIcon={<EditIcon size={18} />}
                             >
                                 Editar
@@ -1864,14 +1864,14 @@ export default function PromotionFormPage({
                                     variant="outline"
                                     onClick={onClose}
                                     disabled={isSaving}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={handleSaveCampaign}
                                     disabled={isSaving}
-                                    className="flex-1 h-[48px]"
+                                    className="flex-1 h-12"
                                     leftIcon={<SaveIcon size={18} />}
                                 >
                                     {isSaving ? "Salvando..." : "Salvar"}

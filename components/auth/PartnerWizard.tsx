@@ -390,6 +390,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                     onChange={(value: string) => patchAddress({ cep: value })}
                                     onAddressFetched={(addr) => patchAddress({
                                         street: addr.street || partnerData.address.street,
+                                        number: addr.number || partnerData.address.number,
                                         neighborhood: addr.neighborhood || partnerData.address.neighborhood,
                                         city: addr.city || partnerData.address.city,
                                         state: addr.state || partnerData.address.state,

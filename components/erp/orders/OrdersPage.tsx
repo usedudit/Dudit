@@ -183,6 +183,8 @@ export default function OrdersPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [deliveryStatusModal, setDeliveryStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
+    const [paymentStatusModal, setPaymentStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
+    const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
     const [receiptPrintOpen, setReceiptPrintOpen] = useState(false)
@@ -442,6 +444,43 @@ export default function OrdersPage({
             setActionModal({ open: false, text: "" })
         }
     }
+
+    const openPaymentStatusModal = (order: Order) => {
+        setPaymentStatusModal({ open: true, order })
+        const status = order.situation
+        setPaymentStatusValue(
+            status === "paid" ? "paid"
+                : status === "partially_paid" ? "partially_paid"
+                    : "pending"
+        )
+    }
+
+    const submitPaymentStatusChange = async () => {
+        const targetOrder = paymentStatusModal.order
+        if (!targetOrder) return
+        setActionModal({ open: true, text: "Atualizando status de pagamento..." })
+        try {
+            const result = await updateOrdersStatusInBatchAction({
+                orderIds: [targetOrder.originalId],
+                partnerId,
+                actionType: "payment_status",
+                statusValue: paymentStatusValue,
+            })
+            if (result.success) {
+                afterMutation(targetOrder.originalId)
+                toast({ title: "Sucesso", description: "Status de pagamento atualizado." })
+                setPaymentStatusModal({ open: false, order: null })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+        } catch (error) {
+            console.error(error)
+            toast({ title: "Erro", description: "Falha ao atualizar status de pagamento.", variant: "destructive" })
+        } finally {
+            setActionModal({ open: false, text: "" })
+        }
+    }
+
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
             const s = new Set(p.ids)
@@ -677,6 +716,32 @@ export default function OrdersPage({
                                     paidAmount: Number(order.paid_amount || 0),
                                 })
                             }}
+                            onUpdatePaymentStatus={(order: any) => {
+                                openPaymentStatusModal({
+                                    originalId: order.id,
+                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                    customer_name: order.customer_name || "Consumidor final",
+                                    customer_id: order.buyer_id || "-",
+                                    total_amount: Number(order.total_amount || 0),
+                                    statusLabel: "",
+                                    statusColor: "gray",
+                                    deliveryStatusLabel: "",
+                                    deliveryStatusColor: "gray",
+                                    isUnfulfilled: false,
+                                    formattedDate: "",
+                                    formattedTime: "",
+                                    store_name: "",
+                                    order_source: order.order_source || "Manual",
+                                    items_count: Number(order.order_items?.length || 0),
+                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                    situation: order.situation || "pending",
+                                    notes: order.notes || "",
+                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                    returnCount: Number(order.return_count || order.return_requests?.length || 0),
+                                    canEdit: order.situation !== "cancelled",
+                                    paidAmount: Number(order.paid_amount || 0),
+                                })
+                            }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
                             initialOrder={currentEntity || effectiveOrders?.find((o: any) => o.id === entityState.entityId) || undefined}
@@ -798,7 +863,7 @@ export default function OrdersPage({
                                     ) : (
                                         <AnimatePresence mode="wait">
                                             <FadeIn
-                                                key={activeTab + (isMobile ? "mobile" : effectiveViewMode)}
+                                                key={activeTab + effectiveViewMode}
                                                 className="w-full"
                                             >
                                                 <SelectionBanner
@@ -809,91 +874,37 @@ export default function OrdersPage({
                                                     itemName="pedidos"
                                                     singularItemName="pedido"
                                                 />
-                                                {isMobile ? (
-                                                    <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                        {paginated.map((o: Order) => (
-                                                            <div
-                                                                key={o.originalId}
-                                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
-                                                                onClick={() => handleDetailsOrder(o)}
-                                                            >
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                                            {o.displayId}
-                                                                        </h3>
-                                                                        <div className="flex gap-1.5 shrink-0 items-center">
-                                                                            {Number(o.returnCount || 0) > 0 && (
-                                                                                <Tooltip text="Possui histórico de trocas/devoluções">
-                                                                                    <Badge variant="gray" icon={<ReturnIcon />} className="h-5 text-[10px] px-1.5 whitespace-nowrap">
-                                                                                        {Number(o.returnCount || 0) > 1 && (
-                                                                                            <span>{o.returnCount}</span>
-                                                                                        )}
-                                                                                    </Badge>
-                                                                                </Tooltip>
-                                                                            )}
-                                                                            {o.situation === "cancelled" ? (
-                                                                                <Badge variant="red" className="h-5 text-[10px] px-1.5">
-                                                                                    Cancelado
-                                                                                </Badge>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <Badge variant={o.statusColor} icon={o.statusIcon as any} className="h-5 text-[10px] px-1.5">
-                                                                                        {o.statusLabel}
-                                                                                    </Badge>
-                                                                                    <Badge variant={o.deliveryStatusColor} icon={o.deliveryStatusIcon as any} className="h-5 text-[10px] px-1.5">
-                                                                                        {o.deliveryStatusLabel}
-                                                                                    </Badge>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-1">
-                                                                        {o.customer_name} • {o.formattedDate}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 text-[14px]">
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                            {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
-                                                                        </span>
-                                                                        <span className="text-gray-300 dark:text-gray-600 font-medium font-bold">•</span>
-                                                                        <span className="font-bold text-brand-primary">
-                                                                            {formatCurrency(o.total_amount)}
-                                                                        </span>
-
-                                                                        <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
-                                                                            <Checkbox checked={selection.ids.has(o.originalId)} onChange={() => handleSelectRow(o.originalId)} />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : effectiveViewMode === "grid" ? (
-                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                        {paginated.map((o: Order) => (
-                                                            <OrderGridCard
-                                                                key={o.originalId}
-                                                                order={o}
-                                                                selected={selection.ids.has(o.originalId)}
-                                                                onSelect={() => handleSelectRow(o.originalId)}
-                                                                onDetails={() => handleDetailsOrder(o)}
-                                                                onPrint={() => handlePrintReceipt(o)}
-                                                                onEdit={() => handleEditOrder(o)}
-                                                                canEdit={o.canEdit}
-                                                                cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
-                                                                onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
-                                                                extraActions={o.situation !== "cancelled" ? (
-                                                                    <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                        Alterar status de entrega
-                                                                    </DropdownItem>
-                                                                ) : null}
-                                                                onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
-                                                                onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
-                                                                onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                ) : (
+                                                {effectiveViewMode === "grid" ? (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                         {paginated.map((o: Order) => (
+                                                             <OrderGridCard
+                                                                 key={o.originalId}
+                                                                 order={o}
+                                                                 selected={selection.ids.has(o.originalId)}
+                                                                 onSelect={() => handleSelectRow(o.originalId)}
+                                                                 onDetails={() => handleDetailsOrder(o)}
+                                                                 onPrint={() => handlePrintReceipt(o)}
+                                                                 onEdit={() => handleEditOrder(o)}
+                                                                 canEdit={o.canEdit}
+                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
+                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
+                                                                 extraActions={o.situation !== "cancelled" ? (
+                                                                     <>
+                                                                         <DropdownItem onClick={() => openPaymentStatusModal(o)}>
+                                                                             Alterar status de pagamento
+                                                                         </DropdownItem>
+                                                                         <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                             Alterar status de entrega
+                                                                         </DropdownItem>
+                                                                     </>
+                                                                 ) : null}
+                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
+                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
+                                                                 onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
+                                                             />
+                                                         ))}
+                                                     </div>
+                                                 ) : (
                                                     <div className="w-full overflow-hidden rounded-xl relative">
                                                         <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                                                         <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
@@ -963,9 +974,14 @@ export default function OrdersPage({
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
                                                                             extraActions={o.situation !== "cancelled" ? (
-                                                                                <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                                    Alterar status de entrega
-                                                                                </DropdownItem>
+                                                                                <>
+                                                                                    <DropdownItem onClick={() => openPaymentStatusModal(o)}>
+                                                                                        Alterar status de pagamento
+                                                                                    </DropdownItem>
+                                                                                    <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                                        Alterar status de entrega
+                                                                                    </DropdownItem>
+                                                                                </>
                                                                             ) : null}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
@@ -1156,6 +1172,39 @@ export default function OrdersPage({
                         <option value="delivered">Entregue</option>
                         <option value="pickup_available">Disponível para retirada</option>
                         <option value="delivery_failed">Entrega não realizada</option>
+                    </select>
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={paymentStatusModal.open}
+                onClose={() => setPaymentStatusModal({ open: false, order: null })}
+                title="Alterar status de pagamento"
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button variant="outline" onClick={() => setPaymentStatusModal({ open: false, order: null })}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={submitPaymentStatusChange}>
+                            Salvar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4 p-4">
+                    <InfoCard
+                        title="Pedido"
+                        message={paymentStatusModal.order?.displayId || "-"}
+                        color="gray"
+                    />
+                    <select
+                        value={paymentStatusValue}
+                        onChange={(e) => setPaymentStatusValue(e.target.value)}
+                        className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm"
+                    >
+                        <option value="pending">Pendente</option>
+                        <option value="paid">Pago</option>
+                        <option value="partially_paid">Parcialmente Pago</option>
                     </select>
                 </div>
             </DefaultModal>

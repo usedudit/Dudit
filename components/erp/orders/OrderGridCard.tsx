@@ -70,16 +70,14 @@ const OrderGridCard = React.memo(
                                 {Number(order.returnCount || 0) > 0 && (
                                     <Tooltip text="Possui histórico de trocas/devoluções">
                                         <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
-                                            {Number(order.returnCount || 0) > 1 && (
-                                                <span className="hidden md:inline">{order.returnCount}</span>
-                                            )}
+                                            {Number(order.returnCount || 0) > 1 && order.returnCount}
                                         </Badge>
                                     </Tooltip>
                                 )}
                                 <div className="flex items-center shrink-0">
                                     {order.situation === "cancelled" ? (
                                         <Badge variant="red" className="whitespace-nowrap scale-90">
-                                            <span className="hidden md:inline">Cancelado</span>
+                                            Cancelado
                                         </Badge>
                                     ) : (
                                         <>
@@ -88,14 +86,14 @@ const OrderGridCard = React.memo(
                                                 icon={order.statusIcon}
                                                 className="whitespace-nowrap scale-90"
                                             >
-                                                <span className="hidden md:inline">{order.statusLabel}</span>
+                                                {order.statusLabel}
                                             </Badge>
                                             <Badge
                                                 variant={order.deliveryStatusColor || "gray"}
                                                 icon={<TruckIcon />}
                                                 className="whitespace-nowrap scale-90"
                                             >
-                                                <span className="hidden md:inline">{order.deliveryStatusLabel || "Não informado"}</span>
+                                                {order.deliveryStatusLabel || "Não informado"}
                                             </Badge>
                                         </>
                                     )}
@@ -138,10 +136,7 @@ const OrderGridCard = React.memo(
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Data</span>
                             <div className="flex flex-col items-end text-right">
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                    {order.formattedDate}
-                                </span>
-                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {order.formattedTime}
+                                    {order.formattedDate} - {order.formattedTime}
                                 </span>
                             </div>
                         </div>

@@ -643,10 +643,10 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
 
                 {/* Mobile Bottom Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                    <Button variant="outline" onClick={handleBack} className="flex-1 h-[48px]" disabled={isLoading}>
+                    <Button variant="outline" onClick={handleBack} className="flex-1 h-12" disabled={isLoading}>
                         Cancelar
                     </Button>
-                    <Button onClick={handleSubmit} className="flex-1 h-[48px]" disabled={isLoading}>
+                    <Button onClick={handleSubmit} className="flex-1 h-12" disabled={isLoading}>
                         Salvar
                     </Button>
                 </div>

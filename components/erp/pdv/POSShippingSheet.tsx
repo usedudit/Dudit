@@ -273,6 +273,8 @@ export default function POSShippingSheet({
             setNeighborhood(addr.neighborhood || "")
             setCity(addr.city || "")
             setState(addr.state || "")
+            setNumber(addr.number || "")
+            setNoNumber(addr.number === "S/N")
           }} />
           <Input label="Rua/Avenida" name="shippingStreet" placeholder="Rua, Avenida, etc." value={street} onChange={(e) => setStreet(e.target.value)} />
           <NumberInputWithCheckbox

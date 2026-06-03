@@ -623,7 +623,7 @@ export default function ServicesPage({
                                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
                                                                 <thead>
                                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 pl-6 pr-3 w-[48px] bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                                                        <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
                                                                             <Checkbox
                                                                                 checked={selection.ids.size === paginated.length && paginated.length > 0}
                                                                                 onCheckedChange={(checked) => {

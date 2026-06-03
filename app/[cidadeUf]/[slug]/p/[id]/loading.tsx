@@ -67,7 +67,7 @@ export default function ProductDetailsLoading() {
                             </div>
 
                             {/* quantity */}
-                            <SkeletonLoader className="w-full h-[48px]" />
+                            <SkeletonLoader className="w-full h-12" />
 
                             {/* buttons */}
                             <SkeletonLoader className="w-full h-[46px] rounded-lg" />
@@ -77,8 +77,8 @@ export default function ProductDetailsLoading() {
                             <div className="space-y-3">
                                 <SkeletonLoader className="w-[80px] h-[16px]" />
                                 <div className="flex gap-2">
-                                    <SkeletonLoader className="flex-1 h-[48px]" />
-                                    <SkeletonLoader className="w-[48px] h-[48px]" />
+                                    <SkeletonLoader className="flex-1 h-12" />
+                                    <SkeletonLoader className="w-12 h-12" />
                                 </div>
                             </div>
 
@@ -187,8 +187,8 @@ export default function ProductDetailsLoading() {
                         <div className="space-y-3">
                             <SkeletonLoader className="w-[80px] h-[16px]" />
                             <div className="flex gap-2">
-                                <SkeletonLoader className="flex-1 h-[48px]" />
-                                <SkeletonLoader className="w-[48px] h-[48px]" />
+                                <SkeletonLoader className="flex-1 h-12" />
+                                <SkeletonLoader className="w-12 h-12" />
                             </div>
                         </div>
 

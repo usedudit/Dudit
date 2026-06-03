@@ -179,6 +179,8 @@ export function ServiceDetailsPageClient({
             opening_hours: p?.opening_hours || null,
             rating: p?.rating || 0,
             paymentMethods: p?.payment_methods || [],
+            payment_methods: p?.payment_methods || [],
+            addresses: p?.addresses || [],
             max_installments: p?.max_installments || 12,
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
@@ -288,6 +290,8 @@ export function ServiceDetailsPageClient({
                 setNewAddressData(prev => ({
                     ...prev,
                     street: data.logradouro || prev.street,
+                    number: data.numero || prev.number,
+                    noNumber: data.numero ? data.numero === "S/N" : prev.noNumber,
                     neighborhood: data.bairro || prev.neighborhood,
                     city: data.localidade || data.municipio || prev.city,
                     state: data.uf || prev.state,
@@ -674,7 +678,7 @@ export function ServiceDetailsPageClient({
                     ...buildBookingPayload(),
                     csrf_token: token,
                 })
-                if (!result.success) {
+                if ("error" in result) {
                     notifyError("Erro", result.error || "Não foi possível iniciar o checkout.")
                     return
                 }

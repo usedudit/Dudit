@@ -54,6 +54,28 @@ export async function subscribeToRecurringPlanAction(input: {
     const user = await requireUser()
     const admin = getAdminClient()
 
+    // Block owner or team member from subscribing
+    const { data: partner } = await admin
+      .from("partners")
+      .select("user_id")
+      .eq("id", input.partnerId)
+      .single()
+
+    if (partner?.user_id === user.id) {
+      return { success: false, error: "Você é dono ou faz parte da equipe deste parceiro e não pode assinar este plano." }
+    }
+
+    const { data: team } = await admin
+      .from("partner_users")
+      .select("id")
+      .eq("partner_id", input.partnerId)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (team) {
+      return { success: false, error: "Você é dono ou faz parte da equipe deste parceiro e não pode assinar este plano." }
+    }
+
     const { data: profile } = await admin
       .from("profiles")
       .select("full_name, email, phone")
@@ -344,7 +366,9 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
     }
 
     const partner = data.partners || {}
-    const image = firstImage || partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const planImages = Array.isArray(data.images) && data.images.length > 0
+      ? data.images
+      : (firstImage ? [firstImage] : [partner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"]);
 
     return {
       ...mapPlanRow(data as Record<string, unknown>),
@@ -352,7 +376,7 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
       items: data.recurring_plan_items || [],
       partners: data.partners,
       price: computedPrice,
-      images: [image],
+      images: planImages,
     }
   } catch (e: unknown) {
     console.error("[getMarketplaceRecurringPlanAction] Error:", e)

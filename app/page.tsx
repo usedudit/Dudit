@@ -11,10 +11,10 @@ import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
-    title: "Dudit | Encontre produtos e serviços perto de você",
+    title: "Dudit | Tudo o que sua cidade tem",
     description: "Descubra produtos, serviços e até itens para aluguel perto de você. Explore negócios locais, fale direto com vendedores e encontre tudo na sua cidade em um só lugar.",
     openGraph: {
-        title: "Dudit | Encontre produtos e serviços perto de você",
+        title: "Dudit | Tudo o que sua cidade tem",
         description: "Encontre produtos e serviços na sua cidade. Explore negócios locais e fale direto com quem vende.",
         url: "https://dudit.com.br",
         siteName: "Dudit",

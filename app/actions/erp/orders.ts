@@ -1606,12 +1606,13 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             const { data: customerData } = await supabase
                 .from("customers")
                 .select("id, name, email, phone, addresses(*)")
-                .eq("id", data.buyer_id)
+                .or(`id.eq.${data.buyer_id},user_id.eq.${data.buyer_id}`)
+                .eq("partner_id", partnerId)
                 .maybeSingle()
             if (customerData) return customerData
 
             try {
-                const { data: authUserRes } = await supabase.auth.admin.getUser(data.buyer_id)
+                const { data: authUserRes } = await supabase.auth.admin.getUserById(data.buyer_id)
                 const authUser = authUserRes?.user
                 if (authUser) {
                     const email = authUser.email
@@ -1633,8 +1634,26 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
 
                         const { data: matchedCustomers } = await query.limit(1)
                         if (matchedCustomers && matchedCustomers.length > 0) {
-                            return matchedCustomers[0]
+                            const matched = matchedCustomers[0]
+                            // Link customer to user_id for faster future queries
+                            await supabase
+                                .from("customers")
+                                .update({ user_id: data.buyer_id })
+                                .eq("id", matched.id)
+                            return {
+                                ...matched,
+                                user_id: data.buyer_id,
+                            }
                         }
+                    }
+
+                    // Fallback to auth user info if no customer record exists under this partner yet
+                    return {
+                        id: data.buyer_id,
+                        name: data.customer_name || authUser.user_metadata?.full_name || "Cliente Marketplace",
+                        email: email || null,
+                        phone: phone || null,
+                        addresses: [],
                     }
                 }
             } catch (err) {

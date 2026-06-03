@@ -37,6 +37,7 @@ export type RecurringPlan = {
   createdAt: string
   updatedAt: string
   items?: RecurringPlanItemRow[]
+  images?: string[] | null
 }
 
 export type RecurringPlanItemRow = RecurringPlanItem & {
@@ -102,6 +103,7 @@ export function mapPlanRow(row: Record<string, unknown>): RecurringPlan {
     showInMarketplace: row.show_in_marketplace !== false,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    images: Array.isArray(row.images) ? (row.images as string[]) : null,
   }
 }
 

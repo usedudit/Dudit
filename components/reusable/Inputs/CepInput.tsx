@@ -12,6 +12,7 @@ interface CepResponse {
     localidade?: string
     municipio?: string
     uf?: string
+    numero?: string
     erro?: boolean
     error?: string
 }
@@ -63,7 +64,7 @@ export const CepInput: React.FC<CepInputProps> = ({
                     neighborhood: data.bairro || "",
                     city: data.localidade || data.municipio || "",
                     state: data.uf || "",
-                    number: "",
+                    number: data.numero || "",
                 })
             } else {
                 fetchingCepRef.current = ""

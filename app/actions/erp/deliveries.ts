@@ -295,7 +295,7 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
       ),
       orders(id, order_number)
     `)
-    .eq("orders.id", params.orderId)
+    .eq("order_id", params.orderId)
     .eq("deliveries.partner_id", params.partnerId)
     .order("position", { ascending: true })
     .limit(1)

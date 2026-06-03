@@ -31,6 +31,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
 import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
 import { useStore } from "@/lib/store-context"
+import { parseAddressString } from "./CreateOrder"
 
 interface OrderDetailViewProps {
     orderId: string
@@ -38,12 +39,13 @@ interface OrderDetailViewProps {
     onBack: () => void
     onEditOrder: (order: any, reason?: string) => void
     onUpdateDeliveryStatus: (order: any) => void
+    onUpdatePaymentStatus: (order: any) => void
     onCancelOrder: (order: any) => void
     onOpenNotes: (order: any) => void
     initialOrder?: any
 }
 
-export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
+export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onUpdatePaymentStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
     const { role } = usePermissions()
     const { selectedStore } = useStore()
 
@@ -266,9 +268,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                                         >
                                             {order.situation !== "cancelled" && (
-                                                <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
-                                                    Alterar status de entrega
-                                                </DropdownItem>
+                                                <>
+                                                    <DropdownItem onClick={() => onUpdatePaymentStatus(order)}>
+                                                        Alterar status de pagamento
+                                                    </DropdownItem>
+                                                    <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
+                                                        Alterar status de entrega
+                                                    </DropdownItem>
+                                                </>
                                             )}
                                         </ActionsDropdown>
                                     </div>
@@ -292,7 +299,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                     <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1">
                                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                                                     {order.order_source === "Marketplace" ? "Canal de venda:" : "Responsável pela venda:"}
                                                                 </span>
@@ -480,9 +487,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                 <CustomerCard
                                                     customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
-                                                    address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? { street: order.delivery_address } : null)}
+                                                    address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
                                                     billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")} />
-                                                {deliverySummary && (
+                                                {deliverySummary && deliverySummary.id && (
                                                     <InfoCard
                                                         title="Entrega vinculada"
                                                         color="blue"
@@ -531,9 +538,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     </Button>}
                 >
                     {order.situation !== "cancelled" && (
-                        <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
-                            Alterar status de entrega
-                        </DropdownItem>
+                        <>
+                            <DropdownItem onClick={() => onUpdatePaymentStatus(order)}>
+                                Alterar status de pagamento
+                            </DropdownItem>
+                            <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
+                                Alterar status de entrega
+                            </DropdownItem>
+                        </>
                     )}
                 </ActionsDropdown>
             </div>

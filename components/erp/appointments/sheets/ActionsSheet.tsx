@@ -119,8 +119,8 @@ export const AddUnavailableSheet = ({
         appointment
             ? getEndTime(appointment.time, appointment.duration)
             : initialTimeSlot
-            ? getEndTime(initialTimeSlot, 60)
-            : '12:00'
+                ? getEndTime(initialTimeSlot, 60)
+                : '12:00'
     );
 
     // MULTI-STAFF SELECTION
@@ -128,8 +128,8 @@ export const AddUnavailableSheet = ({
         appointment?.staffId
             ? [appointment.staffId]
             : initialStaffId
-            ? [initialStaffId]
-            : []
+                ? [initialStaffId]
+                : []
     );
 
     const [description, setDescription] = useState(appointment?.notes || '');
@@ -418,13 +418,13 @@ export const AddUnavailableSheet = ({
                 {isEditing && (
                     <Button
                         variant="outline"
-                        className="flex-1 h-[48px] border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
+                        className="flex-1 h-12 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
                         onClick={() => setIsDeleteModalOpen(true)}
                     >
                         Excluir
                     </Button>
                 )}
-                <Button className={isEditing ? "flex-1 h-[48px]" : "w-full h-[48px]"} onClick={handleConfirm}>
+                <Button className={isEditing ? "flex-1 h-12" : "w-full h-12"} onClick={handleConfirm}>
                     {isEditing ? 'Salvar alterações' : 'Salvar horário'}
                 </Button>
             </div>
@@ -637,8 +637,8 @@ export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { t
                     </div>
                 </div>
                 <div className="p-6 border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex gap-3">
-                    <Button variant="outline" className="flex-1 h-[48px]" onClick={onClose}>Voltar</Button>
-                    <Button className="flex-1 h-[48px] bg-[#dc2626] hover:bg-[#b91c1c] text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none" onClick={onConfirm}>{buttonText}</Button>
+                    <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Voltar</Button>
+                    <Button className="flex-1 h-12 bg-[#dc2626] hover:bg-[#b91c1c] text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none" onClick={onConfirm}>{buttonText}</Button>
                 </div>
             </motion.div>
         </div>

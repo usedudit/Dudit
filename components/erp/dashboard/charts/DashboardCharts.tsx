@@ -147,7 +147,7 @@ export function DashboardPieChart({
             startAngle={half ? 180 : 90}
             endAngle={half ? 0 : -270}
           >
-            {data.map((_, index) => <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+            {data.map((entry, index) => <Cell key={index} fill={(entry.fill as string) || CHART_COLORS[index % CHART_COLORS.length]} />)}
           </Pie>
         </PieChart>
       </ChartContainer>

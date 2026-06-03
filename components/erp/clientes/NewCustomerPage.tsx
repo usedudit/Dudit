@@ -652,6 +652,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                 setNeighborhood(data.neighborhood)
                                                                 setCity(data.city)
                                                                 setUf(data.state || "SP")
+                                                                setNumber(data.number || "")
                                                                 setNoNumber(data.number === "S/N")
                                                             }}
                                                             error={fieldErrors.has("cep")}
@@ -712,6 +713,7 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                                         setBillingNeighborhood(data.neighborhood)
                                                                         setBillingCity(data.city)
                                                                         setBillingUf(data.state || "SP")
+                                                                        setBillingNumber(data.number || "")
                                                                         setBillingNoNumber(data.number === "S/N")
                                                                     }}
                                                                     error={fieldErrors.has("billingCep")}
@@ -881,14 +883,14 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             variant="outline"
                             onClick={handleBack}
                             disabled={isSaving || isEditLoadingLocked}
-                            className="flex-1 h-[48px]"
+                            className="flex-1 h-12"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleSave}
                             disabled={isSaving || isEditLoadingLocked}
-                            className="flex-1 h-[48px]"
+                            className="flex-1 h-12"
                         >
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}

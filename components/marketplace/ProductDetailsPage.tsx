@@ -248,6 +248,8 @@ export function ProductDetailsPageClient({
                 setNewAddressData(prev => ({
                     ...prev,
                     street: data.logradouro || prev.street,
+                    number: data.numero || prev.number,
+                    noNumber: data.numero ? data.numero === "S/N" : prev.noNumber,
                     neighborhood: data.bairro || prev.neighborhood,
                     city: data.localidade || data.municipio || prev.city,
                     state: data.uf || prev.state,

@@ -330,14 +330,14 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
                         <Button
                             variant="outline"
                             onClick={handleBack}
-                            className="flex-1 h-[48px]"
+                            className="flex-1 h-12"
                         >
                             Voltar
                         </Button>
                         <Button
                             onClick={handleSaveAll}
                             isLoading={savingAll}
-                            className="flex-1 h-[48px]"
+                            className="flex-1 h-12"
                             leftIcon={<SaveIcon size={18} />}
                         >
                             Salvar

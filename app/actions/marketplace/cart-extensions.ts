@@ -27,7 +27,7 @@ async function assertCanBuyFromPartner(
   if (team) {
     return { error: "Você não pode comprar de uma loja da qual faz parte da equipe." }
   }
-  return { ok: true as const }
+  return { success: true }
 }
 
 export async function addServiceBookingToCartAction(
@@ -47,7 +47,7 @@ export async function addServiceBookingToCartAction(
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
   const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
-  if ("error" in guard) return guard
+  if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
   const { data: service } = await admin
@@ -106,7 +106,7 @@ export async function addSubscriptionToCartAction(
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
   const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
-  if ("error" in guard) return guard
+  if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
   const { data: plan } = await admin
@@ -164,7 +164,7 @@ export async function addPurchasableServiceToCartAction(
   const supabase = await getSupabaseServerClient()
   const user = await requireUser()
   const guard = await assertCanBuyFromPartner(supabase, user.id, input.partnerId)
-  if ("error" in guard) return guard
+  if (guard.error) return { error: guard.error }
 
   const admin = getAdminClient()
   const { data: service } = await admin

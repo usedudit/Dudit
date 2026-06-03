@@ -116,8 +116,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 }, 50);
             }}
             className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
-                    ? "text-brand-primary bg-brand-primary/15"
-                    : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+                ? "text-brand-primary bg-brand-primary/15"
+                : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
                 }`}
             title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
         >
@@ -845,14 +845,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             variant="outline"
                             onClick={handleBack}
                             disabled={isSaving}
-                            className="flex-1 h-[48px]"
+                            className="flex-1 h-12"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`flex-1 h-[48px] ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-brand-red/90'}`}
+                            className={`flex-1 h-12 ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-brand-red/90'}`}
                         >
                             <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}

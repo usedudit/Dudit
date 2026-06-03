@@ -340,6 +340,7 @@ export function ComprehensiveSupplierForm({ partnerId, supplier }: Comprehensive
                     setFormData((prev) => ({
                       ...prev,
                       street: data.street || prev.street,
+                      number: data.number || prev.number,
                       neighborhood: data.neighborhood || prev.neighborhood,
                       city: data.city || prev.city,
                       state: data.state || prev.state,
