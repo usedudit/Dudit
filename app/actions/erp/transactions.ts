@@ -403,34 +403,40 @@ export async function getFinancialTransactionsAction(
                 .then((r: any) => r.data || [])
             : Promise.resolve([] as InstallmentGroupRow[])
 
-        const [orders, posSales, pmRows, installmentGroups] = await Promise.all([
-            ordersPromise,
-            salesPromise,
-            paymentMethodsPromise,
-            installmentGroupsPromise,
-        ])
-
+        // PERF: Compute installment IDs early (only depends on txs, not on batch results)
         const pendingInstallmentTxIds = txs
             .filter((t) => t.installment_group_id && isStatusPending(t.status))
             .map((t) => t.id)
-        const installmentPaidSumByTxId = new Map<string, number>()
-        if (pendingInstallmentTxIds.length > 0) {
-            const { data: payRows, error: payErr } = await supabase
+        const installmentPaymentsPromise = pendingInstallmentTxIds.length > 0
+            ? supabase
                 .from("transaction_payments")
                 .select("transaction_id, amount, base_amount")
                 .eq("partner_id", partnerId)
                 .in("transaction_id", pendingInstallmentTxIds)
-            if (payErr) throw payErr
-            for (const p of payRows || []) {
-                const tid = String((p as { transaction_id?: string }).transaction_id || "")
-                const pBase = Number(
-                    (p as { base_amount?: number | string | null; amount?: number | string | null }).base_amount ??
-                    (p as { amount?: number | string | null }).amount ??
-                    0,
-                )
-                if (!tid) continue
-                installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + pBase)
-            }
+                .then((r: any) => {
+                    if (r.error) throw r.error
+                    return r.data || []
+                })
+            : Promise.resolve([] as any[])
+
+        const [orders, posSales, pmRows, installmentGroups, installmentPayRows] = await Promise.all([
+            ordersPromise,
+            salesPromise,
+            paymentMethodsPromise,
+            installmentGroupsPromise,
+            installmentPaymentsPromise,
+        ])
+
+        const installmentPaidSumByTxId = new Map<string, number>()
+        for (const p of installmentPayRows) {
+            const tid = String((p as { transaction_id?: string }).transaction_id || "")
+            const pBase = Number(
+                (p as { base_amount?: number | string | null; amount?: number | string | null }).base_amount ??
+                (p as { amount?: number | string | null }).amount ??
+                0,
+            )
+            if (!tid) continue
+            installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + pBase)
         }
 
         // Build order lookup and collect buyer IDs into the customer set
@@ -1304,64 +1310,73 @@ export async function getInstallmentGroupDetailsAction(input: { partnerId: strin
         await requirePartnerAccessWithPermission(input.partnerId, "financial", "view")
         const supabase = createAdminClient()
 
-        const { data: group, error: groupErr } = await supabase
-            .from("installment_groups")
-            .select("id, description, total_amount, installments_count")
-            .eq("id", input.installmentGroupId)
-            .eq("partner_id", input.partnerId)
-            .single()
+        // PERF: Batch 1 — group metadata + installment transactions (independent reads)
+        const [groupResult, rowsResult] = await Promise.all([
+            supabase
+                .from("installment_groups")
+                .select("id, description, total_amount, installments_count")
+                .eq("id", input.installmentGroupId)
+                .eq("partner_id", input.partnerId)
+                .single(),
+            supabase
+                .from("transactions")
+                .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, payment_method_id, payment_type")
+                .eq("partner_id", input.partnerId)
+                .eq("installment_group_id", input.installmentGroupId)
+                .order("installment_number", { ascending: true }),
+        ])
+        const { data: group, error: groupErr } = groupResult
+        const { data: rows, error: rowsErr } = rowsResult
         if (groupErr || !group) throw groupErr || new Error("Grupo de parcelas não encontrado.")
-
-        const { data: rows, error: rowsErr } = await supabase
-            .from("transactions")
-            .select("id, description, amount, original_amount, due_date, payment_date, status, installment_number, payment_method_id, payment_type")
-            .eq("partner_id", input.partnerId)
-            .eq("installment_group_id", input.installmentGroupId)
-            .order("installment_number", { ascending: true })
         if (rowsErr) throw rowsErr
 
         const transactionIds = (rows || []).map((row: any) => row.id).filter(Boolean)
-        const paymentByTxId = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
-        if (transactionIds.length > 0) {
-            const { data: payments, error: paymentsErr } = await supabase
-                .from("transaction_payments")
-                .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
-                .eq("partner_id", input.partnerId)
-                .in("transaction_id", transactionIds)
-            if (paymentsErr) throw paymentsErr
-            for (const payment of payments || []) {
-                const txId = String((payment as any).transaction_id || "")
-                const pBase = Number(
-                    (payment as any).base_amount ?? (payment as any).amount ?? 0,
-                )
-                const pCash = Number((payment as any).amount || 0)
-                const pInt = Number((payment as any).interest_amount || 0)
-                const pDisc = Number((payment as any).discount_amount || 0)
-                const cur: { base: number; cash: number; interest: number; discount: number } =
-                    paymentByTxId.get(txId) || { base: 0, cash: 0, interest: 0, discount: 0 }
-                paymentByTxId.set(txId, {
-                    base: cur.base + pBase,
-                    cash: cur.cash + pCash,
-                    interest: cur.interest + pInt,
-                    discount: cur.discount + pDisc,
-                })
-            }
-        }
-
         const paymentMethodIds = new Set<string>()
         for (const row of rows || []) {
             if ((row as any).payment_method_id) paymentMethodIds.add(String((row as any).payment_method_id))
         }
+
+        // PERF: Batch 2 — payments + payment methods (both depend on rows, independent of each other)
+        const [paymentsResult, pmsResult] = await Promise.all([
+            transactionIds.length > 0
+                ? supabase
+                    .from("transaction_payments")
+                    .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
+                    .eq("partner_id", input.partnerId)
+                    .in("transaction_id", transactionIds)
+                : Promise.resolve({ data: [] as any[], error: null }),
+            paymentMethodIds.size > 0
+                ? supabase
+                    .from("payment_methods")
+                    .select("id, name, payment_type")
+                    .eq("partner_id", input.partnerId)
+                    .in("id", [...paymentMethodIds])
+                : Promise.resolve({ data: [] as any[], error: null }),
+        ])
+        if (paymentsResult.error) throw paymentsResult.error
+
+        const paymentByTxId = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
+        for (const payment of paymentsResult.data || []) {
+            const txId = String((payment as any).transaction_id || "")
+            const pBase = Number(
+                (payment as any).base_amount ?? (payment as any).amount ?? 0,
+            )
+            const pCash = Number((payment as any).amount || 0)
+            const pInt = Number((payment as any).interest_amount || 0)
+            const pDisc = Number((payment as any).discount_amount || 0)
+            const cur: { base: number; cash: number; interest: number; discount: number } =
+                paymentByTxId.get(txId) || { base: 0, cash: 0, interest: 0, discount: 0 }
+            paymentByTxId.set(txId, {
+                base: cur.base + pBase,
+                cash: cur.cash + pCash,
+                interest: cur.interest + pInt,
+                discount: cur.discount + pDisc,
+            })
+        }
+
         const paymentMethodLabelById = new Map<string, string>()
-        if (paymentMethodIds.size > 0) {
-            const { data: pms } = await supabase
-                .from("payment_methods")
-                .select("id, name, payment_type")
-                .eq("partner_id", input.partnerId)
-                .in("id", [...paymentMethodIds])
-            for (const pm of pms || []) {
-                paymentMethodLabelById.set(String((pm as any).id), formatPaymentMethodLabel((pm as any).name, (pm as any).payment_type) || "Não informado")
-            }
+        for (const pm of pmsResult.data || []) {
+            paymentMethodLabelById.set(String((pm as any).id), formatPaymentMethodLabel((pm as any).name, (pm as any).payment_type) || "Não informado")
         }
 
         return {
@@ -1527,17 +1542,14 @@ export async function recordInstallmentPaymentAction(input: {
         }
         if (fullyPaid) {
             updatePayload.status = "paid"
-            // Query all payments for this transaction to calculate final amount
-            const { data: allPayments, error: sumErr } = await supabase
-                .from("transaction_payments")
-                .select("amount")
-                .eq("partner_id", input.partnerId)
-                .eq("transaction_id", input.transactionId)
-            if (!sumErr && allPayments) {
-                const totalPaid = allPayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
-                if (totalPaid > 0) {
-                    updatePayload.amount = totalPaid
-                }
+            // PERF: Use already-computed values instead of re-querying transaction_payments
+            // existingPayments (fetched at L1459) + finalPaid (computed at L1478) = total
+            const existingTotal = (existingPayments || []).reduce(
+                (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
+            )
+            const totalPaid = existingTotal + finalPaid
+            if (totalPaid > 0) {
+                updatePayload.amount = totalPaid
             }
         }
         const { error: updateErr } = await supabase
@@ -2137,22 +2149,24 @@ export async function getTransactionDetailsAction(
         let paymentDateRowLabel: TransactionDetailPayload["paymentDateRowLabel"] = "Data da transação"
         if (row.installment_group_id) {
             paymentDateRowLabel = "Data de finalização"
-            const { data: igGroup } = await supabase
-                .from("installment_groups")
-                .select("total_amount")
-                .eq("id", String(row.installment_group_id))
-                .eq("partner_id", partnerId)
-                .maybeSingle()
+            // PERF: Parallelize group metadata + group transactions (independent reads)
+            const [{ data: igGroup }, { data: groupRows }] = await Promise.all([
+                supabase
+                    .from("installment_groups")
+                    .select("total_amount")
+                    .eq("id", String(row.installment_group_id))
+                    .eq("partner_id", partnerId)
+                    .maybeSingle(),
+                supabase
+                    .from("transactions")
+                    .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type")
+                    .eq("partner_id", partnerId)
+                    .eq("installment_group_id", row.installment_group_id)
+                    .order("installment_number", { ascending: true }),
+            ])
             if (igGroup && igGroup.total_amount != null) {
                 installmentGroupTotalAmount = Math.abs(Number(igGroup.total_amount) || 0) || null
             }
-
-            const { data: groupRows } = await supabase
-                .from("transactions")
-                .select("id, installment_number, due_date, payment_date, status, amount, original_amount, payment_type")
-                .eq("partner_id", partnerId)
-                .eq("installment_group_id", row.installment_group_id)
-                .order("installment_number", { ascending: true })
             const txIds = (groupRows || []).map((g: any) => g.id)
             const paymentByTx = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
             if (txIds.length > 0) {
@@ -2528,9 +2542,10 @@ export async function getTransactionDetailsAction(
 
         let transferAccounts: TransactionDetailPayload["transferAccounts"] = null
         if (row.transfer_group_id) {
+            // PERF: Embedded join eliminates second query for account metadata
             const { data: transferRows } = await supabase
                 .from("transactions")
-                .select("id, account_id, transaction_type, amount")
+                .select("id, account_id, transaction_type, amount, finance_accounts!transactions_account_id_fkey(name, type)")
                 .eq("partner_id", partnerId)
                 .eq("transfer_group_id", row.transfer_group_id)
                 .limit(4)
@@ -2541,24 +2556,13 @@ export async function getTransactionDetailsAction(
             }
             const fromTx = rowByType.get("expense") || null
             const toTx = rowByType.get("income") || null
-            const accountIds = [fromTx?.account_id, toTx?.account_id].filter(Boolean)
-            const accountMetaById = new Map<string, { name: string; type: string }>()
-            if (accountIds.length > 0) {
-                const { data: transferAccountsMeta } = await supabase
-                    .from("finance_accounts")
-                    .select("id, name, type")
-                    .eq("partner_id", partnerId)
-                    .in("id", accountIds)
-                for (const acc of transferAccountsMeta || []) {
-                    accountMetaById.set(String((acc as any).id), {
-                        name: String((acc as any).name || "Conta"),
-                        type: String((acc as any).type || "cash"),
-                    })
-                }
-            }
             transferAccounts = {
-                from: fromTx?.account_id ? (accountMetaById.get(String(fromTx.account_id)) || null) : null,
-                to: toTx?.account_id ? (accountMetaById.get(String(toTx.account_id)) || null) : null,
+                from: fromTx?.finance_accounts
+                    ? { name: String(fromTx.finance_accounts.name || "Conta"), type: String(fromTx.finance_accounts.type || "cash") }
+                    : null,
+                to: toTx?.finance_accounts
+                    ? { name: String(toTx.finance_accounts.name || "Conta"), type: String(toTx.finance_accounts.type || "cash") }
+                    : null,
                 amount: Math.abs(Number((fromTx || toTx || row).amount || 0)),
             }
         }
