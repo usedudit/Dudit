@@ -131,9 +131,11 @@ const OrderListItem = React.memo(
                                     <Badge variant={order.statusColor} icon={order.statusIcon}>
                                         {order.statusLabel}
                                     </Badge>
-                                    <Badge variant={order.deliveryStatusColor || "gray"} icon={order.deliveryStatusIcon}>
-                                        {order.deliveryStatusLabel || "Não informado"}
-                                    </Badge>
+                                    {!order.hasOnlyServices && (
+                                        <Badge variant={order.deliveryStatusColor || "gray"} icon={order.deliveryStatusIcon}>
+                                            {order.deliveryStatusLabel || "Não informado"}
+                                        </Badge>
+                                    )}
                                 </>
                             )}
                         </div>

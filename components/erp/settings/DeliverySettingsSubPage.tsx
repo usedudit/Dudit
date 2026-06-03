@@ -172,7 +172,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                 <Accordion
                                     title={
                                         <span className="flex items-center gap-2">
-                                            Distância e Frete
+                                            Distância e Entrega
                                             {!advancedEnabled && (
                                                 <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
                                             )}

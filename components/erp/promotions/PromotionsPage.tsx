@@ -2,19 +2,19 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Button, 
-  Input, 
-  IconPlaceholder, 
-  Badge, 
-  Checkbox, 
-  Tabs, 
-  TabsList, 
-  TabsTrigger, 
-  Pagination, 
-  SelectionBanner, 
-  AlertModal, 
-  SavingStatusModal, 
+import {
+  Button,
+  Input,
+  IconPlaceholder,
+  Badge,
+  Checkbox,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Pagination,
+  SelectionBanner,
+  AlertModal,
+  SavingStatusModal,
   ThreeDotsLoader,
   ActionsDropdown
 } from "@/components/reusable"
@@ -55,8 +55,8 @@ export default function PromotionsPage({
 }) {
   const { toast } = useToast()
   const isMobile = useMediaQuery("(max-width: 767px)")
-  const [activeTab, setActiveTab] = useState<"list" | "simulator" >("list")
-  
+  const [activeTab, setActiveTab] = useState<"list" | "simulator">("list")
+
   const queryKey = useMemo(() => ["erp", "promotions", partnerId] as const, [partnerId])
 
   // ── Entity Page Hook (URL state + cache + list) ──────────
@@ -158,8 +158,8 @@ export default function PromotionsPage({
   const filteredCampaigns = useMemo(() => {
     const term = debouncedSearch.toLowerCase().trim()
     if (!term) return campaigns
-    return campaigns.filter(c => 
-      c.name.toLowerCase().includes(term) || 
+    return campaigns.filter(c =>
+      c.name.toLowerCase().includes(term) ||
       (c.description && c.description.toLowerCase().includes(term))
     )
   }, [campaigns, debouncedSearch])
@@ -661,7 +661,7 @@ export default function PromotionsPage({
                             />
                           </Div>
                           <Div className="space-y-1">
-                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Valor do Frete</label>
+                            <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading">Valor da Entrega</label>
                             <input
                               type="number"
                               min="0"
@@ -696,7 +696,7 @@ export default function PromotionsPage({
                                   <Span className="text-brand-inactive-text">Subtotal</Span>
                                   <Span className="font-semibold">{formatCurrency(simResult.subtotal)}</Span>
                                 </Div>
-                                
+
                                 {simResult.promotionSavings > 0 && (
                                   <Div className="flex justify-between text-green-600">
                                     <Span>Promoção Produto (Original vs Promo)</Span>
@@ -726,7 +726,7 @@ export default function PromotionsPage({
                                 )}
 
                                 <Div className="flex justify-between">
-                                  <Span className="text-brand-inactive-text">Frete</Span>
+                                  <Span className="text-brand-inactive-text">Entrega</Span>
                                   <Span className={simResult.freeShippingApplied ? "line-through text-brand-inactive-text" : "font-semibold"}>
                                     {formatCurrency(simResult.shipping)}
                                   </Span>
@@ -734,7 +734,7 @@ export default function PromotionsPage({
 
                                 {simResult.freeShippingApplied && (
                                   <Div className="flex justify-between text-green-600 font-semibold text-xs">
-                                    <Span>Frete Grátis Aplicado</Span>
+                                    <Span>Entrega Grátis Aplicada</Span>
                                     <Span>Grátis</Span>
                                   </Div>
                                 )}

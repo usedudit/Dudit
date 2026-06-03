@@ -108,6 +108,8 @@ interface OrderGeneralTabProps {
     originalPaymentMethod?: string
     originalPaymentBreakdown?: Array<{ method: string; amount: number }>
     originalPaidAmount?: number
+    paymentMethodDiscountAmount?: number
+    paymentMethodExtraAmount?: number
     role?: string
 }
 
@@ -134,6 +136,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     originalPaymentMethod = "Não informado",
     originalPaymentBreakdown = [],
     originalPaidAmount = 0,
+    paymentMethodDiscountAmount = 0,
+    paymentMethodExtraAmount = 0,
     role = "OPERATOR"
 }) => {
     const isMarketplaceLocked = isPaidOrder || role === 'DELIVERY';
@@ -514,7 +518,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                                 onClick={() => removeItem(index)}
                                                                 className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10'}`}
                                                             >
-                                                                    <TrashIcon size={14} />
+                                                                <TrashIcon size={14} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -593,7 +597,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     {isPaidOrder ? (
                         <section className="flex flex-col gap-6">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
-                            
+
                             <div className="space-y-3">
                                 <PaymentRow
                                     label="Método de Pagamento"
@@ -634,7 +638,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 {Number(shippingFee || 0) > 0 && (
                                     <PaymentRow
-                                        label="Valor do Frete"
+                                        label="Valor da Entrega"
                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>}
                                     />
                                 )}
@@ -657,6 +661,20 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     <PaymentRow
                                         label="Desconto por Cupom"
                                         value={<span className="text-brand-red font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                    />
+                                )}
+
+                                {paymentMethodDiscountAmount > 0 && (
+                                    <PaymentRow
+                                        label="Desconto do Método"
+                                        value={<span className="text-brand-red font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                    />
+                                )}
+
+                                {paymentMethodExtraAmount > 0 && (
+                                    <PaymentRow
+                                        label="Taxa do Método"
+                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
                                     />
                                 )}
 
@@ -684,8 +702,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         />
                                         <ListItem
                                             icon={TruckIcon}
-                                            title="Adicionar frete"
-                                            description="Define o valor do frete do pedido"
+                                            title="Adicionar entrega"
+                                            description="Define o valor da entrega do pedido"
                                             onClick={isMarketplaceLocked ? undefined : onOpenShipping}
                                             className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
                                         />
@@ -727,7 +745,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 {parseFloat(shippingFee || "0") > 0 && (
                                     <div className="flex justify-between items-center text-[15px]">
-                                        <span className="text-brand-inactive-text font-medium">Frete</span>
+                                        <span className="text-brand-inactive-text font-medium">Entrega</span>
                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                                             {formatCurrency(shippingFee)}
                                         </span>

@@ -42,7 +42,8 @@ function getEntryIcon(entry: HistoryEntry) {
         type.includes("paid") || type.includes("payment") || type.includes("price") ||
         type.includes("money") || type.includes("total") || type.includes("discount") ||
         type.includes("shipping") || content.includes("valor") || content.includes("pago") ||
-        content.includes("preço") || content.includes("desconto") || content.includes("frete")
+        content.includes("preço") || content.includes("desconto") || content.includes("frete") ||
+        content.includes("entrega")
     ) {
         return MoneyIcon
     }

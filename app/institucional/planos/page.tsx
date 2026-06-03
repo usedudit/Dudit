@@ -243,7 +243,7 @@ const ComparisonTable = () => {
       {
          title: "Entrega",
          items: [
-            { name: "Frete local", g: "x", v: "check", c: "check" },
+            { name: "Entrega local", g: "x", v: "check", c: "check" },
             { name: "Logística avançada", g: "x", v: "x", c: "check" },
          ]
       },

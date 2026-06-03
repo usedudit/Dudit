@@ -291,7 +291,7 @@ const SaleReceiptA4Preview = ({
                                             )}
                                             {shippingNum > 0.009 && (
                                                 <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-500 font-medium">Entrega / Frete</span>
+                                                    <span className="text-gray-500 font-medium">Entrega</span>
                                                     <span className="font-bold">{formatCurrency(shippingNum)}</span>
                                                 </div>
                                             )}

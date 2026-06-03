@@ -172,13 +172,13 @@ export function toDateTimeInputValue(value: string | null | undefined) {
 export function getCouponTypeLabel(type: CouponDiscountType) {
   if (type === "percentage") return "Percentual"
   if (type === "fixed") return "Valor fixo"
-  return "Frete gratis"
+  return "Entrega grátis"
 }
 
 export function getCouponValueLabel(coupon: Pick<CouponRow, "discount_type" | "discount_value">) {
   if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}%`
   if (coupon.discount_type === "fixed") return formatCurrency(Number(coupon.discount_value || 0))
-  return "Frete gratis"
+  return "Entrega grátis"
 }
 
 export function getCouponStatusLabel(coupon: Pick<CouponRow, "is_active">) {

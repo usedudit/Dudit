@@ -460,7 +460,7 @@ function buildOrderChangeLines(currentOrder: any, payload: ERPOrderPayload) {
     }
 
     if (Math.abs(Number(currentOrder.delivery_fee || 0) - Number(payload.shippingCost || 0)) > 0.009) {
-        lines.push(`alterou frete: ${formatCurrency(currentOrder.delivery_fee || 0)} -> ${formatCurrency(payload.shippingCost || 0)}`)
+        lines.push(`alterou entrega: ${formatCurrency(currentOrder.delivery_fee || 0)} -> ${formatCurrency(payload.shippingCost || 0)}`)
     }
 
     if (Math.abs(Number(currentOrder.additional_costs || 0) - Number(payload.additionalCosts || 0)) > 0.009) {
@@ -2980,7 +2980,7 @@ export async function getERPOrdersPageAction(
                 created_at,
                 stores(name),
                 return_requests!order_id(id),
-                order_items(quantity)
+                order_items(quantity, product_id, variant_id)
             `
 
         const selectWithPosSale = `

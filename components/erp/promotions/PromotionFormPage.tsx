@@ -44,7 +44,7 @@ function getAutoPromotionName(
     const base = campName || "Promoção";
     if (type === "gift") return `${base} - Brinde`;
     if (type === "buy_x_pay_y") return `${base} - Leve ${buyQuantity || 0} Pague ${payQuantity || 0}`;
-    if (type === "free_shipping") return `${base} - Frete Grátis`;
+    if (type === "free_shipping") return `${base} - Entrega Grátis`;
     if (type === "discount") {
         const valStr = discountType === "percentage" ? `${discountValue || 0}%` : `R$ ${discountValue || 0}`;
         return `${base} - Desconto de ${valStr}`;
@@ -1313,7 +1313,7 @@ export default function PromotionFormPage({
                                                                     { value: "discount", label: "Desconto Direto (Fixo ou %)" },
                                                                     { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
                                                                     { value: "gift", label: "Ganhar Brinde (Freebie)" },
-                                                                    { value: "free_shipping", label: "Frete Grátis" }
+                                                                    { value: "free_shipping", label: "Entrega Grátis" }
                                                                 ]}
                                                             />
 
@@ -1493,7 +1493,7 @@ export default function PromotionFormPage({
                                                                 <IconPlaceholder
                                                                     icon={TagIcon}
                                                                     title="Não há regras de promoção"
-                                                                    subtitle="Adicione descontos, brindes ou frete grátis a esta campanha."
+                                                                    subtitle="Adicione descontos, brindes ou entrega grátis a esta campanha."
                                                                     itemButton={!isReadOnly ? {
                                                                         text: "Adicionar regra",
                                                                         action: () => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' }),
@@ -1574,7 +1574,7 @@ export default function PromotionFormPage({
                                                                                 { value: "discount", label: "Desconto Direto" },
                                                                                 { value: "buy_x_pay_y", label: "Leve X Pague Y" },
                                                                                 { value: "gift", label: "Ganhar Brinde" },
-                                                                                { value: "free_shipping", label: "Frete Grátis" }
+                                                                                { value: "free_shipping", label: "Entrega Grátis" }
                                                                             ]}
                                                                         />
                                                                     </div>
@@ -1625,7 +1625,7 @@ export default function PromotionFormPage({
                                                                             { value: "discount", label: "Desconto Direto" },
                                                                             { value: "buy_x_pay_y", label: "Leve X Pague Y" },
                                                                             { value: "gift", label: "Ganhar Brinde" },
-                                                                            { value: "free_shipping", label: "Frete Grátis" }
+                                                                            { value: "free_shipping", label: "Entrega Grátis" }
                                                                         ]}
                                                                     />
                                                                 </div>
@@ -1665,7 +1665,7 @@ export default function PromotionFormPage({
                                                                                     {promo.promotion_type === "discount" && (
                                                                                         promo.discount_type === "percentage" ? `${promo.discount_value}% Desconto` : `${formatCurrency(promo.discount_value)} Desconto`
                                                                                     )}
-                                                                                    {promo.promotion_type === "free_shipping" && "Frete Grátis"}
+                                                                                    {promo.promotion_type === "free_shipping" && "Entrega Grátis"}
                                                                                 </span>
                                                                                 <span className="block text-xs font-semibold text-brand-primary dark:text-dark-body truncate">
                                                                                     {promo.name || "Regra sem nome"} • Prioridade {promo.priority || 0}
@@ -1757,7 +1757,7 @@ export default function PromotionFormPage({
                                                                                                     {promo.promotion_type === "discount" && (
                                                                                                         promo.discount_type === "percentage" ? `${promo.discount_value}% de Desconto` : `${formatCurrency(promo.discount_value)} de Desconto`
                                                                                                     )}
-                                                                                                    {promo.promotion_type === "free_shipping" && "Frete Grátis"}
+                                                                                                    {promo.promotion_type === "free_shipping" && "Entrega Grátis"}
                                                                                                 </span>
                                                                                                 <span className="text-xs text-brand-inactive-text">
                                                                                                     {promo.name || "Regra sem nome"}

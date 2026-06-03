@@ -157,7 +157,7 @@ export default function CouponsPage({
             } else if (coupon.discount_type === "fixed") {
                 availableTypes.add("Valor fixo")
             } else if (coupon.discount_type === "free_shipping") {
-                availableTypes.add("Frete grátis")
+                availableTypes.add("Entrega grátis")
             }
 
             if (coupon.apply_scope === "all") {
@@ -183,7 +183,7 @@ export default function CouponsPage({
 
         const sections: FilterSectionConfig[] = []
 
-        const discountTypeOptions = ["Percentual", "Valor fixo", "Frete grátis"].filter((opt) =>
+        const discountTypeOptions = ["Percentual", "Valor fixo", "Entrega grátis"].filter((opt) =>
             availableTypes.has(opt)
         )
         if (discountTypeOptions.length > 0) {
@@ -626,7 +626,7 @@ export default function CouponsPage({
                 ? "Percentual"
                 : coupon.discount_type === "fixed"
                     ? "Valor fixo"
-                    : "Frete grátis"
+                    : "Entrega grátis"
 
             const scopeLabel = getCouponApplyScopeLabel(coupon.apply_scope)
             const customerLabel = coupon.customer_scope === "specific" ? "Clientes especificos" : "Todos os clientes"
@@ -1001,7 +1001,7 @@ export default function CouponsPage({
                     onClose={() => setSharingCoupon(null)}
                     url={typeof window !== 'undefined' ? `${window.location.origin}${getPartnerUrl(localPartner)}?cupom=${sharingCoupon.code}` : ""}
                     title={`Cupom ${sharingCoupon.code}`}
-                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Frete gratis" ? "frete grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
+                    shareMessage={`🔥 Olha esse cupom especial na Dudit!\n\nUse o código *${sharingCoupon.code}* para obter *${getCouponValueLabel(sharingCoupon) === "Entrega gratis" ? "entrega grátis" : `${getCouponValueLabel(sharingCoupon)} de desconto`}* nas suas compras na loja *${localPartner?.store_name || localPartner?.storeName || ""}*.\n\nConfira todos os produtos/serviços disponíveis aqui:`}
                     label="Link com cupom"
                 />
             )}

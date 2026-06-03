@@ -87,6 +87,7 @@ interface Order {
     paidAmount: number;
     statusIcon?: React.ReactNode;
     deliveryStatusIcon?: React.ReactNode;
+    hasOnlyServices?: boolean;
 }
 
 interface FilterState {
@@ -300,6 +301,9 @@ export default function OrdersPage({
                     statusInfo.icon = <PartiallyPaidIcon size={12} />
                 }
 
+                const orderItems = o.order_items || []
+                const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => !item.product_id && !item.variant_id)
+
                 return {
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
@@ -325,7 +329,8 @@ export default function OrdersPage({
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
                     returnCount: Number(o.return_count || 0),
                     canEdit: o.situation !== "cancelled",
-                    paidAmount: Number(o.paid_amount || 0)
+                    paidAmount: Number(o.paid_amount || 0),
+                    hasOnlyServices,
                 }
             })
             .filter((o: Order) => {

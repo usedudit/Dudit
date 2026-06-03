@@ -601,7 +601,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <FormDropdown
                                     label="Vendedor"
                                     value={props.salespersonId || ""}
-                                    setValue={props.setSalespersonId || (() => {})}
+                                    setValue={props.setSalespersonId || (() => { })}
                                     options={(props.salespeople || []).map(s => ({ value: s.id, label: s.name }))}
                                     disabled={props.mode === 'edit' || props.mode === 'view' || props.isReadOnly}
                                 />
@@ -643,7 +643,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             </div>
 
                             <MoneyInput
-                                label="Frete"
+                                label="Entrega"
                                 value={Number(props.shippingFee) || 0}
                                 onChange={(val) => props.setShippingFee(val.toString())}
                                 disabled={financialLocked}

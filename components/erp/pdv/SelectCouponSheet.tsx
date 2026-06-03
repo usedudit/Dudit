@@ -73,7 +73,7 @@ const SelectCouponSheet = ({
   const formatDiscount = (coupon: CouponItem) => {
     if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}% off`
     if (coupon.discount_type === "fixed") return `${formatCurrency(Number(coupon.discount_value || 0))} off`
-    return "Frete grátis"
+    return "Entrega grátis"
   }
 
   const getCouponBlockReason = (coupon: CouponItem) => {

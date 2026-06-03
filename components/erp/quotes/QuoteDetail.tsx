@@ -170,7 +170,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         async function load() {
             setIsLoadingQuoteItems(true);
             if (!quote) setLoading(true);
-            
+
             const [detailsRes, interactionsRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
                 getQuoteInteractionsAction(quoteId, partnerId)
@@ -188,7 +188,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             if (interactionsRes.success) {
                 setInteractions(interactionsRes.data);
             }
-            
+
             setLoading(false);
             setIsLoadingQuoteItems(false);
         }
@@ -331,13 +331,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             if (res.success) {
                 setNewComment("");
                 notifySuccess("Mensagem enviada", "Mensagem adicionada com sucesso.");
-                
+
                 // Reload interactions
                 const intRes = await getQuoteInteractionsAction(quoteId, partnerId);
                 if (intRes.success) {
                     setInteractions(intRes.data);
                 }
-                
+
                 lastLoadedHistoryQuoteId.current = null;
                 debouncedRefresh();
             } else {
@@ -652,7 +652,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(discount)}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-[14px]">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete</span>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
                                                 <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shipping)}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-[14px]">
@@ -681,17 +681,17 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                             Link de Aprovação Online
                                         </h3>
-                                        
+
                                         <div className="space-y-3">
                                             <div className="flex gap-2">
-                                                <input 
-                                                    type="text" 
-                                                    readOnly 
+                                                <input
+                                                    type="text"
+                                                    readOnly
                                                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/quote/${quote.public_token}`}
                                                     className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-inactive-text dark:text-dark-body cursor-default select-all"
                                                 />
-                                                <Button 
-                                                    variant="outline" 
+                                                <Button
+                                                    variant="outline"
                                                     className="p-2.5 h-auto text-xs shrink-0 rounded-xl"
                                                     onClick={() => {
                                                         navigator.clipboard.writeText(`${window.location.origin}/quote/${quote.public_token}`);
@@ -704,7 +704,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 </Button>
                                             </div>
 
-                                            <Button 
+                                            <Button
                                                 variant="outline"
                                                 className="w-full text-xs font-semibold justify-center py-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30"
                                                 onClick={() => {
@@ -722,10 +722,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         {quote.metadata?.plain_code || "---"}
                                                     </span>
                                                 </div>
-                                                
+
                                                 {quote.status !== "approved" && quote.status !== "rejected" && !quote.converted && (
-                                                    <Button 
-                                                        variant="outline" 
+                                                    <Button
+                                                        variant="outline"
                                                         className="text-xs py-1 h-[32px] rounded-lg border-brand-border dark:border-dark-border"
                                                         onClick={handleRegenerateCode}
                                                         disabled={isRegeneratingCode}
@@ -742,7 +742,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
                                             Logs e Estatísticas
                                         </h3>
-                                        
+
                                         <div className="space-y-3 text-xs text-brand-dark dark:text-dark-body">
                                             <div className="flex justify-between py-1 border-b border-brand-gray dark:border-dark-border/20">
                                                 <span className="text-brand-inactive-text">Visualizações:</span>
@@ -798,7 +798,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                             <span>Canal de Negociação</span>
                                             <Badge variant="gray">{interactions.length}</Badge>
                                         </h3>
-                                        
+
                                         <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-2">
                                             {interactions.length === 0 ? (
                                                 <div className="text-center py-6 text-xs text-brand-inactive-text">
@@ -806,13 +806,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 </div>
                                             ) : (
                                                 interactions.map((msg: any) => (
-                                                    <div 
-                                                        key={msg.id} 
-                                                        className={`p-3 rounded-2xl text-xs max-w-[85%] ${
-                                                            msg.author_role === "seller" 
-                                                                ? "bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-body align-self-start self-start" 
-                                                                : "bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/20 text-emerald-900 dark:text-emerald-300 align-self-end self-end text-right ml-auto"
-                                                        }`}
+                                                    <div
+                                                        key={msg.id}
+                                                        className={`p-3 rounded-2xl text-xs max-w-[85%] ${msg.author_role === "seller"
+                                                            ? "bg-brand-gray dark:bg-dark-border/40 text-brand-dark dark:text-dark-body align-self-start self-start"
+                                                            : "bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/20 text-emerald-900 dark:text-emerald-300 align-self-end self-end text-right ml-auto"
+                                                            }`}
                                                     >
                                                         <div className="font-bold mb-1">
                                                             {msg.author_role === "seller" ? "Você (Vendedor)" : msg.author_name}
@@ -828,16 +827,16 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                         {quote.status !== "expired" && quote.status !== "cancelled" && !quote.converted && (
                                             <form onSubmit={handleSendComment} className="flex gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     value={newComment}
                                                     onChange={(e) => setNewComment(e.target.value)}
                                                     placeholder="Envie uma mensagem..."
                                                     className="flex-1 text-xs bg-brand-gray/50 dark:bg-dark-border/30 p-2.5 rounded-xl border border-brand-border dark:border-dark-border outline-none text-brand-dark dark:text-dark-body"
                                                     disabled={isSubmittingComment}
                                                 />
-                                                <Button 
-                                                    type="submit" 
+                                                <Button
+                                                    type="submit"
                                                     disabled={!newComment.trim() || isSubmittingComment}
                                                     className="px-3 py-2 text-xs shrink-0 rounded-xl"
                                                 >

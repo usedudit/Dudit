@@ -77,7 +77,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
                     const isFreeShipping = promo.promotionType === "free_shipping"
                     const label = isFreeShipping
-                        ? `Falta ${formatCurrency(diff)} para você ganhar Frete Grátis nesta loja!`
+                        ? `Falta ${formatCurrency(diff)} para você ganhar Entrega Grátis nesta loja!`
                         : `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
 
                     return (

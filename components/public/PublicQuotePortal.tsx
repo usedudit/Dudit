@@ -1,19 +1,19 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from "react"
-import { 
-    getPublicQuoteAction, 
-    submitPublicCommentAction, 
-    approvePublicQuoteAction, 
-    rejectPublicQuoteAction 
+import {
+    getPublicQuoteAction,
+    submitPublicCommentAction,
+    approvePublicQuoteAction,
+    rejectPublicQuoteAction
 } from "@/app/actions/erp/quotes"
-import { 
-    Button, 
-    Badge, 
-    Tabs, 
-    TabsList, 
-    TabsTrigger, 
-    TabsContent, 
+import {
+    Button,
+    Badge,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
     CustomerCard,
     ThreeDotsLoader
 } from "@/components/reusable"
@@ -60,24 +60,24 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const [snapshot, setSnapshot] = useState(initialData.snapshot)
     const [interactions, setInteractions] = useState(initialData.interactions)
     const [activeTab, setActiveTab] = useState("Dados Gerais")
-    
+
     const [newComment, setNewComment] = useState("")
     const [isSubmittingComment, setIsSubmittingComment] = useState(false)
-    
+
     // Approval Modals
     const [showApproveModal, setShowApproveModal] = useState(false)
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [isProcessingAction, setIsProcessingAction] = useState(false)
-    
+
     // Verification Inputs
     const [approverName, setApproverName] = useState("")
     const [approvalCode, setApprovalCode] = useState("")
     const [rejectionReason, setRejectionReason] = useState("")
-    
+
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
-    
+
     const commentEndRef = useRef<HTMLDivElement>(null)
 
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
@@ -125,10 +125,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const handleSendComment = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newComment.trim() || isSubmittingComment) return
-        
+
         setIsSubmittingComment(true)
         setErrorMessage(null)
-        
+
         let guestName = "Cliente"
         if (typeof window !== "undefined") {
             const savedName = localStorage.getItem("dudit_guest_name")
@@ -215,7 +215,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // ─── RENDERING COMPUTED DATA ─────────────────────────────────────────────
     const dataQuote = snapshot || quote
     const items = snapshot?.items || quote.items || []
-    
+
     const partnerName = snapshot?.partner?.name || quote.partners?.store_name || "Parceiro"
     const partnerLogo = getR2ImageUrl(snapshot?.partner?.image_url || quote.partners?.store_image_url || null)
     const partnerAddress = snapshot?.partner?.address || "Endereço comercial não disponível"
@@ -229,14 +229,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const customerName = selectedCustomer?.name || "Consumidor final"
     const customerEmail = selectedCustomer?.email || ""
     const customerPhone = selectedCustomer?.phone || ""
-    
+
     // Address rendering for customer
     const customerAddressText = (() => {
         if (!selectedCustomer?.addresses?.length) return null
         const addr = selectedCustomer.addresses.find((a: any) => a.address_type === "primary" || a.is_default) || selectedCustomer.addresses[0]
         return `${addr.street || ""}, ${addr.number || ""}${addr.complement ? ` - ${addr.complement}` : ""}\n${addr.neighborhood || ""} - ${addr.city || ""}/${addr.state || ""}\nCEP: ${addr.zip_code || ""}`
     })()
-    
+
     // Items mapping for QuotePreview component
     const mappedPreviewItems = useMemo(() => {
         return items.map((item: any) => ({
@@ -320,7 +320,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                                 {/* TABS CONTENT */}
                                 <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
-                                    
+
                                     {/* ─── TAB: DADOS GERAIS ─── */}
                                     {activeTab === "Dados Gerais" && (
                                         <div className="space-y-6 text-left">
@@ -401,7 +401,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                 </div>
                                                 {Number(dataQuote.shipping_cost || 0) > 0 && (
                                                     <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Frete</span>
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(dataQuote.shipping_cost))}</span>
                                                     </div>
                                                 )}
@@ -437,13 +437,13 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                             {/* Decision Action Buttons */}
                                             {!isFinalized ? (
                                                 <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                                                    <Button 
+                                                    <Button
                                                         onClick={() => setShowApproveModal(true)}
                                                         className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm h-11"
                                                     >
                                                         ✓ Aprovar Proposta
                                                     </Button>
-                                                    <Button 
+                                                    <Button
                                                         onClick={() => setShowRejectModal(true)}
                                                         variant="outline"
                                                         className="flex-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 font-bold text-sm h-11 border-red-200 dark:border-red-900/30"
@@ -504,13 +504,12 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                     interactions.map((msg: any) => {
                                                         const isCustomer = msg.author_role === "customer"
                                                         return (
-                                                            <div 
-                                                                key={msg.id} 
-                                                                className={`p-3 rounded-2xl text-xs max-w-[85%] ${
-                                                                    isCustomer 
-                                                                        ? "bg-brand-gray/20 dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading align-self-start self-start" 
-                                                                        : "bg-green-50 border border-green-100 text-green-900 align-self-end self-end text-right ml-auto"
-                                                                }`}
+                                                            <div
+                                                                key={msg.id}
+                                                                className={`p-3 rounded-2xl text-xs max-w-[85%] ${isCustomer
+                                                                    ? "bg-brand-gray/20 dark:bg-dark-border/40 text-brand-dark dark:text-dark-heading align-self-start self-start"
+                                                                    : "bg-green-50 border border-green-100 text-green-900 align-self-end self-end text-right ml-auto"
+                                                                    }`}
                                                             >
                                                                 <div className="font-bold mb-1">
                                                                     {isCustomer ? `${msg.author_name} (Cliente)` : `${msg.author_name} (Vendedor)`}
@@ -529,7 +528,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                             {/* Chat Input Form */}
                                             {!isFinalized && (
                                                 <form onSubmit={handleSendComment} className="flex gap-2 pt-2">
-                                                    <input 
+                                                    <input
                                                         type="text"
                                                         value={newComment}
                                                         onChange={(e) => setNewComment(e.target.value)}
@@ -537,7 +536,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                         className="flex-1 text-xs bg-brand-gray/10 dark:bg-dark-surface/20 p-3 rounded-2xl border border-brand-border dark:border-dark-border outline-none focus:border-brand-inactive-text text-brand-dark dark:text-dark-heading"
                                                         disabled={isSubmittingComment}
                                                     />
-                                                    <Button 
+                                                    <Button
                                                         type="submit"
                                                         disabled={!newComment.trim() || isSubmittingComment}
                                                         className="bg-brand-dark text-white hover:bg-brand-dark/90 font-semibold text-xs px-4 h-11 shrink-0 rounded-2xl"
@@ -625,8 +624,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         <div className="space-y-3">
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Seu Nome Completo</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     value={approverName}
                                     onChange={(e) => setApproverName(e.target.value)}
                                     placeholder="Ex: João da Silva"
@@ -636,8 +635,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Código de Aprovação (4 dígitos)</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     maxLength={4}
                                     value={approvalCode}
                                     onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
@@ -648,14 +647,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </div>
 
                         <div className="flex gap-3 pt-2">
-                            <Button 
+                            <Button
                                 variant="outline"
                                 onClick={() => setShowApproveModal(false)}
                                 className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
                             >
                                 Cancelar
                             </Button>
-                            <Button 
+                            <Button
                                 onClick={handleApprove}
                                 disabled={!approverName.trim() || approvalCode.length < 4 || isProcessingAction}
                                 className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold text-sm py-2.5 h-auto"
@@ -683,8 +682,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         <div className="space-y-3">
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Seu Nome Completo</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     value={approverName}
                                     onChange={(e) => setApproverName(e.target.value)}
                                     placeholder="Ex: João da Silva"
@@ -694,8 +693,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Código de Aprovação (4 dígitos)</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     maxLength={4}
                                     value={approvalCode}
                                     onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
@@ -706,7 +705,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
                             <div>
                                 <label className="text-xs font-bold text-slate-700 block mb-1">Motivo da Recusa</label>
-                                <textarea 
+                                <textarea
                                     rows={3}
                                     value={rejectionReason}
                                     onChange={(e) => setRejectionReason(e.target.value)}
@@ -717,14 +716,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         </div>
 
                         <div className="flex gap-3 pt-2">
-                            <Button 
+                            <Button
                                 variant="outline"
                                 onClick={() => setShowRejectModal(false)}
                                 className="flex-1 text-slate-700 text-sm py-2.5 h-auto"
                             >
                                 Cancelar
                             </Button>
-                            <Button 
+                            <Button
                                 onClick={handleReject}
                                 disabled={!approverName.trim() || approvalCode.length < 4 || !rejectionReason.trim() || isProcessingAction}
                                 className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-2.5 h-auto"

@@ -96,7 +96,7 @@ const normalizeCategory = (category?: string | null) => (category || "Outros").t
 const categoryId = (category: string) => category.toLowerCase()
 
 const formatCouponValue = (coupon: any) => {
-    if (coupon.discount_type === "free_shipping") return "Frete grátis"
+    if (coupon.discount_type === "free_shipping") return "Entrega grátis"
     if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}% OFF`
     return `${formatCurrency(Number(coupon.discount_value || 0))} OFF`
 }

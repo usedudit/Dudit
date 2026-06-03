@@ -372,7 +372,7 @@ export default function DeliveryDetailPage({
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Valor Total do Frete</p>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium uppercase">Valor Total da Entrega</p>
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
                                         {formatCurrency(totalDeliveryFee)}
                                     </p>

@@ -1378,7 +1378,7 @@ export function CheckoutPageClient() {
                                                 Adicionar Oferta Especial
                                             </h3>
                                             <p className="text-[11px] text-brand-inactive-text">
-                                                Aproveite e leve também estes produtos da loja com frete único!
+                                                Aproveite e leve também estes produtos da loja com entrega única!
                                             </p>
                                         </div>
                                     </div>

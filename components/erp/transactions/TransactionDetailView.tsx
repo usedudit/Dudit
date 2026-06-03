@@ -419,7 +419,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                 )}
                                                 {detail.salesSummary && detail.salesSummary.deliveryFee > 0 && (
                                                     <PaymentRow
-                                                        label="Frete/entrega"
+                                                        label="Entrega"
                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.deliveryFee)}</span>}
                                                     />
                                                 )}

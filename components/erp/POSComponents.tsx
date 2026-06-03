@@ -180,7 +180,7 @@ export const ReceiptContent = ({
 
                 {shippingFee > 0 && (
                     <div className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Frete</span>
+                        <span className="text-gray-500 dark:text-gray-400 font-medium">Entrega</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                             {formatCurrency(shippingFee)}
                         </span>

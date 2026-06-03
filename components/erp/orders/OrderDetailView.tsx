@@ -428,7 +428,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                         {Number(order.delivery_fee || 0) > 0 && (
                                                             <PaymentRow
-                                                                label="Valor do Frete"
+                                                                label="Valor da Entrega"
                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>} />
                                                         )}
 

@@ -374,7 +374,7 @@ export function ServiceDetailsPageClient({
                 }
             } catch (err) {
                 if (active) {
-                    setDeliveryError("Erro ao calcular o frete.")
+                    setDeliveryError("Erro ao calcular a entrega.")
                     setDeliveryFee(null)
                     setCalculatedAddress(null)
                 }
@@ -435,7 +435,7 @@ export function ServiceDetailsPageClient({
                 }
             } catch (err) {
                 if (active) {
-                    setDeliveryError("Erro ao calcular o frete.")
+                    setDeliveryError("Erro ao calcular a entrega.")
                     setDeliveryFee(null)
                     setCalculatedAddress(null)
                 }

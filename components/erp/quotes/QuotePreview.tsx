@@ -314,7 +314,7 @@ const QuotePreview = ({
 
                                                 {shippingNum > 0 && (
                                                     <div className="flex justify-between items-center text-xs mb-2">
-                                                        <span className="text-gray-500 font-medium">Frete</span>
+                                                        <span className="text-gray-500 font-medium">Entrega</span>
                                                         <span className="font-bold">{formatCurrency(shippingNum)}</span>
                                                     </div>
                                                 )}

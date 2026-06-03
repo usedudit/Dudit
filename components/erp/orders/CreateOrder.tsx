@@ -246,6 +246,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
     const [originalPaymentBreakdown, setOriginalPaymentBreakdown] = useState<PaymentBreakdownEntry[]>([])
+    const [paymentMethodDiscountAmount, setPaymentMethodDiscountAmount] = useState(0)
+    const [paymentMethodExtraAmount, setPaymentMethodExtraAmount] = useState(0)
+    const [originalTotalAmount, setOriginalTotalAmount] = useState(0)
+    const [originalSubtotal, setOriginalSubtotal] = useState(0)
+    const [originalDiscountAmount, setOriginalDiscountAmount] = useState(0)
+    const [originalCouponDiscountAmount, setOriginalCouponDiscountAmount] = useState(0)
 
     // Form State
     const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
@@ -311,7 +317,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [newAccountIsActive, setNewAccountIsActive] = useState(true)
     const isPaymentProcessing = isPaymentModalOpen && isSaving
 
-    // Fluxos idênticos ao PDV (desconto + frete)
+    // Fluxos idênticos ao PDV (desconto + entrega)
     const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
     const [globalDiscountValue, setGlobalDiscountValue] = useState(0)
     const [globalDiscountType, setGlobalDiscountType] = useState<"fixed" | "percentage" | "coupon">("fixed")
@@ -454,10 +460,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)
                 setDiscountType(order.discount_type || "fixed")
+                setPaymentMethodDiscountAmount(Number(order.payment_method_discount_amount || 0))
+                setPaymentMethodExtraAmount(Number(order.payment_method_extra_amount || 0))
+                setOriginalTotalAmount(Number(order.total_amount || 0))
+                setOriginalSubtotal(Number(order.subtotal_value || 0))
+                setOriginalDiscountAmount(Number(order.discount_value || 0))
+                setOriginalCouponDiscountAmount(Number(order.coupon_discount_amount || 0))
                 const hasCoupon = !!order.coupon_id && !!order.coupons;
                 const couponData = order.coupons;
                 setCouponId(order.coupon_id || null);
-                setCouponDiscountAmount(Number(order.discount_amount || 0));
+                setCouponDiscountAmount(Number(order.coupon_discount_amount || 0));
                 if (hasCoupon) {
                     setCouponCode(couponData.code || "");
                     setGlobalDiscountCouponCode(couponData.code || "");
@@ -477,7 +489,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     setCouponPricingData({
                         id: order.coupon_id,
                         discountType: "fixed",
-                        discountValue: Number(order.discount_amount || 0),
+                        discountValue: Number(order.coupon_discount_amount || 0),
                         maxDiscountValue: null,
                         freeShipping: false
                     });
@@ -1347,13 +1359,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             searchResults={productBucket.filteredResults}
                                             loadMoreProducts={productBucket.loadMore}
                                             hasMoreProducts={productBucket.hasMore}
-                                            subtotal={subtotal}
-                                            discountAmount={discountAmount}
+                                            subtotal={isPaidOrder ? originalSubtotal : subtotal}
+                                            discountAmount={isPaidOrder ? originalDiscountAmount : discountAmount}
                                             discountValue={discountValue}
                                             discountType={discountType}
                                             shippingFee={shippingFee}
                                             otherCosts={otherCosts}
-                                            totalAmount={totalAmount}
+                                            totalAmount={isPaidOrder ? originalTotalAmount : totalAmount}
                                             selectedCustomer={selectedCustomer}
                                             orderDate={orderDate}
                                             salesChannel={salesChannel}
@@ -1383,7 +1395,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             setDiscountType={setDiscountType}
                                             couponCode={couponCode}
                                             setCouponCode={setCouponCode}
-                                            couponDiscountAmount={effectiveCouponDiscountAmount}
+                                            couponDiscountAmount={isPaidOrder ? originalCouponDiscountAmount : effectiveCouponDiscountAmount}
                                             onApplyCoupon={handleApplyCoupon}
                                             onOpenDiscount={() => setIsDiscountModalOpen(true)}
                                             onOpenShipping={handleOpenShippingSheet}
@@ -1421,6 +1433,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             originalPaymentMethod={originalPaymentMethod}
                                             originalPaymentBreakdown={originalPaymentBreakdown}
                                             originalPaidAmount={originalPaidAmount}
+                                            paymentMethodDiscountAmount={paymentMethodDiscountAmount}
+                                            paymentMethodExtraAmount={paymentMethodExtraAmount}
                                             role={role}
                                         />
                                     </div>

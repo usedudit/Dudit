@@ -403,7 +403,7 @@ export default function CouponFormPage({
                                                                 options={[
                                                                     { value: "percentage", label: "Percentual (%)" },
                                                                     { value: "fixed", label: "Valor fixo (R$)" },
-                                                                    { value: "free_shipping", label: "Frete grátis" },
+                                                                    { value: "free_shipping", label: "Entrega grátis" },
                                                                 ]}
                                                             />
                                                         </div>

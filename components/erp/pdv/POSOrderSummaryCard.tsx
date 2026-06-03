@@ -64,7 +64,7 @@ function POSOrderActionsMenu({
         <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
       </DropdownItem>
       <DropdownItem onClick={onAddShipping}>
-        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Frete
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Entrega
       </DropdownItem>
       <DropdownItem onClick={onOpenCreateProduct}>
         <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Criar Produto
