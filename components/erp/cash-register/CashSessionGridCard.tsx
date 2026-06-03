@@ -80,13 +80,13 @@ const CashSessionGridCard = React.memo(
                     <div className="grid grid-cols-3 gap-2">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Inicial</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {formatCurrency(Number(session.initial_amount || 0))}
                             </span>
                         </div>
                         <div className="flex flex-col gap-0.5 items-center text-center">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Recebido</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                 {formatCurrency(Number(session.total_received_amount || 0))}
                             </span>
                         </div>

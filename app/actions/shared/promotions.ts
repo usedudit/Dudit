@@ -662,3 +662,144 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   }
 }
 
+export async function listActivePromotionsInBatch(partnerIds: string[], customerId?: string | null) {
+  if (!partnerIds || partnerIds.length === 0) return {}
+
+  const supabase = getAdminClient()
+  const now = new Date().toISOString()
+
+  // 1. Fetch campaigns that are active and current for all partners
+  let campaignsQuery = supabase
+    .from("campaigns")
+    .select("id, partner_id, customer_scope")
+    .in("partner_id", partnerIds)
+    .eq("is_active", true)
+    .or(`starts_at.is.null,starts_at.lte.${now}`)
+    .or(`ends_at.is.null,ends_at.gte.${now}`)
+
+  const { data: campaigns, error: campError } = await campaignsQuery
+  if (campError || !campaigns || campaigns.length === 0) {
+    return {}
+  }
+
+  // Handle specific customer filtration
+  const activeCampaignIds: string[] = []
+  const campaignIdsToCheckAudience: string[] = []
+
+  for (const c of campaigns) {
+    if (c.customer_scope === "all") {
+      activeCampaignIds.push(c.id)
+    } else if (c.customer_scope === "specific") {
+      campaignIdsToCheckAudience.push(c.id)
+    }
+  }
+
+  if (campaignIdsToCheckAudience.length > 0 && customerId) {
+    const { data: assignments } = await supabase
+      .from("campaign_customers")
+      .select("campaign_id")
+      .eq("customer_id", customerId)
+      .in("campaign_id", campaignIdsToCheckAudience)
+
+    if (assignments && assignments.length > 0) {
+      for (const a of assignments) {
+        activeCampaignIds.push(a.campaign_id)
+      }
+    }
+  }
+
+  if (activeCampaignIds.length === 0) {
+    return {}
+  }
+
+  // Fetch promotions linked to active campaigns
+  const { data: promotions, error: promoError } = await supabase
+    .from("promotions")
+    .select(`
+      *,
+      promotion_products(product_id),
+      promotion_categories(category_id),
+      promotion_services(service_id),
+      promotion_subscriptions(recurring_plan_id)
+    `)
+    .in("partner_id", partnerIds)
+    .eq("is_active", true)
+    .in("campaign_id", activeCampaignIds)
+
+  if (promoError || !promotions || promotions.length === 0) {
+    return {}
+  }
+
+  // Filter out promotions that have hit their overall usage limit
+  const candidatePromos = promotions.filter((promo: any) => {
+    const limit = promo.usage_limit
+    const currentCount = promo.usage_count || 0
+    return limit === null || currentCount < limit
+  })
+
+  if (candidatePromos.length === 0) {
+    return {}
+  }
+
+  // Check per-customer limit if customerId is provided
+  const promoIdsWithCustomerLimit = candidatePromos
+    .filter((p: any) => p.usage_limit_per_customer !== null)
+    .map((p: any) => p.id)
+
+  const customerUsagesMap: Record<string, number> = {}
+
+  if (customerId && promoIdsWithCustomerLimit.length > 0) {
+    const { data: usages } = await supabase
+      .from("promotion_usages")
+      .select("promotion_id")
+      .eq("customer_id", customerId)
+      .in("promotion_id", promoIdsWithCustomerLimit)
+
+    if (usages) {
+      for (const usage of usages) {
+        customerUsagesMap[usage.promotion_id] = (customerUsagesMap[usage.promotion_id] || 0) + 1
+      }
+    }
+  }
+
+  const result: Record<string, PricingPromotion[]> = {}
+
+  for (const promo of candidatePromos) {
+    if (customerId && promo.usage_limit_per_customer !== null) {
+      const userUsage = customerUsagesMap[promo.id] || 0
+      if (userUsage >= promo.usage_limit_per_customer) {
+        continue
+      }
+    }
+
+    const partnerId = promo.partner_id
+    if (!result[partnerId]) {
+      result[partnerId] = []
+    }
+
+    result[partnerId].push({
+      id: promo.id,
+      campaignId: promo.campaign_id,
+      partnerId: promo.partner_id,
+      name: promo.name,
+      promotionType: promo.promotion_type as PromotionType,
+      discountType: promo.discount_type as DiscountType | null,
+      discountValue: promo.discount_value ? Number(promo.discount_value) : null,
+      maxDiscountAmount: promo.max_discount_amount ? Number(promo.max_discount_amount) : null,
+      minSpendAmount: promo.min_spend_amount ? Number(promo.min_spend_amount) : null,
+      giftProductId: promo.gift_product_id,
+      buyQuantity: promo.buy_quantity,
+      payQuantity: promo.pay_quantity,
+      priority: promo.priority,
+      applyScope: promo.apply_scope as ApplyScope,
+      allowCouponCombination: promo.allow_coupon_combination,
+      applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
+      applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
+      applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
+      applicableSubscriptionIds: (promo.promotion_subscriptions || []).map((s: any) => s.recurring_plan_id),
+    })
+  }
+
+  return result
+}
+

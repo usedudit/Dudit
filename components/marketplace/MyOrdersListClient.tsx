@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
-import { OrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
+import { OrderStatusSyncOnLoad, BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { Button, IconPlaceholder, Tooltip, Badge } from "@/components/reusable";
 import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
@@ -109,6 +109,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                         </div>
 
                         <div className="space-y-6 flex-1">
+                            <BatchOrderStatusSyncOnLoad orders={orders} />
                             {orders && orders.length > 0 ? (
                                 orders.map((order: any) => {
                                     const statusConfig = getStatusConfig(order.situation);
@@ -125,13 +126,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                             onClick={(e) => handleCardClick(e, order.id, order.order_number)}
                                             className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors cursor-pointer md:cursor-default"
                                         >
-                                            {order.situation === "pending" && (
-                                                <OrderStatusSyncOnLoad
-                                                    orderId={order.id}
-                                                    status={order.situation}
-                                                    paymentProvider={order.payment_provider}
-                                                />
-                                            )}
+                                            {/* Batch sync handled at container level */}
 
                                             {/* Card Header */}
                                             <div className="px-6 py-4 bg-brand-gray dark:bg-emerald-900/10 flex flex-col md:flex-row md:items-center justify-between gap-4">

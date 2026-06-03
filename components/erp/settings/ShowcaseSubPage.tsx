@@ -299,7 +299,7 @@ export const ShowcaseSubPage = ({
                             </div>
 
                             {/* Desktop action buttons */}
-                            <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                 <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
                                     {isLoading ? "Salvando..." : "Salvar"}
                                 </Button>

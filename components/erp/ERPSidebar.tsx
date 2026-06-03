@@ -223,6 +223,10 @@ export function ERPSidebar() {
     const deliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
     const financialResourceActive = isSystemResourceActive(businessInfo, "financial")
     const appointmentsResourceActive = isSystemResourceActive(businessInfo, "appointments")
+    const customersResourceActive = isSystemResourceActive(businessInfo, "customers")
+    const reportsResourceActive = isSystemResourceActive(businessInfo, "reports")
+    const marketingResourceActive = isSystemResourceActive(businessInfo, "marketing")
+    const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
     const salesGroupActive = ordersResourceActive || quotesResourceActive || posResourceActive || deliveriesResourceActive
     const servicesGroupActive = servicesResourceActive || appointmentsResourceActive
 
@@ -257,6 +261,10 @@ export function ERPSidebar() {
                 if (item.href === "/erp/products" && !productsResourceActive) return null;
                 if (item.href === "/erp/servicos" && !servicesGroupActive) return null;
                 if (item.href === "/erp/resumo-financeiro" && !financialResourceActive) return null;
+                if (item.href === "/erp/customers" && !customersResourceActive) return null;
+                if (item.href === "/erp/reports" && !reportsResourceActive) return null;
+                if (item.label === "Marketing" && !marketingResourceActive) return null;
+                if (item.label === "Minha Vitrine" && !showcaseResourceActive) return null;
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
@@ -317,7 +325,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, showcaseResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

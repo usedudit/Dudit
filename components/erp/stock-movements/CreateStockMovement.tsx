@@ -798,7 +798,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className="w-full h-full object-cover rounded-full" alt="" />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <div className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{item.product.name}</div>
+                                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{item.product.name}</div>
                                                                             <div className="text-[10px] font-medium text-brand-inactive-text uppercase tracking-wider">{item.product.sku}</div>
                                                                         </div>
                                                                     </div>

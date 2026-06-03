@@ -1,23 +1,23 @@
 "use client"
 
-import { useState, useRef, Fragment, useEffect } from "react"
+import { useState, useRef, Fragment } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
-import { TrashIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
-import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { formatCurrency } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
+import { useCSRFToken } from "@/hooks/use-csrf-token"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -37,32 +37,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
 
-    const [partnerPromotions, setPartnerPromotions] = useState<Record<string, any[]>>({})
-
-    useEffect(() => {
-        async function loadPromos() {
-            const partnerIds = Object.keys(itemsByPartner)
-            const promosMap: Record<string, any[]> = {}
-            await Promise.all(
-                partnerIds.map(async (pId) => {
-                    try {
-                        const activePromos = await listActivePromotionsForMarketplaceAction(pId, userId)
-                        promosMap[pId] = activePromos || []
-                    } catch (err) {
-                        console.error(`Failed to load promos for partner ${pId}:`, err)
-                    }
-                })
-            )
-            setPartnerPromotions(promosMap)
-        }
-        if (Object.keys(itemsByPartner).length > 0) {
-            loadPromos()
-        }
-    }, [itemsByPartner, userId])
-
     const renderPromoBanners = (partnerId: string, partnerItemsTotal: number) => {
-        const promos = partnerPromotions[partnerId] || []
-        const pendingPromos = promos.filter(p =>
+        const promos = itemsByPartner[partnerId]?.promotions || []
+        const pendingPromos = promos.filter((p: any) =>
             p.minSpendAmount &&
             p.minSpendAmount > partnerItemsTotal &&
             (p.promotionType === "gift" || p.promotionType === "free_shipping")
@@ -72,7 +49,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
         return (
             <div className="mt-4 space-y-3">
-                {pendingPromos.map((promo) => {
+                {pendingPromos.map((promo: any) => {
                     const diff = promo.minSpendAmount - partnerItemsTotal
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
                     const isFreeShipping = promo.promotionType === "free_shipping"
@@ -183,7 +160,10 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const getItemQuantity = (item: any): number =>
         optimisticItems[item.id]?.quantity ?? item.quantity
 
+    const csrfToken = useCSRFToken()
+
     const getCsrfToken = async (): Promise<string> => {
+        if (csrfToken) return csrfToken
         const { token } = await (await fetch("/api/csrf-token")).json()
         return token
     }

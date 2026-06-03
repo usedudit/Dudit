@@ -58,7 +58,7 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 
 const StockMovementPageContent = ({ partnerId, movements: initialMovements, initialNextCursor, initialHasMore }: StockMovementPageProps) => {
     const { error: notifyError, success: notifySuccess } = useNotification();
-    const isMobile = useMediaQuery("(max-width: 768px)");
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)");
 
     const queryKey = useMemo(() => ['erp', 'stock-movements', partnerId] as const, [partnerId]);
 
@@ -103,7 +103,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [page, setPage] = useState(1);
-    const [viewMode, setViewModeState] = useState<'grid' | 'list'>(isMobile ? 'grid' : 'list');
+    const [viewMode, setViewModeState] = useState<'grid' | 'list'>(isTabletOrMobile ? 'grid' : 'list');
+    const effectiveViewMode = isTabletOrMobile ? 'grid' : viewMode;
     const [filters, setFilters] = useState<{
         movement_type: string[];
         datePeriod: DatePeriodFilterValue;
@@ -141,7 +142,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
         checkScroll();
         window.addEventListener("resize", checkScroll);
         return () => window.removeEventListener("resize", checkScroll);
-    }, [checkScroll, viewMode, loadedMovements]);
+    }, [checkScroll, effectiveViewMode, loadedMovements]);
 
     const filterSections: FilterSectionConfig[] = [
         { id: "datePeriod", title: "Data da movimentação", type: "date-period" },
@@ -457,7 +458,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                 ) : (
                                     <AnimatePresence mode="wait">
                                         <FadeIn
-                                            key={activeTab + viewMode}
+                                            key={activeTab + effectiveViewMode}
                                             className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
                                         >
                                             <SelectionBanner
@@ -468,46 +469,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                                 itemName="movimentações"
                                                 singularItemName="movimentação"
                                             />
-                                            {isMobile ? (
-                                                <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                    {paginatedMovements.map((mov) => {
-                                                        const prefetch = getPrefetchProps(mov.id)
-                                                        return (
-                                                            <div
-                                                                key={mov.id}
-                                                                className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none"
-                                                                onClick={() => handleViewDetails(mov.id)}
-                                                                onMouseEnter={prefetch.onMouseEnter}
-                                                                onMouseLeave={prefetch.onMouseLeave}
-                                                                onTouchStart={prefetch.onTouchStart}
-                                                            >
-                                                                <div className="w-14 h-14 rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border shrink-0 flex items-center justify-center">
-                                                                    <Package className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
-                                                                </div>
-
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">{mov.displayId}</h3>
-                                                                        <Badge variant={mov.type === 'in' ? 'green' : 'red'}>
-                                                                            {mov.type === 'in' ? 'Entrada' : 'Saída'}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mb-2">
-                                                                        {mov.items_count} {mov.items_count === 1 ? 'item' : 'itens'} • {mov.reason}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 text-md">
-                                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{mov.date.split(',')[0]}</span>
-                                                                        <div className="flex-none ml-auto -mb-1" onClick={(e) => e.stopPropagation()}>
-                                                                            <Checkbox checked={selection.ids.has(mov.id)} onChange={() => handleSelectRow(mov.id)} />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            ) : viewMode === 'grid' ? (
-                                                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                            {effectiveViewMode === 'grid' ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginatedMovements.map((mov) => {
                                                         const prefetch = getPrefetchProps(mov.id)
                                                         return (

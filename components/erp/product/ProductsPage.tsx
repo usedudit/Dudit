@@ -11,11 +11,9 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { UNITS } from "@/lib/constants/product-constants"
-import { useQueryClient } from "@tanstack/react-query"
 import { getERPProductsPageAction, type ERPProductListCursor } from "@/app/actions/erp/products"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
-import type { EntityAction } from "@/hooks/use-entity-state"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
@@ -195,7 +193,7 @@ export default function ProductsPage({
     const router = useRouter()
     const { error: notifyError, success: notifySuccess } = useNotification()
     const { selectedStore } = useStore()
-    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const { planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
 
@@ -267,7 +265,7 @@ export default function ProductsPage({
     const [selection, setSelection] = useState({ ids: new Set<string>(), delete: null as Product | null })
     const [actionModal, setActionModal] = useState<{ open: boolean; text: string }>({ open: false, text: "" })
     const [sharingProduct, setSharingProduct] = useState<Product | null>(null)
-    const [viewMode, setViewModeState] = useState<"list" | "grid">("list")
+    const [viewMode, setViewModeState] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const [filters, setFilters] = useState<FilterState>({
         stocks: [],
@@ -290,7 +288,7 @@ export default function ProductsPage({
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
 
-    const effectiveViewMode = viewMode
+    const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
 
     // Initialize refs for container scrolling
@@ -420,6 +418,12 @@ export default function ProductsPage({
     const paginated = useMemo(() =>
         sortedProducts.slice((page - 1) * itemsPerPage, page * itemsPerPage),
         [sortedProducts, page, itemsPerPage])
+
+    useEffect(() => {
+        if (page === totalPages && hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage()
+        }
+    }, [page, totalPages, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     // --- Handlers ---
 
@@ -957,8 +961,27 @@ export default function ProductsPage({
                                         </AnimatePresence>
                                     )}
                                 </AnimatePresence>
+                                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
                             </div>
-                            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+
+                            {hasProducts && paginated.length > 0 && (
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={totalPages}
+                                    onPageChange={(p) => {
+                                        setPage(p)
+                                        if (p === totalPages && hasNextPage && !isFetchingNextPage) {
+                                            void fetchNextPage()
+                                        }
+                                    }}
+                                />
+                            )}
+                            {hasNextPage && page === totalPages && isFetchingNextPage ? (
+                                <div className="flex flex-col gap-2 py-2 px-4">
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse" />
+                                    <div className="h-10 w-full max-w-lg mx-auto rounded-lg bg-gray-100 dark:bg-dark-border/30 animate-pulse opacity-70" />
+                                </div>
+                            ) : null}
                         </div>
                     </FadeIn>
                 )}

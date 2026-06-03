@@ -195,9 +195,9 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
     return (
         <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
@@ -211,40 +211,41 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                 </div>
 
                                 {/* Title row */}
-                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="truncate">Equipe</span>
                                         </h1>
 
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Gerencie os membros da sua equipe e suas permissões de acesso.
                                         </div>
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowInviteModal(true)}>
                                             Convidar membro
                                         </Button>
                                     </div>
+                                </div>
 
-                                    {/* Tabs */}
-                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="members">
-                                                Equipe ({teamMembers.length})
-                                            </TabsTrigger>
-                                            <TabsTrigger value="invites">
-                                                Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
-                                            </TabsTrigger>
-                                        </TabsList>
-                                    </div>
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="members">
+                                            Equipe ({teamMembers.length})
+                                        </TabsTrigger>
+                                        <TabsTrigger value="invites">
+                                            Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
+                                        </TabsTrigger>
+                                    </TabsList>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="px-3 md:px-6 lg:py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                        {/* Content Body */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             {isLoadingMembers ? (
                                 <div className="flex justify-center p-12">
                                     <ThreeDotsLoader />
@@ -521,15 +522,8 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         <Button
-                            variant="outline"
-                            onClick={handleBack}
-                            className="flex-1 h-12 font-bold"
-                        >
-                            Voltar
-                        </Button>
-                        <Button
                             onClick={() => setShowInviteModal(true)}
-                            className="flex-1 h-12 font-bold"
+                            className="flex-1 h-12"
                         >
                             Convidar membro
                         </Button>

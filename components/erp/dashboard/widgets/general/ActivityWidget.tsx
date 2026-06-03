@@ -62,7 +62,7 @@ export async function ActivityWidget({ partnerId }: { partnerId: string }) {
                                 <Icon className={cn("h-4 w-4", toneClasses[item.tone])} />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                     {item.title}
                                 </p>
                                 <div className="flex items-center gap-1.5 text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">

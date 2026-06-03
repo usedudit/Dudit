@@ -10,8 +10,12 @@ export type SystemResourceId =
   | "financial"
   | "team"
   | "appointments"
+  | "customers"
+  | "reports"
+  | "marketing"
+  | "showcase"
 
-export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management"
+export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
 export interface SystemResourceDefinition {
   id: SystemResourceId
@@ -24,9 +28,10 @@ export interface SystemResourceDefinition {
 export const SYSTEM_RESOURCE_MODULE_LABELS: Record<SystemResourceModule, string> = {
   sales: "Vendas",
   catalog: "Produtos",
-  services: "Servicos",
-  operations: "Operacao",
-  management: "Gestao",
+  services: "Serviços",
+  operations: "Operação",
+  management: "Gestão",
+  marketing: "Marketing",
 }
 
 export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
@@ -38,8 +43,8 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   },
   {
     id: "quotes",
-    label: "Orcamentos",
-    description: "Criacao e acompanhamento de propostas.",
+    label: "Orçamentos",
+    description: "Criação e acompanhamento de propostas.",
     module: "sales",
   },
   {
@@ -51,48 +56,89 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "products",
     label: "Produtos",
-    description: "Catalogo, estoque e cadastros de produtos.",
+    description: "Catálogo, estoque e cadastros de produtos.",
+    module: "catalog",
+  },
+  {
+    id: "showcase",
+    label: "Minha Vitrine",
+    description: "Vitrine online para divulgação de produtos e serviços.",
     module: "catalog",
   },
   {
     id: "services",
-    label: "Servicos",
-    description: "Catalogo e cadastros de servicos.",
+    label: "Serviços",
+    description: "Catálogo e cadastros de serviços.",
     module: "services",
   },
   {
     id: "appointments",
     label: "Agendamentos",
-    description: "Agenda de servicos e atendimentos.",
+    description: "Agenda de serviços e atendimentos.",
     module: "services",
   },
   {
     id: "deliveries",
     label: "Entregas",
-    description: "Expedicao, rotas e entregadores.",
+    description: "Expedição, rotas e entregadores.",
     module: "operations",
     minimumPlan: "crescer",
   },
   {
     id: "financial",
     label: "Financeiro",
-    description: "Resumo financeiro, contas, caixa e movimentacoes.",
+    description: "Resumo financeiro, contas, caixa e movimentações.",
     module: "management",
     minimumPlan: "crescer",
   },
   {
     id: "team",
     label: "Equipe",
-    description: "Convites, usuarios e acessos da equipe.",
+    description: "Convites, usuários e acessos da equipe.",
     module: "management",
     minimumPlan: "crescer",
+  },
+  {
+    id: "customers",
+    label: "Clientes",
+    description: "Cadastro e gestão de clientes do negócio.",
+    module: "management",
+  },
+  {
+    id: "reports",
+    label: "Relatórios",
+    description: "Relatórios de vendas, estoque, serviços e financeiro.",
+    module: "management",
+    minimumPlan: "crescer",
+  },
+  {
+    id: "marketing",
+    label: "Marketing",
+    description: "Campanhas, cupons de desconto e assinaturas/planos recorrentes.",
+    module: "marketing",
   },
 ]
 
 export const SYSTEM_RESOURCE_IDS = SYSTEM_RESOURCES.map((resource) => resource.id)
 
 export function normalizeActiveResources(value: unknown): SystemResourceId[] {
-  if (!Array.isArray(value)) return ["orders", "products"]
+  if (!Array.isArray(value)) {
+    return [
+      "orders",
+      "products",
+      "services",
+      "quotes",
+      "pos",
+      "deliveries",
+      "financial",
+      "team",
+      "appointments",
+      "customers",
+      "reports",
+      "marketing",
+      "showcase",
+    ]
+  }
   const allowed = new Set<SystemResourceId>(SYSTEM_RESOURCE_IDS)
   const normalized = value.filter((item): item is SystemResourceId => allowed.has(item as SystemResourceId))
   return Array.from(new Set(normalized))
@@ -100,15 +146,43 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
 
 export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: string[] }): SystemResourceId[] {
   const sells = businessInfo.sells || []
-  const defaults: SystemResourceId[] = ["orders"]
-  if (sells.includes("products")) defaults.push("products")
-  if (sells.includes("services")) defaults.push("services")
+  const defaults: SystemResourceId[] = [
+    "orders",
+    "quotes",
+    "pos",
+    "deliveries",
+    "financial",
+    "team",
+    "customers",
+    "reports",
+    "marketing",
+    "showcase",
+  ]
+  if (sells.includes("products")) {
+    defaults.push("products")
+  }
+  if (sells.includes("services")) {
+    defaults.push("services")
+    defaults.push("appointments")
+  }
   return defaults
 }
 
-export function resolveActiveResources(businessInfo: { sells?: string[]; activeResources?: unknown }): SystemResourceId[] {
+export function resolveActiveResources(businessInfo: { sells?: string[]; activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
   if (Array.isArray(businessInfo.activeResources)) {
-    return normalizeActiveResources(businessInfo.activeResources)
+    const current = normalizeActiveResources(businessInfo.activeResources)
+    
+    // Automatically migrate older schemas to include new resources
+    const version = (businessInfo as any).resourcesVersion || 0
+    if (version < 2) {
+      const newResources: SystemResourceId[] = ["customers", "reports", "marketing", "showcase"]
+      for (const r of newResources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
+    return current
   }
   return defaultActiveResourcesForBusinessInfo(businessInfo)
 }

@@ -1,161 +1,210 @@
 "use client"
 
-import React from "react"
-import { Button } from "@/components/reusable"
+import React, { useCallback } from "react"
+import { Button, FormSection, AlertModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
-import { cn } from "@/lib/utils"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
 import { updateSystemResourcesAction } from "@/app/actions/erp/system-resources"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import {
-  SYSTEM_RESOURCES,
-  SYSTEM_RESOURCE_MODULE_LABELS,
-  resolveActiveResources,
-  type SystemResourceId,
-  type SystemResourceModule,
+    SYSTEM_RESOURCES,
+    SYSTEM_RESOURCE_MODULE_LABELS,
+    resolveActiveResources,
+    type SystemResourceId,
+    type SystemResourceModule,
 } from "@/lib/system-resources"
 
 interface SystemResourcesSubPageProps {
-  businessInfo: {
-    sells?: string[]
-    activeResources?: string[]
-  }
-  planSlug: string
-  onBack: () => void
+    businessInfo: {
+        sells?: string[]
+        activeResources?: string[]
+    }
+    planSlug: string
+    onBack: () => void
 }
 
 export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: SystemResourcesSubPageProps) {
-  const initialResources = React.useMemo(() => resolveActiveResources(businessInfo), [businessInfo])
-  const [selected, setSelected] = React.useState<SystemResourceId[]>(initialResources)
-  const [saving, setSaving] = React.useState(false)
+    const initialResources = React.useMemo(() => resolveActiveResources(businessInfo), [businessInfo])
+    const [selected, setSelected] = React.useState<SystemResourceId[]>(initialResources)
+    const [saving, setSaving] = React.useState(false)
+    const [isScrolled, setIsScrolled] = React.useState(false)
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null)
 
-  const selectedSet = React.useMemo(() => new Set(selected), [selected])
-  const hasChanges = React.useMemo(() => {
-    if (selected.length !== initialResources.length) return true
-    return selected.some((id) => !initialResources.includes(id))
-  }, [initialResources, selected])
+    const handleScroll = useCallback(() => {
+        if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
+    }, [])
 
-  const groupedResources = React.useMemo(() => {
-    return SYSTEM_RESOURCES.reduce((acc, resource) => {
-      if (!acc[resource.module]) acc[resource.module] = []
-      acc[resource.module].push(resource)
-      return acc
-    }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
-  }, [])
+    const selectedSet = React.useMemo(() => new Set(selected), [selected])
+    const hasChanges = React.useMemo(() => {
+        if (selected.length !== initialResources.length) return true
+        return selected.some((id) => !initialResources.includes(id))
+    }, [initialResources, selected])
 
-  const toggleResource = (resourceId: SystemResourceId, checked: boolean) => {
-    setSelected((current) => {
-      if (checked) return Array.from(new Set([...current, resourceId]))
-      return current.filter((id) => id !== resourceId)
-    })
-  }
+    const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(hasChanges)
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const result = await updateSystemResourcesAction(selected)
-      if (!result.success) {
-        toast.error(result.error || "Nao foi possivel salvar os recursos.")
-        return
-      }
-      toast.success("Recursos atualizados", "A pagina sera recarregada para atualizar o menu.")
-      window.location.reload()
-    } catch {
-      toast.error("Erro inesperado ao salvar os recursos.")
-    } finally {
-      setSaving(false)
+    const groupedResources = React.useMemo(() => {
+        return SYSTEM_RESOURCES.reduce((acc, resource) => {
+            if (!acc[resource.module]) acc[resource.module] = []
+            acc[resource.module].push(resource)
+            return acc
+        }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
+    }, [])
+
+    const toggleResource = (resourceId: SystemResourceId, checked: boolean) => {
+        setSelected((current) => {
+            if (checked) return Array.from(new Set([...current, resourceId]))
+            return current.filter((id) => id !== resourceId)
+        })
     }
-  }
 
-  return (
-    <FadeIn>
-      <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-          <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-6 flex items-center justify-between gap-4">
-            <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center">
-              <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-              </Button>
-            </div>
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            const result = await updateSystemResourcesAction(selected)
+            if (!result.success) {
+                toast.error(result.error || "Não foi possível salvar os recursos.")
+                return
+            }
+            toast.success("Recursos atualizados", "A página será recarregada para atualizar o menu.")
+            window.location.reload()
+        } catch {
+            toast.error("Erro inesperado ao salvar os recursos.")
+        } finally {
+            setSaving(false)
+        }
+    }
 
-            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-              <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading truncate">
-                Gerenciar recursos
-              </h1>
-              <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                Ative somente os modulos que aparecem no menu do ERP.
-              </p>
-            </div>
+    const handleBack = useCallback(() => {
+        handleNavigation(onBack)
+    }, [handleNavigation, onBack])
 
-            <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={onBack}>
-                Voltar
-              </Button>
-              <Button onClick={handleSave} isLoading={saving} disabled={!hasChanges || saving} leftIcon={<SaveIcon className="w-4 h-4" />}>
-                Salvar
-              </Button>
-            </div>
-          </div>
-        </div>
+    return (
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
-        <div className="flex-1 overflow-y-auto no-scrollbar px-3 md:px-6 py-6">
-          <div className="max-w-[980px] mx-auto">
-            <div className="mb-6 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface p-4">
-              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativar recursos</p>
-              <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                Recursos ativados aparecem no menu. Recursos desativados somem para deixar a operacao mais limpa.
-              </p>
-            </div>
+                    {/* Sticky Header */}
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
-            <div className="space-y-6">
-              {(Object.keys(groupedResources) as SystemResourceModule[]).map((module) => (
-                <section key={module} className="space-y-3">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
-                    {SYSTEM_RESOURCE_MODULE_LABELS[module]}
-                  </h2>
-                  <div className="rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                    {groupedResources[module].map((resource, index) => {
-                      const checked = selectedSet.has(resource.id)
-                      const requiredPlan = resource.minimumPlan
-                      const isPlanBlocked = requiredPlan ? !hasMinimumPlan(planSlug, requiredPlan) : false
-                      const star = requiredPlan ? planStarIconForTarget(requiredPlan) : null
-
-                      return (
-                        <div
-                          key={resource.id}
-                          className={cn(
-                            "flex items-center justify-between gap-4 p-4",
-                            index > 0 && "border-t border-brand-border dark:border-dark-border",
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-brand-dark dark:text-dark-heading">{resource.label}</p>
-                              {isPlanBlocked && requiredPlan ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-brand-yellow/30 bg-brand-yellow/10 px-2 py-0.5 text-[11px] font-bold text-brand-dark dark:text-dark-heading">
-                                  {star ? <img src={star} alt="" className="w-3.5 h-3.5 object-contain" /> : null}
-                                  Plano {requiredPlan === "crescer" ? "Crescer" : "Escalar"}
-                                </span>
-                              ) : null}
+                            {/* Back button - desktop only */}
+                            <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                </Button>
                             </div>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                              {resource.description}
-                            </p>
-                          </div>
-                          <Switch checked={checked} onCheckedChange={(value: boolean) => toggleResource(resource.id, value)} />
+
+                            {/* Title row */}
+                            <div className="hidden md:flex items-start justify-between">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="truncate">Gerenciar recursos</span>
+                                    </h1>
+
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        Ative somente os módulos que irão aparecer no seu sistema
+                                    </div>
+                                </div>
+
+                                {/* Desktop action buttons */}
+                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                    <Button variant="outline" onClick={handleBack}>
+                                        Voltar
+                                    </Button>
+                                    <Button onClick={handleSave} isLoading={saving} disabled={!hasChanges || saving} leftIcon={<SaveIcon className="w-4 h-4" />}>
+                                        Salvar
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </section>
-              ))}
+                    </div>
+
+                    {/* Content Body */}
+                    <div className="px-3 md:px-6 py-6 max-w-[980px] mx-auto min-h-[400px]">
+                        <div className="mb-6 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface p-4">
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Ativar recursos</p>
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                                Recursos ativados aparecem no menu. Recursos desativados somem para deixar a operação mais limpa.
+                            </p>
+                        </div>
+
+                        <div className="space-y-10">
+                            {(Object.keys(groupedResources) as SystemResourceModule[]).map((module, idx) => (
+                                <FormSection key={module} title={SYSTEM_RESOURCE_MODULE_LABELS[module]} hasSeparator={idx > 0}>
+                                    <div className="divide-y divide-brand-border dark:divide-dark-border">
+                                        {groupedResources[module].map((resource) => {
+                                            const checked = selectedSet.has(resource.id)
+                                            const requiredPlan = resource.minimumPlan
+                                            const isPlanBlocked = requiredPlan ? !hasMinimumPlan(planSlug, requiredPlan) : false
+                                            const star = requiredPlan ? planStarIconForTarget(requiredPlan) : null
+
+                                            return (
+                                                <div
+                                                    key={resource.id}
+                                                    className="flex items-center justify-between gap-4 py-4 px-0"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-bold text-brand-dark dark:text-dark-heading">{resource.label}</p>
+                                                            {isPlanBlocked && requiredPlan ? (
+                                                                <span className="inline-flex items-center gap-1 rounded-full border border-brand-yellow/30 bg-brand-yellow/10 px-2 py-0.5 text-[11px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {star ? <img src={star} alt="" className="w-3.5 h-3.5 object-contain" /> : null}
+                                                                    Plano {requiredPlan === "crescer" ? "Crescer" : "Escalar"}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            {resource.description}
+                                                        </p>
+                                                    </div>
+                                                    <Switch checked={checked} onCheckedChange={(value: boolean) => toggleResource(resource.id, value)} />
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </FormSection>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </FadeIn>
-  )
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <Button
+                    variant="outline"
+                    onClick={handleBack}
+                    className="flex-1 h-12"
+                    disabled={saving}
+                >
+                    Voltar
+                </Button>
+                <Button
+                    onClick={handleSave}
+                    className="flex-1 h-12"
+                    disabled={!hasChanges || saving}
+                    isLoading={saving}
+                >
+                    Salvar
+                </Button>
+            </div>
+
+            {showConfirmDialog && (
+                <AlertModal
+                    isOpen={showConfirmDialog}
+                    onClose={cancelNavigation}
+                    onConfirm={confirmNavigation}
+                    title="Sair sem salvar?"
+                    description="Você tem alterações nos recursos que ainda não foram salvas."
+                    confirmText="Sair sem salvar"
+                    cancelText="Continuar editando"
+                    variant="warning"
+                />
+            )}
+        </FadeIn>
+    )
 }

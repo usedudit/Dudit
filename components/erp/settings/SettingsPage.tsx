@@ -172,7 +172,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
   const canAccessOS = businessInfo?.sells?.includes("services") && isOwnerAdminOrManager
   const showOS = canAccessOS
-  const showVitrine = isOwnerOrAdmin
+  const showVitrine = isOwnerOrAdmin && isSystemResourceActive(businessInfo, "showcase")
   const isQuick = businessInfo.mode === "quick"
   const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
   const isTeamResourceActive = isSystemResourceActive(businessInfo, "team")

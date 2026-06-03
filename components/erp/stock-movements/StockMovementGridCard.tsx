@@ -88,12 +88,20 @@ const StockMovementGridCard = React.memo(
 
                 {/* Footer */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    {/* Motivo */}
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Motivo</span>
-                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                            {movement.reason || '-'}
-                        </span>
+                    {/* Motivo e Referência */}
+                    <div className="flex gap-4">
+                        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">Motivo</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate" title={movement.reason}>
+                                {movement.reason || '-'}
+                            </span>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Referência</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate" title={movement.reference}>
+                                {movement.reference || '-'}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Data e Ações */}

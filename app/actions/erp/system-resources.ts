@@ -35,6 +35,7 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
   const nextBusinessInfo = {
     ...businessInfo,
     activeResources: normalizeActiveResources(activeResources),
+    resourcesVersion: 2,
   }
 
   const { error } = await supabase

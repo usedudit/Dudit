@@ -128,7 +128,7 @@ export default function OrdersPage({
 }) {
     const { toast } = useToast()
     const { selectedStore, isLoading: storeLoading } = useStore()
-    const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const { profile: userProfile } = useUserProfile()
     const currentUserName = userProfile?.full_name || "Usuário"
 
@@ -168,8 +168,8 @@ export default function OrdersPage({
 
     // State
     const [activeTab, setActiveTab] = useState<"Todos" | "Pendente" | "Pago" | "Enviado" | "Cancelado">("Todos")
-    const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
-    const effectiveViewMode = isMobile ? "grid" : viewMode
+    const [viewMode, setViewModeState] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
+    const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })

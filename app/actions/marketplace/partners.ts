@@ -862,3 +862,24 @@ export async function registerPartner(data: any) {
     return { success: false, error: err.message || "Erro desconhecido ao criar parceiro." }
   }
 }
+
+export async function getPartnerOrderBumps(partnerId: string, limit = 5) {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+    .eq("partner_id", partnerId)
+    .eq("is_active", true)
+    .eq("moderation_status", "approved")
+    .eq("show_in_marketplace", true)
+    .gt("stock_available", 0)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("Error fetching order bumps:", error)
+    return []
+  }
+  return data || []
+}
+

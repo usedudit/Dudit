@@ -3,14 +3,10 @@
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-    MapPinIcon, PlusIcon, Package, XIcon, ChevronUpIcon, ChevronDownIcon,
-    TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon,
-} from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useSupabase } from "@/providers/supabase-provider"
@@ -22,12 +18,13 @@ import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction } from "@/app/actions/marketplace/cart"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
+import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
-import { getPartnerProducts } from "@/app/actions/marketplace/partners"
+import { getPartnerOrderBumps } from "@/app/actions/marketplace/partners"
 
 interface ProductItem {
     id: string
@@ -138,11 +135,10 @@ const fadeVariants = {
     closed: { opacity: 0, transition: { duration: 0.2 } },
 }
 
-
-
 export function CheckoutPageClient() {
     const { user } = useSupabase()
     const router = useRouter()
+    const csrfToken = useCSRFToken()
     const [sessionData, setSessionData] = useState<CheckoutSessionData | null>(null)
     const [pageLoading, setPageLoading] = useState(true)
 
@@ -252,7 +248,7 @@ export function CheckoutPageClient() {
         if (!partnerId) return
         let active = true
         setLoadingBumps(true)
-        getPartnerProducts(partnerId)
+        getPartnerOrderBumps(partnerId)
             .then((res) => {
                 if (!active) return
                 if (res) {
@@ -461,22 +457,24 @@ export function CheckoutPageClient() {
             return
         }
         setIsLoading(true)
-        let csrfToken = ""
-        try {
-            const csrfRes = await fetch("/api/csrf-token")
-            const csrfData = await csrfRes.json()
-            csrfToken = csrfData.token || ""
-        } catch {
-            notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
-            setIsLoading(false)
-            return
+        let token = csrfToken || ""
+        if (!token) {
+            try {
+                const csrfRes = await fetch("/api/csrf-token")
+                const csrfData = await csrfRes.json()
+                token = csrfData.token || ""
+            } catch {
+                notifyError("Erro de Segurança", "Erro ao validar segurança. Recarregue a página.")
+                setIsLoading(false)
+                return
+            }
         }
         const result = await createAddressAction({
             entityId: userId, entityType: "user",
             street, number: finalNumber, complement: newAddressData.complement,
             neighborhood, city, state, zipCode,
             isDefault: userAddresses.length === 0,
-            csrf_token: csrfToken,
+            csrf_token: token,
         })
         if (result.error) {
             setDeliveryError(result.error)
@@ -1088,7 +1086,7 @@ export function CheckoutPageClient() {
                     setIsLoading(false)
                     return
                 }
-                const { token } = await fetch("/api/csrf-token").then((r) => r.json())
+                const token = csrfToken || await fetch("/api/csrf-token").then((r) => r.json()).then((d) => d.token || "")
                 if (sessionData?.source === "cart") {
                     const items = sessionData.cartItems || []
                     const result = await checkoutCartAction(

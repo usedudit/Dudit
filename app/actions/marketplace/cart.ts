@@ -18,7 +18,7 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
-import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { listActivePromotionsForMarketplaceAction, listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import {
   resolveCheckoutCartLines,
   buildFulfillmentPayload,
@@ -84,25 +84,37 @@ export async function getCachedCart(userId: string) {
 
   if (!cartItems || cartItems.length === 0) return {}
 
-  // 2. Busca Métodos de Pagamento dos Parceiros Envolvidos
-  const partnerIds = [...new Set(cartItems.map((item: any) => item.partner_id))]
+  // 2. Busca Métodos de Pagamento, Endereços, Configurações de Entrega e Promoções em Paralelo (Batching)
+  const partnerIds = [...new Set(cartItems.map((item: any) => item.partner_id))] as string[]
 
-  const { data: paymentMethods } = await supabase
-    .from("payment_methods")
-    .select("partner_id, payment_type, type, is_active")
-    .in("partner_id", partnerIds)
-    .eq("is_active", true)
-
-  // 2b. Busca Endereços dos Parceiros (separado para não quebrar a query principal)
+  let paymentMethods: any[] | null = null
   let partnerAddresses: Record<string, any[]> = {}
-  try {
-    const { data: addresses } = await supabase
-      .from("addresses")
-      .select("id, partner_id, zip_code, street, number, complement, neighborhood, city, state, is_default")
-      .in("partner_id", partnerIds)
+  let partnerDeliverySettings: Record<string, any> = {}
+  let partnerPromotions: Record<string, any[]> = {}
 
-    if (addresses) {
-      partnerAddresses = addresses.reduce((acc: any, addr: any) => {
+  try {
+    const [pmResult, addrResult, delResult, promosBatch] = await Promise.all([
+      supabase
+        .from("payment_methods")
+        .select("partner_id, payment_type, type, is_active")
+        .in("partner_id", partnerIds)
+        .eq("is_active", true),
+      supabase
+        .from("addresses")
+        .select("id, partner_id, zip_code, street, number, complement, neighborhood, city, state, is_default")
+        .in("partner_id", partnerIds),
+      supabase
+        .from("delivery_settings")
+        .select("partner_id, base_fee, is_delivery_enabled")
+        .in("partner_id", partnerIds),
+      listActivePromotionsInBatch(partnerIds, userId),
+    ])
+
+    paymentMethods = pmResult.data
+    partnerPromotions = promosBatch || {}
+
+    if (addrResult.data) {
+      partnerAddresses = addrResult.data.reduce((acc: any, addr: any) => {
         const key = addr.partner_id
         if (typeof key === "string" && key !== "__proto__" && key !== "constructor" && key !== "prototype") {
           if (!acc[key]) acc[key] = []
@@ -111,20 +123,9 @@ export async function getCachedCart(userId: string) {
         return acc
       }, {})
     }
-  } catch (e) {
-    console.error("Erro ao buscar endereços dos parceiros (não-crítico):", e)
-  }
 
-  // 2c. Busca Configurações de Entrega (novo)
-  let partnerDeliverySettings: Record<string, any> = {}
-  try {
-    const { data: delSettings } = await supabase
-      .from("delivery_settings")
-      .select("partner_id, base_fee, is_delivery_enabled")
-      .in("partner_id", partnerIds)
-
-    if (delSettings) {
-      partnerDeliverySettings = delSettings.reduce((acc: any, ds: any) => {
+    if (delResult.data) {
+      partnerDeliverySettings = delResult.data.reduce((acc: any, ds: any) => {
         const key = ds.partner_id
         if (typeof key === "string" && key !== "__proto__" && key !== "constructor" && key !== "prototype") {
           acc[key] = ds
@@ -133,7 +134,7 @@ export async function getCachedCart(userId: string) {
       }, {})
     }
   } catch (e) {
-    console.error("Erro ao buscar configs de entrega (não-crítico):", e)
+    console.error("Erro ao buscar dados complementares dos parceiros em paralelo (com batching):", e)
   }
 
   // 3. Agrupa os itens por Loja (Parceiro)
@@ -160,6 +161,7 @@ export async function getCachedCart(userId: string) {
             )
           ),
           deliverySettings: partnerDeliverySettings[partnerId] || null,
+          promotions: partnerPromotions[partnerId] || [],
         }
       }
       acc[partnerId].items.push(item)
@@ -607,10 +609,6 @@ export async function checkoutCartAction(
 
   const { lines: resolvedLines, partnerId, hasProducts } = resolved
 
-  const limitCheck = await checkLimit(partnerId, "monthly_orders")
-  if (!limitCheck.allowed) {
-    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
-  }
   let totalAmount = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const orderItems = resolvedLines.map((line) => line.orderItemRow)
   const pricingItems = resolvedLines.map((line) => line.pricingItem)
@@ -619,12 +617,6 @@ export async function checkoutCartAction(
     serviceId: line.serviceId,
     recurringPlanId: line.recurringPlanId,
   }))
-
-  const { data: buyerProfile } = await supabase
-    .from("user_profiles")
-    .select("full_name, phone")
-    .eq("user_id", user.id)
-    .single()
 
   const fulfillmentPayload = buildFulfillmentPayload(
     user.id,
@@ -637,27 +629,66 @@ export async function checkoutCartAction(
   const productIds = resolvedLines
     .filter((l) => l.productId)
     .map((l) => l.productId as string)
-  const { data: products } = productIds.length
-    ? await adminClient.from("products").select("*").in("id", productIds)
-    : { data: [] as any[] }
-  const { data: partner } = await adminClient
-    .from("partners")
-    .select("opening_hours")
-    .eq("id", partnerId)
-    .maybeSingle()
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
+
+  // 1. Parallel independent reads block
+  const [
+    limitCheck,
+    buyerProfileResult,
+    productsResult,
+    partnerResult,
+    deliveryQuote,
+    promotionsData,
+    methodResult,
+  ] = await Promise.all([
+    checkLimit(partnerId, "monthly_orders"),
+    supabase
+      .from("user_profiles")
+      .select("full_name, phone")
+      .eq("user_id", user.id)
+      .single(),
+    productIds.length
+      ? adminClient.from("products").select("*").in("id", productIds)
+      : Promise.resolve({ data: [] as any[] }),
+    adminClient
+      .from("partners")
+      .select("opening_hours")
+      .eq("id", partnerId)
+      .maybeSingle(),
+    (deliveryType === "delivery" && hasProducts)
+      ? quoteDeliveryFeeAction({
+          partnerId,
+          destinationAddress: deliveryAddress,
+          freeDeliveryCoupon: false,
+        })
+      : Promise.resolve({ success: true, fee: 0, distanceKm: null, breakdown: null }),
+    listActivePromotionsForMarketplaceAction(partnerId, user.id),
+    (isUuid && !useMercadoPago)
+      ? supabase
+          .from("payment_methods")
+          .select("*, payment_method_installment_fees(installment_number, fee_percent)")
+          .eq("id", paymentMethod)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  if (!limitCheck.allowed) {
+    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
+  }
+
+  const buyerProfile = buyerProfileResult.data
+  const products = productsResult.data
+  const partner = partnerResult.data
+
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
   if (deliveryType === "delivery" && hasProducts) {
-    const quote = await quoteDeliveryFeeAction({
-      partnerId,
-      destinationAddress: deliveryAddress,
-      freeDeliveryCoupon: false,
-    })
-    if (!quote.success) return { error: quote.error }
-    deliveryFee = Number(quote.fee || 0)
-    distanceKm = Number(quote.distanceKm || 0)
-    deliveryBreakdown = quote.breakdown
+    if (!deliveryQuote.success) return { error: (deliveryQuote as any).error }
+    deliveryFee = Number(deliveryQuote.fee || 0)
+    distanceKm = Number(deliveryQuote.distanceKm || 0)
+    deliveryBreakdown = deliveryQuote.breakdown
   }
 
   let couponIdToSave: string | null = null
@@ -698,19 +729,11 @@ export async function checkoutCartAction(
   // Adjust delivery fee if the chosen coupon is free shipping
   const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
   if (deliveryType === "delivery" && isFreeShippingCoupon) {
-    const quote = await quoteDeliveryFeeAction({
-      partnerId,
-      destinationAddress: deliveryAddress,
-      freeDeliveryCoupon: true,
-    })
-    if (quote.success) {
-      deliveryFee = Number(quote.fee || 0)
-      deliveryBreakdown = quote.breakdown
+    deliveryFee = 0
+    if (deliveryBreakdown) {
+      deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
     }
   }
-
-  // Fetch active promotions
-  const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId, user.id)
 
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
@@ -779,12 +802,7 @@ export async function checkoutCartAction(
     }
   })
 
-  let bestMethod: any = null
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
-  if (isUuid && !useMercadoPago) {
-    const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", paymentMethod).single()
-    bestMethod = methodData
-  }
+  let bestMethod: any = methodResult.data
 
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
 
@@ -798,10 +816,14 @@ export async function checkoutCartAction(
 
   let paymentAwareTotal = totalAmount
   if (bestMethod?.id) {
-    const { data: fees } = await supabase
-      .from("payment_method_installment_fees")
-      .select("installment_number, fee_percent")
-      .eq("payment_method_id", bestMethod.id)
+    let fees = bestMethod.payment_method_installment_fees
+    if (!fees) {
+      const { data: feesData } = await supabase
+        .from("payment_method_installment_fees")
+        .select("installment_number, fee_percent")
+        .eq("payment_method_id", bestMethod.id)
+      fees = feesData || []
+    }
     const calc = calculatePaymentAmounts({
       originalAmount: totalAmount,
       installmentNumber: Math.max(1, Number(installments || 1)),
@@ -811,7 +833,7 @@ export async function checkoutCartAction(
         feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
         discountPercent: Number(bestMethod.discount_percent || 0),
         maxInstallments: Number(bestMethod.max_installments || 1),
-        installmentFees: (fees || []).map((row: any) => ({
+        installmentFees: fees.map((row: any) => ({
           installmentNumber: Number(row.installment_number || 1),
           feePercent: Number(row.fee_percent || 0),
         })),
@@ -992,30 +1014,22 @@ export async function checkoutCartAction(
   }
 
   if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
-    for (const promoId of pricingResult.appliedPromotionIds) {
-      await adminClient.from("promotion_usages").insert({
+    await adminClient.from("promotion_usages").insert(
+      pricingResult.appliedPromotionIds.map(promoId => ({
         promotion_id: promoId,
         customer_id: user.id,
         order_id: order.id,
-      })
-      // Increment usage count of promotion
-      const { data: promoObj } = await adminClient
-        .from("promotions")
-        .select("usage_count")
-        .eq("id", promoId)
-        .single()
-      if (promoObj) {
-        await adminClient
-          .from("promotions")
-          .update({ usage_count: (promoObj.usage_count || 0) + 1 })
-          .eq("id", promoId)
-      }
-    }
+      }))
+    )
   }
 
   // Limpa Cache
-  for (const productId of [...new Set(productIds)]) {
-    await invalidateProductCache(productId, partnerId, "update", { silent: true })
+  if (productIds.length > 0) {
+    await Promise.all(
+      [...new Set(productIds)].map(productId =>
+        invalidateProductCache(productId, partnerId, "update", { silent: true })
+      )
+    )
   }
   await revalidateCart(user.id)
   await revalidateOrders(partnerId)
