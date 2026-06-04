@@ -494,8 +494,9 @@ export async function cancelBuyerOrderAction(orderId: string) {
     return { error: "Sem permissão" }
   }
 
-  if (order.situation !== "pending") {
-    return { error: "Apenas pedidos pendentes podem ser cancelados" }
+  const cancellableStates = ["pending", "unpaid", "in_process", "partially_paid"]
+  if (!cancellableStates.includes(order.situation)) {
+    return { error: "Apenas pedidos pendentes ou não pagos podem ser cancelados" }
   }
 
   if (order.mp_payment_id && order.partner_id) {

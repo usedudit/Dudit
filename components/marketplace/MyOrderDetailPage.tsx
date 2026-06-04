@@ -8,6 +8,7 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
+import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
@@ -280,24 +281,38 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const handleCancelOrder = async () => {
         try {
             setIsCanceling(true);
-            const res = await createMarketplaceCancellationRequestAction({
-                orderId: order.id,
-                reason: cancelReason,
-                details: cancelDetails,
-                idempotencyKey: `cancel:${order.id}:${Date.now()}`,
-            });
-            if (!res.success) throw new Error(res.error);
+            if (order.situation !== "paid") {
+                const res = await cancelBuyerOrderAction(order.id);
+                if (res.error) throw new Error(res.error);
 
-            toast({
-                title: "Solicitacao enviada",
-                description: "O vendedor recebeu seu pedido de cancelamento."
-            });
+                toast({
+                    title: "Pedido cancelado",
+                    description: "O pedido foi cancelado com sucesso."
+                });
 
-            setIsCancelModalOpen(false);
+                setIsCancelModalOpen(false);
+                router.refresh();
+            } else {
+                const res = await createMarketplaceCancellationRequestAction({
+                    orderId: order.id,
+                    reason: cancelReason,
+                    details: cancelDetails,
+                    idempotencyKey: `cancel:${order.id}:${Date.now()}`,
+                });
+                if (!res.success) throw new Error(res.error);
+
+                toast({
+                    title: "Solicitacao enviada",
+                    description: "O vendedor recebeu seu pedido de cancelamento."
+                });
+
+                setIsCancelModalOpen(false);
+                router.refresh();
+            }
         } catch (err: any) {
             toast({
-                title: "Erro ao solicitar cancelamento",
-                description: err.message || "Ocorreu um erro ao solicitar o cancelamento.",
+                title: order.situation !== "paid" ? "Erro ao cancelar" : "Erro ao solicitar cancelamento",
+                description: err.message || "Ocorreu um erro.",
                 variant: "destructive"
             });
         } finally {
@@ -725,26 +740,40 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </button>
                                 </div>
                                 <div className="p-6 space-y-5">
-                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Motivo do cancelamento
-                                        <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                            <option value="purchased_by_mistake">Comprei por engano</option>
-                                            <option value="better_price">Encontrei preco melhor</option>
-                                            <option value="delivery_delay">Atraso na entrega</option>
-                                            <option value="changed_mind">Mudei de ideia</option>
-                                            <option value="payment_issue">Problema no pagamento</option>
-                                            <option value="other">Outro</option>
-                                        </select>
-                                    </label>
-                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Detalhes
-                                        <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
-                                    </label>
+                                    {order.situation !== "paid" ? (
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                            Tem certeza de que deseja cancelar este pedido? O cancelamento será feito imediatamente e os itens retornarão ao estoque.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                Motivo do cancelamento
+                                                <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                                    <option value="purchased_by_mistake">Comprei por engano</option>
+                                                    <option value="better_price">Encontrei preco melhor</option>
+                                                    <option value="delivery_delay">Atraso na entrega</option>
+                                                    <option value="changed_mind">Mudei de ideia</option>
+                                                    <option value="payment_issue">Problema no pagamento</option>
+                                                    <option value="other">Outro</option>
+                                                </select>
+                                            </label>
+                                            <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                Detalhes
+                                                <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
+                                            </label>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
                                     <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
                                     <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
-                                        {isCanceling ? "Enviando..." : "Solicitar cancelamento"}
+                                        {isCanceling ? (
+                                            "Cancelando..."
+                                        ) : order.situation !== "paid" ? (
+                                            "Confirmar cancelamento"
+                                        ) : (
+                                            "Solicitar cancelamento"
+                                        )}
                                     </Button>
                                 </div>
                             </motion.div>
