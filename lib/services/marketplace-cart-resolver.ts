@@ -3,8 +3,18 @@ import type { PricingItem } from "@/lib/services/pricing-engine"
 import type {
   CheckoutFulfillmentLine,
   CheckoutFulfillmentPayload,
+  LineFulfillmentMode,
   ServiceBookingMetadata,
 } from "@/lib/types/marketplace-cart"
+import {
+  isFulfillmentModeAllowed,
+  mergePlanItemFulfillmentModes,
+  pickDefaultFulfillmentMode,
+  productCatalogCapabilities,
+  serviceCatalogCapabilities,
+  type CatalogCapabilities,
+  type FulfillmentMode,
+} from "@/lib/commerce/capabilities"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 
@@ -30,11 +40,32 @@ export type ResolvedCartLine = {
   requiresStock: boolean
   stockProductId?: string | null
   stockVariantId?: string | null
+  fulfillmentMode: LineFulfillmentMode | null
+  lineRequiresDelivery: boolean
+  capabilities: CatalogCapabilities
 }
 
 export type ResolveCartResult =
-  | { success: true; lines: ResolvedCartLine[]; partnerId: string; hasProducts: boolean }
+  | {
+      success: true
+      lines: ResolvedCartLine[]
+      partnerId: string
+      hasProducts: boolean
+      hasDeliveryLines: boolean
+    }
   | { success: false; error: string }
+
+function resolveLineFulfillmentMode(
+  allowed: FulfillmentMode[],
+  selected: string | null | undefined,
+  fallback: FulfillmentMode,
+): FulfillmentMode {
+  if (selected && isFulfillmentModeAllowed(allowed, selected as FulfillmentMode)) {
+    return selected as FulfillmentMode
+  }
+  if (isFulfillmentModeAllowed(allowed, fallback)) return fallback
+  return pickDefaultFulfillmentMode(allowed)
+}
 
 function planTotalFromItems(items: Array<{ unit_price: number | null; quantity: number }>): number {
   return items.reduce((sum, row) => sum + Number(row.unit_price || 0) * Number(row.quantity || 1), 0)
@@ -53,13 +84,17 @@ export async function resolveCheckoutCartLines(
     .from("cart_items")
     .select(`
       id, user_id, partner_id, item_type, product_id, variant_id, service_id,
-      recurring_plan_id, quantity, booking_metadata, pay_deposit_only,
-      products(id, name, price, promotional_price, is_active, stock_available, category_id),
+      recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
+      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
-      services(id, name, price, is_active, scheduling_enabled),
+      services(id, name, price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes),
       recurring_plans(
         id, name, status, show_in_marketplace,
-        recurring_plan_items(unit_price, quantity)
+        recurring_plan_items(
+          unit_price, quantity, item_type, product_id, service_id,
+          products(fulfillment_modes, product_type),
+          services(fulfillment_modes, scheduling_enabled)
+        )
       )
     `)
     .eq("user_id", userId)
@@ -81,6 +116,7 @@ export async function resolveCheckoutCartLines(
   const partnerId = partnerIds[0] as string
   const lines: ResolvedCartLine[] = []
   let hasProducts = false
+  let hasDeliveryLines = false
 
   const { data: partner } = await supabase
     .from("partners")
@@ -123,6 +159,14 @@ export async function resolveCheckoutCartLines(
         unitPrice = promo > 0 && promo < base ? promo : base
       }
 
+      const caps = productCatalogCapabilities(product)
+      const fulfillmentMode = resolveLineFulfillmentMode(
+        caps.fulfillmentModes,
+        row.fulfillment_mode,
+        row.fulfillment_mode === "delivery" ? "delivery" : "pickup",
+      ) as LineFulfillmentMode
+      if (fulfillmentMode === "delivery") hasDeliveryLines = true
+
       const subtotal = unitPrice * qty
       const fulfillmentLine: CheckoutFulfillmentLine = {
         cartItemId: row.id,
@@ -132,6 +176,7 @@ export async function resolveCheckoutCartLines(
         quantity: qty,
         unitPrice,
         lineName,
+        fulfillmentMode,
       }
 
       lines.push({
@@ -161,11 +206,18 @@ export async function resolveCheckoutCartLines(
           product_price: unitPrice,
           quantity: qty,
           subtotal,
+          line_type: "product",
+          fulfillment_mode: fulfillmentMode,
+          service_id: null,
+          recurring_plan_id: null,
         },
         fulfillmentLine,
         requiresStock: true,
         stockProductId: row.product_id,
         stockVariantId: variantId,
+        fulfillmentMode,
+        lineRequiresDelivery: fulfillmentMode === "delivery",
+        capabilities: caps,
       })
       continue
     }
@@ -177,10 +229,22 @@ export async function resolveCheckoutCartLines(
         return { success: false, error: "Agendamento inválido no carrinho." }
       }
 
+      const caps = serviceCatalogCapabilities(service)
+      const fulfillmentMode = resolveLineFulfillmentMode(
+        caps.fulfillmentModes,
+        row.fulfillment_mode,
+        "on_site",
+      ) as LineFulfillmentMode
+      if (fulfillmentMode === "customer_location") hasDeliveryLines = true
+
       const fullPrice = Number(meta.price || service.price || 0)
       let unitPrice = fullPrice
       let payDepositOnly = Boolean(row.pay_deposit_only)
       let depositAmount: number | null = null
+
+      if (caps.paymentRequirement === "deposit_only") {
+        payDepositOnly = true
+      }
 
       if (payDepositOnly) {
         if (!depositAllowed || !partner?.service_deposit_enabled) {
@@ -199,6 +263,7 @@ export async function resolveCheckoutCartLines(
         quantity: qty,
         unitPrice,
         lineName: `${service.name} — ${meta.date} ${meta.time}`,
+        fulfillmentMode,
         bookingMetadata: meta,
         payDepositOnly,
         depositAmount,
@@ -230,9 +295,15 @@ export async function resolveCheckoutCartLines(
           quantity: qty,
           subtotal,
           service_id: row.service_id,
+          line_type: "service_booking",
+          fulfillment_mode: fulfillmentMode,
+          recurring_plan_id: null,
         },
         fulfillmentLine,
         requiresStock: false,
+        fulfillmentMode,
+        lineRequiresDelivery: fulfillmentMode === "customer_location",
+        capabilities: caps,
       })
       continue
     }
@@ -244,6 +315,38 @@ export async function resolveCheckoutCartLines(
       }
 
       const planItems = planRow.recurring_plan_items || []
+      const productModeLists: FulfillmentMode[][] = []
+      const serviceModeLists: FulfillmentMode[][] = []
+
+      for (const pi of planItems as any[]) {
+        if (pi.item_type === "product" && pi.products) {
+          productModeLists.push(
+            productCatalogCapabilities(pi.products).fulfillmentModes,
+          )
+        }
+        if (pi.item_type === "service" && pi.services) {
+          serviceModeLists.push(
+            serviceCatalogCapabilities(pi.services).fulfillmentModes,
+          )
+        }
+      }
+
+      const mergedModes = mergePlanItemFulfillmentModes(productModeLists, serviceModeLists)
+      const caps: CatalogCapabilities = {
+        fulfillmentModes: mergedModes,
+        paymentRequirement: "full_payment",
+        schedulingEnabled: false,
+      }
+
+      const fulfillmentMode = resolveLineFulfillmentMode(
+        mergedModes,
+        row.fulfillment_mode,
+        mergedModes.includes("delivery") ? "delivery" : pickDefaultFulfillmentMode(mergedModes),
+      ) as LineFulfillmentMode
+      if (fulfillmentMode === "delivery" || fulfillmentMode === "customer_location") {
+        hasDeliveryLines = true
+      }
+
       const unitPrice = planTotalFromItems(planItems)
       const subtotal = unitPrice * qty
       const lineName = planRow.name || "Assinatura"
@@ -255,6 +358,7 @@ export async function resolveCheckoutCartLines(
         quantity: qty,
         unitPrice,
         lineName,
+        fulfillmentMode,
       }
 
       lines.push({
@@ -283,23 +387,42 @@ export async function resolveCheckoutCartLines(
           quantity: qty,
           subtotal,
           recurring_plan_id: row.recurring_plan_id,
+          line_type: "subscription",
+          fulfillment_mode: fulfillmentMode,
+          service_id: null,
         },
         fulfillmentLine,
         requiresStock: false,
+        fulfillmentMode,
+        lineRequiresDelivery: fulfillmentMode === "delivery",
+        capabilities: caps,
       })
     }
   }
 
-  return { success: true, lines, partnerId, hasProducts }
+  return { success: true, lines, partnerId, hasProducts, hasDeliveryLines }
+}
+
+/** Legacy order-level delivery fields: derived from product/subscription lines that use delivery. */
+export function deriveOrderDeliveryFields(
+  lines: ResolvedCartLine[],
+  deliveryAddress: string,
+): { deliveryType: "delivery" | "pickup"; deliveryAddress: string } {
+  const anyDelivery = lines.some((l) => l.lineRequiresDelivery)
+  return {
+    deliveryType: anyDelivery ? "delivery" : "pickup",
+    deliveryAddress: anyDelivery ? deliveryAddress : "",
+  }
 }
 
 export function buildFulfillmentPayload(
   buyerId: string,
   partnerId: string,
   lines: ResolvedCartLine[],
-  deliveryType: "delivery" | "pickup",
   deliveryAddress: string,
 ): CheckoutFulfillmentPayload {
+  const { deliveryType, deliveryAddress: address } = deriveOrderDeliveryFields(lines, deliveryAddress)
+
   return {
     version: 1,
     buyerId,
@@ -308,6 +431,6 @@ export function buildFulfillmentPayload(
       .filter((l) => l.itemType !== "product")
       .map((l) => l.fulfillmentLine),
     deliveryType,
-    deliveryAddress,
+    deliveryAddress: address,
   }
 }

@@ -574,7 +574,13 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
 }
 
 export async function checkoutCartAction(
-  partnerItems: { cartItemId: string; productId: string; variantId?: string; quantity: number }[],
+  partnerItems: {
+    cartItemId: string
+    productId: string
+    variantId?: string
+    quantity: number
+    fulfillmentMode?: string
+  }[],
   deliveryType: "delivery" | "pickup",
   deliveryAddress: string,
   paymentMethod: string,
@@ -606,10 +612,22 @@ export async function checkoutCartAction(
   }
 
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId).filter(Boolean)
+
+  const defaultProductMode = deliveryType === "delivery" ? "delivery" : "pickup"
+  for (const item of partnerItems) {
+    if (!item.cartItemId) continue
+    const mode = item.fulfillmentMode || defaultProductMode
+    await adminClient
+      .from("cart_items")
+      .update({ fulfillment_mode: mode, updated_at: new Date().toISOString() })
+      .eq("id", item.cartItemId)
+      .eq("user_id", user.id)
+  }
+
   const resolved = await resolveCheckoutCartLines(adminClient, user.id, cartItemIds)
   if (!resolved.success) return { error: resolved.error }
 
-  const { lines: resolvedLines, partnerId, hasProducts } = resolved
+  const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
 
   let totalAmount = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const orderItems = resolvedLines.map((line) => line.orderItemRow)
@@ -624,9 +642,9 @@ export async function checkoutCartAction(
     user.id,
     partnerId,
     resolvedLines,
-    deliveryType,
     deliveryAddress,
   )
+  const orderDelivery = fulfillmentPayload.deliveryType || deliveryType
 
   const productIds = resolvedLines
     .filter((l) => l.productId)
@@ -658,7 +676,7 @@ export async function checkoutCartAction(
       .select("opening_hours")
       .eq("id", partnerId)
       .maybeSingle(),
-    (deliveryType === "delivery" && hasProducts)
+    hasDeliveryLines && deliveryAddress
       ? quoteDeliveryFeeAction({
           partnerId,
           destinationAddress: deliveryAddress,
@@ -686,7 +704,7 @@ export async function checkoutCartAction(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
-  if (deliveryType === "delivery" && hasProducts) {
+  if (hasDeliveryLines && deliveryAddress) {
     if (!deliveryQuote.success) return { error: (deliveryQuote as any).error }
     deliveryFee = Number(deliveryQuote.fee || 0)
     distanceKm = Number(deliveryQuote.distanceKm || 0)
@@ -730,7 +748,7 @@ export async function checkoutCartAction(
 
   // Adjust delivery fee if the chosen coupon is free shipping
   const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
-  if (deliveryType === "delivery" && isFreeShippingCoupon) {
+  if (hasDeliveryLines && isFreeShippingCoupon) {
     deliveryFee = 0
     if (deliveryBreakdown) {
       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
@@ -881,7 +899,7 @@ export async function checkoutCartAction(
     estimated_ready_at: orderPreparation.readyAt.toISOString(),
     pickup_window_start: orderPreparation.pickupWindowStart.toISOString(),
     pickup_window_end: orderPreparation.pickupWindowEnd.toISOString(),
-    estimated_delivery_at: deliveryType === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
+    estimated_delivery_at: orderDelivery === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
   } : {}
 
   let paymentMethodName = paymentMethod
@@ -923,8 +941,8 @@ export async function checkoutCartAction(
       delivery_fee: deliveryFee,
       distance_km: distanceKm,
       delivery_breakdown: deliveryBreakdown,
-      delivery_type: deliveryType,
-      delivery_address: deliveryAddress,
+      delivery_type: orderDelivery,
+      delivery_address: hasDeliveryLines ? deliveryAddress : deliveryAddress || null,
       payment_method: useMercadoPago ? "Mercado Pago" : paymentMethodName,
       payment_breakdown: useMercadoPago
         ? []

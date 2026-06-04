@@ -160,7 +160,15 @@ export async function validateCouponRow(
         .select("product_id")
         .eq("coupon_id", coupon.id)
         .in("product_id", productIds)
-      if (!links || links.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Nenhum produto do carrinho é elegível para este cupom." }
+      if (!links || links.length === 0) {
+        return {
+          valid: true,
+          discountAmount: 0,
+          partialApplicabilityWarning: items.length > 0,
+          couponId: null,
+          pricingCoupon: null,
+        }
+      }
     }
 
     if (coupon.apply_scope === "categories") {
@@ -172,7 +180,15 @@ export async function validateCouponRow(
       ])
       const allowed = new Set((categoryRows || []).map((row: any) => row.category_id))
       const hasEligibleProduct = (productRows || []).some((row: any) => row.category_id && allowed.has(row.category_id))
-      if (!hasEligibleProduct) return { valid: false, discountAmount: 0, errorMessage: "Nenhum item do carrinho pertence às categorias elegíveis." }
+      if (!hasEligibleProduct) {
+        return {
+          valid: true,
+          discountAmount: 0,
+          partialApplicabilityWarning: items.length > 0,
+          couponId: null,
+          pricingCoupon: null,
+        }
+      }
     }
 
     if (coupon.apply_scope === "services") {
@@ -183,7 +199,15 @@ export async function validateCouponRow(
         .select("service_id")
         .eq("coupon_id", coupon.id)
         .in("service_id", serviceIds)
-      if (!links || links.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Nenhum serviço é elegível para este cupom." }
+      if (!links || links.length === 0) {
+        return {
+          valid: true,
+          discountAmount: 0,
+          partialApplicabilityWarning: items.length > 0,
+          couponId: null,
+          pricingCoupon: null,
+        }
+      }
     }
 
     if (coupon.apply_scope === "subscriptions") {
@@ -194,7 +218,15 @@ export async function validateCouponRow(
         .select("recurring_plan_id")
         .eq("coupon_id", coupon.id)
         .in("recurring_plan_id", planIds)
-      if (!links || links.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Nenhuma assinatura é elegível para este cupom." }
+      if (!links || links.length === 0) {
+        return {
+          valid: true,
+          discountAmount: 0,
+          partialApplicabilityWarning: items.length > 0,
+          couponId: null,
+          pricingCoupon: null,
+        }
+      }
     }
   }
 

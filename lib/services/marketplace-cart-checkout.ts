@@ -46,7 +46,7 @@ export async function priceMarketplaceCartCheckout(
   const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
 
-  const { lines: resolvedLines, partnerId, hasProducts } = resolved
+  const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
   let subtotal = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const orderItems = resolvedLines.map((line) => ({ ...line.orderItemRow }))
   const pricingItems = resolvedLines.map((line) => line.pricingItem)
@@ -60,7 +60,6 @@ export async function priceMarketplaceCartCheckout(
     params.userId,
     partnerId,
     resolvedLines,
-    params.deliveryType,
     params.deliveryAddress,
   )
 
@@ -68,7 +67,7 @@ export async function priceMarketplaceCartCheckout(
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
 
-  if (params.deliveryType === "delivery" && hasProducts) {
+  if (hasDeliveryLines && params.deliveryAddress) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       destinationAddress: params.deliveryAddress,
@@ -125,7 +124,7 @@ export async function priceMarketplaceCartCheckout(
   const isFreeShippingCoupon = Boolean(
     couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping",
   )
-  if (params.deliveryType === "delivery" && isFreeShippingCoupon) {
+  if (hasDeliveryLines && isFreeShippingCoupon) {
     const quote = await quoteDeliveryFeeAction({
       partnerId,
       destinationAddress: params.deliveryAddress,

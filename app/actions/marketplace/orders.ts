@@ -1,28 +1,23 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { OrderSchema } from "@/lib/validation/schemas"
 import { requireUser } from "@/lib/auth/authorization"
-import { requireRateLimit } from "@/lib/security/require-rate-limit"
-import { RateLimitCategory } from "@/lib/rate-limiter"
-import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
-import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { revalidateOrders } from "@/lib/utils/revalidation"
-import { releaseOrderInventory, reserveOrderInventory } from "@/lib/stock/reservations"
+import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { releaseOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
-import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
-import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
-import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
-import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
-import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
-import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { checkoutCartAction } from "@/app/actions/marketplace/cart"
+import {
+  prepareProductBuyNowCheckoutAction,
+} from "@/app/actions/marketplace/cart-extensions"
+import { addPurchasableServiceToCartAction } from "@/app/actions/marketplace/cart-extensions"
 
-// Single revalidation to minimize cache calls
 const revalidateOrdersCache = async () => await revalidateOrders("")
 
+/**
+ * @deprecated Prefer checkoutCartAction. Kept for buy-now session compatibility — delegates to unified cart checkout.
+ */
 export async function createOrderAction(data: {
   itemId: string
   itemType: "product" | "service"
@@ -39,437 +34,66 @@ export async function createOrderAction(data: {
   wantsChange?: boolean
   payWithAmount?: number
 }) {
-  await requireRateLimit(RateLimitCategory.ORDER_CREATE)
-
-  // 0. Check subscription limits
-  const limitName = data.itemType === "product" ? "monthly_orders" : "monthly_appointments"
-  const limitCheck = await checkLimit(data.partnerId, limitName)
-  if (!limitCheck.allowed) {
-    return { error: limitCheck.message || "Limite mensal atingido para este plano." }
-  }
-
-  // Validate CSRF token
-  const { requireCSRF, extractCSRFTokenFromObject } = await import("@/lib/security/csrf-action-wrapper")
-  const csrfToken = extractCSRFTokenFromObject(data as Record<string, unknown>)
-  const csrfValidation = await requireCSRF(csrfToken)
-  if (!csrfValidation.valid) {
-    return { error: csrfValidation.error || "Token CSRF inválido" }
-  }
-
-  // SECURITY FIX (CRIT-02): buyerId derived from session, NEVER from client
   const user = await requireUser()
-  if (!user) {
-    return { error: "Não autenticado" }
-  }
-  const buyerId = user.id
+  if (!user) return { error: "Não autenticado" }
 
-  const validation = OrderSchema.safeParse({
-    itemId: data.itemId,
-    itemType: data.itemType,
-    quantity: data.quantity,
-    totalAmount: data.totalAmount,
-    deliveryType: data.deliveryType,
-    deliveryAddress: data.deliveryAddress,
-    paymentMethod: data.paymentMethod,
-    notes: data.notes,
-    partnerId: data.partnerId,
-    buyerId: buyerId,
-  })
-
-  if (!validation.success) {
-    return { error: validation.error.issues[0].message }
-  }
-
-  const supabase = await getSupabaseServerClient()
-
-  // ========================================================================
-  // SECURITY FIX (CRIT-02): Server-side price verification
-  // Fetch the actual price from the database - NEVER trust client totalAmount
-  // ========================================================================
-  let serverPrice: number
-  let itemName: string = "Item"
-  let preparationProducts: Array<{ availability_value?: number | null; availability_unit?: string | null }> = []
-  let parentProductId = data.itemId
-  let resolvedVariantId: string | null = null
+  const fulfillmentMode = data.deliveryType === "delivery" ? "delivery" : "pickup"
+  let cartItemId: string | undefined
 
   if (data.itemType === "product") {
-    const { data: variantData } = await supabase
+    const admin = getAdminClient()
+    const { data: variantRow } = await admin
       .from("product_variants")
-      .select("id, product_id, price_adjustment, stock_available, variant_name")
+      .select("product_id")
       .eq("id", data.itemId)
       .maybeSingle()
+    const productId = variantRow?.product_id || data.itemId
+    const variantId = variantRow ? data.itemId : undefined
 
-    let productQueryId = data.itemId
-    if (variantData) {
-      parentProductId = variantData.product_id
-      resolvedVariantId = variantData.id
-      productQueryId = variantData.product_id
-    }
-
-    const { data: product, error: productError } = await supabase
-      .from("products")
-      .select("price, promotional_price, name, is_active, stock_available, availability_value, availability_unit")
-      .eq("id", productQueryId)
-      .single()
-
-    if (productError || !product) {
-      return { error: "Produto não encontrado" }
-    }
-    if (!product.is_active) {
-      return { error: "Este produto não está mais disponível" }
-    }
-
-    let basePrice = (product.promotional_price && product.promotional_price < product.price)
-      ? product.promotional_price
-      : product.price
-
-    if (variantData) {
-      basePrice = basePrice + Number(variantData.price_adjustment || 0)
-    }
-
-    serverPrice = basePrice
-    itemName = variantData
-      ? `${product.name} - ${variantData.variant_name}`
-      : (product.name || "Produto")
-
-    preparationProducts = [{
-      availability_value: Number(product.availability_value || 0),
-      availability_unit: product.availability_unit || "Minutos",
-    }]
-
-    const stockAvailable = variantData ? (variantData.stock_available ?? 0) : (product.stock_available ?? 0)
-    if (stockAvailable < data.quantity) {
-      return { error: "Estoque insuficiente para este produto" }
-    }
-
-  } else if (data.itemType === "service") {
-    const { data: service, error: serviceError } = await supabase
-      .from("services")
-      .select("price, name, is_active")
-      .eq("id", data.itemId)
-      .single()
-
-    if (serviceError || !service) {
-      return { error: "Serviço não encontrado" }
-    }
-    if (!service.is_active) {
-      return { error: "Este serviço não está mais disponível" }
-    }
-
-    serverPrice = service.price
-    itemName = service.name || "Serviço"
-  } else {
-    return { error: "Tipo de item inválido" }
-  }
-
-  const expectedTotal = serverPrice * data.quantity
-
-  let deliveryFee = 0
-  let distanceKm: number | null = null
-  let deliveryBreakdown: Record<string, unknown> | null = null
-  if (data.deliveryType === "delivery") {
-    const quote = await quoteDeliveryFeeAction({
+    const prep = await prepareProductBuyNowCheckoutAction({
+      productId,
       partnerId: data.partnerId,
-      destinationAddress: data.deliveryAddress,
-      freeDeliveryCoupon: false,
-    })
-    if (!quote.success) return { error: quote.error }
-    deliveryFee = Number(quote.fee || 0)
-    distanceKm = Number(quote.distanceKm || 0)
-    deliveryBreakdown = quote.breakdown
-  }
-
-  // ========================================================================
-  // COUPON VALIDATION & PRICING ENGINE
-  // ========================================================================
-  let couponIdToSave: string | null = null
-  let couponDiscountAmount = 0
-  let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
-
-  // Try manual coupon code first, then auto-detect
-  const admin = getAdminClient()
-  if (data.couponCode?.trim()) {
-    const couponResult = await validateCoupon({
-      partnerId: data.partnerId,
-      code: data.couponCode,
-      customerId: buyerId,
-      subtotal: expectedTotal,
-      shippingCost: deliveryFee,
-      items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
-    }, admin)
-    if (couponResult.valid) {
-      couponIdToSave = couponResult.couponId || null
-      couponDiscountAmount = couponResult.discountAmount
-      couponPricingData = couponResult.pricingCoupon || null
-    }
-    // If invalid, proceed without coupon (don't block the order)
-  } else {
-    // Auto-detect best automatic coupon
-    const autoResult = await findBestAutomaticCoupon({
-      partnerId: data.partnerId,
-      customerId: buyerId,
-      subtotal: expectedTotal,
-      shippingCost: deliveryFee,
-      items: data.itemType === "product" ? [{ productId: parentProductId }] : [{ serviceId: data.itemId }],
-    }, admin)
-    if (autoResult.valid) {
-      couponIdToSave = autoResult.couponId || null
-      couponDiscountAmount = autoResult.discountAmount
-      couponPricingData = autoResult.pricingCoupon || null
-    }
-  }
-
-  // Adjust delivery fee if the chosen coupon is free shipping
-  const isFreeShippingCoupon = Boolean(couponPricingData?.freeShipping || couponPricingData?.discountType === "free_shipping")
-  if (data.deliveryType === "delivery" && isFreeShippingCoupon) {
-    const quote = await quoteDeliveryFeeAction({
-      partnerId: data.partnerId,
-      destinationAddress: data.deliveryAddress,
-      freeDeliveryCoupon: true,
-    })
-    if (quote.success) {
-      deliveryFee = Number(quote.fee || 0)
-      deliveryBreakdown = quote.breakdown
-    }
-  }
-
-  // Run through pricing engine for consistent calculation
-  const pricingResult = calculateOrderPricing({
-    items: [{
-      productId: data.itemType === "product" ? parentProductId : null,
-      serviceId: data.itemType === "service" ? data.itemId : null,
-      unitPrice: serverPrice,
       quantity: data.quantity,
-    }],
-    shippingCost: deliveryFee,
-    coupon: couponPricingData,
-  })
-
-  const finalTotal = pricingResult.finalTotal
-  couponDiscountAmount = pricingResult.couponDiscountAmount
-
-  const { data: buyerProfile } = await supabase.from("user_profiles").select("full_name, phone").eq("user_id", buyerId).single()
-
-  const paymentIsMp = String(data.paymentMethod || "").toLowerCase().includes("mercado pago")
-  let financeAccountId: string | null = null
-
-  let bestMethod: any = null
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.paymentMethod)
-  if (isUuid && !paymentIsMp) {
-    const { data: methodData } = await supabase.from("payment_methods").select("*").eq("id", data.paymentMethod).single()
-    bestMethod = methodData
-  }
-
-  const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || data.paymentMethod)
-
-  if (!bestMethod && !paymentIsMp) {
-    bestMethod = await pickBestPaymentMethod(
-      supabase as any,
-      chosenType,
-      data.partnerId,
-      { preferDefault: true },
-    )
-  }
-
-  if (paymentIsMp) {
-    financeAccountId = await resolveMarketplaceOrderFinanceAccountId(
-      getAdminClient(),
-      data.partnerId,
-      true,
-    )
-  } else {
-    financeAccountId = bestMethod?.default_finance_account_id || null
-  }
-
-  let paymentAwareTotal = finalTotal
-
-  if (bestMethod?.id && !paymentIsMp) {
-    const { data: fees } = await supabase
-      .from("payment_method_installment_fees")
-      .select("installment_number, fee_percent")
-      .eq("payment_method_id", bestMethod.id)
-    const calc = calculatePaymentAmounts({
-      originalAmount: finalTotal,
-      installmentNumber: Math.max(1, Number(data.installments || 1)),
-      paymentMethod: {
-        feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
-        feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
-        feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
-        discountPercent: Number(bestMethod.discount_percent || 0),
-        maxInstallments: Number(bestMethod.max_installments || 1),
-        installmentFees: (fees || []).map((row: any) => ({
-          installmentNumber: Number(row.installment_number || 1),
-          feePercent: Number(row.fee_percent || 0),
-        })),
-      },
+      variantId,
+      csrf_token: data.csrf_token,
     })
-    paymentAwareTotal = Number(calc.finalAmount || finalTotal)
-  }
-
-  if (chosenType === "cash" && data.deliveryType === "delivery") {
-    if (data.wantsChange === undefined || data.wantsChange === null) {
-      return { error: "Por favor, informe se precisa de troco para o pagamento em dinheiro." }
-    }
-    if (data.wantsChange && (data.payWithAmount === undefined || data.payWithAmount === null || data.payWithAmount < paymentAwareTotal)) {
-      return { error: "O valor informado para o troco é menor que o total do pedido." }
-    }
-  }
-
-  if (!financeAccountId) {
-    return {
-      error: paymentIsMp
-        ? "Esta loja não possui conta Mercado Pago cadastrada no financeiro."
-        : "Esta loja não possui conta bancária ou caixa ativa para registrar o pedido.",
-    }
-  }
-
-  const { data: partner } = await supabase
-    .from("partners")
-    .select("opening_hours")
-    .eq("id", data.partnerId)
-    .maybeSingle()
-
-  const orderPreparation = computeOrderPreparationEstimate({
-    products: preparationProducts,
-    openingHours: (partner as any)?.opening_hours || null,
-    pickupWindowMinutes: 30,
-    deliveryTimeEstimateMinutes: 0,
-  })
-
-  let paymentMethodName = data.paymentMethod
-  if (bestMethod?.name) {
-    paymentMethodName = bestMethod.name
-  } else {
-    paymentMethodName = formatPaymentMethodLabel(data.paymentMethod)
-  }
-
-  if (chosenType === "cash" && data.deliveryType === "delivery") {
-    if (data.wantsChange) {
-      paymentMethodName = `Dinheiro (Troco para R$ ${data.payWithAmount?.toFixed(2).replace('.', ',')})`
-    } else {
-      paymentMethodName = "Dinheiro (Valor exato)"
-    }
-  }
-
-  // Ensure customer exists/is updated for this partner
-  try {
-    const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
-    await ensureMarketplaceCustomer({
+    if (prep.error) return { error: prep.error }
+    cartItemId = prep.cartItemId
+  } else if (data.itemType === "service") {
+    const prep = await addPurchasableServiceToCartAction({
+      serviceId: data.itemId,
       partnerId: data.partnerId,
-      name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
-      email: user.email,
-      phone: buyerProfile?.phone || null,
-      cpf: null,
-      userId: buyerId,
+      quantity: data.quantity,
+      csrf_token: data.csrf_token,
     })
-  } catch (e) {
-    console.error("Error ensuring marketplace customer in createOrderAction:", e)
+    if (prep.error) return { error: prep.error }
+    cartItemId = prep.cartItemId
+  } else {
+    return { error: "Tipo de item inválido." }
   }
 
-  const orderData: any = {
-    buyer_id: buyerId,
-    customer_name: buyerProfile?.full_name || null,
-    partner_id: data.partnerId,
-    product_id: data.itemType === "product" ? parentProductId : null,
-    service_id: data.itemType === "service" ? data.itemId : null,
-    total_amount: paymentAwareTotal,
-    delivery_fee: deliveryFee,
-    distance_km: distanceKm,
-    delivery_breakdown: deliveryBreakdown,
-    delivery_type: data.deliveryType,
-    delivery_address: data.deliveryAddress,
-    payment_method: paymentMethodName,
-    payment_breakdown: paymentIsMp || !bestMethod?.id
-      ? []
-      : [{
-        method: chosenType,
-        amount: paymentAwareTotal,
-        paymentMethodId: bestMethod.id,
-        installmentNumber: Math.max(1, Number(data.installments || 1)),
-        ...(chosenType === "cash" && data.deliveryType === "delivery" ? {
-          wantsChange: data.wantsChange,
-          payWithAmount: data.wantsChange ? data.payWithAmount : null,
-          changeAmount: data.wantsChange ? Number((data.payWithAmount! - paymentAwareTotal).toFixed(2)) : 0
-        } : {})
-      }],
-    payment_provider: paymentIsMp ? "Mercado Pago" : null,
-    situation: "pending",
-    notes: data.notes || null,
-    coupon_id: couponIdToSave,
-    discount_amount: couponDiscountAmount,
-    finance_account_id: financeAccountId,
-    ...(orderPreparation ? {
-      preparation_time_minutes: orderPreparation.preparationTimeMinutes,
-      estimated_ready_at: orderPreparation.readyAt.toISOString(),
-      pickup_window_start: orderPreparation.pickupWindowStart.toISOString(),
-      pickup_window_end: orderPreparation.pickupWindowEnd.toISOString(),
-      estimated_delivery_at: data.deliveryType === "delivery" ? orderPreparation.estimatedDeliveryAt.toISOString() : null,
-    } : {}),
-  }
+  if (!cartItemId) return { error: "Não foi possível preparar o checkout." }
 
-  const { data: order, error } = await supabase.from("orders").insert(orderData).select().single()
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  // Increment usage counter
-  const counterName = data.itemType === "product" ? "orders_month_count" : "appointments_month_count"
-  increment_usage_counter(data.partnerId, counterName).catch(console.error)
-
-  await supabase.from("order_items").insert({
-    order_id: order.id,
-    product_id: data.itemType === "product" ? parentProductId : null,
-    variant_id: resolvedVariantId,
-    product_name: itemName,
-    product_price: serverPrice,
-    quantity: data.quantity,
-    subtotal: expectedTotal,
-  })
-
-  // Record coupon usage
-  if (couponIdToSave) {
-    await supabase.from("coupon_usages").upsert(
+  return checkoutCartAction(
+    [
       {
-        coupon_id: couponIdToSave,
-        customer_id: buyerId,
-        order_id: order.id,
-      },
-      { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
-    )
-  }
-
-  if (data.itemType === "product") {
-    const reserveResult = await reserveOrderInventory({
-      client: supabase,
-      partnerId: data.partnerId,
-      orderId: order.id,
-      items: [{
-        product_id: parentProductId,
-        variant_id: resolvedVariantId,
+        cartItemId,
+        productId: data.itemId,
         quantity: data.quantity,
-      }],
-    })
-
-    if ("error" in reserveResult) {
-      await supabase.from("order_items").delete().eq("order_id", order.id)
-      await supabase.from("orders").delete().eq("id", order.id)
-      return { error: reserveResult.error }
-    }
-
-    await invalidateProductCache(parentProductId, data.partnerId, "update", { silent: true })
-  }
-
-  revalidateOrdersCache()
-
-  return {
-    success: true,
-    orderNumber: order.order_number,
-    orderId: order.id,
-    couponApplied: couponIdToSave ? true : false,
-    couponDiscount: couponDiscountAmount,
-    finalTotal: paymentAwareTotal,
-  }
+        fulfillmentMode,
+      },
+    ],
+    data.deliveryType,
+    data.deliveryAddress,
+    data.paymentMethod,
+    data.installments,
+    data.notes,
+    data.couponCode,
+    false,
+    data.csrf_token,
+    data.wantsChange,
+    data.payWithAmount,
+  )
 }
 
 export async function cancelBuyerOrderAction(orderId: string) {
@@ -505,14 +129,17 @@ export async function cancelBuyerOrderAction(orderId: string) {
       const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`, {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${mpAccessToken}`,
+          Authorization: `Bearer ${mpAccessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: "cancelled" }),
       })
 
       if (!mpResponse.ok) {
-        console.error(`[ORDER CANCELLATION] Failed to cancel payment ${order.mp_payment_id} in Mercado Pago. Status:`, mpResponse.status)
+        console.error(
+          `[ORDER CANCELLATION] Failed to cancel payment ${order.mp_payment_id} in Mercado Pago. Status:`,
+          mpResponse.status,
+        )
       }
     } catch (mpError) {
       console.error("[ORDER CANCELLATION] Error communicating with Mercado Pago for cancellation:", mpError)
@@ -546,10 +173,10 @@ export async function cancelBuyerOrderAction(orderId: string) {
     const productIds = Array.from(
       new Set(
         (order.order_items || [])
-          .map((item: any) => item.product_id)
-          .filter((productId: unknown): productId is string => typeof productId === "string" && productId.length > 0),
+          .map((item: { product_id?: string | null }) => item.product_id)
+          .filter((productId): productId is string => typeof productId === "string" && productId.length > 0),
       ),
-    ) as string[]
+    )
 
     for (const productId of productIds) {
       await invalidateProductCache(productId, order.partner_id, "update", { silent: true })

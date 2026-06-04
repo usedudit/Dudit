@@ -3,7 +3,7 @@
 import { formatCurrency, formatDate } from "@/lib/utils"
 
 export type CouponDiscountType = "percentage" | "fixed" | "free_shipping"
-export type CouponApplyScope = "all" | "categories" | "products" | "services"
+export type CouponApplyScope = "all" | "categories" | "products" | "services" | "subscriptions"
 export type CouponCustomerScope = "all" | "specific"
 
 export interface CouponUsageCounter {

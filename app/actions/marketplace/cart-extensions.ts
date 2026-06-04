@@ -7,6 +7,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { revalidateCart } from "@/lib/utils/revalidation"
 import type { ServiceBookingMetadata } from "@/lib/types/marketplace-cart"
+import { addToCartAction } from "@/app/actions/marketplace/cart"
 
 async function assertCanBuyFromPartner(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -78,6 +79,50 @@ export async function addServiceBookingToCartAction(
   if (error) return { error: error.message }
   await revalidateCart(user.id)
   return { success: true, cartItemId: data.id }
+}
+
+/** Buy-now: adds product to cart and returns cart line id for unified checkout. */
+export async function prepareProductBuyNowCheckoutAction(input: {
+  productId: string
+  partnerId: string
+  quantity?: number
+  variantId?: string
+  csrf_token?: string
+}) {
+  const addResult = await addToCartAction(
+    input.productId,
+    input.quantity ?? 1,
+    input.csrf_token,
+    input.variantId,
+  )
+  if (addResult.error) return { error: addResult.error }
+
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  let query = supabase
+    .from("cart_items")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("partner_id", input.partnerId)
+    .eq("item_type", "product")
+    .eq("product_id", input.productId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+
+  if (input.variantId) {
+    query = query.eq("variant_id", input.variantId)
+  } else {
+    query = query.is("variant_id", null)
+  }
+
+  const { data: row } = await query.maybeSingle()
+  if (!row?.id) return { error: "Item não encontrado no carrinho." }
+
+  await supabase.from("cart_items").update({ selected: true }).eq("id", row.id)
+  await revalidateCart(user.id)
+
+  return { success: true, cartItemId: row.id as string }
 }
 
 /** Book Now flow: stores selection in cart and returns checkout path (no appointment created). */

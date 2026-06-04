@@ -6,12 +6,14 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { ensureMarketplaceCustomer } from "@/lib/services/marketplace-customer"
-import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import type {
   CheckoutFulfillmentPayload,
   CheckoutFulfillmentResult,
+  LineFulfillmentMode,
   ServiceBookingMetadata,
 } from "@/lib/types/marketplace-cart"
+import { isStaffSlotAvailable } from "@/lib/commerce/scheduling-availability"
+import { syncAppointmentReceivable } from "@/lib/services/appointment-receivable"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -21,127 +23,6 @@ function computeEndTime(time: string, durationMinutes: number): string {
   const endH = Math.floor(endMinutes / 60)
   const endM = endMinutes % 60
   return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`
-}
-
-async function syncBookingReceivable(
-  supabase: SupabaseClient,
-  params: {
-    partnerId: string
-    appointmentId: string
-    customerId: string | null
-    serviceName: string
-    startDate: string
-    remaining: number
-    paidAmount: number
-  },
-) {
-  if (params.remaining <= 0.009) {
-    const ref = `appointment:${params.appointmentId}:receivable`
-    await supabase
-      .from("transactions")
-      .update({ status: "paid", payment_date: new Date().toISOString().slice(0, 10) })
-      .eq("partner_id", params.partnerId)
-      .eq("reference_note", ref)
-      .eq("status", "pending")
-    return
-  }
-
-  const ref = `appointment:${params.appointmentId}:receivable`
-  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(supabase as any, params.partnerId, false)
-
-  const { data: existing } = await supabase
-    .from("transactions")
-    .select("id")
-    .eq("partner_id", params.partnerId)
-    .eq("reference_note", ref)
-    .limit(1)
-    .maybeSingle()
-
-  if (existing?.id) {
-    await supabase
-      .from("transactions")
-      .update({
-        amount: params.remaining,
-        original_amount: params.remaining,
-        status: "pending",
-      })
-      .eq("id", existing.id)
-    return
-  }
-
-  const { data: txData } = await supabase
-    .from("transactions")
-    .insert({
-      partner_id: params.partnerId,
-      description: params.serviceName,
-      category: "Vendas",
-      customer_id: params.customerId,
-      contact_type: "customer",
-      amount: params.remaining,
-      due_date: params.startDate,
-      payment_date: params.paidAmount > 0.009 ? new Date().toISOString().slice(0, 10) : null,
-      transaction_date: `${params.startDate}T12:00:00.000Z`,
-      status: "pending",
-      payment_type: "Agendamento",
-      original_amount: params.remaining,
-      fee_amount: 0,
-      transaction_type: "income",
-      origin: "system",
-      reference_note: ref,
-      account_id: financeAccountId || null,
-    })
-    .select("id")
-    .single()
-
-  if (txData?.id) {
-    await supabase
-      .from("appointments")
-      .update({ receivable_transaction_id: txData.id })
-      .eq("id", params.appointmentId)
-  }
-
-  if (params.paidAmount > 0.009) {
-    const payRef = `appointment:${params.appointmentId}:payment`
-    const { data: existingPay } = await supabase
-      .from("transactions")
-      .select("id")
-      .eq("partner_id", params.partnerId)
-      .eq("reference_note", payRef)
-      .maybeSingle()
-
-    if (!existingPay?.id) {
-      const { data: paidTx } = await supabase
-        .from("transactions")
-        .insert({
-          partner_id: params.partnerId,
-          description: params.serviceName,
-          category: "Vendas",
-          customer_id: params.customerId,
-          contact_type: "customer",
-          amount: params.paidAmount,
-          due_date: params.startDate,
-          payment_date: new Date().toISOString().slice(0, 10),
-          transaction_date: new Date().toISOString(),
-          status: "paid",
-          payment_type: "Agendamento",
-          original_amount: params.paidAmount,
-          fee_amount: 0,
-          transaction_type: "income",
-          origin: "system",
-          reference_note: payRef,
-          account_id: financeAccountId || null,
-        })
-        .select("id")
-        .single()
-
-      if (paidTx?.id) {
-        await supabase
-          .from("appointments")
-          .update({ payment_transaction_id: paidTx.id })
-          .eq("id", params.appointmentId)
-      }
-    }
-  }
 }
 
 async function createBookingFromMetadata(
@@ -157,8 +38,10 @@ async function createBookingFromMetadata(
     paidAmount: number
     fullPrice: number
     paymentStatus: "unpaid" | "partially_paid" | "paid"
+    fulfillmentMode?: LineFulfillmentMode | null
+    bufferMinutes?: number
   },
-): Promise<string> {
+): Promise<{ appointmentId: string | null; needsReschedule: boolean }> {
   const customerId = await ensureMarketplaceCustomer({
     partnerId: params.partnerId,
     name: params.buyerName,
@@ -166,6 +49,19 @@ async function createBookingFromMetadata(
     phone: params.buyerPhone || null,
     userId: params.buyerId,
   })
+
+  const slotOk = await isStaffSlotAvailable(supabase, {
+    partnerId: params.partnerId,
+    staffId: params.meta.staffId,
+    date: params.meta.date,
+    startTime: params.meta.time,
+    durationMinutes: params.meta.durationMinutes,
+    bufferMinutes: params.bufferMinutes ?? 0,
+  })
+
+  if (!slotOk) {
+    return { appointmentId: null, needsReschedule: true }
+  }
 
   const endTime = computeEndTime(params.meta.time, params.meta.durationMinutes)
 
@@ -187,6 +83,9 @@ async function createBookingFromMetadata(
       paid_amount: params.paidAmount,
       payment_status: params.paymentStatus,
       sales_channel: STOREFRONT_CHANNEL,
+      fulfillment_mode:
+        params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
+      needs_reschedule: false,
       pricing_unit: "Por Serviço",
       notes: params.meta.notes || null,
       status: params.paymentStatus === "paid" ? "Confirmado" : "Reservado",
@@ -200,7 +99,8 @@ async function createBookingFromMetadata(
   const appointmentId = appointment.id as string
 
   const remaining = Math.max(0, params.fullPrice - params.paidAmount)
-  await syncBookingReceivable(supabase, {
+  const receivableId = await syncAppointmentReceivable({
+    supabase,
     partnerId: params.partnerId,
     appointmentId,
     customerId,
@@ -210,7 +110,14 @@ async function createBookingFromMetadata(
     paidAmount: params.paidAmount,
   })
 
-  return appointmentId
+  if (receivableId) {
+    await supabase
+      .from("appointments")
+      .update({ receivable_transaction_id: receivableId })
+      .eq("id", appointmentId)
+  }
+
+  return { appointmentId, needsReschedule: false }
 }
 
 async function createSubscriptionFromPlan(
@@ -282,6 +189,7 @@ async function createSubscriptionFromPlan(
       delivery_type: params.deliveryType,
       delivery_address: params.deliveryAddress || null,
       finance_account_id: params.financeAccountId || null,
+      sales_channel: STOREFRONT_CHANNEL,
       notes: `Assinatura via checkout pedido ${params.orderId}`,
     })
     .select("id")
@@ -397,7 +305,7 @@ export async function fulfillMarketplaceOrder(
               ? "partially_paid"
               : "unpaid"
 
-        const appointmentId = await createBookingFromMetadata(supabase, {
+        const bookingResult = await createBookingFromMetadata(supabase, {
           partnerId: order.partner_id,
           buyerId: order.buyer_id,
           buyerEmail,
@@ -408,11 +316,24 @@ export async function fulfillMarketplaceOrder(
           paidAmount,
           fullPrice,
           paymentStatus,
+          fulfillmentMode: line.fulfillmentMode,
         })
-        result.appointmentIds!.push(appointmentId)
+
+        if (bookingResult.needsReschedule) {
+          result.rescheduleRequired = result.rescheduleRequired || []
+          result.rescheduleRequired.push({
+            serviceName: line.bookingMetadata.serviceName,
+            date: line.bookingMetadata.date,
+            time: line.bookingMetadata.time,
+          })
+        } else if (bookingResult.appointmentId) {
+          result.appointmentIds!.push(bookingResult.appointmentId)
+        }
       }
 
       if (line.itemType === "subscription" && line.recurringPlanId) {
+        const subDeliveryType =
+          line.fulfillmentMode === "delivery" ? "delivery" : "pickup"
         const { subscriptionId, executionId } = await createSubscriptionFromPlan(supabase, {
           partnerId: order.partner_id,
           buyerId: order.buyer_id,
@@ -421,7 +342,7 @@ export async function fulfillMarketplaceOrder(
           buyerPhone: profile?.phone,
           recurringPlanId: line.recurringPlanId,
           orderId,
-          deliveryType: (order.delivery_type as "pickup" | "delivery") || payload.deliveryType || "pickup",
+          deliveryType: subDeliveryType,
           deliveryAddress: order.delivery_address || payload.deliveryAddress,
           financeAccountId: order.finance_account_id,
         })

@@ -262,6 +262,15 @@ async function createRecurringAppointments(params: {
 
   const servicesMap = new Map((services || []).map((s) => [s.id, s]))
 
+  const { data: subscription } = await supabase
+    .from("recurring_subscriptions")
+    .select("sales_channel")
+    .eq("id", claim.subscriptionId)
+    .maybeSingle()
+
+  const appointmentSalesChannel =
+    subscription?.sales_channel === "online_storefront" ? "online_storefront" : "booking"
+
   for (const item of serviceItems) {
     const service = servicesMap.get(item.service_id!)
     if (!service) throw new Error(`Serviço ${item.service_id} indisponível`)
@@ -313,6 +322,7 @@ async function createRecurringAppointments(params: {
         pricing_unit: "Por Serviço",
         notes: "Agendamento gerado automaticamente por assinatura recorrente.",
         source: "appointment",
+        sales_channel: appointmentSalesChannel,
         recurring_subscription_id: claim.subscriptionId,
         recurring_execution_id: claim.executionId,
       })

@@ -13,6 +13,8 @@ export type ServiceBookingMetadata = {
   instantPurchase?: boolean
 }
 
+export type LineFulfillmentMode = "delivery" | "pickup" | "on_site" | "customer_location"
+
 export type CheckoutFulfillmentLine = {
   cartItemId?: string
   itemType: MarketplaceCartItemType
@@ -23,6 +25,7 @@ export type CheckoutFulfillmentLine = {
   quantity: number
   unitPrice: number
   lineName: string
+  fulfillmentMode?: LineFulfillmentMode | null
   bookingMetadata?: ServiceBookingMetadata | null
   payDepositOnly?: boolean
   depositAmount?: number | null
@@ -42,4 +45,11 @@ export type CheckoutFulfillmentResult = {
   appointmentIds?: string[]
   subscriptionIds?: string[]
   executionIds?: string[]
+  /** Paid orders where the selected slot was taken — buyer must reschedule */
+  rescheduleRequired?: Array<{
+    serviceId?: string | null
+    serviceName?: string
+    date?: string
+    time?: string
+  }>
 }
