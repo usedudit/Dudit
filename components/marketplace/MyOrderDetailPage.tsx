@@ -423,20 +423,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         >
             <div className="w-full">
                 {/* Header */}
-                <div className="mb-8 hidden lg:flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
-                    <div className="hidden md:flex">
-                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
-                            <XIcon className="w-5 h-5" />
-                        </Button>
-                        <div className="text-left w-full">
-                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Compra</h1>
-                            <p className="text-md text-brand-inactive-text mt-1">Acompanhe o status e informações do seu pedido.</p>
-                        </div>
+                <div className="mb-8 hidden lg:flex flex-row items-center gap-4 w-full justify-start">
+                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                        <XIcon className="w-5 h-5" />
+                    </Button>
+                    <div className="text-left flex-1 min-w-0">
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Pedido #{orderNumber}</h1>
+                        <p className="text-md text-brand-inactive-text mt-1">{dateStrFull} às {dateStrTime}</p>
+                    </div>
+                    <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
+                        <statusConfig.icon size={16} />
+                        <span>{statusConfig.statusText}</span>
                     </div>
                 </div>
 
                 <div className="max-w-3xl lg:max-w-[1400px] mx-auto w-full pb-32">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         {/* Left Column (Sections 1, 2, 3, 4, 5) */}
                         <div className="lg:col-span-8 space-y-8">
                             {/* Section 1: Detalhes do Pedido (Chave-Valor estilo ERP) */}

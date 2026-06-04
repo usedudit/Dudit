@@ -10,6 +10,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
+import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 
 interface OrderDetailItem {
     id: string
@@ -59,12 +60,14 @@ interface PixPaymentWrapperProps {
         city?: string
         federalUnit?: string
     }
+    mpAcceptedPaymentMethods?: MpAcceptedPaymentMethods
 }
 
 export function PaymentWrapper({
     open, onClose, pixData: initialPixData, boletoData: initialBoletoData, orderId, amount,
     orderDetails, orderNumber, sellerName, buyerId,
-    useMercadoPago = false, partnerId, mpPublicKey, userEmail, userName, userAddress
+    useMercadoPago = false, partnerId, mpPublicKey, userEmail, userName, userAddress,
+    mpAcceptedPaymentMethods,
 }: PixPaymentWrapperProps) {
     const [copied, setCopied] = useState(false)
     const [isChecking, setIsChecking] = useState(false)
@@ -251,8 +254,12 @@ export function PaymentWrapper({
                         hideFormTitle: false,
                     },
                     paymentMethods: {
-                        ticket: "all", bankTransfer: "all", creditCard: "all",
-                        debitCard: "all", mercadoPago: "all", atm: "all",
+                        ticket: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        bankTransfer: mpAcceptedPaymentMethods?.pix === false ? [] : "all",
+                        creditCard: mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
+                        debitCard: mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
+                        mercadoPago: mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all",
+                        atm: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                     },
                 },
                 callbacks: {

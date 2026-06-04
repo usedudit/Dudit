@@ -8,6 +8,22 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 
+export type MpAcceptedPaymentMethods = {
+  credit_card: boolean
+  debit_card: boolean
+  pix: boolean
+  boleto: boolean
+  mercado_pago_wallet: boolean
+}
+
+export const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
+  credit_card: true,
+  debit_card: true,
+  pix: true,
+  boleto: true,
+  mercado_pago_wallet: true,
+}
+
 export async function disconnectMercadoPagoAction() {
   await requireRateLimit(RateLimitCategory.PAYMENT)
 
@@ -66,7 +82,7 @@ export async function getMercadoPagoStatusAction() {
 
   const { data: partner } = await supabase
     .from("partners")
-    .select("mp_user_id, mp_connected_at, mp_public_key")
+    .select("mp_user_id, mp_connected_at, mp_public_key, mp_accepted_payment_methods")
     .eq("id", ctx.partnerId)
     .single()
 
@@ -74,10 +90,16 @@ export async function getMercadoPagoStatusAction() {
     return { error: "Parceiro não encontrado" }
   }
 
+  const acceptedPaymentMethods: MpAcceptedPaymentMethods = {
+    ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
+    ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
+  }
+
   return {
     connected: !!partner.mp_user_id,
     connectedAt: partner.mp_connected_at,
     publicKey: partner.mp_public_key,
+    acceptedPaymentMethods,
   }
 }
 
@@ -141,5 +163,63 @@ export async function refreshMercadoPagoTokenAction() {
     return { success: true }
   } catch (error: any) {
     return { error: error.message }
+  }
+}
+
+export async function updateMpAcceptedPaymentMethodsAction(methods: MpAcceptedPaymentMethods) {
+  await requireRateLimit(RateLimitCategory.PAYMENT)
+
+  const user = await requireUser()
+  const supabase = await getSupabaseServerClient()
+
+  const ctx = await getCurrentPartnerContext()
+  if (!ctx) return { error: "Contexto de ERP não encontrado" }
+
+  await requirePartnerAccessWithPermission(ctx.partnerId, "settings", "settings_integrations", user)
+
+  // Sanitize: only keep valid boolean keys
+  const sanitized: MpAcceptedPaymentMethods = {
+    credit_card: Boolean(methods.credit_card),
+    debit_card: Boolean(methods.debit_card),
+    pix: Boolean(methods.pix),
+    boleto: Boolean(methods.boleto),
+    mercado_pago_wallet: Boolean(methods.mercado_pago_wallet),
+  }
+
+  const { error } = await supabase
+    .from("partners")
+    .update({ mp_accepted_payment_methods: sanitized })
+    .eq("id", ctx.partnerId)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath("/erp/settings")
+  return { success: true }
+}
+
+/**
+ * Public getter: any logged-in user can read (storefront/checkout data).
+ * Returns the accepted payment methods for a given partner.
+ */
+export async function getMpAcceptedPaymentMethodsPublicAction(partnerId: string) {
+  await requireUser()
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("mp_accepted_payment_methods")
+    .eq("id", partnerId)
+    .single()
+
+  if (!partner) {
+    return { ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS }
+  }
+
+  return {
+    ...DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
+    ...(partner.mp_accepted_payment_methods as Partial<MpAcceptedPaymentMethods> || {}),
   }
 }

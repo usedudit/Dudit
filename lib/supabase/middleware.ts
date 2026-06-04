@@ -264,7 +264,7 @@ export async function middleware(request: NextRequest) {
         https://www.google-analytics.com 
         https://stats.g.doubleclick.net;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://api.mapbox.com;
-    font-src 'self' https://fonts.gstatic.com data:;
+    font-src 'self' https://fonts.gstatic.com https://fonts.cdnfonts.com data:;
     frame-ancestors 'none';
     base-uri 'self';
     form-action 'self';

@@ -25,7 +25,7 @@ import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
-import { getMercadoPagoStatusAction } from '@/app/actions/mercadopago';
+import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import SaleReceiptPrintModal from './receipt/SaleReceiptPrintModal';
 import { buildSaleReceiptFromCartSnapshot } from '@/lib/sales/sale-receipt';
@@ -333,6 +333,7 @@ const PaymentModal = ({
     // Mercado Pago State
     const [mpConnected, setMpConnected] = useState(false);
     const [mpPublicKey, setMpPublicKey] = useState<string | null>(null);
+    const [mpAcceptedPaymentMethods, setMpAcceptedPaymentMethods] = useState<MpAcceptedPaymentMethods | undefined>(undefined);
     const [mpStep, setMpStep] = useState<"brick" | "pix" | "boleto" | "mp_redirect" | "error">("brick");
     const [mpSdkLoaded, setMpSdkLoaded] = useState(false);
     const [mpBrickReady, setMpBrickReady] = useState(false);
@@ -537,12 +538,17 @@ const PaymentModal = ({
             if ('connected' in res && res.connected) {
                 setMpConnected(true);
                 setMpPublicKey(res.publicKey || null);
+                if ('acceptedPaymentMethods' in res) {
+                    setMpAcceptedPaymentMethods(res.acceptedPaymentMethods);
+                }
             } else {
                 setMpConnected(false);
                 setMpPublicKey(null);
+                setMpAcceptedPaymentMethods(undefined);
             }
         }).catch(() => {
             setMpConnected(false);
+            setMpAcceptedPaymentMethods(undefined);
         });
     }, [isOpen]);
 
@@ -669,8 +675,12 @@ const PaymentModal = ({
                         hideFormTitle: false,
                     },
                     paymentMethods: {
-                        ticket: "all", bankTransfer: "all", creditCard: "all",
-                        debitCard: "all", mercadoPago: "all", atm: "all",
+                        ticket: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        bankTransfer: mpAcceptedPaymentMethods?.pix === false ? [] : "all",
+                        creditCard: mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
+                        debitCard: mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
+                        mercadoPago: mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all",
+                        atm: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                     },
                 },
                 callbacks: {

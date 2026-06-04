@@ -215,10 +215,13 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                                 )}
                                                             </h3>
                                                             {/* Order ID & Date Bottom */}
-                                                            <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5 flex-wrap">
-                                                                <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
-                                                                <span>•</span>
-                                                                <span>{formatFullDate(order.created_at)}</span>
+                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
+                                                                    <span className="hidden lg:inline">•</span>
+                                                                    <span className="hidden lg:inline">{formatFullDate(order.created_at)}</span>
+                                                                </div>
+                                                                <span className="block lg:hidden mt-0.5">{formatFullDate(order.created_at)}</span>
                                                             </div>
                                                         </div>
                                                     </div>

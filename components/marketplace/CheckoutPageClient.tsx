@@ -25,6 +25,7 @@ import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 import { getPartnerOrderBumps } from "@/app/actions/marketplace/partners"
+import { getMpAcceptedPaymentMethodsPublicAction, type MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 
 interface ProductItem {
     id: string
@@ -338,9 +339,16 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         if (formData.paymentMethod && storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
-            setFormData(prev => ({ ...prev, paymentMethod: storefrontMethods[0].id }))
+            setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
         }
     }, [storefrontMethods, formData.paymentMethod])
+
+    // Auto-set paymentOption to "traditional" for non-MP stores
+    useEffect(() => {
+        if (!storefrontMethodsLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null) {
+            setPaymentOption("traditional")
+        }
+    }, [storefrontMethodsLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption])
 
     useEffect(() => {
         let active = true
@@ -369,10 +377,10 @@ export function CheckoutPageClient() {
                 if (!active) return
                 if (result.success && result.methods.length > 0) {
                     setStorefrontMethods(result.methods)
-                    // Se o método atual não está entre os disponíveis, seleciona o primeiro
+                    // Se o método atual não está entre os disponíveis, limpa a seleção
                     const availableTypes = result.methods.map((m) => m.type)
                     if (formData.paymentMethod && !availableTypes.includes(formData.paymentMethod as any)) {
-                        setFormData((prev) => ({ ...prev, paymentMethod: result.methods[0].type, installments: 1 }))
+                        setFormData((prev) => ({ ...prev, paymentMethod: "", installments: 1 }))
                     }
                 }
                 setStorefrontMethodsLoading(false)
@@ -387,6 +395,14 @@ export function CheckoutPageClient() {
     // PIX modal state
     const [showPixModal, setShowPixModal] = useState(false)
     const [pixPaymentData, setPixPaymentData] = useState<any>(null)
+    const [mpAcceptedPaymentMethods, setMpAcceptedPaymentMethods] = useState<MpAcceptedPaymentMethods | undefined>(undefined)
+
+    useEffect(() => {
+        if (!partnerId) return
+        getMpAcceptedPaymentMethodsPublicAction(partnerId)
+            .then(setMpAcceptedPaymentMethods)
+            .catch((err) => console.error("Error loading MP accepted payment methods:", err))
+    }, [partnerId])
 
     useEffect(() => {
         if (user) {
@@ -1141,6 +1157,11 @@ export function CheckoutPageClient() {
                 setIsLoading(false)
                 return
             } else {
+                if (!formData.paymentMethod) {
+                    setPaymentError("Por favor, selecione um meio de pagamento.")
+                    setIsLoading(false)
+                    return
+                }
                 if (paymentPreviewLoading) {
                     setPaymentError("Aguarde o cálculo do pagamento terminar antes de finalizar.")
                     setIsLoading(false)
@@ -1488,6 +1509,17 @@ export function CheckoutPageClient() {
                                                         transition={{ duration: 0.2 }}
                                                         className="mb-4"
                                                     >
+                                                        {!formData.paymentMethod ? (
+                                                            <ListItem
+                                                                icon={MoneyIcon}
+                                                                title="Selecione o meio de pagamento"
+                                                                description="Clique para escolher como deseja pagar"
+                                                                className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                                right={
+                                                                    <Button variant="link" onClick={() => setShowPaymentModal(true)}>Selecionar</Button>
+                                                                }
+                                                            />
+                                                        ) : (
                                                         <ListItem
                                                             icon={
                                                                 selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
@@ -1507,6 +1539,7 @@ export function CheckoutPageClient() {
                                                                 <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
                                                             }
                                                         />
+                                                        )}
                                                         {renderChangeSection()}
                                                         {selectedStorefrontMethod?.cardBrand && (
                                                             <div className="mt-4">
@@ -1558,6 +1591,17 @@ export function CheckoutPageClient() {
                                                 <p className="text-sm text-brand-inactive-text">Este vendedor aceita apenas pagamentos diretos (Entrega ou Retirada).</p>
                                             </div>
                                             <div className="mb-6">
+                                                {!formData.paymentMethod ? (
+                                                    <ListItem
+                                                        icon={MoneyIcon}
+                                                        title="Selecione o meio de pagamento"
+                                                        description="Clique para escolher como deseja pagar"
+                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                        right={
+                                                            <Button variant="link" onClick={() => setShowPaymentModal(true)}>Selecionar</Button>
+                                                        }
+                                                    />
+                                                ) : (
                                                 <ListItem
                                                     icon={
                                                         selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
@@ -1577,6 +1621,7 @@ export function CheckoutPageClient() {
                                                         <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
                                                     }
                                                 />
+                                                )}
                                                 {renderChangeSection()}
                                                 {selectedStorefrontMethod?.cardBrand && (
                                                     <div className="mt-4">
@@ -2320,6 +2365,7 @@ export function CheckoutPageClient() {
                     userEmail={pixPaymentData.userEmail}
                     userName={pixPaymentData.userName}
                     buyerId={userId!}
+                    mpAcceptedPaymentMethods={mpAcceptedPaymentMethods}
                 />
             )}
 

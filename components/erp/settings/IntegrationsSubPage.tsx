@@ -5,7 +5,13 @@ import { useSearchParams } from "next/navigation"
 import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
-import { disconnectMercadoPagoAction } from "@/app/actions/mercadopago"
+import {
+    disconnectMercadoPagoAction,
+    getMercadoPagoStatusAction,
+    updateMpAcceptedPaymentMethodsAction,
+    DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
+    type MpAcceptedPaymentMethods,
+} from "@/app/actions/mercadopago"
 import {
     getWhatsappIntegrationAction,
     disconnectWhatsappAction,
@@ -78,6 +84,11 @@ export const IntegrationsSubPage = ({
 
     const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
+
+    // Accepted payment methods state
+    const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
+    const [isLoadingMethods, setIsLoadingMethods] = useState(false)
+    const [isSavingMethods, setIsSavingMethods] = useState<string | null>(null)
 
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
@@ -153,10 +164,44 @@ export const IntegrationsSubPage = ({
         }
     }, [])
 
+    const fetchMpAcceptedMethods = useCallback(async () => {
+        if (!mpConnected) return
+        setIsLoadingMethods(true)
+        try {
+            const res = await getMercadoPagoStatusAction()
+            if ('acceptedPaymentMethods' in res && res.acceptedPaymentMethods) {
+                setAcceptedMethods(res.acceptedPaymentMethods)
+            }
+        } catch (err) {
+            console.error("Error fetching accepted methods:", err)
+        } finally {
+            setIsLoadingMethods(false)
+        }
+    }, [mpConnected])
+
+    const handleToggleMethod = async (key: keyof MpAcceptedPaymentMethods) => {
+        const updated = { ...acceptedMethods, [key]: !acceptedMethods[key] }
+        setAcceptedMethods(updated)
+        setIsSavingMethods(key)
+        try {
+            const res = await updateMpAcceptedPaymentMethodsAction(updated)
+            if (res.error) {
+                toast.error(`Erro ao salvar: ${res.error}`)
+                setAcceptedMethods(acceptedMethods) // rollback
+            }
+        } catch (err) {
+            toast.error("Erro ao salvar configuração")
+            setAcceptedMethods(acceptedMethods) // rollback
+        } finally {
+            setIsSavingMethods(null)
+        }
+    }
+
     useEffect(() => {
         checkPlan()
         fetchWaStatus()
-    }, [checkPlan, fetchWaStatus])
+        fetchMpAcceptedMethods()
+    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -334,6 +379,45 @@ export const IntegrationsSubPage = ({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Accepted Payment Methods Section */}
+                        {mpConnected && (
+                            <div className="mt-6">
+                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-3">Meios de pagamento aceitos</h4>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                    Escolha quais meios de pagamento online seus clientes podem usar no checkout.
+                                </p>
+                                <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden divide-y divide-brand-border dark:divide-dark-border bg-white dark:bg-dark-surface">
+                                    {([
+                                        { key: "credit_card" as const, label: "Cartão de Crédito", icon: "https://img.dudit.com.br/static/icons/payments/CreditCard.png", description: "Visa, Mastercard, Elo e mais" },
+                                        { key: "debit_card" as const, label: "Cartão de Débito", icon: "https://img.dudit.com.br/static/icons/payments/DebitCard.png", description: "Débito online" },
+                                        { key: "pix" as const, label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png", description: "Transferência instantânea" },
+                                        { key: "boleto" as const, label: "Boleto Bancário", icon: "https://img.dudit.com.br/static/icons/payments/Boleto.png", description: "Pagamento em até 3 dias úteis" },
+                                        { key: "mercado_pago_wallet" as const, label: "Saldo Mercado Pago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png", description: "Saldo MP e parcelamento sem cartão" },
+                                    ]).map((method) => (
+                                        <div
+                                            key={method.key}
+                                            className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/10"
+                                        >
+                                            <img
+                                                src={method.icon}
+                                                alt={method.label}
+                                                className="w-8 h-8 object-contain shrink-0 rounded-md"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">{method.label}</span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">{method.description}</span>
+                                            </div>
+                                            <Switch
+                                                checked={acceptedMethods[method.key]}
+                                                onCheckedChange={() => handleToggleMethod(method.key)}
+                                                className={isSavingMethods === method.key ? "opacity-50 pointer-events-none" : ""}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Mensagens</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
