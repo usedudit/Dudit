@@ -9,7 +9,6 @@ import {
     disconnectMercadoPagoAction,
     getMercadoPagoStatusAction,
     updateMpAcceptedPaymentMethodsAction,
-    DEFAULT_MP_ACCEPTED_PAYMENT_METHODS,
     type MpAcceptedPaymentMethods,
 } from "@/app/actions/mercadopago"
 import {
@@ -65,6 +64,14 @@ export const IntegrationCard = ({
     </div>
 )
 
+const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
+    credit_card: true,
+    debit_card: true,
+    pix: true,
+    boleto: true,
+    mercado_pago_wallet: true,
+}
+
 // ─── Mercado Pago icon ────────────────────────────────────────────────────────
 
 export const IntegrationsSubPage = ({
@@ -89,6 +96,7 @@ export const IntegrationsSubPage = ({
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
     const [isLoadingMethods, setIsLoadingMethods] = useState(false)
     const [isSavingMethods, setIsSavingMethods] = useState<string | null>(null)
+    const [showMpConfig, setShowMpConfig] = useState(false)
 
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
@@ -235,6 +243,8 @@ export const IntegrationsSubPage = ({
 
         if (result.error) {
             toast.error(`Erro: ${result.error}`)
+        } else {
+            setShowMpConfig(false)
         }
         setIsLoading(false)
     }
@@ -363,6 +373,14 @@ export const IntegrationsSubPage = ({
                                         >
                                             Saber mais
                                         </Button>
+                                        {mpConnected && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowMpConfig(!showMpConfig)}
+                                            >
+                                                Configurar
+                                            </Button>
+                                        )}
                                         <Switch
                                             checked={mpConnected}
                                             onCheckedChange={(checked) => {
@@ -381,39 +399,41 @@ export const IntegrationsSubPage = ({
                         </div>
 
                         {/* Accepted Payment Methods Section */}
-                        {mpConnected && (
-                            <div className="mt-6">
-                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-3">Meios de pagamento aceitos</h4>
+                        {mpConnected && showMpConfig && (
+                            <div className="mt-6 max-w-xl">
+                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1">Meios de pagamento aceitos</h4>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
                                     Escolha quais meios de pagamento online seus clientes podem usar no checkout.
                                 </p>
-                                <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden divide-y divide-brand-border dark:divide-dark-border bg-white dark:bg-dark-surface">
+                                <div className="space-y-4">
                                     {([
                                         { key: "credit_card" as const, label: "Cartão de Crédito", icon: "https://img.dudit.com.br/static/icons/payments/CreditCard.png", description: "Visa, Mastercard, Elo e mais" },
                                         { key: "debit_card" as const, label: "Cartão de Débito", icon: "https://img.dudit.com.br/static/icons/payments/DebitCard.png", description: "Débito online" },
                                         { key: "pix" as const, label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png", description: "Transferência instantânea" },
                                         { key: "boleto" as const, label: "Boleto Bancário", icon: "https://img.dudit.com.br/static/icons/payments/Boleto.png", description: "Pagamento em até 3 dias úteis" },
                                         { key: "mercado_pago_wallet" as const, label: "Saldo Mercado Pago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png", description: "Saldo MP e parcelamento sem cartão" },
-                                    ]).map((method) => (
-                                        <div
-                                            key={method.key}
-                                            className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/10"
-                                        >
-                                            <img
-                                                src={method.icon}
-                                                alt={method.label}
-                                                className="w-8 h-8 object-contain shrink-0 rounded-md"
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">{method.label}</span>
-                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">{method.description}</span>
+                                    ]).map((method, index, arr) => (
+                                        <React.Fragment key={method.key}>
+                                            <div
+                                                className="flex items-center gap-3 py-2 transition-colors"
+                                            >
+                                                <img
+                                                    src={method.icon}
+                                                    alt={method.label}
+                                                    className="w-8 h-8 object-contain shrink-0 rounded-md"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">{method.label}</span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">{method.description}</span>
+                                                </div>
+                                                <Switch
+                                                    checked={acceptedMethods[method.key]}
+                                                    onCheckedChange={() => handleToggleMethod(method.key)}
+                                                    className={isSavingMethods === method.key ? "opacity-50 pointer-events-none" : ""}
+                                                />
                                             </div>
-                                            <Switch
-                                                checked={acceptedMethods[method.key]}
-                                                onCheckedChange={() => handleToggleMethod(method.key)}
-                                                className={isSavingMethods === method.key ? "opacity-50 pointer-events-none" : ""}
-                                            />
-                                        </div>
+                                            {index < arr.length - 1 && <hr className="border-brand-border dark:border-dark-border" />}
+                                        </React.Fragment>
                                     ))}
                                 </div>
                             </div>

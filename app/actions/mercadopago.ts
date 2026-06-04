@@ -16,7 +16,7 @@ export type MpAcceptedPaymentMethods = {
   mercado_pago_wallet: boolean
 }
 
-export const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
+const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
   credit_card: true,
   debit_card: true,
   pix: true,

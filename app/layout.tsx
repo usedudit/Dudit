@@ -38,15 +38,15 @@ export const metadata: Metadata = {
     },
     icons: {
         icon: [
-            { url: '/favicon.ico', sizes: '32x32' },
-            { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-            { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+            { url: '/favicon.ico?v=2', sizes: '32x32' },
+            { url: '/icons/icon-192x192.png?v=2', sizes: '192x192', type: 'image/png' },
+            { url: '/icons/icon-512x512.png?v=2', sizes: '512x512', type: 'image/png' },
         ],
-        apple: '/icons/apple-touch-icon.png',
+        apple: '/icons/apple-touch-icon.png?v=2',
     },
     appleWebApp: {
         capable: true,
-        statusBarStyle: 'default',
+        statusBarStyle: 'black-translucent',
         title: 'Dudit',
     },
     metadataBase: new URL("https://dudit.com.br"),
@@ -74,11 +74,11 @@ export default async function RootLayout({
                     href="https://fonts.gstatic.com"
                     crossOrigin="anonymous"
                 />
-                <meta name="theme-color" content="#059669" />
+                <meta name="theme-color" content="#003229" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
-                <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
                 <meta name="mobile-web-app-capable" content="yes" />
-                <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+                <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2" />
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
