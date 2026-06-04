@@ -363,10 +363,10 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-            <MarketplaceHeader />
+            <MarketplaceHeader simpleTitle="Minha sacola" />
 
             <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
-                <div className="flex items-center mb-8">
+                <div className="hidden lg:block items-center mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Minha sacola</h1>
                         <p className="text-md text-brand-inactive-text mt-1">Veja os itens da sua sacola</p>

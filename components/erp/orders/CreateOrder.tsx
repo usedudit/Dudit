@@ -30,11 +30,12 @@ import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from
 import DefaultModal from "@/components/reusable/DefaultModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
-import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton } from "@/components/reusable"
-import { TagIcon, MoneyIcon, FileIcon } from "@/lib/icons"
+import { Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput, Button as ReusableButton, FormSection, FormDropdown, DatePicker } from "@/components/reusable"
+import { TagIcon, MoneyIcon, FileIcon, UserIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
 import { OrderGeneralTab } from "./OrderGeneralTab"
@@ -1325,6 +1326,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             Dados gerais
                                             {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                         </TabsTrigger>
+                                        <TabsTrigger value="settings" className="xl:hidden">
+                                            Configurações
+                                        </TabsTrigger>
                                         {deliveryMethod === 'delivery' && (
                                             <TabsTrigger value="delivery">
                                                 Entrega
@@ -1437,6 +1441,99 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             paymentMethodExtraAmount={paymentMethodExtraAmount}
                                             role={role}
                                         />
+                                    </div>
+                                </FadeIn>
+                            </TabsContent>
+
+                            <TabsContent value="settings" className="xl:hidden mt-0">
+                                <FadeIn key="settings">
+                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6">
+                                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Configurações do Pedido</h3>
+
+                                        {isPaidOrder ? (
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-start text-[14px] gap-4">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{orderDate.split("-").reverse().join("/")}</span>
+                                                </div>
+                                                <div className="flex justify-between items-start text-[14px] gap-4">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
+                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{salesChannel}</span>
+                                                </div>
+                                                <div className="flex justify-between items-start text-[14px] gap-4">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Método de Entrega</span>
+                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>
+                                                </div>
+                                                {!isQuick && (
+                                                    <div className="flex justify-between items-start text-[14px] gap-4">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Conta de recebimento</span>
+                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <DatePicker
+                                                    label="Data do Pedido"
+                                                    disabled={isMarketplaceLocked}
+                                                    value={orderDate}
+                                                    onChange={(date) => {
+                                                        if (date) {
+                                                            const d = new Date(date)
+                                                            setOrderDate(formatLocalISODate(d))
+                                                        }
+                                                    }}
+                                                />
+
+                                                <FormDropdown
+                                                    label="Canal de Venda"
+                                                    disabled={isMarketplaceLocked}
+                                                    value={salesChannel}
+                                                    setValue={(val: any) => setSalesChannel(val)}
+                                                    options={salesChannelOptions}
+                                                />
+
+                                                <FormDropdown
+                                                    label="Método de Entrega"
+                                                    disabled={isMarketplaceLocked && isPaidOrder}
+                                                    value={deliveryMethod}
+                                                    setValue={(val: any) => setDeliveryMethod(val)}
+                                                    options={deliveryMethodOptions}
+                                                />
+
+                                                {!isQuick && (
+                                                    <Combobox
+                                                        label="Conta de recebimento"
+                                                        disabled={isMarketplaceLocked && isPaidOrder}
+                                                        value={financeAccountId || undefined}
+                                                        onChange={(val) => {
+                                                            setFinanceAccountId(val)
+                                                            setFieldErrors((prev) => {
+                                                                const next = new Set(prev)
+                                                                next.delete("financeAccountId")
+                                                                return next
+                                                            })
+                                                        }}
+                                                        options={accountOptions}
+                                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: () => {
+                                                            setNewAccountName("")
+                                                            setNewAccountType("cash")
+                                                            setNewAccountInitialBalance(0)
+                                                            setNewAccountIsDefault(
+                                                                !financeAccounts.some(
+                                                                    (acc) =>
+                                                                        acc.type === "cash" &&
+                                                                        (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                                                ),
+                                                            )
+                                                            setNewAccountIsActive(true)
+                                                            setIsAccountModalOpen(true)
+                                                        } }}
+                                                        error={fieldErrors?.has("financeAccountId")}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </FadeIn>
                             </TabsContent>
@@ -1892,14 +1989,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         variant="outline"
                         onClick={handleBack}
                         disabled={isSaving}
-                        className="flex-1"
+                        className="flex-1 h-12"
                     >
                         Cancelar
                     </Button>
                     <Button
                         onClick={handleSaveOrder}
                         disabled={isSaving}
-                        className="flex-1"
+                        className="flex-1 h-12"
                     >
                         <SaveIcon className="w-4 h-4 mr-2" />
                         {isSaving ? "Salvando..." : primaryActionLabel}

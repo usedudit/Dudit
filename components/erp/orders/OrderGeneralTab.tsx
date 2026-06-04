@@ -10,7 +10,9 @@ import {
     MoneyInput,
     InfoCard,
     ListItem,
+    FormSection,
 } from "@/components/reusable"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
     SearchIcon, PlusIcon, TagIcon, TrashIcon,
     CheckCircleIcon, EditIcon, UserIcon,
@@ -195,7 +197,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
     return (
         <FadeIn>
-            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+            {/* Desktop View */}
+            <div className="hidden xl:grid grid-cols-12 gap-y-8 md:gap-y-0">
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {isPaidOrder ? (
                         <section className="space-y-6">
@@ -401,7 +404,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         </td>
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-center gap-2">
-                                                                {item.isEditing ? (
+                                                                 {item.isEditing ? (
                                                                     <button
                                                                         onClick={() => {
                                                                             if (!item.name || item.name.trim() === '') {
@@ -896,6 +899,460 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* Mobile/Tablet View */}
+            <div className="xl:hidden space-y-6">
+                {/* 1. Cliente */}
+                <FormSection title="" hasSeparator={false} className="mt-0">
+                    {selectedCustomer ? (
+                        <ListItem
+                            left={
+                                <UserProfileImage
+                                    fullName={selectedCustomer.name || "Cliente"}
+                                    imageUrl={selectedCustomer.avatar}
+                                    className="w-10 h-10 text-base"
+                                />
+                            }
+                            title={selectedCustomer.name}
+                            description={selectedCustomer.email || "Sem e-mail cadastrado"}
+                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                            showChevron={true}
+                            onClick={isMarketplaceLocked ? undefined : () => setIsCustomerSheetOpen(true)}
+                        />
+                    ) : (
+                        <ListItem
+                            left={
+                                <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
+                                    <UserIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                </div>
+                            }
+                            title="Nenhum cliente selecionado"
+                            description="Clique para selecionar um cliente"
+                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                            showChevron={true}
+                            onClick={isMarketplaceLocked ? undefined : () => setIsCustomerSheetOpen(true)}
+                        />
+                    )}
+                </FormSection>
+
+                {/* 2. Itens do Pedido */}
+                <FormSection title="Itens do Pedido" hasSeparator={false}>
+                    {isPaidOrder ? (
+                        <div className="space-y-4">
+                            {items.map((item: any, idx: number) => (
+                                <div key={idx} className="flex items-start gap-4">
+                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border">
+                                        <img
+                                            src={getR2ImageUrl(item.image, "thumbnail")}
+                                            className="w-full h-full object-cover rounded-xl"
+                                            alt={item.name}
+                                            onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.name || "Produto sem nome"}</h4>
+                                            <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.unitPrice * item.quantity)}</span>
+                                        </div>
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                            <span>{item.quantity} un. • {formatCurrency(item.unitPrice)} / un.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div ref={searchRef} className={`relative mb-6 ${isMarketplaceLocked ? 'pointer-events-none opacity-60' : ''}`}>
+                                <Input
+                                    label=""
+                                    name="productSearchMobile"
+                                    placeholder="Buscar produtos para adicionar..."
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                    value={searchQuery}
+                                    onChange={(e: any) => {
+                                        setSearchQuery(e.target.value);
+                                        setIsProductSearchOpen(true);
+                                        if (setFieldErrors) {
+                                            setFieldErrors(prev => {
+                                                const next = new Set(prev);
+                                                next.delete("productSearch");
+                                                return next;
+                                            });
+                                        }
+                                    }}
+                                    onFocus={() => {
+                                        setIsProductSearchOpen(true);
+                                        onSearchFocus?.();
+                                    }}
+                                    className="mb-0"
+                                    error={fieldErrors?.has("productSearch")}
+                                    errorMessage={fieldErrors?.has("productSearch") ? "Adicione um item" : undefined}
+                                />
+
+                                <AnimatePresence>
+                                    {isProductSearchOpen && searchQuery && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 5 }}
+                                            className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl shadow-xl z-[9999] max-h-72 overflow-y-auto custom-scrollbar"
+                                            onScroll={(e) => {
+                                                const target = e.currentTarget
+                                                if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+                                                    loadMoreProducts?.()
+                                                }
+                                            }}
+                                        >
+                                            {isSearching ? (
+                                                <ThreeDotsLoader />
+                                            ) : searchResults.length > 0 ? (
+                                                searchResults.map(product => (
+                                                    <div
+                                                        key={product.id}
+                                                        onClick={() => {
+                                                            addProductToOrder(product);
+                                                            setIsProductSearchOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-4 p-3.5 hover:bg-gray-50 dark:hover:bg-dark-border cursor-pointer border-b border-brand-border dark:border-dark-border last:border-0 transition-colors"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/50 overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                            <img src={getR2ImageUrl(product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} alt={product.name} className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 text-left">
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{product.name}</div>
+                                                            <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                            <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
+                                                                {product.stock} em estoque
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="p-4 text-center text-sm text-brand-inactive-text">Nenhum produto encontrado.</div>
+                                            )}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {items.length > 0 ? (
+                                <div className="flex flex-col gap-4 mb-4">
+                                    {paginatedItems.map((item, paginatedIndex) => {
+                                        const index = (currentPage - 1) * ITEMS_PER_PAGE + paginatedIndex;
+                                        const hasNameError = Boolean(nameErrors[index] || manualItemNameErrors.has(index));
+                                        const hasPriceError = Boolean(priceErrors[index] || manualItemPriceErrors.has(index));
+                                        return (
+                                            <div key={index} className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-4">
+                                                <div className="flex flex-col gap-3">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                            <img src={getR2ImageUrl(item.image, "thumbnail")} className={`w-full h-full rounded-full ${!item.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 text-left">
+                                                            {item.isEditing ? (
+                                                                <div className="mb-2">
+                                                                    <Input
+                                                                        name={`item-name-mobile-general-${index}`}
+                                                                        value={item.name}
+                                                                        disabled={isMarketplaceLocked}
+                                                                        onChange={(e: any) => {
+                                                                            updateItemField(index, 'name', e.target.value);
+                                                                            if (nameErrors[index]) {
+                                                                                setNameErrors(prev => ({ ...prev, [index]: false }));
+                                                                            }
+                                                                        }}
+                                                                        placeholder="Nome do produto..."
+                                                                        error={hasNameError}
+                                                                        errorMessage="Nome obrigatório"
+                                                                        className="mb-0"
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="font-bold text-[14px] text-brand-dark dark:text-dark-heading mb-0.5 truncate">
+                                                                    {item.name || 'Produto sem nome'}
+                                                                </div>
+                                                            )}
+                                                            {!item.isEditing && (
+                                                                <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate mb-2">
+                                                                    {item.sku || 'Sem SKU'}
+                                                                </div>
+                                                            )}
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                Total: {formatCurrency(item.unitPrice * item.quantity)}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex gap-1 shrink-0">
+                                                            {item.isEditing ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!item.name || item.name.trim() === '') {
+                                                                            setNameErrors(prev => ({ ...prev, [index]: true }));
+                                                                        } else if (item.isManual && Number(item.unitPrice || 0) <= 0) {
+                                                                            setPriceErrors(prev => ({ ...prev, [index]: true }));
+                                                                        } else {
+                                                                            toggleItemEdit(index, false);
+                                                                        }
+                                                                    }}
+                                                                    className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-green hover:bg-green-50 dark:hover:bg-green-900/10'}`}
+                                                                >
+                                                                    <CheckCircleIcon size={14} />
+                                                                </button>
+                                                            ) : item.isManual ? (
+                                                                <button
+                                                                    onClick={() => toggleItemEdit(index, true)}
+                                                                    className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border'}`}
+                                                                >
+                                                                    <EditIcon size={14} />
+                                                                </button>
+                                                            ) : null}
+                                                            <button
+                                                                disabled={isMarketplaceLocked}
+                                                                onClick={() => removeItem(index)}
+                                                                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${isMarketplaceLocked ? 'text-gray-300 pointer-events-none' : 'text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10'}`}
+                                                            >
+                                                                <TrashIcon size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <QuantitySelector
+                                                            value={item.quantity}
+                                                            disabled={isMarketplaceLocked}
+                                                            onChange={(val) => updateItemQty(index, val)}
+                                                            max={resolveItemQuantityMax ? resolveItemQuantityMax(item) : undefined}
+                                                            size="sm"
+                                                        />
+                                                        <div className="flex-1 max-w-[140px]">
+                                                            <MoneyInput
+                                                                name={`item-price-mobile-general-${index}`}
+                                                                disabled={isMarketplaceLocked}
+                                                                value={item.unitPrice}
+                                                                onChange={(val: number) => {
+                                                                    updateItemPrice(index, val)
+                                                                    if (priceErrors[index]) {
+                                                                        setPriceErrors(prev => ({ ...prev, [index]: false }));
+                                                                    }
+                                                                }}
+                                                                className="mb-0"
+                                                                error={hasPriceError}
+                                                                errorMessage="Preço obrigatório"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="w-full flex-col flex items-center justify-center py-6">
+                                    <IconPlaceholder
+                                        icon={SearchIcon}
+                                        title="Nenhum produto adicionado"
+                                        subtitle="Busque produtos no campo acima ou cadastre um item avulso manualmente."
+                                        itemButton={isMarketplaceLocked ? undefined : {
+                                            text: "Adicionar item manual",
+                                            action: addBlankItem,
+                                            variant: "outline",
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {items.length > 0 && !isMarketplaceLocked && (
+                                <Button
+                                    variant="link"
+                                    onClick={addBlankItem}
+                                    className="p-0 h-auto"
+                                >
+                                    <PlusIcon size={14} strokeWidth={3} />
+                                    Adicionar item manual
+                                </Button>
+                            )}
+
+                            <div className="mt-2">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={(page) => setCurrentPage(page)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </FormSection>
+
+                {/* 3. Pagamento */}
+                <FormSection title="Pagamento" hasSeparator={false}>
+                    {isPaidOrder ? (
+                        <div className="space-y-3">
+                            <PaymentRow
+                                label="Método de Pagamento"
+                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{paymentMethodLabel}</span>}
+                            />
+                            {paymentBreakdown.length > 1 && (
+                                <PaymentRow
+                                    label="Valores por meio"
+                                    value={
+                                        <div className="flex flex-col gap-1">
+                                            {paymentBreakdown.map((entry: any, index: number) => (
+                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                    {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    }
+                                />
+                            )}
+                            <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
+                            <PaymentRow
+                                label="Tipo de Entrega"
+                                value={
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                        {deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço"}
+                                    </span>
+                                }
+                            />
+                            {Number(shippingFee || 0) > 0 && (
+                                <PaymentRow
+                                    label="Valor da Entrega"
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>}
+                                />
+                            )}
+                            {Number(otherCosts || 0) > 0 && (
+                                <PaymentRow
+                                    label="Outros Custos"
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(otherCosts)}</span>}
+                                />
+                            )}
+                            {Number(discountAmount || 0) > 0 && (
+                                <PaymentRow
+                                    label="Desconto do Pedido"
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
+                                />
+                            )}
+                            {couponDiscountAmount > 0 && (
+                                <PaymentRow
+                                    label="Desconto por Cupom"
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                />
+                            )}
+                            {paymentMethodDiscountAmount > 0 && (
+                                <PaymentRow
+                                    label="Desconto do Método"
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                />
+                            )}
+                            {paymentMethodExtraAmount > 0 && (
+                                <PaymentRow
+                                    label="Taxa do Método"
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
+                                />
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {!isQuickMode && (
+                                    <>
+                                        <ListItem
+                                            icon={TagIcon}
+                                            title="Aplicar desconto"
+                                            description={hasCoupon ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                            onClick={isMarketplaceLocked ? undefined : onOpenDiscount}
+                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                        />
+                                        <ListItem
+                                            icon={TruckIcon}
+                                            title="Adicionar entrega"
+                                            description="Define o valor da entrega do pedido"
+                                            onClick={isMarketplaceLocked ? undefined : onOpenShipping}
+                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                        />
+                                    </>
+                                )}
+                                <MoneyInput
+                                    label="Outros Custos"
+                                    disabled={isMarketplaceLocked}
+                                    value={parseFloat(otherCosts || "0")}
+                                    onChange={(val) => setOtherCosts(val.toString())}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </FormSection>
+
+                {/* 4. Resumo de Valores */}
+                <div className="flex flex-col gap-3 mt-4 border-t border-dashed border-brand-border dark:border-dark-border pt-6">
+                    <div className="flex justify-between items-center text-[15px]">
+                        <span className="text-brand-inactive-text font-medium">Subtotal</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(subtotal)}
+                        </span>
+                    </div>
+
+                    {discountAmount > 0 && (
+                        <div className="flex justify-between items-center text-[15px]">
+                            <span className="text-brand-inactive-text font-medium">Desconto</span>
+                            <span className="font-bold text-brand-green">
+                                -{formatCurrency(discountAmount)}
+                            </span>
+                        </div>
+                    )}
+
+                    {couponDiscountAmount > 0 && (
+                        <div className="flex justify-between items-center text-[15px]">
+                            <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
+                            <span className="font-bold text-brand-green">
+                                -{formatCurrency(couponDiscountAmount)}
+                            </span>
+                        </div>
+                    )}
+
+                    {parseFloat(shippingFee || "0") > 0 && (
+                        <div className="flex justify-between items-center text-[15px]">
+                            <span className="text-brand-inactive-text font-medium">Entrega</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(shippingFee)}
+                            </span>
+                        </div>
+                    )}
+
+                    {parseFloat(otherCosts || "0") > 0 && (
+                        <div className="flex justify-between items-center text-[15px]">
+                            <span className="text-brand-inactive-text font-medium">Outros Custos</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(otherCosts)}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
+                        <div className="flex justify-between items-end">
+                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
+                            <span className="text-[32px] font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
+                                {formatCurrency(totalAmount)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {!isPaidOrder && (
+                        <Button
+                            size="lg"
+                            className="w-full mt-6"
+                            onClick={handleSaveOrder}
+                            disabled={isSaving}
+                        >
+                            Ir para Pagamento
+                        </Button>
+                    )}
                 </div>
             </div>
         </FadeIn>

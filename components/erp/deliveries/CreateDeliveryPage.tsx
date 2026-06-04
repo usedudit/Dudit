@@ -513,114 +513,114 @@ export default function CreateDeliveryPage({
                                                     ) : null}
                                                 </section>
 
-                                                    {selectedOrders.length > 0 && (
-                                                        <>
-                                                            <div className="h-px w-full bg-brand-border dark:bg-dark-border lg:hidden" />
+                                                {selectedOrders.length > 0 && (
+                                                    <>
+                                                        <div className="h-px w-full bg-brand-border dark:bg-dark-border lg:hidden" />
 
-                                                            <section className="lg:hidden">
-                                                                <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                                    Informações da Entrega
-                                                                </h3>
-                                                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                                    <FormDropdown
-                                                                        label="Carrier / Entregador"
-                                                                        value={selectedDeliveryPersonId || "none"}
-                                                                        setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
-                                                                        options={[
-                                                                            { value: "none", label: "Entrega própria" },
-                                                                            ...deliveryPeople.map((person) => ({
-                                                                                value: person.id,
-                                                                                label: person.fullName,
-                                                                            })),
-                                                                        ]}
-                                                                        onFocus={() => {
-                                                                            void loadDeliveryPeople()
-                                                                        }}
-                                                                    />
+                                                        <section className="lg:hidden">
+                                                            <h3 className="mb-4 text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                                Informações da Entrega
+                                                            </h3>
+                                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                                <FormDropdown
+                                                                    label="Carrier / Entregador"
+                                                                    value={selectedDeliveryPersonId || "none"}
+                                                                    setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
+                                                                    options={[
+                                                                        { value: "none", label: "Entrega própria" },
+                                                                        ...deliveryPeople.map((person) => ({
+                                                                            value: person.id,
+                                                                            label: person.fullName,
+                                                                        })),
+                                                                    ]}
+                                                                    onFocus={() => {
+                                                                        void loadDeliveryPeople()
+                                                                    }}
+                                                                />
 
-                                                                    <FormDropdown
-                                                                        label="Status"
-                                                                        value={status}
-                                                                        setValue={setStatus}
-                                                                        options={[
-                                                                            { value: "pending", label: "Pendente" },
-                                                                            { value: "preparing", label: "Em preparação" },
-                                                                            { value: "sent", label: "Saiu para entrega" },
-                                                                            { value: "delivered", label: "Concluída" },
-                                                                            { value: "cancelled", label: "Cancelada" },
-                                                                        ]}
-                                                                    />
+                                                                <FormDropdown
+                                                                    label="Status"
+                                                                    value={status}
+                                                                    setValue={setStatus}
+                                                                    options={[
+                                                                        { value: "pending", label: "Pendente" },
+                                                                        { value: "preparing", label: "Em preparação" },
+                                                                        { value: "sent", label: "Saiu para entrega" },
+                                                                        { value: "delivered", label: "Concluída" },
+                                                                        { value: "cancelled", label: "Cancelada" },
+                                                                    ]}
+                                                                />
 
-                                                                    <DatePicker
-                                                                        label="Data de saída"
-                                                                        value={date}
-                                                                        onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
-                                                                        placeholder="Selecione a data"
-                                                                    />
+                                                                <DatePicker
+                                                                    label="Data de saída"
+                                                                    value={date}
+                                                                    onChange={(nextDate) => setDate(toLocalDateInput(nextDate))}
+                                                                    placeholder="Selecione a data"
+                                                                />
 
-                                                                    <TimePicker
-                                                                        label="Horário de saída"
-                                                                        value={time}
-                                                                        onChange={setTime}
-                                                                        placeholder="Selecione o horário"
-                                                                    />
+                                                                <TimePicker
+                                                                    label="Horário de saída"
+                                                                    value={time}
+                                                                    onChange={setTime}
+                                                                    placeholder="Selecione o horário"
+                                                                />
+                                                            </div>
+                                                        </section>
+
+                                                        <div className="h-px w-full bg-brand-border dark:bg-dark-border" />
+
+                                                        <section>
+                                                            <h3 className="mb-5 text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                                                Itens do Pedido
+                                                            </h3>
+                                                            {allItems.length === 0 ? (
+                                                                <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
+                                                                    Nenhum item detalhado foi retornado para os pedidos selecionados.
                                                                 </div>
-                                                            </section>
+                                                            ) : (
+                                                                <div className="space-y-4">
+                                                                    {allItems.map((item) => {
+                                                                        const itemImage = getR2ImageUrl((item as any).products?.images || (item as any).image || null, "thumbnail")
+                                                                        const itemSku = (item as any).products?.sku || (item as any).sku || "N/A"
+                                                                        const itemPrice = Number((item as any).product_price || (item as any).price || 0)
+                                                                        const itemSubtotal = Number((item as any).subtotal || itemPrice * Number(item.quantity || 0))
 
-                                                            <div className="h-px w-full bg-brand-border dark:bg-dark-border" />
-
-                                                            <section>
-                                                                <h3 className="mb-5 text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                                    Itens do Pedido
-                                                                </h3>
-                                                                {allItems.length === 0 ? (
-                                                                    <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                                                        Nenhum item detalhado foi retornado para os pedidos selecionados.
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="space-y-4">
-                                                                        {allItems.map((item) => {
-                                                                            const itemImage = getR2ImageUrl((item as any).products?.images || (item as any).image || null, "thumbnail")
-                                                                            const itemSku = (item as any).products?.sku || (item as any).sku || "N/A"
-                                                                            const itemPrice = Number((item as any).product_price || (item as any).price || 0)
-                                                                            const itemSubtotal = Number((item as any).subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                                            return (
-                                                                                <div key={item.id} className="flex items-start gap-4">
-                                                                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                                        <img
-                                                                                            src={itemImage}
-                                                                                            className="w-full h-full object-cover rounded-xl"
-                                                                                            alt={item.product_name || "Produto sem nome"}
-                                                                                            onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                                        />
+                                                                        return (
+                                                                            <div key={item.id} className="flex items-start gap-4">
+                                                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                                    <img
+                                                                                        src={itemImage}
+                                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                                        alt={item.product_name || "Produto sem nome"}
+                                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="flex justify-between items-start mb-1">
+                                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {item.product_name || "Produto sem nome"}
+                                                                                        </h4>
+                                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
+                                                                                            {formatCurrency(itemSubtotal)}
+                                                                                        </span>
                                                                                     </div>
-                                                                                    <div className="flex-1 min-w-0">
-                                                                                        <div className="flex justify-between items-start mb-1">
-                                                                                            <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                                {item.product_name || "Produto sem nome"}
-                                                                                            </h4>
-                                                                                            <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                                                                {formatCurrency(itemSubtotal)}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
-                                                                                            SKU: {itemSku}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                                            <span>
-                                                                                                {item.quantity} un. • {formatCurrency(itemPrice)} / un.
-                                                                                            </span>
-                                                                                        </div>
+                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">
+                                                                                        SKU: {itemSku}
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                                        <span>
+                                                                                            {item.quantity} un. • {formatCurrency(itemPrice)} / un.
+                                                                                        </span>
                                                                                     </div>
                                                                                 </div>
-                                                                            )
-                                                                        })}
-                                                                    </div>
-                                                                )}
-                                                            </section>
-                                                        </>
-                                                    )}
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </section>
+                                                    </>
+                                                )}
                                             </div>
 
                                             <div className="col-span-12 hidden border-l border-brand-border pl-12 dark:border-dark-border lg:block lg:col-span-4">
@@ -789,7 +789,7 @@ export default function CreateDeliveryPage({
                             Informações detalhadas do pedido {infoOrder?.displayId}
                         </SheetDescription>
                     </SheetHeader>
-                    
+
                     {infoOrder && (
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             <div className="space-y-4">

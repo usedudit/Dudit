@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
     ChevronLeftIcon,
-    ThreeDotsIcon
+    ThreeDotsIcon,
+    UserIcon
 } from "@/lib/icons"
 import {
     Button,
@@ -16,6 +17,8 @@ import {
     TabsList,
     TabsTrigger,
     Input,
+    ListItem,
+    FormSection
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { usePermissions } from "@/lib/permission-context"
@@ -32,6 +35,8 @@ import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
 import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import BottomSheet from "@/components/BottomSheet"
 
 interface OrderDetailViewProps {
     orderId: string
@@ -59,6 +64,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [historyLoaded, setHistoryLoaded] = useState(false)
     const [deliverySummary, setDeliverySummary] = useState<any | null>(null)
     const [isReceiptPrintOpen, setIsReceiptPrintOpen] = useState(false)
+    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
+    const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -314,7 +321,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                                     <TabsContent value="summary" className="mt-0">
                                         <FadeIn key="summary">
-                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                                            {/* Desktop View */}
+                                            <div className="hidden xl:grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                         <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
@@ -544,6 +552,189 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Mobile/Tablet View */}
+                                            <div className="xl:hidden space-y-6">
+                                                {/* 1. Steps (Timeline) */}
+                                                <FormSection title="" hasSeparator={false} className="mt-0">
+                                                    {(() => {
+                                                        const activeSteps = timelineSteps.filter(s => s.active);
+                                                        const currentStep = activeSteps[activeSteps.length - 1] || timelineSteps[0];
+                                                        return (
+                                                            <ListItem
+                                                                title={currentStep.label}
+                                                                description={currentStep.date ? `${currentStep.date} às ${currentStep.time}` : undefined}
+                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                showChevron={true}
+                                                                onClick={() => setIsStepsSheetOpen(true)}
+                                                                left={
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                                                        order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                            ? "bg-brand-red/10 text-brand-red"
+                                                                            : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                                                    }`}>
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${
+                                                                            order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                                ? "bg-brand-red"
+                                                                                : "bg-brand-dark dark:bg-dark-heading"
+                                                                        }`} />
+                                                                    </div>
+                                                                }
+                                                            />
+                                                        );
+                                                    })()}
+                                                </FormSection>
+
+                                                {/* 2. Observação */}
+                                                {(cleanNotes || cancelNote) && (
+                                                    <FormSection title="" hasSeparator={false} className="mt-0">
+                                                        <InfoCard
+                                                            title="Observações do Pedido"
+                                                            message={[cleanNotes, cancelNote].filter(Boolean).join("\n")}
+                                                            color="orange" />
+                                                    </FormSection>
+                                                )}
+
+                                                {/* 3. Cliente */}
+                                                {(() => {
+                                                    const customerObj = order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null);
+                                                    return customerObj ? (
+                                                        <FormSection title="" hasSeparator={false} className="mt-0">
+                                                            <ListItem
+                                                                left={
+                                                                    <UserProfileImage
+                                                                        fullName={customerObj.name || "Cliente"}
+                                                                        imageUrl={customerObj.avatar}
+                                                                        className="w-10 h-10 text-base"
+                                                                    />
+                                                                }
+                                                                title={customerObj.name || "Consumidor Final"}
+                                                                description={customerObj.email || "Sem e-mail cadastrado"}
+                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                showChevron={true}
+                                                                onClick={() => setIsCustomerSheetOpen(true)}
+                                                            />
+                                                        </FormSection>
+                                                    ) : null;
+                                                })()}
+
+                                                {/* 4. Itens do Pedido */}
+                                                <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
+                                                    <div className="space-y-4">
+                                                        {(order.order_items || []).map((item: any) => (
+                                                            <div key={item.id} className="flex items-start gap-4">
+                                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={getR2ImageUrl(item.image, "thumbnail")}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.product_name}
+                                                                        onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
+                                                                    </div>
+                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                        <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </FormSection>
+
+                                                {/* 5. Detalhes do Pagamento */}
+                                                <FormSection title="Detalhes do Pagamento" hasSeparator={true} className="mt-0">
+                                                    <div className="space-y-3">
+                                                        <PaymentRow
+                                                            label="Método de Pagamento"
+                                                            value={
+                                                                <div className="flex items-center gap-2">
+                                                                    {order.payment_provider === "Mercado Pago" && (
+                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                            <img
+                                                                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                                                alt="Mercado Pago"
+                                                                                className="w-5 h-5 object-contain"
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                        {paymentMethodLabel}
+                                                                    </span>
+                                                                </div>
+                                                            } />
+
+                                                        {paymentBreakdown.length > 1 && (
+                                                            <PaymentRow
+                                                                label="Valores por meio"
+                                                                value={<div className="flex flex-col gap-1">
+                                                                    {paymentBreakdown.map((entry: any, index: number) => (
+                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>} />
+                                                        )}
+
+                                                        <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>} />
+
+                                                        <PaymentRow
+                                                            label="Tipo de Entrega"
+                                                            value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
+                                                            </span>} />
+
+                                                        {Number(order.delivery_fee || 0) > 0 && (
+                                                            <PaymentRow
+                                                                label="Valor da Entrega"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.delivery_fee)}</span>} />
+                                                        )}
+
+                                                        {Number(order.additional_costs || 0) > 0 && (
+                                                            <PaymentRow label="Outros Custos" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>} />
+                                                        )}
+
+                                                        {Number(order.discount_value || 0) > 0 && (
+                                                            <PaymentRow
+                                                                label="Desconto do Pedido"
+                                                                value={<span className="text-brand-green font-bold">- {formatCurrency(order.discount_value)}</span>} />
+                                                        )}
+                                                        {couponDiscountAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Desconto por Cupom"
+                                                                value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>} />
+                                                        )}
+                                                        {paymentMethodDiscountAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Desconto do Método"
+                                                                value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
+                                                        )}
+                                                        {paymentMethodExtraAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Taxa do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
+                                                        )}
+                                                        {changeAmount > 0.009 && (
+                                                            <PaymentRow
+                                                                label="Troco"
+                                                                value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>} />
+                                                        )}
+                                                        {wantsChange && payWithAmount !== null && (
+                                                            <PaymentRow
+                                                                label="Troco Solicitado"
+                                                                value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(cashChangeAmount)} (para {formatCurrency(payWithAmount)})</span>} />
+                                                        )}
+
+                                                        <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                            <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                                            <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
+                                                        </div>
+                                                    </div>
+                                                </FormSection>
+                                            </div>
                                         </FadeIn>
                                     </TabsContent>
 
@@ -582,6 +773,49 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     )}
                 </ActionsDropdown>
             </div>
+
+            <BottomSheet
+                isOpen={isCustomerSheetOpen}
+                onClose={() => setIsCustomerSheetOpen(false)}
+                title="Detalhes do Cliente"
+            >
+                <div className="pt-2">
+                    <CustomerCard
+                        chrome="minimal"
+                        customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
+                        address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
+                        billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")}
+                    />
+                </div>
+            </BottomSheet>
+
+            <BottomSheet
+                isOpen={isStepsSheetOpen}
+                onClose={() => setIsStepsSheetOpen(false)}
+                title="Status do Pedido"
+            >
+                <div className="space-y-0 my-4 px-2">
+                    {timelineSteps.map((step, idx) => (
+                        <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
+                            <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                            </div>
+                            <div className="flex flex-col text-left">
+                                <span className={`text-sm font-semibold ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                    {step.label}
+                                </span>
+                                {step.date ? (
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                        {step.date} às {step.time}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </BottomSheet>
 
             <SaleReceiptPrintModal
                 isOpen={isReceiptPrintOpen}

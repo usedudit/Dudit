@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon } from "@/lib/icons"
+import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon, MoneyIcon, TruckIcon } from "@/lib/icons"
 
 interface ColumnDef {
     id: string
@@ -128,11 +128,11 @@ const OrderListItem = React.memo(
                                 </Badge>
                             ) : (
                                 <>
-                                    <Badge variant={order.statusColor} icon={order.statusIcon}>
+                                    <Badge variant={order.statusColor} icon={<MoneyIcon />}>
                                         {order.statusLabel}
                                     </Badge>
                                     {!order.hasOnlyServices && (
-                                        <Badge variant={order.deliveryStatusColor || "gray"} icon={order.deliveryStatusIcon}>
+                                        <Badge variant={order.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
                                             {order.deliveryStatusLabel || "Não informado"}
                                         </Badge>
                                     )}

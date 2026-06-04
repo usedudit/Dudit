@@ -57,12 +57,14 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
     }, [user, router])
 
     // Fetch favorites
-    const fetchFavorites = useCallback(async () => {
+    const fetchFavorites = useCallback(async (force = false) => {
         if (!user) return
-        setIsLoading(true)
+        if (items.length === 0 || force) {
+            setIsLoading(true)
+        }
         try {
             const [favResult, countResult] = await Promise.all([
-                getUserFavoritesAction({ type: activeTab }),
+                getUserFavoritesAction({ type: "todos" }),
                 getFavoritesCountAction(),
             ])
 
@@ -75,15 +77,26 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
         } finally {
             setIsLoading(false)
         }
-    }, [user, activeTab])
+    }, [user, items.length])
 
     useEffect(() => {
         fetchFavorites()
-    }, [fetchFavorites, contextCount]) // Refetch when favorites change via context
+    }, [fetchFavorites])
+
+    useEffect(() => {
+        fetchFavorites(true)
+    }, [contextCount])
 
     // Filter and sort items
     const filteredItems = useMemo(() => {
         let result = [...items]
+
+        // Tab filter
+        if (activeTab === "produtos") {
+            result = result.filter((item) => item.itemType === "produto")
+        } else if (activeTab === "servicos") {
+            result = result.filter((item) => item.itemType === "servico")
+        }
 
         // Search filter (debounced via searchQuery state)
         if (searchQuery.trim()) {
@@ -113,7 +126,7 @@ export function FavoritesPageClient({ userProfile, cartCount }: FavoritesPageCli
         }
 
         return result
-    }, [items, searchQuery, sortBy])
+    }, [items, searchQuery, sortBy, activeTab])
 
     // Debounced search
     const handleSearchChange = useCallback((value: string) => {

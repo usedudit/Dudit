@@ -25,7 +25,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
     }
 
     return (
-        <footer className="bg-brand-dark py-16 border-t border-white/10 relative mt-auto w-full">
+        <footer className="hidden lg:block bg-brand-dark py-16 border-t border-white/10 relative mt-auto w-full">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
 
                 {/* Seção Superior */}

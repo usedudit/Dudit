@@ -4,7 +4,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingCartIcon, TruckIcon, ReturnIcon } from "@/lib/icons"
+import { ShoppingCartIcon, TruckIcon, ReturnIcon, MoneyIcon, CancelCircleIcon } from "@/lib/icons"
 
 interface OrderGridCardProps {
     order: any
@@ -74,28 +74,26 @@ const OrderGridCard = React.memo(
                                         </Badge>
                                     </Tooltip>
                                 )}
-                                <div className="flex items-center shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                     {order.situation === "cancelled" ? (
-                                        <Badge variant="red" className="whitespace-nowrap scale-90">
-                                            Cancelado
-                                        </Badge>
+                                        <Badge
+                                            variant="red"
+                                            icon={<CancelCircleIcon />}
+                                            className="whitespace-nowrap scale-90"
+                                        />
                                     ) : (
                                         <>
                                             <Badge
                                                 variant={order.statusColor}
-                                                icon={order.statusIcon}
+                                                icon={<MoneyIcon />}
                                                 className="whitespace-nowrap scale-90"
-                                            >
-                                                {order.statusLabel}
-                                            </Badge>
+                                            />
                                             {!order.hasOnlyServices && (
                                                 <Badge
                                                     variant={order.deliveryStatusColor || "gray"}
                                                     icon={<TruckIcon />}
                                                     className="whitespace-nowrap scale-90"
-                                                >
-                                                    {order.deliveryStatusLabel || "Não informado"}
-                                                </Badge>
+                                                />
                                             )}
                                         </>
                                     )}

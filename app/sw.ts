@@ -163,7 +163,7 @@ const duditRuntimeCaching = [
 // ============================================================
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: false, // Usuário decide quando atualizar
+  skipWaiting: true, // Auto-activates when installed
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: duditRuntimeCaching,

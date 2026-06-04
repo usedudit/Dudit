@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon, FileTextIcon, ChevronLeftIcon } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection } from "@/components/reusable"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Textarea } from "@/components/ui/textarea"
@@ -219,7 +219,7 @@ export function CheckoutPageClient() {
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
         deliveryAddress: "",
-        paymentMethod: partnerInfo.paymentMethods?.[0] || "cash",
+        paymentMethod: "",
         notes: "",
         installments: 1,
     })
@@ -242,7 +242,7 @@ export function CheckoutPageClient() {
 
 
 
-    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago">("traditional")
+    const [paymentOption, setPaymentOption] = useState<"traditional" | "mercadopago" | null>(null)
     const [paymentPreview, setPaymentPreview] = useState<MarketplacePaymentPreview | null>(null)
     const [paymentPreviewLoading, setPaymentPreviewLoading] = useState(false)
     const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false)
@@ -337,18 +337,10 @@ export function CheckoutPageClient() {
 
 
     useEffect(() => {
-        if (storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
+        if (formData.paymentMethod && storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
             setFormData(prev => ({ ...prev, paymentMethod: storefrontMethods[0].id }))
         }
     }, [storefrontMethods, formData.paymentMethod])
-
-
-    useEffect(() => {
-        if (sessionData) {
-            setFormData(prev => ({ ...prev, paymentMethod: partnerInfo.paymentMethods?.[0] || "cash" }))
-            setPaymentOption(partnerInfo.mpConnected ? "mercadopago" : "traditional")
-        }
-    }, [sessionData])
 
     useEffect(() => {
         let active = true
@@ -366,6 +358,7 @@ export function CheckoutPageClient() {
         return () => { active = false }
     }, [partnerId])
 
+
     // Carrega métodos de pagamento reais do vendedor
     useEffect(() => {
         let active = true
@@ -378,7 +371,7 @@ export function CheckoutPageClient() {
                     setStorefrontMethods(result.methods)
                     // Se o método atual não está entre os disponíveis, seleciona o primeiro
                     const availableTypes = result.methods.map((m) => m.type)
-                    if (!availableTypes.includes(formData.paymentMethod as any)) {
+                    if (formData.paymentMethod && !availableTypes.includes(formData.paymentMethod as any)) {
                         setFormData((prev) => ({ ...prev, paymentMethod: result.methods[0].type, installments: 1 }))
                     }
                 }
@@ -545,7 +538,7 @@ export function CheckoutPageClient() {
         if (!isCashPayment || isPickup) return null
 
         return (
-            <div className="mt-3 pl-8 flex items-center justify-between bg-brand-gray/30 dark:bg-dark-border/20 p-3 rounded-xl border border-brand-border/40 dark:border-dark-border/40">
+            <div className="mt-4 flex items-center justify-between">
                 <div className="text-xs">
                     {wantsChange ? (
                         <p className="text-brand-dark dark:text-dark-heading font-medium">
@@ -597,7 +590,7 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         let active = true
-        if (!partnerId || isPickup || !formData.deliveryAddress || !canUseDelivery) {
+        if (!partnerId || !formData.deliveryAddress || !canUseDelivery) {
             setDeliveryFee(0)
             setDeliveryDistanceKm(null)
             setDeliveryBreakdown(null)
@@ -638,7 +631,7 @@ export function CheckoutPageClient() {
             active = false
             window.clearTimeout(timer)
         }
-    }, [partnerId, isPickup, formData.deliveryAddress, hasFreeDeliveryCoupon, canUseDelivery])
+    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, canUseDelivery])
 
     useEffect(() => {
         let active = true
@@ -1334,9 +1327,7 @@ export function CheckoutPageClient() {
                         />
                         <span className="font-bold text-white text-sm truncate">{sellerName}</span>
                     </div>
-                    <div className="text-xs text-white/80 font-medium">
-                        Etapa {mobileStep}/2
-                    </div>
+                    <div className="w-8" />
                 </header>
 
                 <div className="container mx-auto px-4 lg:px-6 max-w-[1400px] w-full pt-6 md:pt-10 pb-32 md:pb-20 flex-1">
@@ -1361,46 +1352,24 @@ export function CheckoutPageClient() {
                             <FormSection title="Entrega">
                                 <div className="space-y-6">
                                     <div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {canUseDelivery && (
-                                                <ListItem
-                                                    icon={TruckIcon}
-                                                    title="Entrega"
-                                                    description="Receba em casa"
-                                                    className={`px-4 py-3 gap-4 ${formData.deliveryType === "delivery" ? "border-brand-green dark:border-brand-green" : ""}`}
-                                                    onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                    right={
-                                                        <RadioButton
-                                                            name="deliveryTypeDesktop"
-                                                            value="delivery"
-                                                            checked={!isPickup}
-                                                            onChange={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                        />
-                                                    }
-                                                />
-                                            )}
-                                            <ListItem
-                                                icon={StoreIcon}
-                                                title="Retirada no local"
-                                                description="Retire imediatamente"
-                                                className={`px-4 py-3 gap-4 ${isPickup ? "border-brand-green dark:border-brand-green" : ""}`}
-                                                onClick={() => {
-                                                    setFormData({ ...formData, deliveryType: "pickup" })
-                                                    if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
-                                                }}
-                                                right={
-                                                    <RadioButton
-                                                        name="deliveryTypeDesktop"
-                                                        value="pickup"
-                                                        checked={isPickup}
-                                                        onChange={() => {
-                                                            setFormData({ ...formData, deliveryType: "pickup" })
-                                                            if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
-                                                        }}
-                                                    />
+                                        <Tabs
+                                            value={formData.deliveryType}
+                                            onValueChange={(val) => {
+                                                const type = val as "delivery" | "pickup"
+                                                setFormData(prev => ({ ...prev, deliveryType: type }))
+                                                if (type === "pickup" && partnerInfo.mpConnected) {
+                                                    setPaymentOption("mercadopago")
                                                 }
-                                            />
-                                        </div>
+                                            }}
+                                            className="w-full"
+                                        >
+                                            <TabsList className="mb-6">
+                                                {canUseDelivery && (
+                                                    <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                                )}
+                                                <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
+                                            </TabsList>
+                                        </Tabs>
                                     </div>
 
                                     <AnimatePresence mode="wait">
@@ -1529,9 +1498,9 @@ export function CheckoutPageClient() {
                                                             title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                                                             description={
                                                                 selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                                selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                                    selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                        wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                            wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                                                             }
                                                             className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                             right={
@@ -1599,9 +1568,9 @@ export function CheckoutPageClient() {
                                                     title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                                                     description={
                                                         selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                        wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                        wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                            selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                                                     }
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                     right={
@@ -1688,62 +1657,7 @@ export function CheckoutPageClient() {
                                 </div>
                             </div>
 
-                            {/* ORDER BUMP SECTION (Desktop) */}
-                            {bumpCandidates.length > 0 && (
-                                <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-5">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <span className="text-sm">✨</span>
-                                        <div>
-                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                Adicionar Oferta Especial
-                                            </h3>
-                                            <p className="text-[11px] text-brand-inactive-text">
-                                                Aproveite e leve também este produto da loja com entrega única!
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {bumpCandidates.slice(0, 1).map((p: any) => {
-                                        const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
-                                        const basePrice = Number(p.price)
-                                        const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
-                                        const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
 
-                                        return (
-                                            <div
-                                                key={p.id}
-                                                className="flex items-center gap-3 p-3 border border-brand-border dark:border-dark-border rounded-lg bg-brand-slate/10 dark:bg-dark-border/10 animate-fade-in"
-                                            >
-                                                <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
-                                                    <img src={img} alt={p.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-xs truncate">
-                                                        {p.name}
-                                                    </h4>
-                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                        {promoPrice > 0 && promoPrice < basePrice && (
-                                                            <span className="text-[10px] line-through text-brand-inactive-text">
-                                                                {formatCurrency(basePrice)}
-                                                            </span>
-                                                        )}
-                                                        <span className="text-xs font-bold text-brand-green">
-                                                            {formatCurrency(price)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => handleAddBumpProduct(p)}
-                                                    className="h-7 text-[11px] font-bold px-2.5 shrink-0"
-                                                >
-                                                    Adicionar
-                                                </Button>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            )}
                         </div>
                     </div>
 
@@ -1752,37 +1666,24 @@ export function CheckoutPageClient() {
                         {mobileStep === 1 && (
                             <div className="space-y-6 pb-24">
                                 <div className="space-y-4">
-                                    <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Opção de Envio</h3>
-                                    <div className="grid grid-cols-2 gap-2 bg-brand-slate/20 dark:bg-dark-border/40 p-1 rounded-xl">
-                                        {canUseDelivery && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                className={`py-2 px-3 text-sm font-semibold rounded-lg transition-all ${
-                                                    formData.deliveryType === "delivery"
-                                                        ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
-                                                        : "text-brand-inactive-text"
-                                                }`}
-                                            >
-                                                Entrega
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData({ ...formData, deliveryType: "pickup" })
-                                                if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
-                                            }}
-                                            className={`py-2 px-3 text-sm font-semibold rounded-lg transition-all ${
-                                                formData.deliveryType === "pickup"
-                                                    ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
-                                                    : "text-brand-inactive-text"
-                                            }`}
-                                            style={!canUseDelivery ? { gridColumn: "span 2" } : undefined}
-                                        >
-                                            Retirada no local
-                                        </button>
-                                    </div>
+                                    <Tabs
+                                        value={formData.deliveryType}
+                                        onValueChange={(val) => {
+                                            const type = val as "delivery" | "pickup"
+                                            setFormData(prev => ({ ...prev, deliveryType: type }))
+                                            if (type === "pickup" && partnerInfo.mpConnected) {
+                                                setPaymentOption("mercadopago")
+                                            }
+                                        }}
+                                        className="w-full"
+                                    >
+                                        <TabsList className="mb-6">
+                                            {canUseDelivery && (
+                                                <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                            )}
+                                            <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
                                 </div>
 
                                 {formData.deliveryType === "delivery" ? (
@@ -1790,9 +1691,13 @@ export function CheckoutPageClient() {
                                         {loadingAddresses ? (
                                             <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
                                         ) : userAddresses.length > 0 && selectedAddress ? (
-                                            <div className="flex items-center justify-between w-full p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-slate/10 dark:bg-dark-border/10">
+                                            <div className="flex items-center justify-between w-full p-0 border-none bg-transparent shadow-none">
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <MapPinIcon className="w-5 h-5 text-brand-green shrink-0" />
+                                                    <img
+                                                        src="https://img.dudit.com.br/static/Map.png"
+                                                        alt="Mapa"
+                                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                    />
                                                     <div className="flex flex-col min-w-0">
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
                                                             {selectedAddress.street}, {selectedAddress.number}
@@ -1830,11 +1735,11 @@ export function CheckoutPageClient() {
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="flex items-start gap-3 p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-slate/10 dark:bg-dark-border/10">
+                                    <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
                                         <img
                                             src="https://img.dudit.com.br/static/Map.png"
                                             alt="Mapa"
-                                            className="w-12 h-12 object-cover rounded-lg shrink-0"
+                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
                                         />
                                         <div className="min-w-0">
                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
@@ -1850,65 +1755,10 @@ export function CheckoutPageClient() {
                                     </div>
                                 )}
 
-                                {/* ORDER BUMP SECTION (Mobile) */}
-                                {bumpCandidates.length > 0 && (
-                                    <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-4 mt-4">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="text-sm">✨</span>
-                                            <div>
-                                                <h3 className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                                    Adicionar Oferta Especial
-                                                </h3>
-                                                <p className="text-[10px] text-brand-inactive-text">
-                                                    Aproveite e leve também este produto da loja!
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {bumpCandidates.slice(0, 1).map((p: any) => {
-                                            const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
-                                            const basePrice = Number(p.price)
-                                            const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
-                                            const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
 
-                                            return (
-                                                <div
-                                                    key={p.id}
-                                                    className="flex items-center gap-2.5 p-2.5 border border-brand-border dark:border-dark-border rounded-lg bg-brand-slate/10 dark:bg-dark-border/10"
-                                                >
-                                                    <div className="w-10 h-10 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
-                                                        <img src={img} alt={p.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[11px] truncate">
-                                                            {p.name}
-                                                        </h4>
-                                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                                            {promoPrice > 0 && promoPrice < basePrice && (
-                                                                <span className="text-[9px] line-through text-brand-inactive-text">
-                                                                    {formatCurrency(basePrice)}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-[11px] font-bold text-brand-green">
-                                                                {formatCurrency(price)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={() => handleAddBumpProduct(p)}
-                                                        className="h-6 text-[10px] font-bold px-2 shrink-0"
-                                                    >
-                                                        Adicionar
-                                                    </Button>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
 
                                 {/* Bottom Bar Step 1 */}
-                                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[100] flex gap-3">
+                                <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -1933,8 +1783,7 @@ export function CheckoutPageClient() {
                         {mobileStep === 2 && (
                             <div className="space-y-6 pb-28">
                                 {/* Payment Selector */}
-                                <div className="space-y-4">
-                                    <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Forma de Pagamento</h3>
+                                <FormSection title="Forma de Pagamento">
                                     {partnerInfo.mpConnected ? (
                                         <div className="space-y-1">
                                             <ListItem
@@ -1986,16 +1835,19 @@ export function CheckoutPageClient() {
                                                             selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                                 MoneyIcon
                                                 }
-                                                title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                title={formData.paymentMethod ? (selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando...") : "Escolher meio de pagamento"}
                                                 description={
+                                                    !formData.paymentMethod ? "Clique para selecionar" :
                                                     selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                    selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                    wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                                                 }
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                 right={
-                                                    <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                    <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>
+                                                        {formData.paymentMethod ? "Trocar" : "Selecionar"}
+                                                    </Button>
                                                 }
                                             />
                                             {renderChangeSection()}
@@ -2046,52 +1898,97 @@ export function CheckoutPageClient() {
                                             <InfoCard message={`${paymentError}`} color="red" />
                                         </div>
                                     )}
-                                </div>
+                                </FormSection>
 
                                 {/* Coupon Selector */}
-                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
-                                    <ListItem
-                                        icon={TagIcon}
-                                        title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
-                                        titleClassName="text-sm"
-                                        description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
-                                        className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
-                                        onClick={() => {
-                                            if (!couponListLoading && availableCoupons.length > 0) {
-                                                setSelectedCouponId(appliedCoupon?.id || "")
-                                                setShowCouponModal(true)
+                                {availableCoupons.length > 0 && (
+                                    <FormSection title="Cupom de Desconto" hasSeparator>
+                                        <ListItem
+                                            icon={TagIcon}
+                                            title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
+                                            description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
+                                            className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                            onClick={() => {
+                                                if (!couponListLoading && availableCoupons.length > 0) {
+                                                    setSelectedCouponId(appliedCoupon?.id || "")
+                                                    setShowCouponModal(true)
+                                                }
+                                            }}
+                                            showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                                            right={
+                                                appliedCoupon ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleRemoveCoupon()
+                                                        }}
+                                                        className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
+                                                    >
+                                                        <XIcon size={12} /> Remover
+                                                    </button>
+                                                ) : couponListLoading ? (
+                                                    <Spinner size={16} />
+                                                ) : undefined
                                             }
-                                        }}
-                                        showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
-                                        right={
-                                            appliedCoupon ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleRemoveCoupon()
-                                                    }}
-                                                    className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
-                                                >
-                                                    <XIcon size={12} /> Remover
-                                                </button>
-                                            ) : couponListLoading ? (
-                                                <Spinner size={16} />
-                                            ) : undefined
-                                        }
-                                    />
-                                    {couponError && (
-                                        <p className="text-xs text-red-500 mt-1">{couponError}</p>
-                                    )}
-                                    {couponPartialWarning && appliedCoupon && (
-                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                            Cupom elegível apenas para alguns itens do carrinho.
-                                        </p>
-                                    )}
-                                </div>
+                                        />
+                                        {couponError && (
+                                            <p className="text-xs text-red-500 mt-1">{couponError}</p>
+                                        )}
+                                        {couponPartialWarning && appliedCoupon && (
+                                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                Cupom elegível apenas para alguns itens do carrinho.
+                                            </p>
+                                        )}
+                                    </FormSection>
+                                )}
+
+                                {/* Totals Summary */}
+                                <FormSection title="Resumo dos Valores" hasSeparator>
+                                    <div className="space-y-2 text-sm text-brand-inactive-text">
+                                        <div className="flex justify-between">
+                                            <span>Subtotal</span>
+                                            <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                        </div>
+                                        {couponDiscount > 0 && (
+                                            <div className="flex justify-between text-brand-green font-semibold">
+                                                <span>Desconto do cupom</span>
+                                                <span>-{formatCurrency(couponDiscount)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span>Entrega</span>
+                                            <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                                                {isPickup ? "Grátis" : deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                            </span>
+                                        </div>
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
+                                            <div className="flex justify-between text-brand-green font-semibold">
+                                                <span>Desconto do pagamento</span>
+                                                <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                            <div className="flex justify-between">
+                                                <span>Juros</span>
+                                                <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.interestAmount)}</span>
+                                            </div>
+                                        )}
+                                        {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
+                                            <div className="flex justify-between">
+                                                <span>Taxas</span>
+                                                <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading pt-2 border-t border-brand-border/20">
+                                            <span>Total</span>
+                                            <span>{formatCurrency(checkoutTotalToCharge)}</span>
+                                        </div>
+                                    </div>
+                                </FormSection>
 
                                 {/* Observations */}
-                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                                <FormSection title="Observações" hasSeparator>
                                     <ListItem
                                         icon={FileTextIcon}
                                         title="Observações"
@@ -2104,59 +2001,32 @@ export function CheckoutPageClient() {
                                             </Button>
                                         }
                                     />
-                                </div>
-
-                                {/* Totals Summary */}
-                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4 space-y-2 text-sm text-brand-inactive-text">
-                                    <div className="flex justify-between">
-                                        <span>Subtotal</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                                    </div>
-                                    {couponDiscount > 0 && (
-                                        <div className="flex justify-between text-brand-green font-semibold">
-                                            <span>Desconto do cupom</span>
-                                            <span>-{formatCurrency(couponDiscount)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between">
-                                        <span>Entrega</span>
-                                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                                            {isPickup ? "Grátis" : deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
-                                        </span>
-                                    </div>
-                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
-                                        <div className="flex justify-between text-brand-green font-semibold">
-                                            <span>Desconto do pagamento</span>
-                                            <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
-                                        </div>
-                                    )}
-                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span>Juros</span>
-                                            <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.interestAmount)}</span>
-                                        </div>
-                                    )}
-                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
-                                        <div className="flex justify-between">
-                                            <span>Taxas</span>
-                                            <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading pt-2 border-t border-brand-border/20">
-                                        <span>Total</span>
-                                        <span>{formatCurrency(checkoutTotalToCharge)}</span>
-                                    </div>
-                                </div>
+                                </FormSection>
 
                                 {/* Fixed Bottom Bar Step 2 */}
-                                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[100]">
+                                <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
                                     <Button
                                         type="button"
-                                        onClick={() => setShowReviewModal(true)}
-                                        disabled={disableCheckoutSubmit}
-                                        className="w-full h-12"
+                                        variant="outline"
+                                        onClick={() => setMobileStep(1)}
+                                        disabled={isLoading}
+                                        className="w-[120px] h-12 bg-transparent"
                                     >
-                                        Revisar pedido • {formatCurrency(checkoutTotalToCharge)}
+                                        Voltar
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!paymentOption || (paymentOption === "traditional" && !formData.paymentMethod)) {
+                                                notifyError("Erro de Pagamento", "Por favor, selecione uma forma de pagamento.")
+                                                return
+                                            }
+                                            setShowReviewModal(true)
+                                        }}
+                                        disabled={disableCheckoutSubmit}
+                                        className="flex-1 h-12"
+                                    >
+                                        Finalizar • {formatCurrency(checkoutTotalToCharge)}
                                     </Button>
                                 </div>
                             </div>
@@ -2214,7 +2084,7 @@ export function CheckoutPageClient() {
                             variant="outline"
                             onClick={() => setShowReviewModal(false)}
                             disabled={isLoading}
-                            className="flex-1 bg-transparent"
+                            className="flex-1 h-12"
                         >
                             Alterar pedido
                         </Button>
@@ -2224,7 +2094,7 @@ export function CheckoutPageClient() {
                                 setShowReviewModal(false)
                             }}
                             disabled={disableCheckoutSubmit}
-                            className="flex-1"
+                            className="flex-1 h-12"
                         >
                             {isLoading ? "Processando..." : "Fazer pedido"}
                         </Button>
@@ -2233,41 +2103,62 @@ export function CheckoutPageClient() {
             >
                 <div className="space-y-6">
                     <div className="space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Destino</p>
-                        {formData.deliveryType === "delivery" ? (
-                            <ListItem
-                                icon={MapPinIcon}
-                                title="Endereço de entrega"
-                                description={formData.deliveryAddress}
-                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
-                            />
+                        {formData.deliveryType === "delivery" && selectedAddress ? (
+                            <div className="flex items-center gap-3 p-0 border-none bg-transparent shadow-none">
+                                <img
+                                    src="https://img.dudit.com.br/static/Map.png"
+                                    alt="Mapa"
+                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                />
+                                <div className="flex flex-col min-w-0">
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                        {selectedAddress.street}, {selectedAddress.number}
+                                    </p>
+                                    <p className="text-xs text-brand-inactive-text truncate">
+                                        {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : formData.deliveryType === "pickup" ? (
+                            <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
+                                <img
+                                    src="https://img.dudit.com.br/static/Map.png"
+                                    alt="Mapa"
+                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                    <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
+                                        {formatPartnerAddress(partnerInfo.address)}
+                                    </p>
+                                    {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
+                                        <p className="text-[11px] text-brand-inactive-text mt-1.5 font-medium">
+                                            Pronto em {preparationEstimate.readyInMinutes} min • Retirar das {pickupStartLabel} às {pickupEndLabel}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
                         ) : (
-                            <ListItem
-                                icon={StoreIcon}
-                                title="Retirada no local"
-                                description={formatPartnerAddress(partnerInfo.address)}
-                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
-                            />
+                            <div className="text-sm text-brand-inactive-text">Endereço não selecionado</div>
                         )}
                     </div>
 
-                    <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
-                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Pagamento</p>
+                    <div className="space-y-4">
                         <ListItem
                             icon={
                                 paymentOption === "mercadopago" ? <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" /> :
-                                selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                MoneyIcon
+                                    selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                        selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                MoneyIcon
                             }
                             title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                             description={
                                 paymentOption === "mercadopago" ? "Cartão, Pix ou saldo MP" :
-                                selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
-                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                        selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
+                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                             }
                             className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                             right={
@@ -2277,7 +2168,7 @@ export function CheckoutPageClient() {
                     </div>
 
                     {appliedCoupon && (
-                        <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                        <div className="space-y-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Cupom Aplicado</p>
                             <ListItem
                                 icon={TagIcon}
@@ -2287,23 +2178,6 @@ export function CheckoutPageClient() {
                             />
                         </div>
                     )}
-
-                    <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
-                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Itens</p>
-                        <div className="max-h-[200px] overflow-y-auto space-y-3 pr-2">
-                            {products.map((item) => {
-                                const qty = quantities[item.id] || item.quantity
-                                return (
-                                    <div key={item.id} className="flex justify-between items-center text-sm py-1">
-                                        <span className="text-brand-dark dark:text-dark-heading truncate max-w-[200px] font-medium">
-                                            {item.name} <span className="text-xs text-brand-inactive-text">x{qty}</span>
-                                        </span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.price * qty)}</span>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
                 </div>
             </DefaultModal>
 
@@ -2631,9 +2505,6 @@ export function CheckoutPageClient() {
                 }
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-brand-inactive-text">
-                        Como você vai pagar o pedido em dinheiro na entrega?
-                    </p>
                     <div className="space-y-3">
                         <ListItem
                             title="Não preciso de troco"
@@ -2667,15 +2538,10 @@ export function CheckoutPageClient() {
 
                     {tempWantsChange === true && (
                         <div className="mt-4 space-y-3 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
-                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                Pagar com (R$)
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                min={checkoutTotalToCharge}
+                            <MoneyInput
+                                prefix="R$"
                                 value={tempPayWithAmount}
-                                onChange={(e) => setTempPayWithAmount(e.target.value)}
+                                onChange={(val) => setTempPayWithAmount(val ? String(val) : "")}
                                 placeholder="Ex: 50,00"
                                 className="w-full"
                             />

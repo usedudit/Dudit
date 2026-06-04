@@ -435,214 +435,258 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </div>
                 </div>
 
-                <div className="max-w-3xl mx-auto space-y-8 pb-32">
-                    {/* Section 1: Detalhes do Pedido (Chave-Valor estilo ERP) */}
-                    <FormSection title={`Pedido #${orderNumber}`}>
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
-                            <DetailRow
-                                label="Status do Pagamento"
-                                value={
-                                    <span className={statusConfig.color}>
-                                        {statusConfig.label}
-                                    </span>
-                                }
-                            />
-                            <DetailRow
-                                label="Status da Entrega"
-                                value={
-                                    order.delivery_status === 'pending' ? 'Pendente' :
-                                        order.delivery_status === 'preparing' ? 'Preparando' :
-                                            order.delivery_status === 'sent' ? 'Enviado' :
-                                                order.delivery_status === 'delivered' ? 'Entregue' :
-                                                    order.delivery_status === 'pickup_available' ? 'Disponível para retirada' :
-                                                        order.delivery_status === 'delivery_failed' ? 'Não entregue' :
-                                                            order.delivery_status
-                                }
-                            />
-                            <DetailRow
-                                label="Data do Pedido"
-                                value={`${dateStrFull} às ${dateStrTime}`}
-                            />
-                            <DetailRow
-                                label="Tipo de Envio"
-                                value={isDelivery ? "Entrega via Delivery" : "Retirada no Local"}
-                            />
-                            <DetailRow
-                                label="Destino"
-                                value={
-                                    isDelivery ? (
-                                        <span className="text-xs font-normal text-brand-inactive-text">
-                                            Será entregue no endereço selecionado
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs font-normal text-brand-inactive-text">
-                                            Você retirará na loja parceira
-                                        </span>
-                                    )
-                                }
-                            />
-                        </div>
-                    </FormSection>
+                <div className="max-w-3xl lg:max-w-[1400px] mx-auto w-full pb-32">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        {/* Left Column (Sections 1, 2, 3, 4, 5) */}
+                        <div className="lg:col-span-8 space-y-8">
+                            {/* Section 1: Detalhes do Pedido (Chave-Valor estilo ERP) */}
+                            <FormSection title={`Pedido #${orderNumber}`}>
+                                <div>
+                                    <DetailRow
+                                        label="Status do Pagamento"
+                                        value={
+                                            <span className={statusConfig.color}>
+                                                {statusConfig.label}
+                                            </span>
+                                        }
+                                    />
+                                    <DetailRow
+                                        label="Status da Entrega"
+                                        value={
+                                            order.delivery_status === 'pending' ? 'Pendente' :
+                                                order.delivery_status === 'preparing' ? 'Preparando' :
+                                                    order.delivery_status === 'sent' ? 'Enviado' :
+                                                        order.delivery_status === 'delivered' ? 'Entregue' :
+                                                            order.delivery_status === 'pickup_available' ? 'Disponível para retirada' :
+                                                                order.delivery_status === 'delivery_failed' ? 'Não entregue' :
+                                                                    order.delivery_status
+                                        }
+                                    />
+                                    <DetailRow
+                                        label="Data do Pedido"
+                                        value={`${dateStrFull} às ${dateStrTime}`}
+                                    />
+                                    <DetailRow
+                                        label="Tipo de Envio"
+                                        value={isDelivery ? "Entrega via Delivery" : "Retirada no Local"}
+                                    />
+                                </div>
+                            </FormSection>
 
-                    {/* Section 2: Itens do Pedido */}
-                    <FormSection title="Itens do Pedido">
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6 space-y-4">
-                            {order.order_items?.map((item: any) => {
-                                const itemImage = getPrimaryProductDisplayImage({
-                                    images: item.products?.images || null,
-                                    video_thumbnail: item.products?.video_thumbnail || null,
-                                    fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                });
-                                return (
-                                    <Link
-                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
-                                        prefetch={true}
-                                        key={item.id}
-                                        className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                            {/* Section 2: Itens do Pedido */}
+                            <FormSection title="Itens do Pedido">
+                                <div className="space-y-4">
+                                    {order.order_items?.map((item: any) => {
+                                        const itemImage = getPrimaryProductDisplayImage({
+                                            images: item.products?.images || null,
+                                            video_thumbnail: item.products?.video_thumbnail || null,
+                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                        });
+                                        return (
+                                            <Link
+                                                href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                                                prefetch={true}
+                                                key={item.id}
+                                                className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                            >
+                                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
+                                                        {item.products?.name || item.product_name}
+                                                    </h3>
+                                                    {item.product_variants?.variant_name && (
+                                                        <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                    )}
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                                        {formatCurrency(item.product_price)}
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                                    x{item.quantity}
+                                                </div>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </FormSection>
+
+                            {/* Section 3: Endereço de entrega / retirada */}
+                            <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
+                                {isDelivery ? (
+                                    <div
+                                        onClick={() => setIsShippingModalOpen(true)}
+                                        className="flex items-stretch gap-3 cursor-pointer"
                                     >
-                                        <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
-                                            <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                        <img
+                                            src="https://img.dudit.com.br/static/Map.png"
+                                            alt="Endereço de entrega"
+                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                        />
+                                        <div className="flex flex-col justify-center">
+                                            <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                {addressTypeLabel || "Endereço de Entrega"}
+                                            </p>
+                                            <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
-                                                {item.products?.name || item.product_name}
-                                            </h3>
-                                            {item.product_variants?.variant_name && (
-                                                <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
-                                            )}
-                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                {formatCurrency(item.product_price)}
-                                            </div>
-                                        </div>
-                                        <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                            x{item.quantity}
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </FormSection>
-
-                    {/* Section 3: Endereço de entrega / retirada */}
-                    <FormSection title={isDelivery ? (addressTypeLabel || "Endereço de Entrega") : "Local de Retirada"}>
-                        {isDelivery ? (
-                            <div
-                                onClick={() => setIsShippingModalOpen(true)}
-                                className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl"
-                            >
-                                <img
-                                    src="https://img.dudit.com.br/static/Map.png"
-                                    alt="Endereço de entrega"
-                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                />
-                                <div className="flex flex-col justify-center">
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        {addressTypeLabel || "Endereço de Entrega"}
-                                    </p>
-                                    <p className="text-xs text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div
-                                onClick={() => setIsShippingModalOpen(true)}
-                                className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl"
-                            >
-                                <img
-                                    src="https://img.dudit.com.br/static/Map.png"
-                                    alt="Local de Retirada"
-                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                />
-                                <div className="flex flex-col justify-center">
-                                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                    <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
-                                </div>
-                            </div>
-                        )}
-                    </FormSection>
-
-                    {/* Section 4: Pagamento */}
-                    <FormSection title="Pagamento">
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl">
-                            <ListItem
-                                icon={PaymentIconEl}
-                                title={
-                                    loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            {paymentMethodName}
-                                        </span>
-                                }
-                                description={
-                                    <span className="text-xs text-brand-inactive-text font-normal">
-                                        {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
-                                    </span>
-                                }
-                                className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
-                                onClick={handlePixClick}
-                                right={
-                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                                }
-                            />
-                        </div>
-                    </FormSection>
-
-                    {/* Section 5: Vendedor */}
-                    <FormSection title="Vendedor">
-                        <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                                <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                <div className="text-xs text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
-                            </div>
-                            <ChevronRightIcon size={18} className="text-brand-inactive-text" />
-                        </Link>
-                    </FormSection>
-
-                    {/* Section 6: Resumo dos Valores */}
-                    <FormSection title="Resumo dos Valores">
-                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-6 rounded-2xl">
-                            {renderPriceSummary()}
-                        </div>
-                    </FormSection>
-
-                    {/* Actions / Buttons */}
-                    <div className="space-y-4 pt-4">
-                        {canCancelOrder && (
-                            <Button
-                                variant="outlinered"
-                                className="w-full h-12 font-bold"
-                                onClick={() => setIsCancelModalOpen(true)}
-                                disabled={isCanceling}
-                            >
-                                {isCanceling ? (
-                                    <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                    </div>
                                 ) : (
-                                    "Cancelar pedido"
+                                    <div
+                                        onClick={() => setIsShippingModalOpen(true)}
+                                        className="flex items-stretch gap-3 cursor-pointer"
+                                    >
+                                        <img
+                                            src="https://img.dudit.com.br/static/Map.png"
+                                            alt="Local de Retirada"
+                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                        />
+                                        <div className="flex flex-col justify-center">
+                                            <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                            <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
+                                        </div>
+                                    </div>
                                 )}
-                            </Button>
-                        )}
+                            </FormSection>
 
-                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                            {/* Section 4: Pagamento */}
+                            <FormSection title="Pagamento">
+                                <div>
+                                    <ListItem
+                                        icon={PaymentIconEl}
+                                        title={
+                                            loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
+                                                <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                    {paymentMethodName}
+                                                </span>
+                                        }
+                                        description={
+                                            <span className="text-xs lg:text-sm text-brand-inactive-text font-normal">
+                                                {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
+                                            </span>
+                                        }
+                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                        onClick={handlePixClick}
+                                        right={
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                        }
+                                    />
+                                </div>
+                            </FormSection>
+
+                            {/* Section 5: Vendedor */}
+                            <FormSection title="Vendedor">
+                                <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                        <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
+                                        <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
+                                    </div>
+                                    <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                                </Link>
+                            </FormSection>
+
+                            {/* Mobile/Tablet Section 6: Resumo dos Valores */}
+                            <div className="block lg:hidden">
+                                <FormSection title="Resumo dos Valores">
+                                    <div>
+                                        {renderPriceSummary()}
+                                    </div>
+                                </FormSection>
                             </div>
-                        )}
 
-                        {canRequestResolution && (
-                            <>
-                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                </p>
-                                <Button
-                                    variant="outline"
-                                    className="w-full h-12 font-bold"
-                                    onClick={() => setIsReturnModalOpen(true)}
-                                >
-                                    Solicitar troca ou devolucao
-                                </Button>
-                            </>
-                        )}
+                            {/* Mobile/Tablet Actions / Buttons */}
+                            <div className="block lg:hidden space-y-4 pt-4">
+                                {canCancelOrder && (
+                                    <Button
+                                        variant="outlinered"
+                                        className="w-full h-12 font-bold"
+                                        onClick={() => setIsCancelModalOpen(true)}
+                                        disabled={isCanceling}
+                                    >
+                                        {isCanceling ? (
+                                            <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                        ) : (
+                                            "Cancelar pedido"
+                                        )}
+                                    </Button>
+                                )}
+
+                                {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                        Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                    </div>
+                                )}
+
+                                {canRequestResolution && (
+                                    <>
+                                        <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                            Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                        </p>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full h-12 font-bold"
+                                            onClick={() => setIsReturnModalOpen(true)}
+                                        >
+                                            Solicitar troca ou devolucao
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Column (resumo dos valores + actions) - Desktop only */}
+                        <div className="hidden lg:block lg:col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
+                            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                                <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                    Resumo dos Valores
+                                </div>
+                                <div className="p-6">
+                                    {renderPriceSummary()}
+                                </div>
+                            </div>
+
+                            {/* Desktop Actions / Buttons */}
+                            <div className="space-y-4 pt-4">
+                                {canCancelOrder && (
+                                    <Button
+                                        variant="outlinered"
+                                        className="w-full h-12 font-bold"
+                                        onClick={() => setIsCancelModalOpen(true)}
+                                        disabled={isCanceling}
+                                    >
+                                        {isCanceling ? (
+                                            <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                        ) : (
+                                            "Cancelar pedido"
+                                        )}
+                                    </Button>
+                                )}
+
+                                {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                        Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                    </div>
+                                )}
+
+                                {canRequestResolution && (
+                                    <>
+                                        <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                            Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                        </p>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full h-12 font-bold"
+                                            onClick={() => setIsReturnModalOpen(true)}
+                                        >
+                                            Solicitar troca ou devolucao
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

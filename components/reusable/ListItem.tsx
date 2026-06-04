@@ -53,14 +53,14 @@ export const ListItem: React.FC<ListItemProps> = ({
 
             <div className="flex-1 min-w-0">
                 <h3
-                    className={`text-base font-bold text-brand-dark dark:text-dark-heading truncate ${titleClassName}`}
+                    className={`text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate ${titleClassName}`}
                 >
                     {title}
                 </h3>
 
                 {description && (
                     <p
-                        className={`text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words ${descriptionClassName}`}
+                        className={`text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words ${descriptionClassName}`}
                     >
                         {description}
                     </p>

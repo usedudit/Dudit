@@ -1,17 +1,10 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
 import { NotificationProvider } from "@/hooks/use-notification"
 import { PreventSamePageNavigation } from "@/components/PreventSamePageNavigation"
 import { PWAUpdatePrompt } from "@/components/pwa/PWAUpdatePrompt"
 import { MarketplaceBottomMenu } from "@/components/marketplace/MarketplaceBottomMenu"
-
-const inter = Inter({
-    subsets: ["latin"],
-    display: "swap",
-    variable: "--font-inter",
-})
 
 export const metadata: Metadata = {
     title: "Dudit | Tudo o que sua cidade tem",
@@ -73,7 +66,7 @@ export default async function RootLayout({
     const user = await getCurrentUser()
 
     return (
-        <html lang="pt-BR" className={inter.variable}>
+        <html lang="pt-BR">
             <head>
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link

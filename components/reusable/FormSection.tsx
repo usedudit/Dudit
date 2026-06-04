@@ -18,7 +18,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
             <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full" />
         )}
         <div className={`${hasSeparator ? "mt-8" : ""} ${className}`.trim()}>
-            <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
+            <h2 className="text-sm lg:text-xl font-medium text-brand-dark mb-6">{title}</h2>
             <div className="space-y-5">{children}</div>
         </div>
     </>
