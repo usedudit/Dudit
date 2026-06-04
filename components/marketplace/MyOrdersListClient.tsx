@@ -77,15 +77,13 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
         if (target.closest('a') || target.closest('button')) {
             return;
         }
-        if (window.innerWidth < 768) {
-            handleOpenDetails(id, orderNumber);
-        }
+        handleOpenDetails(id, orderNumber);
     };
 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
 
     return (
-        <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
+        <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
             <AnimatePresence mode="wait">
                 {activeOrderId && activeOrder ? (
                     <MyOrderDetailPage key="details" order={activeOrder} onBack={handleCloseDetails} />
@@ -124,12 +122,12 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                         <div
                                             key={order.id}
                                             onClick={(e) => handleCardClick(e, order.id, order.order_number)}
-                                            className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-colors cursor-pointer md:cursor-default"
+                                            className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden transition-all duration-200 cursor-pointer hover:shadow-md hover:border-brand-green dark:hover:border-brand-green"
                                         >
                                             {/* Batch sync handled at container level */}
 
                                             {/* Card Header */}
-                                            <div className="px-6 py-4 bg-brand-gray dark:bg-emerald-900/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div className="px-6 py-4 flex flex-row items-center justify-between gap-4">
                                                 <div className="flex items-center gap-4">
                                                     {/* Seller Image */}
                                                     <img
@@ -139,39 +137,33 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                     />
 
                                                     <div>
-                                                        {/* Date Top */}
+                                                        {/* Store Name Top */}
                                                         <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                            {formatFullDate(order.created_at)}
-                                                            <span className={`w-2.5 h-2.5 rounded-full ${statusConfig.dotBg} md:hidden`} title={statusConfig.label} />
-                                                        </h3>
-                                                        {/* Order ID & Store Name Bottom */}
-                                                        <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5">
-                                                            Pedido #{order.order_number || order.id.slice(0, 8)}
-                                                            {returnHistoryCount > 0 && (
-                                                                <Tooltip text="Possui histórico de trocas/devoluções">
-                                                                    <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
-                                                                        {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                                                    </Badge>
-                                                                </Tooltip>
-                                                            )}
-                                                            <span>•</span>
                                                             {order.partners?.store_name || "Loja Parceira"}
+                                                        </h3>
+                                                        {/* Order ID & Date Bottom */}
+                                                        <div className="text-xs text-brand-inactive-text flex items-center gap-1 mt-0.5 flex-wrap">
+                                                            <span>Pedido #{order.order_number || order.id.slice(0, 8)}</span>
+                                                            <span>•</span>
+                                                            <span>{formatFullDate(order.created_at)}</span>
+                                                            {returnHistoryCount > 0 && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <Tooltip text="Possui histórico de trocas/devoluções">
+                                                                        <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap inline-flex">
+                                                                            {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
+                                                                        </Badge>
+                                                                    </Tooltip>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Separator mobile */}
-                                                <div className="hidden h-px bg-brand-border/60 dark:bg-dark-border/60 w-full md:hidden" />
-
-                                                <div className="hidden md:flex items-center justify-center md:justify-end gap-3 md:gap-6 w-full md:w-auto">
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-xs font-medium text-brand-inactive-text md:block hidden">Total</span>
-                                                        {formatCurrency(order.total_amount)}
-                                                    </div>
-                                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} dark:bg-opacity-20`}>
-                                                        <StatusIcon size={14} />
-                                                        {statusConfig.label}
-                                                    </div>
+                                                {/* Right side: Status as plain colored text */}
+                                                <div className={`flex items-center gap-1.5 text-xs font-bold ${statusConfig.color}`}>
+                                                    <StatusIcon size={14} />
+                                                    <span>{statusConfig.label}</span>
                                                 </div>
                                             </div>
 
@@ -221,37 +213,44 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                 </div>
 
                                                 {/* Actions Footer */}
-                                                <div className={`flex-wrap justify-end items-center gap-3 mt-8 pt-6 border-t border-brand-border dark:border-dark-border ${hasReviewAction ? 'flex' : 'hidden md:flex'}`}>
-
-                                                    {order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0] && (
-                                                        <ReviewButton
-                                                            orderId={order.id}
-                                                            partnerId={order.partner_id}
-                                                            productId={order.order_items[0].product_id}
-                                                            serviceId={null}
-                                                            userId={userId}
-                                                            itemName={order.order_items[0].products?.name || order.order_items[0].product_name}
-                                                        />
-                                                    )}
-
-                                                    {reviewedOrderIds.has(order.id) && (
-                                                        <span className="text-sm font-medium text-brand-green flex items-center gap-1.5 mr-auto">
-                                                            <CheckCircleIcon size={16} /> Pedido avaliado
+                                                <div className="flex flex-row justify-between items-center gap-4 mt-8 pt-6 border-t border-brand-border dark:border-dark-border w-full flex-wrap">
+                                                    {/* Left Side: Total Amount */}
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs text-brand-inactive-text">Total</span>
+                                                        <span className="text-base font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(order.total_amount)}
                                                         </span>
-                                                    )}
+                                                    </div>
 
-                                                    {/* Action Buttons Container */}
-                                                    <div className="hidden md:flex flex-row items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0 justify-end flex-wrap">
+                                                    {/* Right Side: Actions */}
+                                                    <div className="flex flex-row items-center gap-3 flex-wrap justify-end">
+                                                        {reviewedOrderIds.has(order.id) && (
+                                                            <span className="text-xs sm:text-sm font-medium text-brand-green flex items-center gap-1.5">
+                                                                <CheckCircleIcon size={16} /> Pedido avaliado
+                                                            </span>
+                                                        )}
+
+                                                        {order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0] && (
+                                                            <ReviewButton
+                                                                orderId={order.id}
+                                                                partnerId={order.partner_id}
+                                                                productId={order.order_items[0].product_id}
+                                                                serviceId={null}
+                                                                userId={userId}
+                                                                itemName={order.order_items[0].products?.name || order.order_items[0].product_name}
+                                                            />
+                                                        )}
+
                                                         <Button
                                                             onClick={() => handleOpenDetails(order.id, order.order_number)}
                                                             variant="outline"
-                                                            className="flex-1 sm:flex-initial sm:w-auto order-1"
+                                                            className="w-auto"
                                                         >
                                                             Ver detalhes
                                                         </Button>
 
                                                         {order.situation === 'pending' && (
-                                                            <div className="flex-1 sm:flex-initial sm:w-auto order-2">
+                                                            <div className="w-auto">
                                                                 <OrderRetryPayment
                                                                     orderId={order.id}
                                                                     amount={order.total_amount}

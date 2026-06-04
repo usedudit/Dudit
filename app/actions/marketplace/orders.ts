@@ -36,6 +36,8 @@ export async function createOrderAction(data: {
   partnerId: string
   csrf_token?: string
   couponCode?: string | null
+  wantsChange?: boolean
+  payWithAmount?: number
 }) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -304,6 +306,15 @@ export async function createOrderAction(data: {
     paymentAwareTotal = Number(calc.finalAmount || finalTotal)
   }
 
+  if (chosenType === "cash" && data.deliveryType === "delivery") {
+    if (data.wantsChange === undefined || data.wantsChange === null) {
+      return { error: "Por favor, informe se precisa de troco para o pagamento em dinheiro." }
+    }
+    if (data.wantsChange && (data.payWithAmount === undefined || data.payWithAmount === null || data.payWithAmount < paymentAwareTotal)) {
+      return { error: "O valor informado para o troco é menor que o total do pedido." }
+    }
+  }
+
   if (!financeAccountId) {
     return {
       error: paymentIsMp
@@ -330,6 +341,14 @@ export async function createOrderAction(data: {
     paymentMethodName = bestMethod.name
   } else {
     paymentMethodName = formatPaymentMethodLabel(data.paymentMethod)
+  }
+
+  if (chosenType === "cash" && data.deliveryType === "delivery") {
+    if (data.wantsChange) {
+      paymentMethodName = `Dinheiro (Troco para R$ ${data.payWithAmount?.toFixed(2).replace('.', ',')})`
+    } else {
+      paymentMethodName = "Dinheiro (Valor exato)"
+    }
   }
 
   // Ensure customer exists/is updated for this partner
@@ -367,6 +386,11 @@ export async function createOrderAction(data: {
         amount: paymentAwareTotal,
         paymentMethodId: bestMethod.id,
         installmentNumber: Math.max(1, Number(data.installments || 1)),
+        ...(chosenType === "cash" && data.deliveryType === "delivery" ? {
+          wantsChange: data.wantsChange,
+          payWithAmount: data.wantsChange ? data.payWithAmount : null,
+          changeAmount: data.wantsChange ? Number((data.payWithAmount! - paymentAwareTotal).toFixed(2)) : 0
+        } : {})
       }],
     payment_provider: paymentIsMp ? "Mercado Pago" : null,
     situation: "pending",

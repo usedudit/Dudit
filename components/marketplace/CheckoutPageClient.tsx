@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon, FileTextIcon, ChevronLeftIcon } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -170,6 +170,8 @@ export function CheckoutPageClient() {
     const products = sessionData?.products || []
     const partnerId = sessionData?.partnerId || ""
     const partnerInfo = sessionData?.partnerInfo || { paymentMethods: [] } as any
+    const storeImage = partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const sellerName = partnerInfo?.store_name || "Loja"
 
     const quantities = useMemo<Record<string, number>>(() => {
         const acc: Record<string, number> = {}
@@ -215,12 +217,28 @@ export function CheckoutPageClient() {
     const [couponPartialWarning, setCouponPartialWarning] = useState(false)
 
     const [formData, setFormData] = useState({
-        deliveryType: "pickup" as "delivery" | "pickup",
+        deliveryType: "delivery" as "delivery" | "pickup",
         deliveryAddress: "",
         paymentMethod: partnerInfo.paymentMethods?.[0] || "cash",
         notes: "",
         installments: 1,
     })
+
+    const [mobileStep, setMobileStep] = useState<1 | 2>(1)
+    const [showReviewModal, setShowReviewModal] = useState(false)
+    const [showNotesModal, setShowNotesModal] = useState(false)
+
+    const [wantsChange, setWantsChange] = useState<boolean | null>(null)
+    const [payWithAmount, setPayWithAmount] = useState<number | null>(null)
+    const [showChangeModal, setShowChangeModal] = useState(false)
+    const [tempWantsChange, setTempWantsChange] = useState<boolean | null>(null)
+    const [tempPayWithAmount, setTempPayWithAmount] = useState("")
+
+    const handleOpenChangeModal = () => {
+        setTempWantsChange(wantsChange)
+        setTempPayWithAmount(payWithAmount ? String(payWithAmount) : "")
+        setShowChangeModal(true)
+    }
 
 
 
@@ -493,12 +511,7 @@ export function CheckoutPageClient() {
     const isPickup = formData.deliveryType === "pickup"
     const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
 
-    // Auto-switch to delivery mode when user has a saved address AND delivery is enabled
-    useEffect(() => {
-        if (canUseDelivery && selectedAddressId && formData.deliveryAddress) {
-            setFormData((prev) => prev.deliveryType === "pickup" ? { ...prev, deliveryType: "delivery" } : prev)
-        }
-    }, [canUseDelivery, selectedAddressId, formData.deliveryAddress])
+
 
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
     const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
@@ -526,6 +539,37 @@ export function CheckoutPageClient() {
             })
     const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
     const selectedStorefrontMethod = storefrontMethods.find((m) => m.id === formData.paymentMethod) || null
+    const isCashPayment = paymentOption === "traditional" && (selectedStorefrontMethod ? selectedStorefrontMethod.type === "cash" : formData.paymentMethod === "cash")
+
+    const renderChangeSection = () => {
+        if (!isCashPayment || isPickup) return null
+
+        return (
+            <div className="mt-3 pl-8 flex items-center justify-between bg-brand-gray/30 dark:bg-dark-border/20 p-3 rounded-xl border border-brand-border/40 dark:border-dark-border/40">
+                <div className="text-xs">
+                    {wantsChange ? (
+                        <p className="text-brand-dark dark:text-dark-heading font-medium">
+                            Troco para <strong className="font-bold">{formatCurrency(payWithAmount || 0)}</strong> (Troco: <span className="text-brand-green font-bold">{formatCurrency(Math.max(0, (payWithAmount || 0) - checkoutTotalToCharge))}</span>)
+                        </p>
+                    ) : wantsChange === false ? (
+                        <p className="text-brand-inactive-text">Não precisa de troco (valor exato)</p>
+                    ) : (
+                        <p className="text-amber-600 dark:text-amber-400 font-medium">Defina se precisa de troco</p>
+                    )}
+                </div>
+                <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={handleOpenChangeModal}
+                    className="!p-0 !h-auto text-xs font-semibold text-brand-green"
+                >
+                    {wantsChange !== null ? "Alterar" : "Definir"}
+                </Button>
+            </div>
+        )
+    }
+
     const shouldPreviewTraditionalPayment = Boolean(
         partnerId &&
         paymentOption === "traditional" &&
@@ -655,6 +699,14 @@ export function CheckoutPageClient() {
             setFormData((prev) => ({ ...prev, installments: maxInstallments }))
         }
     }, [paymentPreview, formData.installments])
+
+    useEffect(() => {
+        if (isCashPayment && !isPickup && wantsChange === null && !showChangeModal) {
+            setTempWantsChange(null)
+            setTempPayWithAmount("")
+            setShowChangeModal(true)
+        }
+    }, [isCashPayment, isPickup, wantsChange, showChangeModal])
 
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutTotalWithDelivery)
@@ -1021,6 +1073,26 @@ export function CheckoutPageClient() {
         setDeliveryError(null)
         setPaymentError(null)
         setIsLoading(true)
+
+        if (isCashPayment && !isPickup) {
+            if (wantsChange === null) {
+                setPaymentError("Por favor, informe se precisa de troco.")
+                setTempWantsChange(null)
+                setTempPayWithAmount("")
+                setShowChangeModal(true)
+                setIsLoading(false)
+                return
+            }
+            if (wantsChange && (!payWithAmount || payWithAmount < checkoutTotalToCharge)) {
+                setPaymentError("O valor pago não pode ser menor que o total do pedido.")
+                setTempWantsChange(true)
+                setTempPayWithAmount(payWithAmount ? String(payWithAmount) : "")
+                setShowChangeModal(true)
+                setIsLoading(false)
+                return
+            }
+        }
+
         if (formData.deliveryType === "delivery") {
             if (!canUseDelivery) {
                 setDeliveryError("Entrega indisponível para este plano ou loja.")
@@ -1106,7 +1178,9 @@ export function CheckoutPageClient() {
                         formData.notes,
                         couponCode || null,
                         false,
-                        token
+                        token,
+                        wantsChange || false,
+                        payWithAmount || undefined,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -1154,6 +1228,8 @@ export function CheckoutPageClient() {
                         partnerId: partnerId,
                         csrf_token: token,
                         couponCode: couponCode || null,
+                        wantsChange: wantsChange || false,
+                        payWithAmount: payWithAmount || undefined,
                     })
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
@@ -1217,7 +1293,8 @@ export function CheckoutPageClient() {
     return (
         <>
             <div className="min-h-screen flex flex-col bg-white dark:bg-dark-surface">
-                <header className="lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
+                {/* Desktop Header */}
+                <header className="hidden lg:flex flex-col w-full bg-brand-dark sticky top-0 z-50 shadow-md">
                     <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
                         <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img
@@ -1234,8 +1311,37 @@ export function CheckoutPageClient() {
                     </div>
                 </header>
 
-                <div className="container mx-auto px-4 lg:px-6 max-w-[1400px] w-full pt-6 md:pt-10 pb-32 md:pb-20">
-                    <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4 w-full justify-start">
+                {/* Mobile/Tablet Header */}
+                <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-brand-dark sticky top-0 z-50 shadow-md">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (mobileStep === 2) {
+                                setMobileStep(1)
+                            } else {
+                                router.back()
+                            }
+                        }}
+                        className="text-white p-1 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                        <ChevronLeftIcon size={24} />
+                    </button>
+                    <div className="flex items-center gap-2 max-w-[200px] truncate">
+                        <img
+                            src={storeImage}
+                            alt={sellerName}
+                            className="w-8 h-8 rounded-full object-cover border border-white/20 bg-white"
+                        />
+                        <span className="font-bold text-white text-sm truncate">{sellerName}</span>
+                    </div>
+                    <div className="text-xs text-white/80 font-medium">
+                        Etapa {mobileStep}/2
+                    </div>
+                </header>
+
+                <div className="container mx-auto px-4 lg:px-6 max-w-[1400px] w-full pt-6 md:pt-10 pb-32 md:pb-20 flex-1">
+                    {/* Page Title (hidden on mobile, shown on desktop) */}
+                    <div className="hidden lg:flex mb-8 flex-col md:flex-row md:items-center gap-4 w-full justify-start">
                         <div className="hidden md:flex">
                             <Button variant="filled" onClick={() => router.back()} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                                 <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -1247,8 +1353,10 @@ export function CheckoutPageClient() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                        <div className="lg:col-span-8 space-y-4">
+                    {/* Desktop Two-Column Layout */}
+                    <div className="hidden lg:grid grid-cols-12 gap-8 items-start">
+                        {/* Left Column (dados do pedido) */}
+                        <div className="col-span-8 space-y-6 pr-6">
                             {/* ENTREGA */}
                             <FormSection title="Entrega">
                                 <div className="space-y-6">
@@ -1263,7 +1371,7 @@ export function CheckoutPageClient() {
                                                     onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
                                                     right={
                                                         <RadioButton
-                                                            name="deliveryType"
+                                                            name="deliveryTypeDesktop"
                                                             value="delivery"
                                                             checked={!isPickup}
                                                             onChange={() => setFormData({ ...formData, deliveryType: "delivery" })}
@@ -1282,7 +1390,7 @@ export function CheckoutPageClient() {
                                                 }}
                                                 right={
                                                     <RadioButton
-                                                        name="deliveryType"
+                                                        name="deliveryTypeDesktop"
                                                         value="pickup"
                                                         checked={isPickup}
                                                         onChange={() => {
@@ -1295,10 +1403,9 @@ export function CheckoutPageClient() {
                                         </div>
                                     </div>
 
-                                    <AnimatePresence>
+                                    <AnimatePresence mode="wait">
                                         {isPickup && (
                                             <motion.div key="pickup" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-                                                {/* FIX 1: Small square map image inline beside address text, no border wrapper */}
                                                 <div className="flex items-stretch gap-3">
                                                     <img
                                                         src="https://img.dudit.com.br/static/Map.png"
@@ -1338,18 +1445,16 @@ export function CheckoutPageClient() {
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col items-center border-t border-brand-border dark:border-dark-border pt-6">
-                                                        <div className="flex flex-col items-center border-brand-border dark:border-dark-border pt-6">
-                                                            <IconPlaceholder
-                                                                icon={MapPinIcon}
-                                                                title="Nenhum endereço cadastrado"
-                                                                subtitle="Adicione um endereço para receber sua entrega."
-                                                                itemButton={{
-                                                                    text: "Cadastrar Endereço",
-                                                                    action: () => setShowAddressForm(true),
-                                                                    variant: "outline"
-                                                                }}
-                                                            />
-                                                        </div>
+                                                        <IconPlaceholder
+                                                            icon={MapPinIcon}
+                                                            title="Nenhum endereço cadastrado"
+                                                            subtitle="Adicione um endereço para receber sua entrega."
+                                                            itemButton={{
+                                                                text: "Cadastrar Endereço",
+                                                                action: () => setShowAddressForm(true),
+                                                                variant: "outline"
+                                                            }}
+                                                        />
                                                     </div>
                                                 )}
                                             </motion.div>
@@ -1364,82 +1469,21 @@ export function CheckoutPageClient() {
                                 </div>
                             </FormSection>
 
-                            {/* ORDER BUMP SECTION */}
-                            {bumpCandidates.length > 0 && (
-                                <div className="border border-indigo-200/60 dark:border-indigo-900/40 rounded-xl bg-gradient-to-r from-indigo-50/50 via-purple-50/30 to-indigo-50/50 dark:from-indigo-950/20 dark:via-purple-950/15 dark:to-indigo-950/20 p-5 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-xs">
-                                            ✨
-                                        </span>
-                                        <div>
-                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                Adicionar Oferta Especial
-                                            </h3>
-                                            <p className="text-[11px] text-brand-inactive-text">
-                                                Aproveite e leve também estes produtos da loja com entrega única!
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {bumpCandidates.slice(0, 2).map((p: any) => {
-                                            const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
-                                            const basePrice = Number(p.price)
-                                            const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
-                                            const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
-
-                                            return (
-                                                <div
-                                                    key={p.id}
-                                                    className="flex items-center gap-3 p-3 bg-white/70 dark:bg-dark-surface/60 backdrop-blur-sm border border-brand-border/50 dark:border-dark-border/50 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-800 transition-all shadow-sm"
-                                                >
-                                                    <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
-                                                        <img src={img} alt={p.name} className="w-full h-full object-contain" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-xs truncate">
-                                                            {p.name}
-                                                        </h4>
-                                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                                            {promoPrice > 0 && promoPrice < basePrice && (
-                                                                <span className="text-[10px] line-through text-brand-inactive-text">
-                                                                    {formatCurrency(basePrice)}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-xs font-bold text-brand-green">
-                                                                {formatCurrency(price)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={() => handleAddBumpProduct(p)}
-                                                        className="h-7 text-[11px] font-bold px-2.5 shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50"
-                                                    >
-                                                        Adicionar
-                                                    </Button>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
-                                <div>
+                                <div className="space-y-6">
                                     {partnerInfo.mpConnected ? (
                                         <>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                            <div className="space-y-1 mb-4">
                                                 <ListItem
-                                                    icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-6 h-6" />}
+                                                    icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
                                                     title="Mercado Pago"
                                                     description="Pague com cartão, Pix ou saldo MP."
-                                                    className={`px-4 py-3 gap-4 ${paymentOption === "mercadopago" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                    className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                     onClick={() => setPaymentOption("mercadopago")}
                                                     right={
                                                         <RadioButton
-                                                            name="paymentOption"
+                                                            name="paymentOptionDesktop"
                                                             value="mercadopago"
                                                             checked={paymentOption === "mercadopago"}
                                                             onChange={() => setPaymentOption("mercadopago")}
@@ -1450,12 +1494,12 @@ export function CheckoutPageClient() {
                                                     <ListItem
                                                         icon={MoneyIcon}
                                                         title={traditionalPaymentLabel}
-                                                        description="Combine o pagamento na entrega ou retirada."
-                                                        className={`px-4 py-3 gap-4 ${paymentOption === "traditional" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                                        description="Pague na entrega ou retirada."
+                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                         onClick={() => setPaymentOption("traditional")}
                                                         right={
                                                             <RadioButton
-                                                                name="paymentOption"
+                                                                name="paymentOptionDesktop"
                                                                 value="traditional"
                                                                 checked={paymentOption === "traditional"}
                                                                 onChange={() => setPaymentOption("traditional")}
@@ -1473,7 +1517,7 @@ export function CheckoutPageClient() {
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
                                                         transition={{ duration: 0.2 }}
-                                                        className="mb-6"
+                                                        className="mb-4"
                                                     >
                                                         <ListItem
                                                             icon={
@@ -1483,12 +1527,18 @@ export function CheckoutPageClient() {
                                                                             MoneyIcon
                                                             }
                                                             title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
-                                                            description={selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" : selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro"}
-                                                            className="border-none px-0 py-2 !bg-transparent shadow-none"
+                                                            description={
+                                                                selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                                selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                            }
+                                                            className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                             right={
                                                                 <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
                                                             }
                                                         />
+                                                        {renderChangeSection()}
                                                         {selectedStorefrontMethod?.cardBrand && (
                                                             <div className="mt-4">
                                                                 <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
@@ -1547,12 +1597,18 @@ export function CheckoutPageClient() {
                                                                     MoneyIcon
                                                     }
                                                     title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
-                                                    description={selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" : selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro"}
-                                                    className="border-none px-0 py-2 !bg-transparent shadow-none"
+                                                    description={
+                                                        selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                        wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                        wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                    }
+                                                    className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                     right={
                                                         <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
                                                     }
                                                 />
+                                                {renderChangeSection()}
                                                 {selectedStorefrontMethod?.cardBrand && (
                                                     <div className="mt-4">
                                                         <span className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Bandeiras aceitas</span>
@@ -1604,30 +1660,25 @@ export function CheckoutPageClient() {
                                 </div>
                             </FormSection>
 
-                            {/* Resumo do Pedido - Only visible on Tablet/Mobile */}
-                            <div className="block lg:hidden">
-                                <FormSection hasSeparator title="Resumo do Pedido">
-                                    {renderSummaryContent(false)}
-                                </FormSection>
-                            </div>
-
                             {/* OBSERVAÇÕES */}
                             <FormSection hasSeparator title="Observações">
-                                <div>
-                                    <Textarea
-                                        id="notes-cw"
-                                        placeholder="Ex: Tocar interfone, embalar para presente, detalhes da entrega..."
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                        className="resize-none"
-                                        rows={3}
-                                    />
-                                </div>
+                                <ListItem
+                                    icon={FileTextIcon}
+                                    title="Observações"
+                                    description={formData.notes ? formData.notes : "Adicionar observações ao pedido"}
+                                    className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                    onClick={() => setShowNotesModal(true)}
+                                    right={
+                                        <Button variant="link" onClick={() => setShowNotesModal(true)}>
+                                            {formData.notes ? "Alterar" : "Adicionar"}
+                                        </Button>
+                                    }
+                                />
                             </FormSection>
                         </div>
 
-                        {/* RIGHT COLUMN */}
-                        <div className="lg:col-span-4 space-y-4 hidden lg:block">
+                        {/* Right Column (resumo + order bump) */}
+                        <div className="col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
                             <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
                                 <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                                     Resumo do Pedido
@@ -1636,31 +1687,627 @@ export function CheckoutPageClient() {
                                     {renderSummaryContent(true)}
                                 </div>
                             </div>
-                        </div>
 
+                            {/* ORDER BUMP SECTION (Desktop) */}
+                            {bumpCandidates.length > 0 && (
+                                <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-5">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="text-sm">✨</span>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                Adicionar Oferta Especial
+                                            </h3>
+                                            <p className="text-[11px] text-brand-inactive-text">
+                                                Aproveite e leve também este produto da loja com entrega única!
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {bumpCandidates.slice(0, 1).map((p: any) => {
+                                        const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
+                                        const basePrice = Number(p.price)
+                                        const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
+                                        const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+
+                                        return (
+                                            <div
+                                                key={p.id}
+                                                className="flex items-center gap-3 p-3 border border-brand-border dark:border-dark-border rounded-lg bg-brand-slate/10 dark:bg-dark-border/10 animate-fade-in"
+                                            >
+                                                <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                                                    <img src={img} alt={p.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-xs truncate">
+                                                        {p.name}
+                                                    </h4>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        {promoPrice > 0 && promoPrice < basePrice && (
+                                                            <span className="text-[10px] line-through text-brand-inactive-text">
+                                                                {formatCurrency(basePrice)}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-xs font-bold text-brand-green">
+                                                            {formatCurrency(price)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => handleAddBumpProduct(p)}
+                                                    className="h-7 text-[11px] font-bold px-2.5 shrink-0"
+                                                >
+                                                    Adicionar
+                                                </Button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Mobile/Tablet Stage Flow Layout */}
+                    <div className="block lg:hidden space-y-6">
+                        {mobileStep === 1 && (
+                            <div className="space-y-6 pb-24">
+                                <div className="space-y-4">
+                                    <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Opção de Envio</h3>
+                                    <div className="grid grid-cols-2 gap-2 bg-brand-slate/20 dark:bg-dark-border/40 p-1 rounded-xl">
+                                        {canUseDelivery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
+                                                className={`py-2 px-3 text-sm font-semibold rounded-lg transition-all ${
+                                                    formData.deliveryType === "delivery"
+                                                        ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
+                                                        : "text-brand-inactive-text"
+                                                }`}
+                                            >
+                                                Entrega
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, deliveryType: "pickup" })
+                                                if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
+                                            }}
+                                            className={`py-2 px-3 text-sm font-semibold rounded-lg transition-all ${
+                                                formData.deliveryType === "pickup"
+                                                    ? "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-heading shadow-sm"
+                                                    : "text-brand-inactive-text"
+                                            }`}
+                                            style={!canUseDelivery ? { gridColumn: "span 2" } : undefined}
+                                        >
+                                            Retirada no local
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {formData.deliveryType === "delivery" ? (
+                                    <div className="space-y-4">
+                                        {loadingAddresses ? (
+                                            <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
+                                        ) : userAddresses.length > 0 && selectedAddress ? (
+                                            <div className="flex items-center justify-between w-full p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-slate/10 dark:bg-dark-border/10">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <MapPinIcon className="w-5 h-5 text-brand-green shrink-0" />
+                                                    <div className="flex flex-col min-w-0">
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                            {selectedAddress.street}, {selectedAddress.number}
+                                                        </p>
+                                                        <p className="text-xs text-brand-inactive-text truncate">
+                                                            {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button variant="link" size="sm" onClick={() => setShowAddressModal(true)}>
+                                                    Trocar
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center p-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                                                <p className="text-sm text-brand-inactive-text mb-4 text-center">Nenhum endereço selecionado</p>
+                                                <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)}>
+                                                    Adicionar endereço
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {/* Static delivery fee display */}
+                                        {!deliveryQuoteLoading && !deliveryError && formData.deliveryAddress && (
+                                            <div className="flex justify-between items-center py-3 border-t border-brand-border dark:border-dark-border">
+                                                <span className="text-sm font-medium text-brand-inactive-text">Taxa de entrega</span>
+                                                <span className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark dark:text-dark-heading" : "text-brand-green font-semibold"}`}>
+                                                    {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {deliveryError && (
+                                            <InfoCard message={deliveryError} color="red" />
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-start gap-3 p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-slate/10 dark:bg-dark-border/10">
+                                        <img
+                                            src="https://img.dudit.com.br/static/Map.png"
+                                            alt="Mapa"
+                                            className="w-12 h-12 object-cover rounded-lg shrink-0"
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                            <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
+                                                {formatPartnerAddress(partnerInfo.address)}
+                                            </p>
+                                            {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
+                                                <p className="text-[11px] text-brand-inactive-text mt-1.5 font-medium">
+                                                    Pronto em {preparationEstimate.readyInMinutes} min • Retirar das {pickupStartLabel} às {pickupEndLabel}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ORDER BUMP SECTION (Mobile) */}
+                                {bumpCandidates.length > 0 && (
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface p-4 mt-4">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="text-sm">✨</span>
+                                            <div>
+                                                <h3 className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                                    Adicionar Oferta Especial
+                                                </h3>
+                                                <p className="text-[10px] text-brand-inactive-text">
+                                                    Aproveite e leve também este produto da loja!
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {bumpCandidates.slice(0, 1).map((p: any) => {
+                                            const img = p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png"
+                                            const basePrice = Number(p.price)
+                                            const promoPrice = p.promotional_price ? Number(p.promotional_price) : 0
+                                            const price = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    className="flex items-center gap-2.5 p-2.5 border border-brand-border dark:border-dark-border rounded-lg bg-brand-slate/10 dark:bg-dark-border/10"
+                                                >
+                                                    <div className="w-10 h-10 bg-white border border-brand-border dark:border-dark-border rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                                                        <img src={img} alt={p.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-[11px] truncate">
+                                                            {p.name}
+                                                        </h4>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            {promoPrice > 0 && promoPrice < basePrice && (
+                                                                <span className="text-[9px] line-through text-brand-inactive-text">
+                                                                    {formatCurrency(basePrice)}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[11px] font-bold text-brand-green">
+                                                                {formatCurrency(price)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => handleAddBumpProduct(p)}
+                                                        className="h-6 text-[10px] font-bold px-2 shrink-0"
+                                                    >
+                                                        Adicionar
+                                                    </Button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Bottom Bar Step 1 */}
+                                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[100] flex gap-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => router.back()}
+                                        disabled={isLoading}
+                                        className="flex-1 h-12 bg-transparent"
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={() => setMobileStep(2)}
+                                        disabled={formData.deliveryType === "delivery" && (!formData.deliveryAddress || !!deliveryError || deliveryQuoteLoading)}
+                                        className="flex-1 h-12"
+                                    >
+                                        Continuar
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {mobileStep === 2 && (
+                            <div className="space-y-6 pb-28">
+                                {/* Payment Selector */}
+                                <div className="space-y-4">
+                                    <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading">Forma de Pagamento</h3>
+                                    {partnerInfo.mpConnected ? (
+                                        <div className="space-y-1">
+                                            <ListItem
+                                                icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
+                                                title="Mercado Pago"
+                                                description="Cartão, Pix ou saldo MP."
+                                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                                onClick={() => setPaymentOption("mercadopago")}
+                                                right={
+                                                    <RadioButton
+                                                        name="paymentOptionMobile"
+                                                        value="mercadopago"
+                                                        checked={paymentOption === "mercadopago"}
+                                                        onChange={() => setPaymentOption("mercadopago")}
+                                                    />
+                                                }
+                                            />
+                                            {(!isPickup || !partnerInfo.mpConnected) && (
+                                                <ListItem
+                                                    icon={MoneyIcon}
+                                                    title={traditionalPaymentLabel}
+                                                    description="Pague ao receber ou retirar."
+                                                    className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                                    onClick={() => setPaymentOption("traditional")}
+                                                    right={
+                                                        <RadioButton
+                                                            name="paymentOptionMobile"
+                                                            value="traditional"
+                                                            checked={paymentOption === "traditional"}
+                                                            onChange={() => setPaymentOption("traditional")}
+                                                        />
+                                                    }
+                                                />
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2.5 pb-2">
+                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
+                                            <p className="text-xs text-brand-inactive-text">Pagamento direto com o vendedor (Entrega ou Retirada).</p>
+                                        </div>
+                                    )}
+
+                                    {paymentOption === "traditional" && (
+                                        <div className="mt-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2">
+                                            <ListItem
+                                                icon={
+                                                    selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                        selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                MoneyIcon
+                                                }
+                                                title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                description={
+                                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                    selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                    wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                }
+                                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                                right={
+                                                    <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                }
+                                            />
+                                            {renderChangeSection()}
+                                            {selectedStorefrontMethod?.cardBrand && (
+                                                <div className="mt-3">
+                                                    <span className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-2">Bandeiras aceitas</span>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {selectedStorefrontMethod.cardBrand.split(/[;,]/).map(b => {
+                                                            const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                            if (!brand) return null
+                                                            return (
+                                                                <div key={brand.id} className="flex items-center gap-1.5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-lg">
+                                                                    <img src={brand.image} alt={brand.name} className="w-4 h-4 object-contain animate-fade-in" />
+                                                                    <span className="text-[10px] font-medium text-brand-dark dark:text-dark-heading">{brand.name}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {shouldShowInstallments && (
+                                                <div className="mt-4">
+                                                    <FormDropdown
+                                                        label="Parcelas"
+                                                        value={String(formData.installments)}
+                                                        setValue={(value) => setFormData((prev) => ({ ...prev, installments: Number(value) }))}
+                                                        options={
+                                                            paymentPreview?.installmentOptions ? paymentPreview.installmentOptions.map(opt => ({
+                                                                value: String(opt.installments),
+                                                                label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                            })) : Array.from({ length: Number(paymentPreview?.maxInstallments || 1) }, (_, index) => {
+                                                                const installmentNumber = index + 1
+                                                                const installmentAmount = paymentPreview?.installmentAmounts?.[index]
+                                                                return {
+                                                                    value: String(installmentNumber),
+                                                                    label: `${installmentNumber}x${installmentAmount ? ` de ${formatCurrency(installmentAmount)}` : ""}`
+                                                                }
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {paymentError && (
+                                        <div className="flex gap-3 mt-4 w-full">
+                                            <InfoCard message={`${paymentError}`} color="red" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Coupon Selector */}
+                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                                    <ListItem
+                                        icon={TagIcon}
+                                        title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
+                                        titleClassName="text-sm"
+                                        description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
+                                        className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                        onClick={() => {
+                                            if (!couponListLoading && availableCoupons.length > 0) {
+                                                setSelectedCouponId(appliedCoupon?.id || "")
+                                                setShowCouponModal(true)
+                                            }
+                                        }}
+                                        showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                                        right={
+                                            appliedCoupon ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleRemoveCoupon()
+                                                    }}
+                                                    className="text-xs font-semibold text-brand-red hover:text-red-600 flex items-center gap-1 shrink-0"
+                                                >
+                                                    <XIcon size={12} /> Remover
+                                                </button>
+                                            ) : couponListLoading ? (
+                                                <Spinner size={16} />
+                                            ) : undefined
+                                        }
+                                    />
+                                    {couponError && (
+                                        <p className="text-xs text-red-500 mt-1">{couponError}</p>
+                                    )}
+                                    {couponPartialWarning && appliedCoupon && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                            Cupom elegível apenas para alguns itens do carrinho.
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Observations */}
+                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                                    <ListItem
+                                        icon={FileTextIcon}
+                                        title="Observações"
+                                        description={formData.notes ? formData.notes : "Adicionar observações ao pedido"}
+                                        className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                        onClick={() => setShowNotesModal(true)}
+                                        right={
+                                            <Button variant="link" size="sm" onClick={() => setShowNotesModal(true)}>
+                                                {formData.notes ? "Alterar" : "Adicionar"}
+                                            </Button>
+                                        }
+                                    />
+                                </div>
+
+                                {/* Totals Summary */}
+                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 pt-4 space-y-2 text-sm text-brand-inactive-text">
+                                    <div className="flex justify-between">
+                                        <span>Subtotal</span>
+                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                    </div>
+                                    {couponDiscount > 0 && (
+                                        <div className="flex justify-between text-brand-green font-semibold">
+                                            <span>Desconto do cupom</span>
+                                            <span>-{formatCurrency(couponDiscount)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                        <span>Entrega</span>
+                                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                                            {isPickup ? "Grátis" : deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                        </span>
+                                    </div>
+                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0 && (
+                                        <div className="flex justify-between text-brand-green font-semibold">
+                                            <span>Desconto do pagamento</span>
+                                            <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
+                                        </div>
+                                    )}
+                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Juros</span>
+                                            <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.interestAmount)}</span>
+                                        </div>
+                                    )}
+                                    {paymentOption === "traditional" && paymentPreview?.success && Number(paymentPreview.feeAmount || 0) > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Taxas</span>
+                                            <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.feeAmount)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-base font-bold text-brand-dark dark:text-dark-heading pt-2 border-t border-brand-border/20">
+                                        <span>Total</span>
+                                        <span>{formatCurrency(checkoutTotalToCharge)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Fixed Bottom Bar Step 2 */}
+                                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[100]">
+                                    <Button
+                                        type="button"
+                                        onClick={() => setShowReviewModal(true)}
+                                        disabled={disableCheckoutSubmit}
+                                        className="w-full h-12"
+                                    >
+                                        Revisar pedido • {formatCurrency(checkoutTotalToCharge)}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="shrink-0 mt-auto pb-[80px] lg:pb-0">
                     <MarketplaceFooter />
                 </div>
-
-                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border p-4 z-[110] lg:hidden">
-                    <div className="flex gap-3">
-                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading} className="flex-1 h-12 bg-transparent">
-                            Voltar
-                        </Button>
-                        <Button
-                            onClick={(e) => handleSubmit(e as any)}
-                            disabled={disableCheckoutSubmit}
-                            className={`flex-2 h-12 ${isLoading ? "opacity-80" : ""}`}
-                        >
-                            {isLoading ? "Processando..." : paymentPreviewLoading ? "Calculando pagamento..." : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`}
-                        </Button>
-                    </div>
-                </div>
             </div>
 
+            {/* Custom Modals */}
+
+            {/* Observations Modal */}
+            <DefaultModal
+                isOpen={showNotesModal}
+                onClose={() => setShowNotesModal(false)}
+                title="Observações do pedido"
+                maxWidth="sm"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowNotesModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={() => setShowNotesModal(false)}>
+                            Confirmar
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-xs text-brand-inactive-text">
+                        Adicione instruções especiais para a preparação ou entrega do seu pedido.
+                    </p>
+                    <Textarea
+                        placeholder="Ex: Tocar interfone, embalar para presente, detalhes da entrega..."
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        className="resize-none"
+                        rows={4}
+                    />
+                </div>
+            </DefaultModal>
+
+            {/* Mobile Review Modal (Stage 3) */}
+            <DefaultModal
+                isOpen={showReviewModal}
+                onClose={() => setShowReviewModal(false)}
+                title="Revise o seu pedido"
+                maxWidth="md"
+                footer={
+                    <div className="flex w-full gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowReviewModal(false)}
+                            disabled={isLoading}
+                            className="flex-1 bg-transparent"
+                        >
+                            Alterar pedido
+                        </Button>
+                        <Button
+                            onClick={(e) => {
+                                handleSubmit(e as any)
+                                setShowReviewModal(false)
+                            }}
+                            disabled={disableCheckoutSubmit}
+                            className="flex-1"
+                        >
+                            {isLoading ? "Processando..." : "Fazer pedido"}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Destino</p>
+                        {formData.deliveryType === "delivery" ? (
+                            <ListItem
+                                icon={MapPinIcon}
+                                title="Endereço de entrega"
+                                description={formData.deliveryAddress}
+                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                            />
+                        ) : (
+                            <ListItem
+                                icon={StoreIcon}
+                                title="Retirada no local"
+                                description={formatPartnerAddress(partnerInfo.address)}
+                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                            />
+                        )}
+                    </div>
+
+                    <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Pagamento</p>
+                        <ListItem
+                            icon={
+                                paymentOption === "mercadopago" ? <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" /> :
+                                selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                MoneyIcon
+                            }
+                            title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                            description={
+                                paymentOption === "mercadopago" ? "Cartão, Pix ou saldo MP" :
+                                selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
+                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                            }
+                            className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                            right={
+                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(checkoutTotalToCharge)}</span>
+                            }
+                        />
+                    </div>
+
+                    {appliedCoupon && (
+                        <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                            <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Cupom Aplicado</p>
+                            <ListItem
+                                icon={TagIcon}
+                                title={getCouponTitle(appliedCoupon)}
+                                description="Desconto concedido"
+                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                            />
+                        </div>
+                    )}
+
+                    <div className="space-y-4 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text">Itens</p>
+                        <div className="max-h-[200px] overflow-y-auto space-y-3 pr-2">
+                            {products.map((item) => {
+                                const qty = quantities[item.id] || item.quantity
+                                return (
+                                    <div key={item.id} className="flex justify-between items-center text-sm py-1">
+                                        <span className="text-brand-dark dark:text-dark-heading truncate max-w-[200px] font-medium">
+                                            {item.name} <span className="text-xs text-brand-inactive-text">x{qty}</span>
+                                        </span>
+                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(item.price * qty)}</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </DefaultModal>
+
+            {/* Restored Custom Modals */}
             <DefaultModal
                 isOpen={showCouponModal}
                 onClose={() => setShowCouponModal(false)}
@@ -1685,7 +2332,7 @@ export function CheckoutPageClient() {
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
                                 description={getCouponSubtitle(coupon)}
-                                className={`px-4 py-3 gap-4 ${selectedCouponId === coupon.id ? "border-brand-green dark:border-brand-green" : ""}`}
+                                className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${selectedCouponId === coupon.id ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
                                 onClick={() => setSelectedCouponId(coupon.id)}
                                 right={
                                     <RadioButton
@@ -1952,6 +2599,101 @@ export function CheckoutPageClient() {
                             Sim
                         </Button>
                     </div>
+                </div>
+            </DefaultModal>
+
+            {/* New Cash Change Modal */}
+            <DefaultModal
+                isOpen={showChangeModal}
+                onClose={() => setShowChangeModal(false)}
+                title="Precisa de troco?"
+                maxWidth="sm"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowChangeModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setWantsChange(tempWantsChange)
+                                if (tempWantsChange === true) {
+                                    setPayWithAmount(Number(tempPayWithAmount))
+                                } else {
+                                    setPayWithAmount(null)
+                                }
+                                setShowChangeModal(false)
+                            }}
+                            disabled={tempWantsChange === null || (tempWantsChange === true && (!tempPayWithAmount || Number(tempPayWithAmount) < checkoutTotalToCharge || isNaN(Number(tempPayWithAmount))))}
+                        >
+                            Confirmar
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-brand-inactive-text">
+                        Como você vai pagar o pedido em dinheiro na entrega?
+                    </p>
+                    <div className="space-y-3">
+                        <ListItem
+                            title="Não preciso de troco"
+                            description="Vou pagar com o valor exato"
+                            className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${tempWantsChange === false ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
+                            onClick={() => setTempWantsChange(false)}
+                            right={
+                                <RadioButton
+                                    name="changeOption"
+                                    value="no_change"
+                                    checked={tempWantsChange === false}
+                                    onChange={() => setTempWantsChange(false)}
+                                />
+                            }
+                        />
+                        <ListItem
+                            title="Sim, preciso de troco"
+                            description="Vou precisar de troco para outro valor"
+                            className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${tempWantsChange === true ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
+                            onClick={() => setTempWantsChange(true)}
+                            right={
+                                <RadioButton
+                                    name="changeOption"
+                                    value="needs_change"
+                                    checked={tempWantsChange === true}
+                                    onChange={() => setTempWantsChange(true)}
+                                />
+                            }
+                        />
+                    </div>
+
+                    {tempWantsChange === true && (
+                        <div className="mt-4 space-y-3 border-t border-brand-border/40 dark:border-dark-border/40 pt-4">
+                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Pagar com (R$)
+                            </label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min={checkoutTotalToCharge}
+                                value={tempPayWithAmount}
+                                onChange={(e) => setTempPayWithAmount(e.target.value)}
+                                placeholder="Ex: 50,00"
+                                className="w-full"
+                            />
+                            {tempPayWithAmount && !isNaN(Number(tempPayWithAmount)) && (
+                                <div className="text-xs space-y-1">
+                                    {Number(tempPayWithAmount) >= checkoutTotalToCharge ? (
+                                        <p className="text-brand-inactive-text">
+                                            Troco estimado: <span className="text-brand-green font-bold">{formatCurrency(Number(tempPayWithAmount) - checkoutTotalToCharge)}</span>
+                                        </p>
+                                    ) : (
+                                        <p className="text-red-500 font-semibold">
+                                            O valor pago não pode ser menor que o total do pedido ({formatCurrency(checkoutTotalToCharge)})
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </DefaultModal>
         </>

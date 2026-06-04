@@ -583,6 +583,8 @@ export async function checkoutCartAction(
   couponCode?: string | null,
   useMercadoPago?: boolean,
   csrf_token?: string,
+  wantsChange?: boolean,
+  payWithAmount?: number,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -842,6 +844,15 @@ export async function checkoutCartAction(
     paymentAwareTotal = Number(calc.finalAmount || totalAmount)
   }
 
+  if (chosenType === "cash" && deliveryType === "delivery") {
+    if (wantsChange === undefined || wantsChange === null) {
+      return { error: "Por favor, informe se precisa de troco para o pagamento em dinheiro." }
+    }
+    if (wantsChange && (payWithAmount === undefined || payWithAmount === null || payWithAmount < paymentAwareTotal)) {
+      return { error: "O valor informado para o troco é menor que o total do pedido." }
+    }
+  }
+
   const financeAccountId = (bestMethod as any)?.default_finance_account_id || await resolveMarketplaceOrderFinanceAccountId(
     adminClient,
     partnerId,
@@ -880,6 +891,14 @@ export async function checkoutCartAction(
     paymentMethodName = formatPaymentMethodLabel(paymentMethod)
   }
 
+  if (chosenType === "cash" && deliveryType === "delivery") {
+    if (wantsChange) {
+      paymentMethodName = `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})`
+    } else {
+      paymentMethodName = "Dinheiro (Valor exato)"
+    }
+  }
+
   // Ensure customer exists/is updated for this partner
   try {
     const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
@@ -914,6 +933,11 @@ export async function checkoutCartAction(
           amount: paymentAwareTotal,
           paymentMethodId: bestMethod.id,
           installmentNumber: Math.max(1, Number(installments || 1)),
+          ...(chosenType === "cash" && deliveryType === "delivery" ? {
+            wantsChange,
+            payWithAmount: wantsChange ? payWithAmount : null,
+            changeAmount: wantsChange ? Number((payWithAmount! - paymentAwareTotal).toFixed(2)) : 0
+          } : {})
         }],
       payment_provider: useMercadoPago ? "Mercado Pago" : null,
       situation: "pending",

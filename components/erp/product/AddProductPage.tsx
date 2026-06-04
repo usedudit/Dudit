@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
@@ -26,8 +26,6 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import { generateEAN13 } from "@/lib/utils/barcode"
-
-
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"

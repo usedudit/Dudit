@@ -653,21 +653,21 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {Number(discountAmount || 0) > 0 && (
                                     <PaymentRow
                                         label="Desconto do Pedido"
-                                        value={<span className="text-brand-red font-bold">- {formatCurrency(discountAmount)}</span>}
+                                        value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
                                     />
                                 )}
 
                                 {couponDiscountAmount > 0 && (
                                     <PaymentRow
                                         label="Desconto por Cupom"
-                                        value={<span className="text-brand-red font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                        value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
                                     />
                                 )}
 
                                 {paymentMethodDiscountAmount > 0 && (
                                     <PaymentRow
                                         label="Desconto do Método"
-                                        value={<span className="text-brand-red font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                        value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
                                     />
                                 )}
 
@@ -728,7 +728,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {discountAmount > 0 && (
                                     <div className="flex justify-between items-center text-[15px]">
                                         <span className="text-brand-inactive-text font-medium">Desconto</span>
-                                        <span className="font-bold text-brand-red">
+                                        <span className="font-bold text-brand-green">
                                             -{formatCurrency(discountAmount)}
                                         </span>
                                     </div>

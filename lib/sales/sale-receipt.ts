@@ -1,4 +1,5 @@
 import { formatDateTime } from "@/lib/utils"
+import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 
 export type SaleReceiptFormat = "thermal" | "a4"
 
@@ -134,10 +135,18 @@ export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[]
     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
     const filtered = breakdown.filter((e: any) => e?.method && Number(e.amount || 0) > 0.009)
     if (filtered.length > 0) {
-        return filtered.map((e: any) => ({
-            label: String(e.method),
-            amount: Number(e.amount || 0),
-        }))
+        return filtered.map((e: any) => {
+            let label = formatPaymentMethodLabel(e.method)
+            if (e.method === "cash" && e.wantsChange) {
+                label = `Dinheiro (Troco para R$ ${Number(e.payWithAmount || 0).toFixed(2).replace('.', ',')})`
+            } else if (e.method === "cash" && e.wantsChange === false) {
+                label = "Dinheiro (Valor exato)"
+            }
+            return {
+                label,
+                amount: Number(e.amount || 0),
+            }
+        })
     }
     if (Number(order.paid_amount || 0) > 0.009 && order.payment_method) {
         return [{ label: String(order.payment_method), amount: Number(order.paid_amount || 0) }]
@@ -146,16 +155,24 @@ export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[]
 }
 
 export function buildPaymentLinesFromBreakdown(
-    breakdown: Array<{ method?: string; amount?: number }> | undefined,
+    breakdown: Array<{ method?: string; amount?: number; wantsChange?: boolean; payWithAmount?: number }> | undefined,
     fallbackMethod?: string,
     fallbackAmount?: number,
 ): SaleReceiptPaymentLine[] {
     const filtered = (breakdown || []).filter((e) => e?.method && Number(e.amount || 0) > 0.009)
     if (filtered.length > 0) {
-        return filtered.map((e) => ({
-            label: String(e.method),
-            amount: Number(e.amount || 0),
-        }))
+        return filtered.map((e) => {
+            let label = formatPaymentMethodLabel(e.method)
+            if (e.method === "cash" && e.wantsChange) {
+                label = `Dinheiro (Troco para R$ ${Number(e.payWithAmount || 0).toFixed(2).replace('.', ',')})`
+            } else if (e.method === "cash" && e.wantsChange === false) {
+                label = "Dinheiro (Valor exato)"
+            }
+            return {
+                label,
+                amount: Number(e.amount || 0),
+            }
+        })
     }
     if (fallbackMethod && Number(fallbackAmount || 0) > 0.009) {
         return [{ label: fallbackMethod, amount: Number(fallbackAmount || 0) }]

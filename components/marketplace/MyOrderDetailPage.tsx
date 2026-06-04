@@ -1,23 +1,14 @@
 "use client"
 
-import { useState, useCallback } from 'react';
-import {
-    ChevronRightIcon,
-    CreditCardIcon,
-    XIcon,
-    CheckCircleIcon,
-    ClockIcon,
-    AlertCircleIcon,
-    ChevronDownIcon,
-    ChevronUpIcon,
-    ReturnIcon
-} from '@/lib/icons';
+import { useState, useCallback, useEffect } from 'react';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tooltip, Badge } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
+import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
 import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from '@/lib/returns/calculations';
@@ -152,6 +143,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const handleBack = useCallback(() => onBack(), [onBack]);
 
+    const [userAddresses, setUserAddresses] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!order?.buyer_id) return;
+        getAddressesAction(order.buyer_id, "user")
+            .then(res => {
+                if (res && res.addresses) {
+                    setUserAddresses(res.addresses);
+                }
+            })
+            .catch(err => console.error("Error fetching user addresses:", err));
+    }, [order?.buyer_id]);
+
     if (!order) return null;
 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
@@ -171,7 +175,84 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
     const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
-    const PaymentIcon = isPix ? () => <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-[18px] h-[18px] object-contain" /> : CreditCardIcon;
+
+    const paymentMethodLower = String(order.payment_method || "").toLowerCase();
+    const isMp = order.payment_provider === "Mercado Pago" || order.payment_method === "Mercado Pago";
+    const isCredit = paymentMethodLower.includes("crédito") || paymentMethodLower.includes("credito") || paymentMethodLower.includes("credit");
+    const isDebit = paymentMethodLower.includes("débito") || paymentMethodLower.includes("debito") || paymentMethodLower.includes("debit");
+    const isCash = paymentMethodLower.includes("dinheiro") || paymentMethodLower.includes("cash") || paymentMethodLower.includes("money");
+
+    const PaymentIconEl = isMp ? (
+        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
+    ) : isPix ? (
+        <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />
+    ) : isCredit ? (
+        <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão de Crédito" className="w-5 h-5 object-contain shrink-0" />
+    ) : isDebit ? (
+        <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão de Débito" className="w-5 h-5 object-contain shrink-0" />
+    ) : isCash ? (
+        <MoneyIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
+    ) : (
+        <CreditCardIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
+    );
+
+    // Address Type Resolution
+    const matchedAddress = userAddresses.find(a => {
+        const cleanDelivery = String(order.delivery_address || "").toLowerCase().replace(/\s/g, "");
+        const cleanStreet = String(a.street || "").toLowerCase().replace(/\s/g, "");
+        const cleanNumber = String(a.number || "").toLowerCase().replace(/\s/g, "");
+        return cleanDelivery.includes(cleanStreet) && cleanDelivery.includes(cleanNumber);
+    });
+
+    const addressTypeLabel = matchedAddress
+        ? (matchedAddress.address_type === "casa" ? "Casa" : matchedAddress.address_type === "trabalho" ? "Trabalho" : "Outro")
+        : null;
+
+    // ERP style detail row helper
+    const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+        <div className="flex justify-between items-center text-sm gap-4 py-2.5 border-b border-brand-border/40 dark:border-dark-border/40 last:border-0">
+            <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+            <div className="text-right font-semibold text-brand-dark dark:text-dark-heading">{value}</div>
+        </div>
+    );
+
+    // Pricing details mapping
+    const subtotalVal = Number(order.subtotal_original || totalAmount - Number(order.shipping_total || 0) + Number(order.discount_total || 0));
+    const discountVal = Number(order.discount_total || 0);
+    const shippingVal = Number(order.shipping_total || order.delivery_fee || 0);
+    const totalVal = Number(order.total_amount || 0);
+
+    const renderPriceSummary = () => {
+        return (
+            <div className="space-y-3">
+                <div className="flex justify-between text-sm text-brand-inactive-text">
+                    <span>Subtotal</span>
+                    <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(subtotalVal)}</span>
+                </div>
+                {shippingVal > 0 ? (
+                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                        <span>Entrega</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(shippingVal)}</span>
+                    </div>
+                ) : (
+                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                        <span>Entrega</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">Grátis</span>
+                    </div>
+                )}
+                {discountVal > 0 && (
+                    <div className="flex justify-between text-sm text-brand-green">
+                        <span>Desconto</span>
+                        <span className="font-medium">-{formatCurrency(discountVal)}</span>
+                    </div>
+                )}
+                <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
+                    <span className="text-md font-bold text-brand-dark dark:text-dark-heading">Total</span>
+                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">{formatCurrency(totalVal)}</span>
+                </div>
+            </div>
+        );
+    };
 
     const handlePixClick = async () => {
         if (order.situation !== "pending" || !isPix) return;
@@ -332,11 +413,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         </>
     );
 
-    const subtotalVal = Number(order.subtotal_original || totalAmount - Number(order.shipping_total || 0) + Number(order.discount_total || 0));
-    const discountVal = Number(order.discount_total || 0);
-    const shippingVal = Number(order.shipping_total || order.delivery_fee || 0);
-    const totalVal = Number(order.total_amount || 0);
-
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -352,299 +428,190 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                             <XIcon className="w-5 h-5" />
                         </Button>
-                    </div>
-                    <div className="text-left w-full">
-                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Compra</h1>
-                        <p className="text-md text-brand-inactive-text mt-1">Acompanhe o status e informações do seu pedido.</p>
+                        <div className="text-left w-full">
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da Compra</h1>
+                            <p className="text-md text-brand-inactive-text mt-1">Acompanhe o status e informações do seu pedido.</p>
+                        </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
 
-                    {/* LEFT COLUMN - DESKTOP ONLY */}
-                    <div className="hidden lg:block col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-10">
-
-                        {/* Status Card */}
-                        <FormSection
-                            title={`Detalhes do Pedido #${orderNumber}`}
-                        >
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4 flex-wrap text-sm text-brand-inactive-text">
-                                    Realizado em {dateStrFull}
-                                    {returnHistoryCount > 0 && (
-                                        <Tooltip text="Possui histórico de trocas/devoluções">
-                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
-                                                {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                            </Badge>
-                                        </Tooltip>
-                                    )}
-                                </div>
-                                <p className="text-brand-dark dark:text-dark-body text-sm">
-                                    {isDelivery ? (
-                                        <>Será entregue via delivery no endereço cadastrado.</>
+                <div className="max-w-3xl mx-auto space-y-8 pb-32">
+                    {/* Section 1: Detalhes do Pedido (Chave-Valor estilo ERP) */}
+                    <FormSection title={`Pedido #${orderNumber}`}>
+                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
+                            <DetailRow
+                                label="Status do Pagamento"
+                                value={
+                                    <span className={statusConfig.color}>
+                                        {statusConfig.label}
+                                    </span>
+                                }
+                            />
+                            <DetailRow
+                                label="Status da Entrega"
+                                value={
+                                    order.delivery_status === 'pending' ? 'Pendente' :
+                                        order.delivery_status === 'preparing' ? 'Preparando' :
+                                            order.delivery_status === 'sent' ? 'Enviado' :
+                                                order.delivery_status === 'delivered' ? 'Entregue' :
+                                                    order.delivery_status === 'pickup_available' ? 'Disponível para retirada' :
+                                                        order.delivery_status === 'delivery_failed' ? 'Não entregue' :
+                                                            order.delivery_status
+                                }
+                            />
+                            <DetailRow
+                                label="Data do Pedido"
+                                value={`${dateStrFull} às ${dateStrTime}`}
+                            />
+                            <DetailRow
+                                label="Tipo de Envio"
+                                value={isDelivery ? "Entrega via Delivery" : "Retirada no Local"}
+                            />
+                            <DetailRow
+                                label="Destino"
+                                value={
+                                    isDelivery ? (
+                                        <span className="text-xs font-normal text-brand-inactive-text">
+                                            Será entregue no endereço selecionado
+                                        </span>
                                     ) : (
-                                        <>Você optou por retirar o pedido no local da loja <b>{sellerName}</b>.</>
-                                    )}
-                                </p>
-                            </div>
-                        </FormSection>
+                                        <span className="text-xs font-normal text-brand-inactive-text">
+                                            Você retirará na loja parceira
+                                        </span>
+                                    )
+                                }
+                            />
+                        </div>
+                    </FormSection>
 
-                        {/* Purchase Info Card */}
-                        <FormSection hasSeparator title="Informações da compra">
-                            <div className="space-y-6">
-                                <div>
-                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-3">Pagamento</h4>
-                                    <ListItem
-                                        icon={PaymentIcon}
-                                        title={
-                                            loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
-                                                <div className="flex items-center gap-1.5 text-sm font-bold text-brand-dark dark:text-dark-heading flex-wrap">
-                                                    {paymentMethodName}
-                                                    <span className="text-brand-inactive-text font-normal">•</span>
-                                                    <span className="font-normal text-brand-inactive-text">
-                                                        {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
-                                                    </span>
-                                                </div>
-                                        }
-                                        description={
-                                            <span className="text-sm font-medium text-brand-inactive-text">
-                                                {formatCurrency(totalAmount)}
-                                            </span>
-                                        }
-                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
-                                        onClick={handlePixClick}
-                                    />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-3">Envio</h4>
-                                    {isDelivery ? (
-                                        <div
-                                            onClick={() => setIsShippingModalOpen(true)}
-                                            className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                                        >
-                                            <img
-                                                src="https://img.dudit.com.br/static/Map.png"
-                                                alt="Endereço de entrega"
-                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                            />
-                                            <div className="flex flex-col justify-center">
-                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                                <p className="text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
-                                                {order.customer_name && (
-                                                    <p className="text-xs text-brand-inactive-text mt-0.5">Recebedor: {order.customer_name}</p>
-                                                )}
+                    {/* Section 2: Itens do Pedido */}
+                    <FormSection title="Itens do Pedido">
+                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6 space-y-4">
+                            {order.order_items?.map((item: any) => {
+                                const itemImage = getPrimaryProductDisplayImage({
+                                    images: item.products?.images || null,
+                                    video_thumbnail: item.products?.video_thumbnail || null,
+                                    fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                });
+                                return (
+                                    <Link
+                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                                        prefetch={true}
+                                        key={item.id}
+                                        className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                    >
+                                        <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                            <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
+                                                {item.products?.name || item.product_name}
+                                            </h3>
+                                            {item.product_variants?.variant_name && (
+                                                <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                            )}
+                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                                {formatCurrency(item.product_price)}
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div
-                                            onClick={() => setIsShippingModalOpen(true)}
-                                            className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                                        >
-                                            <img
-                                                src="https://img.dudit.com.br/static/Map.png"
-                                                alt="Local de Retirada"
-                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                            />
-                                            <div className="flex flex-col justify-center">
-                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                                <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
-                                            </div>
+                                        <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                            x{item.quantity}
                                         </div>
-                                    )}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </FormSection>
+
+                    {/* Section 3: Endereço de entrega / retirada */}
+                    <FormSection title={isDelivery ? (addressTypeLabel || "Endereço de Entrega") : "Local de Retirada"}>
+                        {isDelivery ? (
+                            <div
+                                onClick={() => setIsShippingModalOpen(true)}
+                                className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl"
+                            >
+                                <img
+                                    src="https://img.dudit.com.br/static/Map.png"
+                                    alt="Endereço de entrega"
+                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                />
+                                <div className="flex flex-col justify-center">
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        {addressTypeLabel || "Endereço de Entrega"}
+                                    </p>
+                                    <p className="text-xs text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
                                 </div>
                             </div>
-                        </FormSection>
-
-                        {/* Seller Card */}
-                        <FormSection hasSeparator title="Vendedor">
-                            <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                                    <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                    <div className="text-xs text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
-                                </div>
-                                <ChevronRightIcon size={18} className="text-brand-inactive-text" />
-                            </Link>
-                        </FormSection>
-
-                        {canCancelOrder && (
-                            <>
-                                <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
-                                <Button
-                                    variant="outlinered"
-                                    className="w-full sm:w-auto h-12 font-bold"
-                                    onClick={() => setIsCancelModalOpen(true)}
-                                    disabled={isCanceling}
-                                >
-                                    {isCanceling ? (
-                                        <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
-                                    ) : (
-                                        "Cancelar pedido"
-                                    )}
-                                </Button>
-                            </>
-                        )}
-
-                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
-                            <div className="mt-6 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body">
-                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
-                            </div>
-                        )}
-
-                        {canRequestResolution && (
-                            <>
-                                <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
-                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body">
-                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                </p>
-                                <Button
-                                    variant="outline"
-                                    className="w-full sm:w-auto h-12 font-bold"
-                                    onClick={() => setIsReturnModalOpen(true)}
-                                >
-                                    Solicitar troca ou devolucao
-                                </Button>
-                            </>
-                        )}
-                    </div>
-
-                    {/* LEFT COLUMN - TABLET & MOBILE ONLY */}
-                    <div className="block lg:hidden col-span-12 space-y-8 pb-32">
-                        {/* 1. Itens do Pedido (at the top) */}
-                        <FormSection title={`Detalhes do Pedido #${orderNumber}`}>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4 flex-wrap text-sm text-brand-inactive-text">
-                                    Realizado em {dateStrFull}
-                                    {returnHistoryCount > 0 && (
-                                        <Tooltip text="Possui histórico de trocas/devoluções">
-                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
-                                                {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
-                                            </Badge>
-                                        </Tooltip>
-                                    )}
-                                </div>
-                                <div className="border-t border-brand-border/40 dark:border-dark-border/40 my-4"></div>
-                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-3">Itens do Pedido</h4>
-                                <div className="space-y-4">
-                                    {order.order_items?.map((item: any) => {
-                                        const itemImage = getPrimaryProductDisplayImage({
-                                            images: item.products?.images || null,
-                                            video_thumbnail: item.products?.video_thumbnail || null,
-                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                        });
-                                        return (
-                                            <Link
-                                                href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
-                                                prefetch={true}
-                                                key={item.id}
-                                                className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
-                                            >
-                                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
-                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
-                                                        {item.products?.name || item.product_name}
-                                                    </h3>
-                                                    {item.product_variants?.variant_name && (
-                                                        <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
-                                                    )}
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                        {formatCurrency(item.product_price)}
-                                                    </div>
-                                                </div>
-                                                <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                                    x{item.quantity}
-                                                </div>
-                                            </Link>
-                                        );
-                                    })}
+                        ) : (
+                            <div
+                                onClick={() => setIsShippingModalOpen(true)}
+                                className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl"
+                            >
+                                <img
+                                    src="https://img.dudit.com.br/static/Map.png"
+                                    alt="Local de Retirada"
+                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                />
+                                <div className="flex flex-col justify-center">
+                                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                    <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
                                 </div>
                             </div>
-                        </FormSection>
+                        )}
+                    </FormSection>
 
-                        {/* 2. Endereço de entrega / retirada */}
-                        <FormSection hasSeparator title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
-                            {isDelivery ? (
-                                <div
-                                    onClick={() => setIsShippingModalOpen(true)}
-                                    className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                                >
-                                    <img
-                                        src="https://img.dudit.com.br/static/Map.png"
-                                        alt="Endereço de entrega"
-                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                    />
-                                    <div className="flex flex-col justify-center">
-                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                        <p className="text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
-                                        {order.customer_name && (
-                                            <p className="text-xs text-brand-inactive-text mt-0.5">Recebedor: {order.customer_name}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    onClick={() => setIsShippingModalOpen(true)}
-                                    className="flex items-stretch gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                                >
-                                    <img
-                                        src="https://img.dudit.com.br/static/Map.png"
-                                        alt="Local de Retirada"
-                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                    />
-                                    <div className="flex flex-col justify-center">
-                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </FormSection>
-
-                        {/* 3. Pagamento */}
-                        <FormSection hasSeparator title="Pagamento">
+                    {/* Section 4: Pagamento */}
+                    <FormSection title="Pagamento">
+                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-4 rounded-2xl">
                             <ListItem
-                                icon={PaymentIcon}
+                                icon={PaymentIconEl}
                                 title={
                                     loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
-                                        <div className="flex items-center gap-1.5 text-sm font-bold text-brand-dark dark:text-dark-heading flex-wrap">
+                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                             {paymentMethodName}
-                                            <span className="text-brand-inactive-text font-normal">•</span>
-                                            <span className="font-normal text-brand-inactive-text">
-                                                {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
-                                            </span>
-                                        </div>
+                                        </span>
                                 }
                                 description={
-                                    <span className="text-sm font-medium text-brand-inactive-text">
-                                        {formatCurrency(totalAmount)}
+                                    <span className="text-xs text-brand-inactive-text font-normal">
+                                        {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
                                     </span>
                                 }
                                 className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
                                 onClick={handlePixClick}
+                                right={
+                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                }
                             />
-                        </FormSection>
+                        </div>
+                    </FormSection>
 
-                        {/* 4. Vendedor */}
-                        <FormSection hasSeparator title="Vendedor">
-                            <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
-                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                                    <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                    <div className="text-xs text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
-                                </div>
-                                <ChevronRightIcon size={18} className="text-brand-inactive-text" />
-                            </Link>
-                        </FormSection>
+                    {/* Section 5: Vendedor */}
+                    <FormSection title="Vendedor">
+                        <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="p-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors block cursor-pointer bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
+                                <div className="text-xs text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
+                            </div>
+                            <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                        </Link>
+                    </FormSection>
 
-                        {/* 5. Cancelar */}
+                    {/* Section 6: Resumo dos Valores */}
+                    <FormSection title="Resumo dos Valores">
+                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border p-6 rounded-2xl">
+                            {renderPriceSummary()}
+                        </div>
+                    </FormSection>
+
+                    {/* Actions / Buttons */}
+                    <div className="space-y-4 pt-4">
                         {canCancelOrder && (
                             <Button
                                 variant="outlinered"
-                                className="w-full h-12 font-bold animate-none"
+                                className="w-full h-12 font-bold"
                                 onClick={() => setIsCancelModalOpen(true)}
                                 disabled={isCanceling}
                             >
@@ -657,14 +624,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         )}
 
                         {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
-                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body">
+                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                 Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
                             </div>
                         )}
 
                         {canRequestResolution && (
                             <>
-                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body">
+                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                     Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
                                 </p>
                                 <Button
@@ -677,239 +644,176 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </>
                         )}
                     </div>
-
-                    {/* RIGHT COLUMN - SUMMARY (DESKTOP ONLY) */}
-                    <div className="hidden lg:block col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                        <div className="bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden sticky top-[90px]">
-                            <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-emerald-900/10 font-bold text-brand-dark dark:text-dark-heading">
-                                Resumo da compra
-                            </div>
-                            <div className="p-6">
-                                {renderSummaryContent()}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Collapsible Order Summary Bottom Sheet - Tablet/Mobile only */}
-                    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border shadow-[0_-4px_12px_rgba(0,0,0,0.08)] block lg:hidden pb-safe">
-                        <div className="max-w-[1400px] mx-auto px-6 py-4">
-                            <AnimatePresence>
-                                {isBottomSummaryOpen && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="overflow-hidden pb-4 mb-4 border-b border-brand-border dark:border-dark-border space-y-3"
-                                    >
-                                        <div className="flex justify-between text-sm text-brand-inactive-text">
-                                            <span>Subtotal</span>
-                                            <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(subtotalVal)}</span>
-                                        </div>
-                                        {discountVal > 0 && (
-                                            <div className="flex justify-between text-sm text-brand-green">
-                                                <span>Desconto</span>
-                                                <span className="font-medium">-{formatCurrency(discountVal)}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between text-sm text-brand-inactive-text">
-                                            <span>Entrega</span>
-                                            <span className="text-brand-dark dark:text-dark-heading font-medium">
-                                                {shippingVal > 0 ? formatCurrency(shippingVal) : "Grátis"}
-                                            </span>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-
-                            <div className="flex items-center justify-between w-full">
-                                <div
-                                    className="flex items-center gap-3 cursor-pointer select-none"
-                                    onClick={() => setIsBottomSummaryOpen(!isBottomSummaryOpen)}
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center text-brand-dark dark:text-dark-heading hover:bg-gray-200 dark:hover:bg-dark-border transition-colors">
-                                        {isBottomSummaryOpen ? <ChevronDownIcon size={18} /> : <ChevronUpIcon size={18} />}
-                                    </div>
-                                    <span className="text-sm font-bold text-[#005e7a] dark:text-[#0296c0] transition-colors">
-                                        Ver Detalhes do Pedido
-                                    </span>
-                                </div>
-                                <div className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(totalAmount)}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
 
-            <AnimatePresence>
-                {isShippingModalOpen && (
-                    <ShippingDetailsModal isOpen={isShippingModalOpen} onClose={() => setIsShippingModalOpen(false)} order={order} />
+                <AnimatePresence>
+                    {isShippingModalOpen && (
+                        <ShippingDetailsModal isOpen={isShippingModalOpen} onClose={() => setIsShippingModalOpen(false)} order={order} />
+                    )}
+                </AnimatePresence>
+
+                {pixData && (
+                    <PaymentWrapper
+                        open={showPixModal}
+                        onClose={() => setShowPixModal(false)}
+                        pixData={pixData}
+                        orderId={order.id}
+                        amount={Number(totalAmount)}
+                        orderDetails={pixOrderDetails}
+                    />
                 )}
-            </AnimatePresence>
 
-            {pixData && (
-                <PaymentWrapper
-                    open={showPixModal}
-                    onClose={() => setShowPixModal(false)}
-                    pixData={pixData}
-                    orderId={order.id}
-                    amount={Number(totalAmount)}
-                    orderDetails={pixOrderDetails}
-                />
-            )}
-
-            <AnimatePresence>
-                {isCancelModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white dark:bg-dark-surface w-full max-w-lg rounded-2xl overflow-hidden"
-                        >
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Cancelar pedido</h3>
-                                <button onClick={() => setIsCancelModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                                    <XIcon size={24} />
-                                </button>
-                            </div>
-                            <div className="p-6 space-y-5">
-                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    Motivo do cancelamento
-                                    <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                        <option value="purchased_by_mistake">Comprei por engano</option>
-                                        <option value="better_price">Encontrei preco melhor</option>
-                                        <option value="delivery_delay">Atraso na entrega</option>
-                                        <option value="changed_mind">Mudei de ideia</option>
-                                        <option value="payment_issue">Problema no pagamento</option>
-                                        <option value="other">Outro</option>
-                                    </select>
-                                </label>
-                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    Detalhes
-                                    <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
-                                </label>
-                            </div>
-                            <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
-                                <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
-                                <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
-                                    {isCanceling ? "Enviando..." : "Solicitar cancelamento"}
-                                </Button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-                {isReturnModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white dark:bg-dark-surface w-full max-w-2xl rounded-2xl overflow-hidden"
-                        >
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Solicitar troca ou devolucao</h3>
-                                <button onClick={() => setIsReturnModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                                    <XIcon size={24} />
-                                </button>
-                            </div>
-                            <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-6">
-                                <div className="space-y-3">
-                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
-                                    {order.order_items?.map((item: any) => {
-                                        const itemImage = getPrimaryProductDisplayImage({
-                                            images: item.products?.images || null,
-                                            video_thumbnail: item.products?.video_thumbnail || null,
-                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                        });
-                                        return (
-                                            <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Number(returnItems[item.id] || 0) > 0}
-                                                    onChange={(event) => setReturnItems(prev => ({ ...prev, [item.id]: event.target.checked ? 1 : 0 }))}
-                                                />
-                                                <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain" />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
-                                                    <p className="text-xs text-brand-inactive-text">Comprado: {item.quantity} un.</p>
-                                                </div>
-                                                <input
-                                                    type="number"
-                                                    min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
-                                                    max={item.quantity}
-                                                    value={returnItems[item.id] || 0}
-                                                    onChange={(event) => setReturnItems(prev => ({
-                                                        ...prev,
-                                                        [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(event.target.value || 0))),
-                                                    }))}
-                                                    className="w-20 h-10 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-2 text-sm"
-                                                />
-                                            </div>
-                                        )
-                                    })}
+                <AnimatePresence>
+                    {isCancelModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="bg-white dark:bg-dark-surface w-full max-w-lg rounded-2xl overflow-hidden"
+                            >
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
+                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Cancelar pedido</h3>
+                                    <button onClick={() => setIsCancelModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
+                                        <XIcon size={24} />
+                                    </button>
                                 </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-6 space-y-5">
                                     <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Motivo
-                                        <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                            <option value="wrong_item">Recebi item errado</option>
-                                            <option value="defective">Item com defeito</option>
-                                            <option value="damaged">Item danificado</option>
-                                            <option value="different_from_description">Diferente da descricao</option>
-                                            <option value="missing_parts">Faltam partes</option>
-                                            <option value="arrived_late">Chegou atrasado</option>
+                                        Motivo do cancelamento
+                                        <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                            <option value="purchased_by_mistake">Comprei por engano</option>
+                                            <option value="better_price">Encontrei preco melhor</option>
+                                            <option value="delivery_delay">Atraso na entrega</option>
                                             <option value="changed_mind">Mudei de ideia</option>
+                                            <option value="payment_issue">Problema no pagamento</option>
                                             <option value="other">Outro</option>
                                         </select>
                                     </label>
                                     <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Resolucao
-                                        <select value={returnResolution} onChange={(e) => setReturnResolution(e.target.value as any)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                            <option value="exchange">Troca</option>
-                                            <option value="refund">Reembolso</option>
-                                            <option value="store_credit">Vale-compra</option>
-                                        </select>
+                                        Detalhes
+                                        <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
                                     </label>
                                 </div>
-
-                                <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                    Mensagem opcional
-                                    <textarea value={returnMessage} onChange={(e) => setReturnMessage(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
-                                </label>
-
-                                <div className="space-y-3">
-                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
-                                    <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-brand-border dark:border-dark-border p-4 text-center text-sm font-semibold text-brand-inactive-text">
-                                        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleEvidenceUpload} />
-                                        {evidenceUploader.isLoading ? "Enviando..." : "Adicionar fotos ou PDF"}
-                                        <span className="mt-1 text-xs font-medium">{returnEvidence.length}/5 arquivos</span>
-                                    </label>
-                                    {returnEvidence.length > 0 && (
-                                        <div className="grid grid-cols-2 gap-2 text-xs text-brand-inactive-text">
-                                            {returnEvidence.map((file, index) => (
-                                                <div key={`${file.file_url}-${index}`} className="truncate rounded-lg border border-brand-border p-2">{file.file_name || file.file_url}</div>
-                                            ))}
-                                        </div>
-                                    )}
+                                <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
+                                    <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
+                                    <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
+                                        {isCanceling ? "Enviando..." : "Solicitar cancelamento"}
+                                    </Button>
                                 </div>
-                            </div>
-                            <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
-                                <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
-                                <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
-                                    {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
-                                </Button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                    {isReturnModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="bg-white dark:bg-dark-surface w-full max-w-2xl rounded-2xl overflow-hidden"
+                            >
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
+                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Solicitar troca ou devolucao</h3>
+                                    <button onClick={() => setIsReturnModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
+                                        <XIcon size={24} />
+                                    </button>
+                                </div>
+                                <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-6">
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
+                                        {order.order_items?.map((item: any) => {
+                                            const itemImage = getPrimaryProductDisplayImage({
+                                                images: item.products?.images || null,
+                                                video_thumbnail: item.products?.video_thumbnail || null,
+                                                fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                            });
+                                            return (
+                                                <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Number(returnItems[item.id] || 0) > 0}
+                                                        onChange={(event) => setReturnItems(prev => ({ ...prev, [item.id]: event.target.checked ? 1 : 0 }))}
+                                                    />
+                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
+                                                        <p className="text-xs text-brand-inactive-text">Comprado: {item.quantity} un.</p>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
+                                                        max={item.quantity}
+                                                        value={returnItems[item.id] || 0}
+                                                        onChange={(event) => setReturnItems(prev => ({
+                                                            ...prev,
+                                                            [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(event.target.value || 0))),
+                                                        }))}
+                                                        className="w-20 h-10 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-2 text-sm"
+                                                    />
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            Motivo
+                                            <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                                <option value="wrong_item">Recebi item errado</option>
+                                                <option value="defective">Item com defeito</option>
+                                                <option value="damaged">Item danificado</option>
+                                                <option value="different_from_description">Diferente da descricao</option>
+                                                <option value="missing_parts">Faltam partes</option>
+                                                <option value="arrived_late">Chegou atrasado</option>
+                                                <option value="changed_mind">Mudei de ideia</option>
+                                                <option value="other">Outro</option>
+                                            </select>
+                                        </label>
+                                        <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                            Resolucao
+                                            <select value={returnResolution} onChange={(e) => setReturnResolution(e.target.value as any)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
+                                                <option value="exchange">Troca</option>
+                                                <option value="refund">Reembolso</option>
+                                                <option value="store_credit">Vale-compra</option>
+                                            </select>
+                                        </label>
+                                    </div>
+
+                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        Mensagem opcional
+                                        <textarea value={returnMessage} onChange={(e) => setReturnMessage(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
+                                    </label>
+
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
+                                        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-brand-border dark:border-dark-border p-4 text-center text-sm font-semibold text-brand-inactive-text">
+                                            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleEvidenceUpload} />
+                                            {evidenceUploader.isLoading ? "Enviando..." : "Adicionar fotos ou PDF"}
+                                            <span className="mt-1 text-xs font-medium">{returnEvidence.length}/5 arquivos</span>
+                                        </label>
+                                        {returnEvidence.length > 0 && (
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-brand-inactive-text">
+                                                {returnEvidence.map((file, index) => (
+                                                    <div key={`${file.file_url}-${index}`} className="truncate rounded-lg border border-brand-border p-2">{file.file_name || file.file_url}</div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
+                                    <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
+                                    <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
+                                        {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+            </div>
         </motion.div>
     );
 };
