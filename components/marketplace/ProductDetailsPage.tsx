@@ -15,6 +15,7 @@ import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
+import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -690,40 +691,77 @@ export function ProductDetailsPageClient({
         }
     }, [userId, router, product.id, quantity, selectedVariant, notifySuccess, notifyError])
 
-    const handleBuyNow = useCallback(() => {
+    const handleBuyNow = useCallback(async () => {
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
-        const checkoutData = {
-            source: "product",
-            partnerId: partner.id,
-            products: [{
-                id: product.id,
-                name: `${product.name} ${selectedVariant?.variant_name || ""}`,
-                price: pricing.current,
-                quantity,
-                image: productImages[Math.max(0, activeImgIndex - videoOffset)] || productImages[0],
-                variant: selectedVariant?.variant_name,
-                availabilityValue: Number(product.availability_value || 0),
-                availabilityUnit: product.availability_unit || "Minutos",
-            }],
-            partnerInfo: {
-                address: partner.address || {},
-                paymentMethods: partner.paymentMethods || ["Dinheiro"],
-                mpConnected: !!partner.mp_user_id,
-                mpPublicKey: partner.mp_public_key,
-                store_name: partner.store_name,
-                openingHours: partner.openingHours || null,
-            },
-            itemId: selectedVariant?.id || product.id,
-            itemType: "product",
-            deliverySettings: deliveryConfig?.settings ? {
-                base_fee: deliveryConfig.settings.baseFee,
-                is_delivery_enabled: deliveryConfig.settings.isDeliveryEnabled,
-            } : undefined,
-        }
+        if (isActionInProgress.current) return
 
-        sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
-        router.push("/checkout")
-    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset])
+        isActionInProgress.current = true
+        setLoading(true)
+        try {
+            const { token } = await fetch("/api/csrf-token").then((r) => r.json())
+            const prep = await prepareProductBuyNowCheckoutAction({
+                productId: product.id,
+                partnerId: partner.id,
+                quantity,
+                variantId: selectedVariant?.id,
+                csrf_token: token,
+            })
+            if ("error" in prep && prep.error) {
+                notifyError("Erro", prep.error)
+                return
+            }
+
+            const cartItemId = "cartItemId" in prep ? prep.cartItemId : null
+            if (!cartItemId) {
+                notifyError("Erro", "Não foi possível iniciar o checkout.")
+                return
+            }
+
+            invalidateCartCache()
+
+            const checkoutData = {
+                source: "cart" as const,
+                partnerId: partner.id,
+                products: [{
+                    id: product.id,
+                    name: `${product.name} ${selectedVariant?.variant_name || ""}`.trim(),
+                    price: pricing.current,
+                    quantity,
+                    image: productImages[Math.max(0, activeImgIndex - videoOffset)] || productImages[0],
+                    variant: selectedVariant?.variant_name,
+                    availabilityValue: Number(product.availability_value || 0),
+                    availabilityUnit: product.availability_unit || "Minutos",
+                }],
+                cartItems: [{
+                    cartItemId,
+                    itemType: "product" as const,
+                    productId: product.id,
+                    variantId: selectedVariant?.id,
+                    quantity,
+                }],
+                partnerInfo: {
+                    address: partner.address || {},
+                    paymentMethods: partner.paymentMethods || ["Dinheiro"],
+                    mpConnected: !!partner.mp_user_id,
+                    mpPublicKey: partner.mp_public_key,
+                    store_name: partner.store_name,
+                    openingHours: partner.openingHours || null,
+                },
+                deliverySettings: deliveryConfig?.settings ? {
+                    base_fee: deliveryConfig.settings.baseFee,
+                    is_delivery_enabled: deliveryConfig.settings.isDeliveryEnabled,
+                } : undefined,
+            }
+
+            sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
+            router.push("/checkout")
+        } catch {
+            notifyError("Erro", "Erro inesperado ao iniciar checkout.")
+        } finally {
+            setLoading(false)
+            isActionInProgress.current = false
+        }
+    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset, deliveryConfig, notifyError])
 
 
     const shareMessage = useMemo(() => {

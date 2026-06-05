@@ -366,7 +366,8 @@ export async function getAppointmentsAction() {
 const APPOINTMENT_LIST_COLUMNS = `
   id, partner_id, customer_id, customer_name, service_name,
   start_date, start_time, end_date, end_time, duration_minutes,
-  staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source
+  staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source,
+  sales_channel, payment_status, fulfillment_mode, needs_reschedule
 `
 
 /**

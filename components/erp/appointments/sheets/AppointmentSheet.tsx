@@ -1544,6 +1544,39 @@ export const AppointmentSheet = ({
                                     </div>
                                 )}
 
+                                {mode === 'view' && appointment && (
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Canal</p>
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
+                                                {appointment.salesChannel || 'booking'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Pagamento</p>
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
+                                                {appointment.paymentStatus || 'unpaid'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Atendimento</p>
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
+                                                {appointment.fulfillmentMode?.replace(/_/g, ' ') || '—'}
+                                            </p>
+                                        </div>
+                                        {appointment.needsReschedule && (
+                                            <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 col-span-2">
+                                                <p className="font-bold text-amber-800 dark:text-amber-300">
+                                                    Reagendamento necessário
+                                                </p>
+                                                <p className="text-amber-700/90 dark:text-amber-400/90 mt-0.5">
+                                                    O horário original não está mais disponível.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Client Section */}
                                 <div>
                                     <div className="flex justify-between items-center mb-3 px-1">

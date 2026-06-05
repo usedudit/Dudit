@@ -591,6 +591,7 @@ export async function checkoutCartAction(
   csrf_token?: string,
   wantsChange?: boolean,
   payWithAmount?: number,
+  payDepositOnly?: boolean,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -613,6 +614,15 @@ export async function checkoutCartAction(
 
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId).filter(Boolean)
 
+  if (payDepositOnly) {
+    await adminClient
+      .from("cart_items")
+      .update({ pay_deposit_only: true, updated_at: new Date().toISOString() })
+      .in("id", cartItemIds)
+      .eq("user_id", user.id)
+      .eq("item_type", "service_booking")
+  }
+
   const defaultProductMode = deliveryType === "delivery" ? "delivery" : "pickup"
   for (const item of partnerItems) {
     if (!item.cartItemId) continue
@@ -628,6 +638,17 @@ export async function checkoutCartAction(
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  const lineContexts = (
+    await import("@/lib/commerce/marketplace-checkout-lines")
+  ).buildCheckoutLineContextsFromResolved(resolvedLines)
+  const requirements = (
+    await import("@/lib/commerce/checkout-requirements")
+  ).aggregateCheckoutRequirements(lineContexts)
+
+  if (requirements.showCustomerAddressSection && !deliveryAddress?.trim()) {
+    return { error: "Informe o endereço para continuar." }
+  }
 
   let totalAmount = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const orderItems = resolvedLines.map((line) => line.orderItemRow)
@@ -826,6 +847,18 @@ export async function checkoutCartAction(
   let bestMethod: any = methodResult.data
 
   const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
+
+  const { validateMarketplaceCheckoutPayment } = await import(
+    "@/lib/commerce/validate-marketplace-checkout-payment"
+  )
+  const paymentValidation = validateMarketplaceCheckoutPayment({
+    requirements,
+    paymentOption: useMercadoPago ? "mercadopago" : "traditional",
+    paymentMethodType: useMercadoPago ? null : chosenType,
+    productDeliveryType: deliveryType,
+    useMercadoPago,
+  })
+  if (!paymentValidation.valid) return { error: paymentValidation.error }
 
   if (!bestMethod && !useMercadoPago) {
     bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })

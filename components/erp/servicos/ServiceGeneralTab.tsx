@@ -3,6 +3,8 @@
 import type React from "react"
 import { useMemo } from "react"
 import { Input, FormDropdown, Checkbox, MoneyInput, Combobox } from "@/components/reusable"
+import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
+import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
 import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon } from "@/lib/icons"
@@ -141,6 +143,27 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 width="w-full"
                             />
                         </div>
+
+                        <FulfillmentModesEditor
+                            label="Formas de atendimento (vitrine)"
+                            allowedModes={["on_site", "customer_location"]}
+                            value={(serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]}
+                            onChange={(modes) => manualChange("fulfillment_modes", modes)}
+                            disabled={!isEditing}
+                        />
+
+                        <FormDropdown
+                            label="Exigência de pagamento (vitrine)"
+                            options={[
+                                { value: "full_payment", label: "Pagamento integral online" },
+                                { value: "deposit_only", label: "Sinal / entrada (plano Grow+)" },
+                                { value: "pay_on_service", label: "Pagar no atendimento" },
+                            ]}
+                            value={serviceData.payment_requirement || "full_payment"}
+                            setValue={(v) => manualChange("payment_requirement", v)}
+                            disabled={!isEditing}
+                            width="w-full"
+                        />
 
                     </div>
                 </div>

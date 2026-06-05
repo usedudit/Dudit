@@ -6,6 +6,7 @@ import {
   productCatalogCapabilities,
   serviceCatalogCapabilities,
 } from "@/lib/commerce/capabilities"
+import { aggregateCheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 
 describe("capabilities", () => {
   it("defaults physical product to delivery and pickup", () => {
@@ -32,6 +33,25 @@ describe("capabilities", () => {
     )
     expect(merged).toContain("delivery")
     expect(merged).toContain("on_site")
+  })
+
+  it("service-only checkout hides product delivery and pay on delivery", () => {
+    const caps = serviceCatalogCapabilities({
+      fulfillment_modes: ["on_site"],
+      scheduling_enabled: true,
+    })
+    const requirements = aggregateCheckoutRequirements([
+      {
+        lineId: "s1",
+        lineKind: "service_booking",
+        catalog: caps,
+        fulfillmentMode: "on_site",
+        schedulingMetadataComplete: true,
+      },
+    ])
+    expect(requirements.showProductFulfillmentOptions).toBe(false)
+    expect(requirements.allowPayOnDelivery).toBe(false)
+    expect(requirements.showPartnerLocation).toBe(true)
   })
 
   it("rejects invalid selected mode", () => {

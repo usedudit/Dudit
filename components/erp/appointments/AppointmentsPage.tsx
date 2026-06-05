@@ -163,7 +163,11 @@ const AppointmentsPage = ({
         source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
         recurrence: (row.recurrence as any) || 'none',
         saleId: row.sale_id || null,
-        paidAmount: Number(row.paid_amount || 0)
+        paidAmount: Number(row.paid_amount || 0),
+        salesChannel: row.sales_channel || "booking",
+        paymentStatus: row.payment_status || "unpaid",
+        fulfillmentMode: row.fulfillment_mode || null,
+        needsReschedule: Boolean(row.needs_reschedule),
     }), []);
 
     // Catalogs come from SSR props - only refresh unavailable types when needed

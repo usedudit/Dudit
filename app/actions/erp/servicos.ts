@@ -197,6 +197,12 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             resources: data.resources || [],
             assigned_staff: data.assigned_staff || data.assignedStaff || { all: true, staff_ids: [] },
             is_active: data.isActive !== false && data.is_active !== false,
+            scheduling_enabled:
+                data.scheduling_enabled ?? data.schedulingEnabled ?? true,
+            fulfillment_modes: Array.isArray(data.fulfillment_modes)
+                ? data.fulfillment_modes
+                : data.fulfillmentModes || ["on_site"],
+            payment_requirement: data.payment_requirement || data.paymentRequirement || "full_payment",
             images: data.images || [],
             is_unavailable_type: data.isUnavailableType || data.is_unavailable_type || false,
             created_at: getBrasiliaTime(),
@@ -319,6 +325,12 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.images !== undefined) payload.images = data.images
         if (data.marketplace_category_id !== undefined) payload.marketplace_category_id = data.marketplace_category_id
         if (data.marketplaceCategoryId !== undefined) payload.marketplace_category_id = data.marketplaceCategoryId
+        if (data.scheduling_enabled !== undefined) payload.scheduling_enabled = data.scheduling_enabled
+        if (data.schedulingEnabled !== undefined) payload.scheduling_enabled = data.schedulingEnabled
+        if (data.fulfillment_modes !== undefined) payload.fulfillment_modes = data.fulfillment_modes
+        if (data.fulfillmentModes !== undefined) payload.fulfillment_modes = data.fulfillmentModes
+        if (data.payment_requirement !== undefined) payload.payment_requirement = data.payment_requirement
+        if (data.paymentRequirement !== undefined) payload.payment_requirement = data.paymentRequirement
 
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)

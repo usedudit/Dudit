@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, Checkbox } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,6 +17,7 @@ import { listApplicableMarketplaceCouponsAction, validateCouponAction } from "@/
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction } from "@/app/actions/marketplace/cart"
+import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
@@ -26,6 +27,10 @@ import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/ac
 import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 import { getPartnerOrderBumps } from "@/app/actions/marketplace/partners"
 import { getMpAcceptedPaymentMethodsPublicAction, type MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
+import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
+import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
+import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
+import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 
 interface ProductItem {
     id: string
@@ -180,6 +185,54 @@ export function CheckoutPageClient() {
         setPageLoading(false)
     }, [router])
 
+    const legacyCartHydrationRef = useRef(false)
+
+    useEffect(() => {
+        if (legacyCartHydrationRef.current || !sessionData || pageLoading || !user?.id) return
+        const hasRealCartIds = (sessionData.cartItems || []).some(
+            (item) => item.cartItemId && !String(item.cartItemId).startsWith("bump-"),
+        )
+        if (hasRealCartIds || sessionData.source !== "product") return
+
+        const productId = sessionData.products?.[0]?.id || sessionData.itemId
+        if (!productId || !sessionData.partnerId) return
+
+        legacyCartHydrationRef.current = true
+        let active = true
+        ;(async () => {
+            try {
+                const csrfRes = await fetch("/api/csrf-token")
+                const { token } = await csrfRes.json()
+                const prep = await prepareProductBuyNowCheckoutAction({
+                    productId,
+                    partnerId: sessionData.partnerId,
+                    quantity: sessionData.products?.[0]?.quantity ?? 1,
+                    csrf_token: token,
+                })
+                if (!active || ("error" in prep && prep.error) || !("cartItemId" in prep)) return
+
+                const updated: CheckoutSessionData = {
+                    ...sessionData,
+                    source: "cart",
+                    cartItems: [{
+                        cartItemId: prep.cartItemId,
+                        itemType: "product",
+                        productId,
+                        quantity: sessionData.products?.[0]?.quantity ?? 1,
+                    }],
+                }
+                setSessionData(updated)
+                sessionStorage.setItem("checkout_session", JSON.stringify(updated))
+            } catch {
+                // Legacy session without cart line — checkout context stays disabled
+            }
+        })()
+
+        return () => {
+            active = false
+        }
+    }, [sessionData, pageLoading, user?.id])
+
     const formatPartnerAddress = (addr: any) => {
         if (!addr) return "Endereço não informado"
         if (typeof addr === "string") return addr
@@ -194,6 +247,21 @@ export function CheckoutPageClient() {
     const products = sessionData?.products || []
     const partnerId = sessionData?.partnerId || ""
     const partnerInfo = sessionData?.partnerInfo || { paymentMethods: [] } as any
+
+    const cartItemIds = useMemo(
+        () => (sessionData?.cartItems || []).map((item) => item.cartItemId).filter(Boolean),
+        [sessionData?.cartItems],
+    )
+
+    const { checkoutContext, contextLoading, contextError } = useMarketplaceCheckoutContext({
+        partnerId,
+        cartItemIds,
+        mpConnected: Boolean(partnerInfo?.mpConnected),
+        enabled: Boolean(partnerId && cartItemIds.length > 0),
+    })
+
+    const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
+    const [payDepositOnly, setPayDepositOnly] = useState(false)
     const storeImage = partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
     const sellerName = partnerInfo?.store_name || "Loja"
 
@@ -548,13 +616,19 @@ export function CheckoutPageClient() {
     }
 
     const isPickup = formData.deliveryType === "pickup"
-    const canUseDelivery = deliveryPlanEnabled && deliveryEnabled
-
-
+    const productDeliveryQuoteActive = Boolean(
+        requirements?.showProductFulfillmentOptions &&
+        requirements.showDeliverySection &&
+        formData.deliveryType === "delivery" &&
+        deliveryPlanEnabled &&
+        deliveryEnabled,
+    )
+    const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
 
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
     const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
-    const checkoutTotalWithDelivery = checkoutBaseTotal + (isPickup ? 0 : deliveryFee)
+    const checkoutTotalWithDelivery =
+        checkoutBaseTotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
         credit_card: "Cartão de crédito",
@@ -563,8 +637,8 @@ export function CheckoutPageClient() {
         other: "Outros",
     }
     // Usa métodos reais carregados do servidor; fallback para a sessão apenas durante o loading
-    const paymentMethods = storefrontMethods.length > 0
-        ? storefrontMethods.map((m) => ({
+    const paymentMethods = visibleStorefrontMethods.length > 0
+        ? visibleStorefrontMethods.map((m) => ({
             value: m.id,
             label: paymentTypeLabelMap[m.type] || m.type,
         }))
@@ -576,8 +650,59 @@ export function CheckoutPageClient() {
                     label: paymentTypeLabelMap[type] || type,
                 }
             })
-    const traditionalPaymentLabel = isPickup ? "Pagar na Retirada" : "Pagar na Entrega"
-    const selectedStorefrontMethod = storefrontMethods.find((m) => m.id === formData.paymentMethod) || null
+    const traditionalPaymentLabel = requirements?.hasPayOnService
+        ? "Pagar no atendimento"
+        : isPickup
+            ? "Pagar na Retirada"
+            : "Pagar na Entrega"
+
+    const visibleStorefrontMethods = useMemo(() => {
+        if (!requirements || requirements.allowPayOnDelivery) return storefrontMethods
+        return storefrontMethods.filter((m) => m.type !== "cash")
+    }, [storefrontMethods, requirements])
+
+    const showTraditionalPaymentOption = Boolean(
+        requirements?.allowPayOnDelivery ||
+        requirements?.hasPayOnService ||
+        (requirements?.hasProductLines && !requirements?.hasServiceLines),
+    )
+
+    const schedulingLines = useMemo(
+        () =>
+            (checkoutContext?.lines || [])
+                .filter((l) => l.lineKind === "service_booking" && l.bookingSummary)
+                .map((l) => ({ name: l.displayName, summary: l.bookingSummary })),
+        [checkoutContext?.lines],
+    )
+
+    const partnerAddressLabel = formatPartnerAddress(
+        checkoutContext?.partner?.address || partnerInfo.address,
+    )
+
+    const showMobileFulfillmentStep = Boolean(
+        requirements &&
+        (
+            requirements.showProductFulfillmentOptions ||
+            requirements.showPartnerLocation ||
+            requirements.showCustomerAddressSection ||
+            requirements.showSchedulingSummary ||
+            checkoutContext?.deposit.available
+        ),
+    )
+
+    const mobileStep1Blocked = Boolean(
+        contextLoading ||
+        (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) ||
+        (productDeliveryQuoteActive &&
+            (showAddressForm || !formData.deliveryAddress?.trim() || deliveryQuoteLoading || !!deliveryError)),
+    )
+
+    useEffect(() => {
+        if (contextLoading || !requirements) return
+        if (!showMobileFulfillmentStep) setMobileStep(2)
+    }, [contextLoading, requirements, showMobileFulfillmentStep])
+
+    const selectedStorefrontMethod = visibleStorefrontMethods.find((m) => m.id === formData.paymentMethod) || null
     const isCashPayment = paymentOption === "traditional" && (selectedStorefrontMethod ? selectedStorefrontMethod.type === "cash" : formData.paymentMethod === "cash")
 
     const renderChangeSection = () => {
@@ -639,7 +764,7 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         let active = true
-        if (!partnerId || !formData.deliveryAddress || !canUseDelivery) {
+        if (!partnerId || !formData.deliveryAddress || !productDeliveryQuoteActive) {
             setDeliveryFee(0)
             setDeliveryDistanceKm(null)
             setDeliveryBreakdown(null)
@@ -683,7 +808,7 @@ export function CheckoutPageClient() {
             active = false
             window.clearTimeout(timer)
         }
-    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, canUseDelivery])
+    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, productDeliveryQuoteActive])
 
     useEffect(() => {
         let active = true
@@ -811,12 +936,54 @@ export function CheckoutPageClient() {
         && (Number(paymentPreview?.maxInstallments || selectedStorefrontMethod?.maxInstallments || 1) > 1)
     const disableCheckoutSubmit = isLoading
         || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
-        || (!isPickup && (deliveryQuoteLoading || !!deliveryError))
+        || (productDeliveryQuoteActive && (deliveryQuoteLoading || !!deliveryError))
 
     const renderSummaryContent = (showSubmitButton = false) => (
         <>
             <div className="space-y-4 mb-6 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                {products.map((item) => {
+                {checkoutContext?.lines && checkoutContext.lines.length > 0 ? (
+                    <>
+                        {checkoutContext.lines.some((l) => l.lineKind === "product") && (
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide">Produtos</p>
+                        )}
+                        {checkoutContext.lines
+                            .filter((l) => l.lineKind === "product")
+                            .map((line) => (
+                                <div key={line.lineId} className="flex justify-between text-sm py-1">
+                                    <span className="truncate pr-2">{line.displayName}</span>
+                                    <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                </div>
+                            ))}
+                        {checkoutContext.lines.some((l) => l.lineKind === "service_booking") && (
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2">Serviços</p>
+                        )}
+                        {checkoutContext.lines
+                            .filter((l) => l.lineKind === "service_booking")
+                            .map((line) => (
+                                <div key={line.lineId} className="py-1">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="truncate pr-2">{line.displayName}</span>
+                                        <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                    </div>
+                                    {line.bookingSummary && (
+                                        <p className="text-xs text-brand-inactive-text">{line.bookingSummary}</p>
+                                    )}
+                                </div>
+                            ))}
+                        {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2">Assinaturas</p>
+                        )}
+                        {checkoutContext.lines
+                            .filter((l) => l.lineKind === "subscription")
+                            .map((line) => (
+                                <div key={line.lineId} className="flex justify-between text-sm py-1">
+                                    <span className="truncate pr-2">{line.displayName}</span>
+                                    <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                </div>
+                            ))}
+                    </>
+                ) : (
+                products.map((item) => {
                     const itemImage = item.image || "https://img.dudit.com.br/static/Placeholder.png"
                     const qty = quantities[item.id] || item.quantity
 
@@ -846,7 +1013,8 @@ export function CheckoutPageClient() {
                             </div>
                         </div>
                     )
-                })}
+                })
+                )}
             </div>
 
             <div className="mb-4 space-y-2">
@@ -901,9 +1069,10 @@ export function CheckoutPageClient() {
                         <span>-{formatCurrency(couponDiscount)}</span>
                     </div>
                 )}
+                {showDeliveryFeeRow && (
                 <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                     <span>Entrega</span>
-                    <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                    <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                         {isPickup
                             ? "Grátis"
                             : deliveryQuoteLoading
@@ -912,13 +1081,14 @@ export function CheckoutPageClient() {
                                     ? formatCurrency(deliveryFee)
                                     : hasFreeDeliveryCoupon
                                         ? "Grátis"
-                                        : !canUseDelivery || deliveryError || !formData.deliveryAddress
+                                        : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
                                             ? "A combinar"
                                             : "Grátis"
                         }
                     </span>
                 </div>
-                {!isPickup && deliveryBreakdown && (
+                )}
+                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (
                     <div className="space-y-1 text-xs text-brand-inactive-text">
                         {deliveryBreakdown.baseFee > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>}
                         {deliveryBreakdown.distanceFee > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>}
@@ -1131,12 +1301,13 @@ export function CheckoutPageClient() {
             }
         }
 
-        if (formData.deliveryType === "delivery") {
-            if (!canUseDelivery) {
-                setDeliveryError("Entrega indisponível para este plano ou loja.")
-                setIsLoading(false)
-                return
-            }
+        if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+            setDeliveryError("Por favor, selecione ou cadastre um endereço para continuar.")
+            setIsLoading(false)
+            return
+        }
+
+        if (productDeliveryQuoteActive) {
             if (showAddressForm) {
                 setDeliveryError("Por favor, salve o endereço antes de finalizar o pedido")
                 setIsLoading(false)
@@ -1144,6 +1315,20 @@ export function CheckoutPageClient() {
             }
             if (!formData.deliveryAddress) {
                 setDeliveryError("Por favor, selecione um endereço de entrega")
+                setIsLoading(false)
+                return
+            }
+        }
+
+        if (requirements && paymentOption) {
+            const clientPayCheck = validateMarketplaceCheckoutPayment({
+                requirements,
+                paymentOption,
+                paymentMethodType: selectedStorefrontMethod?.type || formData.paymentMethod,
+                productDeliveryType: formData.deliveryType,
+            })
+            if (!clientPayCheck.valid) {
+                setPaymentError(clientPayCheck.error)
                 setIsLoading(false)
                 return
             }
@@ -1224,6 +1409,7 @@ export function CheckoutPageClient() {
                         token,
                         wantsChange || false,
                         payWithAmount || undefined,
+                        payDepositOnly,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -1247,7 +1433,7 @@ export function CheckoutPageClient() {
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
-                            deliveryFee: isPickup ? 0 : deliveryFee,
+                            deliveryFee: showDeliveryFeeRow && !isPickup ? deliveryFee : 0,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                         useMercadoPago: false,
@@ -1398,100 +1584,69 @@ export function CheckoutPageClient() {
                     <div className="hidden lg:grid grid-cols-12 gap-8 items-start">
                         {/* Left Column (dados do pedido) */}
                         <div className="col-span-8 space-y-6 pr-6">
-                            {/* ENTREGA */}
-                            <FormSection title="Entrega">
-                                <div className="space-y-6">
-                                    <div>
-                                        <Tabs
-                                            value={formData.deliveryType}
-                                            onValueChange={(val) => {
-                                                const type = val as "delivery" | "pickup"
-                                                setFormData(prev => ({ ...prev, deliveryType: type }))
-                                                if (type === "pickup" && partnerInfo.mpConnected) {
-                                                    setPaymentOption("mercadopago")
-                                                }
-                                            }}
-                                            className="w-full"
-                                        >
-                                            <TabsList className="mb-6">
-                                                {canUseDelivery && (
-                                                    <TabsTrigger value="delivery">Entrega</TabsTrigger>
-                                                )}
-                                                {pickupEnabled && (
-                                                    <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
-                                                )}
-                                            </TabsList>
-                                        </Tabs>
-                                    </div>
-
-                                    <AnimatePresence mode="wait">
-                                        {isPickup && (
-                                            <motion.div key="pickup" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-                                                <div className="flex items-stretch gap-3">
-                                                    <img
-                                                        src="https://img.dudit.com.br/static/Map.png"
-                                                        alt="Mapa do local"
-                                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                    />
-                                                    <div className="flex flex-col justify-center">
-                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(partnerInfo.address)}</p>
-                                                        {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                                            <p className="text-xs text-brand-inactive-text mt-1">
-                                                                {getReadyDayLabel(preparationEstimate) === "hoje"
-                                                                    ? `Pronto em ${preparationEstimate.readyInMinutes} minutos`
-                                                                    : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
-                                                                } • Retirar a partir de {pickupStartLabel}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                        {!isPickup && (
-                                            <motion.div key="delivery" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-                                                {loadingAddresses ? (
-                                                    <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
-                                                ) : userAddresses.length > 0 && selectedAddress ? (
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div className="flex items-stretch gap-3">
-                                                            <img
-                                                                src="https://img.dudit.com.br/static/Map.png"
-                                                                alt="Endereço de entrega"
-                                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                            />
-                                                            <div className="flex flex-col justify-center">
-                                                                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                                                <p className="text-sm text-brand-inactive-text">{selectedAddress.street}, {selectedAddress.number}</p>
-                                                            </div>
-                                                        </div>
-                                                        <Button variant="link" onClick={() => setShowAddressModal(true)}>Trocar</Button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center border-t border-brand-border dark:border-dark-border pt-6">
-                                                        <IconPlaceholder
-                                                            icon={MapPinIcon}
-                                                            title="Nenhum endereço cadastrado"
-                                                            subtitle="Adicione um endereço para receber sua entrega."
-                                                            itemButton={{
-                                                                text: "Cadastrar Endereço",
-                                                                action: () => setShowAddressForm(true),
-                                                                variant: "outline"
-                                                            }}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    {deliveryError && (
-                                        <div className="flex gap-3 mt-4 w-full">
-                                            <InfoCard message={`${deliveryError}`} color="red" />
-                                        </div>
-                                    )}
+                            {contextError && (
+                                <InfoCard message={contextError} color="red" />
+                            )}
+                            {contextLoading && (
+                                <div className="py-8 flex justify-center">
+                                    <Spinner />
                                 </div>
-                            </FormSection>
+                            )}
+                            {requirements && (
+                                <CheckoutFulfillmentPanel
+                                    requirements={requirements}
+                                    deliveryType={formData.deliveryType}
+                                    onDeliveryTypeChange={(type) => {
+                                        setFormData((prev) => ({ ...prev, deliveryType: type }))
+                                        if (type === "pickup" && partnerInfo.mpConnected) {
+                                            setPaymentOption("mercadopago")
+                                        }
+                                    }}
+                                    deliveryPlanEnabled={deliveryPlanEnabled}
+                                    deliveryEnabled={deliveryEnabled}
+                                    pickupEnabled={pickupEnabled}
+                                    partnerAddressLabel={partnerAddressLabel}
+                                    deliveryError={deliveryError}
+                                    schedulingLines={schedulingLines}
+                                    addressProps={{
+                                        loadingAddresses,
+                                        userAddresses,
+                                        selectedAddress,
+                                        onOpenModal: () => setShowAddressModal(true),
+                                        onOpenForm: () => setShowAddressForm(true),
+                                    }}
+                                />
+                            )}
+
+                            {checkoutContext?.deposit.available && (
+                                <FormSection title="Sinal / entrada">
+                                    <div className="space-y-3">
+                                        <Checkbox
+                                            label={`Pagar sinal de ${checkoutContext.deposit.percent}% agora (${formatCurrency(checkoutContext.deposit.previewAmount)})`}
+                                            checked={payDepositOnly}
+                                            onChange={() => setPayDepositOnly((v) => !v)}
+                                        />
+                                        {checkoutContext.deposit.manualOnly && payDepositOnly && (
+                                            <InfoCard
+                                                message="Sem Mercado Pago: sua reserva será confirmada e o restante será combinado diretamente com a loja."
+                                                color="blue"
+                                            />
+                                        )}
+                                        {requirements?.hasPayOnService && !payDepositOnly && (
+                                            <p className="text-sm text-brand-inactive-text">
+                                                Você também pode pagar integralmente no atendimento.
+                                            </p>
+                                        )}
+                                    </div>
+                                </FormSection>
+                            )}
+
+                            {requirements?.hasPayOnService && (
+                                <InfoCard
+                                    message="Parte do valor pode ser paga no atendimento. Use Mercado Pago para pagamento automático ou finalize para reservar com cobrança manual."
+                                    color="blue"
+                                />
+                            )}
 
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
@@ -1514,11 +1669,15 @@ export function CheckoutPageClient() {
                                                         />
                                                     }
                                                 />
-                                                {(!isPickup || !partnerInfo.mpConnected) && (
+                                                {showTraditionalPaymentOption && (
                                                     <ListItem
                                                         icon={MoneyIcon}
                                                         title={traditionalPaymentLabel}
-                                                        description="Pague na entrega ou retirada."
+                                                        description={
+                                                            requirements?.hasPayOnService
+                                                                ? "Reserve e combine o pagamento com a loja."
+                                                                : "Pague na entrega ou retirada."
+                                                        }
                                                         className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                         onClick={() => setPaymentOption("traditional")}
                                                         right={
@@ -1742,137 +1901,64 @@ export function CheckoutPageClient() {
 
                     {/* Mobile/Tablet Stage Flow Layout */}
                     <div className="block lg:hidden space-y-6">
-                        {mobileStep === 1 && (
+                        {mobileStep === 1 && showMobileFulfillmentStep && (
                             <div className="space-y-6 pb-24">
-                                <FormSection title="Entrega ou Retirada">
-                                    <div className="space-y-6">
-                                        {/* Address Block */}
-                                        {formData.deliveryType === "delivery" ? (
-                                            <div className="w-full">
-                                                {loadingAddresses ? (
-                                                    <div className="py-4 text-center text-sm text-gray-400">Carregando endereços...</div>
-                                                ) : userAddresses.length > 0 && selectedAddress ? (
-                                                    <div className="flex items-center justify-between w-full p-0 border-none bg-transparent shadow-none">
-                                                        <div className="flex items-stretch gap-3 min-w-0">
-                                                            <img
-                                                                src="https://img.dudit.com.br/static/Map.png"
-                                                                alt="Mapa"
-                                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                            />
-                                                            <div className="flex flex-col justify-center min-w-0">
-                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                    Seu Endereço de Entrega
-                                                                </p>
-                                                                <p className="text-xs text-brand-inactive-text truncate">
-                                                                    {selectedAddress.street}, {selectedAddress.number}
-                                                                </p>
-                                                                <p className="text-xs text-brand-inactive-text truncate">
-                                                                    {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <Button variant="link" size="sm" onClick={() => setShowAddressModal(true)}>
-                                                            Trocar
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center p-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                                        <p className="text-sm text-brand-inactive-text mb-4 text-center">Nenhum endereço selecionado</p>
-                                                        <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)}>
-                                                            Adicionar endereço
-                                                        </Button>
-                                                    </div>
-                                                )}
-
-                                                {deliveryError && (
-                                                    <div className="mt-4">
-                                                        <InfoCard message={deliveryError} color="red" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
-                                                <img
-                                                    src="https://img.dudit.com.br/static/Map.png"
-                                                    alt="Mapa"
-                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                                    <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
-                                                        {formatPartnerAddress(partnerInfo.address)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Selection list (Delivery vs Pickup) */}
-                                        <div className="space-y-3 pt-2">
-                                            {canUseDelivery && (
-                                                <ListItem
-                                                    icon={TruckIcon}
-                                                    title="Entrega"
-                                                    description="Receba em casa"
-                                                    className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${formData.deliveryType === "delivery" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
-                                                    onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
-                                                    right={
-                                                        <span className={`text-xs font-bold ${deliveryFee > 0 ? "text-brand-dark dark:text-dark-heading" : "text-brand-green font-semibold"}`}>
-                                                            {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
-                                                        </span>
-                                                    }
-                                                />
-                                            )}
-                                            {pickupEnabled && (
-                                                <ListItem
-                                                    icon={StoreIcon}
-                                                    title="Retirada no local"
-                                                    description="Retire imediatamente"
-                                                    className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${formData.deliveryType === "pickup" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
-                                                    onClick={() => {
-                                                        setFormData({ ...formData, deliveryType: "pickup" })
-                                                        if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
-                                                    }}
-                                                    right={
-                                                        <span className="text-xs font-bold text-brand-green font-semibold">Grátis</span>
-                                                    }
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Status notice */}
-                                        <div className="flex gap-2.5 pt-2">
-                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                            <p className="text-xs text-brand-inactive-text">
-                                                {formData.deliveryType === "delivery" ? (
-                                                    <>
-                                                        Você receberá seu pedido no endereço informado •{" "}
-                                                        <span className={deliveryFee > 0 ? "" : "text-brand-green font-semibold"}>
-                                                            {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        Você retirará o pedido no local informado •{" "}
-                                                        <span className="text-brand-green font-semibold">Grátis</span>
-                                                    </>
-                                                )}
-                                                {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                                    <>
-                                                        {" • "}
-                                                        {getReadyDayLabel(preparationEstimate) === "hoje"
-                                                            ? `Pronto em ${preparationEstimate.readyInMinutes} min`
-                                                            : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
-                                                        }
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
+                                {contextError && <InfoCard message={contextError} color="red" />}
+                                {contextLoading ? (
+                                    <div className="py-8 flex justify-center">
+                                        <Spinner />
                                     </div>
-                                </FormSection>
+                                ) : requirements ? (
+                                    <>
+                                        <CheckoutFulfillmentPanel
+                                            requirements={requirements}
+                                            deliveryType={formData.deliveryType}
+                                            onDeliveryTypeChange={(type) => {
+                                                setFormData((prev) => ({ ...prev, deliveryType: type }))
+                                                if (type === "pickup" && partnerInfo.mpConnected) {
+                                                    setPaymentOption("mercadopago")
+                                                }
+                                            }}
+                                            deliveryPlanEnabled={deliveryPlanEnabled}
+                                            deliveryEnabled={deliveryEnabled}
+                                            pickupEnabled={pickupEnabled}
+                                            partnerAddressLabel={partnerAddressLabel}
+                                            deliveryError={deliveryError}
+                                            schedulingLines={schedulingLines}
+                                            addressProps={{
+                                                loadingAddresses,
+                                                userAddresses,
+                                                selectedAddress,
+                                                onOpenModal: () => setShowAddressModal(true),
+                                                onOpenForm: () => setShowAddressForm(true),
+                                            }}
+                                        />
+                                        {checkoutContext?.deposit.available && (
+                                            <FormSection title="Sinal / entrada">
+                                                <div className="space-y-3">
+                                                    <Checkbox
+                                                        label={`Pagar sinal de ${checkoutContext.deposit.percent}% agora (${formatCurrency(checkoutContext.deposit.previewAmount)})`}
+                                                        checked={payDepositOnly}
+                                                        onChange={() => setPayDepositOnly((v) => !v)}
+                                                    />
+                                                    {checkoutContext.deposit.manualOnly && payDepositOnly && (
+                                                        <InfoCard
+                                                            message="Sem Mercado Pago: sua reserva será confirmada e o restante será combinado diretamente com a loja."
+                                                            color="blue"
+                                                        />
+                                                    )}
+                                                </div>
+                                            </FormSection>
+                                        )}
+                                        {requirements.hasPayOnService && (
+                                            <InfoCard
+                                                message="Parte do valor pode ser paga no atendimento."
+                                                color="blue"
+                                            />
+                                        )}
+                                    </>
+                                ) : null}
 
-
-
-                                {/* Bottom Bar Step 1 */}
                                 <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
                                     <Button
                                         type="button"
@@ -1886,7 +1972,7 @@ export function CheckoutPageClient() {
                                     <Button
                                         type="button"
                                         onClick={() => setMobileStep(2)}
-                                        disabled={formData.deliveryType === "delivery" && (!formData.deliveryAddress || !!deliveryError || deliveryQuoteLoading)}
+                                        disabled={mobileStep1Blocked}
                                         className="flex-1 h-12"
                                     >
                                         Continuar
@@ -1916,11 +2002,15 @@ export function CheckoutPageClient() {
                                                     />
                                                 }
                                             />
-                                            {(!isPickup || !partnerInfo.mpConnected) && (
+                                            {showTraditionalPaymentOption && (
                                                 <ListItem
                                                     icon={MoneyIcon}
                                                     title={traditionalPaymentLabel}
-                                                    description="Pague ao receber ou retirar."
+                                                    description={
+                                                        requirements?.hasPayOnService
+                                                            ? "Reserve e combine o pagamento com a loja."
+                                                            : "Pague ao receber ou retirar."
+                                                    }
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                     onClick={() => setPaymentOption("traditional")}
                                                     right={
@@ -1937,7 +2027,11 @@ export function CheckoutPageClient() {
                                     ) : (
                                         <div className="flex gap-2.5 pb-2">
                                             <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                            <p className="text-xs text-brand-inactive-text">Pagamento direto com o vendedor (Entrega ou Retirada).</p>
+                                            <p className="text-xs text-brand-inactive-text">
+                                                {requirements?.hasPayOnService
+                                                    ? "Pagamento direto com o vendedor (reserva / pagar no atendimento)."
+                                                    : "Pagamento direto com o vendedor."}
+                                            </p>
                                         </div>
                                     )}
 
@@ -2073,7 +2167,7 @@ export function CheckoutPageClient() {
                                         )}
                                         <div className="flex justify-between">
                                             <span>Entrega</span>
-                                            <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !canUseDelivery))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                                            <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
                                                 {isPickup ? "Grátis" : deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
                                             </span>
                                         </div>

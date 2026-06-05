@@ -375,6 +375,9 @@ export async function createProductComprehensiveAction(data: {
             unit: data.unit || null,
             brand_id: (data as any).brand_id || (data as any).brandId || null,
             product_type: data.productType || "Físico",
+            fulfillment_modes: Array.isArray((data as any).fulfillment_modes)
+                ? (data as any).fulfillment_modes
+                : (data as any).fulfillmentModes || undefined,
             location: data.location || null,
             location_id: (data as any).location_id || data.locationId || null,
             cost_price: data.costPrice || 0,
@@ -654,6 +657,8 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.maxStock !== undefined) payload.max_stock = data.maxStock
         if (data.isActive !== undefined) payload.is_active = data.isActive
         if (data.productType !== undefined) payload.product_type = data.productType
+        if ((data as any).fulfillment_modes !== undefined) payload.fulfillment_modes = (data as any).fulfillment_modes
+        if ((data as any).fulfillmentModes !== undefined) payload.fulfillment_modes = (data as any).fulfillmentModes
 
         if (data.packagingType !== undefined) logisticsPayload.packaging_type = data.packagingType
         if (data.preparationDays !== undefined) logisticsPayload.preparation_days = data.preparationDays

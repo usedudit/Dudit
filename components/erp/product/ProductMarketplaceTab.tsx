@@ -7,6 +7,8 @@ import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIco
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
+import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
+import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 
 interface ProductMarketplaceTabProps {
   productData: any
@@ -97,6 +99,15 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
             />
           </div>
           <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
+          {!isDigital && (
+            <FulfillmentModesEditor
+              label="Formas de entrega (vitrine)"
+              allowedModes={["delivery", "pickup"]}
+              value={(productData?.fulfillment_modes || ["delivery", "pickup"]) as FulfillmentMode[]}
+              onChange={(modes) => manualChange("fulfillment_modes", modes)}
+              disabled={!isEditing}
+            />
+          )}
         </div>
 
         {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
