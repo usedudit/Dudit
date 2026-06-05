@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 
-import { defaultCache } from "@serwist/next/worker"
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist"
 import {
   Serwist,
@@ -19,6 +18,40 @@ declare global {
 }
 
 declare const self: ServiceWorkerGlobalScope
+
+// ============================================================
+// Filtro do precache: remove rotas que não fazem sentido cachear
+// no navegador (API routes, ERP, admin, rotas privadas, etc.)
+// Isso reduz o cache de ~600MB para ~30-60MB.
+// ============================================================
+const PRECACHE_EXCLUDE_PATTERNS = [
+  /\/app\/api\//,          // API routes rodam no servidor
+  /\/app\/erp\//,          // ERP — privado, precisa de auth + dados live
+  /\/app\/ddt-admin\//,    // Admin — privado
+  /\/app\/auth\//,         // Auth — transiente
+  /\/app\/cart\//,          // Carrinho — privado
+  /\/app\/checkout\//,     // Checkout — privado
+  /\/app\/payment\//,      // Pagamento — privado
+  /\/app\/dashboard\//,    // Dashboard — privado
+  /\/app\/pedidos\//,      // Pedidos — privado
+  /\/app\/perfil\//,       // Perfil — privado
+  /\/app\/select-erp\//,   // Seleção ERP — privado
+  /\/app\/banned\//,       // Ban page
+  /\/app\/account\//,      // Conta — privado
+  /\/app\/invite\//,       // Convites — privado
+  /\/app\/assinaturas\//, // Assinaturas — privado
+  /\/loading-[a-f0-9]+\.js$/, // Loading skeletons — dispensáveis
+]
+
+function filterPrecacheManifest(
+  manifest: (PrecacheEntry | string)[] | undefined
+): (PrecacheEntry | string)[] {
+  if (!manifest) return []
+  return manifest.filter((entry) => {
+    const url = typeof entry === "string" ? entry : entry.url
+    return !PRECACHE_EXCLUDE_PATTERNS.some((pattern) => pattern.test(url))
+  })
+}
 
 // ============================================================
 // REGRA ABSOLUTA: Rotas que NUNCA devem ser cacheadas
@@ -106,8 +139,9 @@ const duditRuntimeCaching = [
       cacheName: "dudit-cdn-images",
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 150,
+          maxEntries: 80,
           maxAgeSeconds: 7 * 24 * 60 * 60,
+          purgeOnQuotaError: true,
         }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),
       ],
@@ -121,7 +155,11 @@ const duditRuntimeCaching = [
     handler: new CacheFirst({
       cacheName: "dudit-next-static",
       plugins: [
-        new ExpirationPlugin({ maxAgeSeconds: 365 * 24 * 60 * 60 }),
+        new ExpirationPlugin({
+          maxEntries: 200,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias (não 365)
+          purgeOnQuotaError: true,
+        }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),
       ],
     }),
@@ -162,10 +200,15 @@ const duditRuntimeCaching = [
 // Inicialização do Serwist
 // ============================================================
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true, // Auto-activates when installed
+  precacheEntries: filterPrecacheManifest(self.__SW_MANIFEST),
+  precacheOptions: {
+    cleanupOutdatedCaches: true,
+    concurrency: 10,
+  },
+  skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
+  disableDevLogs: true,
   runtimeCaching: duditRuntimeCaching,
   fallbacks: {
     entries: [

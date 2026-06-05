@@ -1,8 +1,8 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, FormSection, IconPlaceholder, InfoCard } from "@/components/reusable"
-import { MapPinIcon, Tabs, TabsList, TabsTrigger } from "@/lib/icons"
+import { Button, FormSection, IconPlaceholder, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { MapPinIcon } from "@/lib/icons"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 
 const fadeVariants = {

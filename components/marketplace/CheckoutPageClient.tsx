@@ -209,7 +209,7 @@ export function CheckoutPageClient() {
                     quantity: sessionData.products?.[0]?.quantity ?? 1,
                     csrf_token: token,
                 })
-                if (!active || ("error" in prep && prep.error) || !("cartItemId" in prep)) return
+                if (!active || "error" in prep || !prep.cartItemId) return
 
                 const updated: CheckoutSessionData = {
                     ...sessionData,
@@ -636,6 +636,11 @@ export function CheckoutPageClient() {
         cash: "Dinheiro",
         other: "Outros",
     }
+    const visibleStorefrontMethods = useMemo(() => {
+        if (!requirements || requirements.allowPayOnDelivery) return storefrontMethods
+        return storefrontMethods.filter((m) => m.type !== "cash")
+    }, [storefrontMethods, requirements])
+
     // Usa métodos reais carregados do servidor; fallback para a sessão apenas durante o loading
     const paymentMethods = visibleStorefrontMethods.length > 0
         ? visibleStorefrontMethods.map((m) => ({
@@ -656,11 +661,6 @@ export function CheckoutPageClient() {
             ? "Pagar na Retirada"
             : "Pagar na Entrega"
 
-    const visibleStorefrontMethods = useMemo(() => {
-        if (!requirements || requirements.allowPayOnDelivery) return storefrontMethods
-        return storefrontMethods.filter((m) => m.type !== "cash")
-    }, [storefrontMethods, requirements])
-
     const showTraditionalPaymentOption = Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
@@ -671,7 +671,7 @@ export function CheckoutPageClient() {
         () =>
             (checkoutContext?.lines || [])
                 .filter((l) => l.lineKind === "service_booking" && l.bookingSummary)
-                .map((l) => ({ name: l.displayName, summary: l.bookingSummary })),
+                .map((l) => ({ name: l.displayName, summary: l.bookingSummary ?? null })),
         [checkoutContext?.lines],
     )
 
