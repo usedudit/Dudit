@@ -23,9 +23,17 @@ export default async function PaymentSuccessPage({
 
   const { data: order } = await supabase
     .from("orders")
-    .select("order_number, total_amount, situation")
+    .select("order_number, total_amount, situation, delivery_fee, discount_amount, payment_method_discount_amount, order_items(subtotal, product_price, quantity)")
     .eq("id", orderId)
     .single()
+
+  const subtotal = (order?.order_items || []).reduce(
+    (sum: number, item: any) => sum + Number(item.subtotal ?? Number(item.product_price || 0) * Number(item.quantity || 0)),
+    0,
+  )
+  const deliveryFee = Math.max(0, Number(order?.delivery_fee || 0))
+  const couponDiscount = Math.max(0, Number(order?.discount_amount || 0))
+  const paymentMethodDiscount = Math.max(0, Number(order?.payment_method_discount_amount || 0))
 
   return (
     <div className="container max-w-2xl mx-auto py-12 px-4">
@@ -42,7 +50,13 @@ export default async function PaymentSuccessPage({
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <p className="text-sm text-muted-foreground">Número do Pedido</p>
               <p className="text-2xl font-bold">{order.order_number}</p>
-              <p className="text-lg">Total: {formatCurrency(order.total_amount)}</p>
+              <div className="space-y-1 text-sm text-left max-w-sm mx-auto">
+                <p className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></p>
+                <p className="flex justify-between"><span>Entrega</span><span>{formatCurrency(deliveryFee)}</span></p>
+                {couponDiscount > 0 && <p className="flex justify-between text-green-700"><span>Cupom</span><span>-{formatCurrency(couponDiscount)}</span></p>}
+                {paymentMethodDiscount > 0 && <p className="flex justify-between text-green-700"><span>Pagamento</span><span>-{formatCurrency(paymentMethodDiscount)}</span></p>}
+                <p className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{formatCurrency(order.total_amount)}</span></p>
+              </div>
               <p className="text-sm">
                 Status: <span className="font-semibold">{order.situation === "paid" ? "Pago" : "Processando"}</span>
               </p>

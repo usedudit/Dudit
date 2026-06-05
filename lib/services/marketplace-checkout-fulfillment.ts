@@ -59,11 +59,54 @@ async function createBookingFromMetadata(
     bufferMinutes: params.bufferMinutes ?? 0,
   })
 
-  if (!slotOk) {
-    return { appointmentId: null, needsReschedule: true }
-  }
-
   const endTime = computeEndTime(params.meta.time, params.meta.durationMinutes)
+
+  const { data: existing } = await supabase
+    .from("appointments")
+    .select("id, customer_id, needs_reschedule")
+    .eq("marketplace_order_id", params.orderId)
+    .eq("partner_id", params.partnerId)
+    .eq("service_name", params.meta.serviceName)
+    .eq("start_date", params.meta.date)
+    .eq("start_time", params.meta.time)
+    .eq("staff_partner_user_id", params.meta.staffId)
+    .maybeSingle()
+
+  if (existing?.id) {
+    const needsReschedule = Boolean(existing.needs_reschedule)
+    const remaining = Math.max(0, params.fullPrice - params.paidAmount)
+    const receivableId = await syncAppointmentReceivable({
+      supabase,
+      partnerId: params.partnerId,
+      appointmentId: existing.id as string,
+      customerId: existing.customer_id,
+      serviceName: params.meta.serviceName,
+      startDate: params.meta.date,
+      remaining,
+      paidAmount: params.paidAmount,
+    })
+
+    const updatePayload: Record<string, unknown> = {
+      paid_amount: params.paidAmount,
+      payment_status: params.paymentStatus,
+      fulfillment_mode:
+        params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
+      needs_reschedule: needsReschedule,
+      status: needsReschedule
+        ? "Reservado"
+        : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
+          ? "Confirmado"
+          : "Reservado",
+    }
+    if (receivableId) updatePayload.receivable_transaction_id = receivableId
+
+    await supabase
+      .from("appointments")
+      .update(updatePayload)
+      .eq("id", existing.id)
+
+    return { appointmentId: existing.id as string, needsReschedule }
+  }
 
   const { data: appointment, error } = await supabase
     .from("appointments")
@@ -85,10 +128,14 @@ async function createBookingFromMetadata(
       sales_channel: STOREFRONT_CHANNEL,
       fulfillment_mode:
         params.fulfillmentMode === "customer_location" ? "customer_location" : "on_site",
-      needs_reschedule: false,
+      needs_reschedule: !slotOk,
       pricing_unit: "Por Serviço",
       notes: params.meta.notes || null,
-      status: (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid") ? "Confirmado" : "Reservado",
+      status: !slotOk
+        ? "Reservado"
+        : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
+          ? "Confirmado"
+          : "Reservado",
       source: "appointment",
       marketplace_order_id: params.orderId,
     })
@@ -117,7 +164,7 @@ async function createBookingFromMetadata(
       .eq("id", appointmentId)
   }
 
-  return { appointmentId, needsReschedule: false }
+  return { appointmentId, needsReschedule: !slotOk }
 }
 
 async function createSubscriptionFromPlan(
@@ -243,12 +290,19 @@ export async function fulfillMarketplaceOrder(
     .maybeSingle()
 
   const situation = String(order.situation || "").toLowerCase()
+  const payload = order.checkout_fulfillment as CheckoutFulfillmentPayload | null
+  const expectedScheduledServices = (payload?.lines || []).filter(
+    (line) =>
+      line.itemType === "service_booking" &&
+      line.bookingMetadata &&
+      !line.bookingMetadata.instantPurchase &&
+      line.bookingMetadata.staffId,
+  ).length
 
   if (existingFulfillment?.status === "completed") {
+    const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
     if (situation === "paid" || situation === "approved") {
-      const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
-      const payload = order.checkout_fulfillment as CheckoutFulfillmentPayload | null
-      if (appointmentIds.length > 0 && payload?.lines) {
+      if (appointmentIds.length >= expectedScheduledServices && payload?.lines) {
         for (const line of payload.lines) {
           if (line.itemType === "service_booking" && line.bookingMetadata) {
             const fullPrice = line.fullPrice ?? line.bookingMetadata.price
@@ -294,14 +348,15 @@ export async function fulfillMarketplaceOrder(
         }
       }
     }
-    return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
+    if (appointmentIds.length >= expectedScheduledServices) {
+      return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
+    }
   }
 
   if (!options?.force && situation !== "paid" && situation !== "approved") {
     return { success: false, error: "Pedido ainda não está pago." }
   }
 
-  const payload = order.checkout_fulfillment as CheckoutFulfillmentPayload | null
   if (!payload?.lines?.length) {
     return { success: true, skipped: true }
   }

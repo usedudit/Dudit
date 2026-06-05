@@ -17,6 +17,7 @@ import type { CheckoutFulfillmentPayload } from "@/lib/types/marketplace-cart"
 export type MarketplaceCartCheckoutPricing = {
   partnerId: string
   hasProducts: boolean
+  subtotal: number
   resolvedLines: ResolvedCartLine[]
   orderItems: Record<string, unknown>[]
   fulfillmentPayload: CheckoutFulfillmentPayload
@@ -210,6 +211,7 @@ export async function priceMarketplaceCartCheckout(
     data: {
       partnerId,
       hasProducts,
+      subtotal: pricingResult.subtotal,
       resolvedLines,
       orderItems,
       fulfillmentPayload,
@@ -240,7 +242,11 @@ export function mapOrderItemsForPaymentInsert(
     product_name: item.product_name,
     product_price: item.product_price,
     quantity: item.quantity,
-    subtotal: Number(item.product_price || 0) * Number(item.quantity || 0),
+    subtotal: item.subtotal ?? Number(item.product_price || 0) * Number(item.quantity || 0),
+    line_type: item.line_type ?? null,
+    fulfillment_mode: item.fulfillment_mode ?? null,
+    service_id: item.service_id ?? null,
+    recurring_plan_id: item.recurring_plan_id ?? null,
     is_promotional: item.is_promotional ?? false,
     promotion_id: item.promotion_id ?? null,
   }))

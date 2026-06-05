@@ -622,15 +622,21 @@ export async function checkoutCartAction(
     .eq("item_type", "service_booking")
 
   const defaultProductMode = deliveryType === "delivery" ? "delivery" : "pickup"
+  const fulfillmentUpdates = new Map<string, string[]>()
   for (const item of partnerItems) {
     if (!item.cartItemId) continue
     const mode = item.fulfillmentMode || defaultProductMode
-    await adminClient
-      .from("cart_items")
-      .update({ fulfillment_mode: mode, updated_at: new Date().toISOString() })
-      .eq("id", item.cartItemId)
-      .eq("user_id", user.id)
+    fulfillmentUpdates.set(mode, [...(fulfillmentUpdates.get(mode) || []), item.cartItemId])
   }
+  await Promise.all(
+    [...fulfillmentUpdates.entries()].map(([mode, ids]) =>
+      adminClient
+        .from("cart_items")
+        .update({ fulfillment_mode: mode, updated_at: new Date().toISOString() })
+        .in("id", ids)
+        .eq("user_id", user.id),
+    ),
+  )
 
   const resolved = await resolveCheckoutCartLines(adminClient, user.id, cartItemIds)
   if (!resolved.success) return { error: resolved.error }
@@ -867,6 +873,7 @@ export async function checkoutCartAction(
   }
 
   let paymentAwareTotal = totalAmount
+  let paymentMethodDiscountAmount = 0
   if (bestMethod?.id) {
     let fees = bestMethod.payment_method_installment_fees
     if (!fees) {
@@ -892,6 +899,7 @@ export async function checkoutCartAction(
       },
     })
     paymentAwareTotal = Number(calc.finalAmount || totalAmount)
+    paymentMethodDiscountAmount = Number(calc.paymentMethodDiscountAmount || 0)
   }
 
   if (chosenType === "cash" && deliveryType === "delivery") {
@@ -995,6 +1003,7 @@ export async function checkoutCartAction(
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
       discount_amount: couponDiscountAmount,
+      payment_method_discount_amount: paymentMethodDiscountAmount,
       promotions_applied: promotionsAppliedSnapshot,
       checkout_fulfillment: fulfillmentPayload,
       order_source: "Vitrine Online",

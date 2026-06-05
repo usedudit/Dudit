@@ -119,6 +119,8 @@ async function handler(request: NextRequest) {
     let reserveItems: Array<{ product_id: string; variant_id: string | null; quantity: number }> = []
     let productIdsForCache: string[] = []
     let orderItemsForInsert: Record<string, unknown>[] = []
+    let resolvedOrderDeliveryType = normalizedDeliveryType
+    let resolvedOrderDeliveryAddress = deliveryAddress || null
     const validatedItems: Array<{
       product_id: string
       variant_id: string | null
@@ -159,6 +161,9 @@ async function handler(request: NextRequest) {
       couponIdToSave = priced.data.couponId
       couponDiscountAmount = priced.data.couponDiscountAmount
       checkoutFulfillment = priced.data.fulfillmentPayload as unknown as Record<string, unknown>
+      resolvedOrderDeliveryType =
+        priced.data.fulfillmentPayload.deliveryType === "delivery" ? "delivery" : "pickup"
+      resolvedOrderDeliveryAddress = priced.data.fulfillmentPayload.deliveryAddress || deliveryAddress || null
       promotionsApplied = priced.data.promotionsAppliedSnapshot
       reserveItems = priced.data.reserveItems
       productIdsForCache = priced.data.productIds
@@ -547,8 +552,8 @@ async function handler(request: NextRequest) {
         partner_id: partnerId,
         buyer_id: buyerId,
         customer_name: customerName,
-        delivery_type: normalizedDeliveryType,
-        delivery_address: deliveryAddress,
+        delivery_type: resolvedOrderDeliveryType,
+        delivery_address: resolvedOrderDeliveryAddress,
         notes: notes,
         total_amount: totalAmount,
         situation: paymentStatus === "approved" ? "paid" : (paymentStatus === "in_process" ? "in_process" : "pending"),
@@ -557,7 +562,9 @@ async function handler(request: NextRequest) {
         mp_payment_id: mpPaymentId.toString(),
         coupon_id: couponIdToSave,
         discount_amount: couponDiscountAmount,
+        payment_method_discount_amount: 0,
         delivery_fee: deliveryFee,
+        payment_breakdown: [{ method: paymentMethodDisplayName, amount: totalAmount, provider: "Mercado Pago" }],
         checkout_fulfillment: checkoutFulfillment,
         order_source: "Vitrine Online",
         promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,

@@ -40,6 +40,32 @@ const formatPartnerAddress = (addresses: any) => {
     return `${addr.street || ""}, ${addr.number || "S/N"}${addr.complement ? ` - ${addr.complement}` : ""}${addr.neighborhood ? ` - ${addr.neighborhood}` : ""}, ${addr.city || ""} - ${addr.state || ""}`.replace(/\s+/g, ' ').trim()
 };
 
+const getFulfillmentModeLabel = (mode?: string | null) => {
+    switch (mode) {
+        case "delivery": return "Entrega";
+        case "pickup": return "Retirada";
+        case "on_site": return "Na loja";
+        case "customer_location": return "No endereço do cliente";
+        default: return "Nao informado";
+    }
+};
+
+const getItemKindLabel = (item: any) => {
+    const type = item.line_type || (item.service_id ? "service_booking" : item.recurring_plan_id ? "subscription" : "product");
+    if (type === "service_booking") return "Servico";
+    if (type === "subscription") return "Assinatura";
+    return "Produto";
+};
+
+const findFulfillmentLine = (order: any, item: any) => {
+    const lines = order.checkout_fulfillment?.lines || [];
+    return lines.find((line: any) => {
+        if (item.service_id && line.serviceId === item.service_id) return true;
+        if (item.recurring_plan_id && line.recurringPlanId === item.recurring_plan_id) return true;
+        return line.lineName === item.product_name;
+    });
+};
+
 const getClientTimelineSteps = (order: any) => {
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
@@ -321,9 +347,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     );
 
     // Pricing details mapping
-    const subtotalVal = Number(order.subtotal_original || totalAmount - Number(order.shipping_total || 0) + Number(order.discount_total || 0));
-    const discountVal = Number(order.discount_total || 0);
-    const shippingVal = Number(order.shipping_total || order.delivery_fee || 0);
+    const itemsSubtotal = (order.order_items || []).reduce(
+        (sum: number, item: any) => sum + Number(item.subtotal ?? Number(item.product_price || 0) * Number(item.quantity || 0)),
+        0
+    );
+    const couponDiscountVal = Math.max(0, Number(order.discount_amount ?? order.discount_total ?? 0));
+    const paymentMethodDiscountVal = Math.max(0, Number(order.payment_method_discount_amount || 0));
+    const shippingVal = Math.max(0, Number(order.delivery_fee ?? order.shipping_total ?? 0));
+    const subtotalVal = Number(order.subtotal_original || itemsSubtotal || totalAmount - shippingVal + couponDiscountVal + paymentMethodDiscountVal);
     const totalVal = Number(order.total_amount || 0);
 
     const renderPriceSummary = () => {
@@ -344,10 +375,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         <span className="text-brand-dark dark:text-dark-heading font-medium">Grátis</span>
                     </div>
                 )}
-                {discountVal > 0 && (
+                {couponDiscountVal > 0 && (
                     <div className="flex justify-between text-sm text-brand-green">
-                        <span>Desconto</span>
-                        <span className="font-medium">-{formatCurrency(discountVal)}</span>
+                        <span>Desconto do cupom</span>
+                        <span className="font-medium">-{formatCurrency(couponDiscountVal)}</span>
+                    </div>
+                )}
+                {paymentMethodDiscountVal > 0 && (
+                    <div className="flex justify-between text-sm text-brand-green">
+                        <span>Desconto do pagamento</span>
+                        <span className="font-medium">-{formatCurrency(paymentMethodDiscountVal)}</span>
                     </div>
                 )}
                 <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
@@ -475,20 +512,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         <>
             <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                 {order.order_items?.map((item: any) => {
+                    const itemKind = getItemKindLabel(item);
+                    const fulfillmentLine = findFulfillmentLine(order, item);
+                    const fulfillmentMode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
                     const itemImage = getPrimaryProductDisplayImage({
                         images: item.products?.images || null,
                         video_thumbnail: item.products?.video_thumbnail || null,
                         fallback_variant_image: item.product_variants?.variant_options?.image || null,
                     });
-                    const itemTotal = Number(item.subtotal || item.product_price * item.quantity);
-
-                    return (
-                        <Link
-                            href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
-                            prefetch={true}
-                            key={item.id}
-                            className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
-                        >
+                    const content = (
+                        <>
                             <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
                                 <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                             </div>
@@ -499,6 +532,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 {item.product_variants?.variant_name && (
                                     <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
                                 )}
+                                <div className="text-xs text-brand-inactive-text mt-0.5">
+                                    {itemKind}
+                                    {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
+                                </div>
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
                                     {formatCurrency(item.product_price)}
                                 </div>
@@ -506,6 +543,27 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
                                 x{item.quantity}
                             </div>
+                        </>
+                    );
+
+                    if (!item.product_id) {
+                        return (
+                            <div
+                                key={item.id}
+                                className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                            >
+                                {content}
+                            </div>
+                        );
+                    }
+                    return (
+                        <Link
+                            href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                            prefetch={true}
+                            key={item.id}
+                            className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                        >
+                            {content}
                         </Link>
                     );
                 })}
@@ -588,18 +646,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     <FormSection title="Itens do Pedido">
                                         <div className="space-y-4">
                                             {order.order_items?.map((item: any) => {
+                                                const itemKind = getItemKindLabel(item);
+                                                const fulfillmentLine = findFulfillmentLine(order, item);
+                                                const fulfillmentMode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
                                                 const itemImage = getPrimaryProductDisplayImage({
                                                     images: item.products?.images || null,
                                                     video_thumbnail: item.products?.video_thumbnail || null,
                                                     fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                                 });
-                                                return (
-                                                    <Link
-                                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
-                                                        prefetch={true}
-                                                        key={item.id}
-                                                        className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
-                                                    >
+                                                const content = (
+                                                    <>
                                                         <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
                                                             <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                         </div>
@@ -610,6 +666,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             {item.product_variants?.variant_name && (
                                                                 <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
                                                             )}
+                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                {itemKind}
+                                                                {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
+                                                            </div>
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
                                                                 {formatCurrency(item.product_price)}
                                                             </div>
@@ -617,6 +677,26 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
                                                             x{item.quantity}
                                                         </div>
+                                                    </>
+                                                );
+                                                if (!item.product_id) {
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                                        >
+                                                            {content}
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <Link
+                                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                                                        prefetch={true}
+                                                        key={item.id}
+                                                        className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                                    >
+                                                        {content}
                                                     </Link>
                                                 );
                                             })}
@@ -659,6 +739,41 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                         )}
                                     </FormSection>
+
+                                    {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
+                                    <FormSection title="Atendimento e Assinaturas">
+                                        <div className="space-y-4">
+                                            {(order.order_items || [])
+                                                .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
+                                                .map((item: any) => {
+                                                    const fulfillmentLine = findFulfillmentLine(order, item);
+                                                    const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
+                                                    const isCustomerAddress = mode === "customer_location" || mode === "delivery";
+                                                    const address = isCustomerAddress
+                                                        ? (order.delivery_address || "Endereco nao informado")
+                                                        : formatPartnerAddress(order.partners?.addresses);
+
+                                                    return (
+                                                        <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
+                                                            <img
+                                                                src="https://img.dudit.com.br/static/Map.png"
+                                                                alt={getFulfillmentModeLabel(mode)}
+                                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                            />
+                                                            <div className="flex flex-col justify-center min-w-0">
+                                                                <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                    {getItemKindLabel(item)} · {getFulfillmentModeLabel(mode)}
+                                                                </p>
+                                                                <p className="text-xs lg:text-sm text-brand-inactive-text">
+                                                                    {isCustomerAddress && addressTypeLabel ? `${addressTypeLabel}: ` : ""}{address}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    </FormSection>
+                                    )}
 
                                     {/* Section 3: Pagamento */}
                                     <FormSection title="Pagamento">
