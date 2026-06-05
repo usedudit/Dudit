@@ -119,7 +119,7 @@ export async function validateCouponRow(
   const subtotal = Math.max(0, Number(input.subtotal || 0))
   const shippingCost = Math.max(0, Number(input.shippingCost || 0))
   if (subtotal < Number(coupon.min_cart_value || 0)) {
-    return { valid: false, discountAmount: 0, errorMessage: "Valor mínimo do carrinho não atingido." }
+    return { valid: false, discountAmount: 0, errorMessage: "Valor mínimo da sacola não atingido." }
   }
 
   // Allow combination check (do not allow combining with products on promotion or manual discounts)

@@ -350,7 +350,8 @@ async function _searchMarketplaceInternal(
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
-                        product_variants(variant_options, price_adjustment, is_active)
+                        product_variants(variant_options, price_adjustment, is_active),
+                        show_price_in_store
                     `)
                         .in("id", produtosIds)
                         .eq("is_active", true)
@@ -360,9 +361,10 @@ async function _searchMarketplaceInternal(
             if (servicosIds.length > 0) {
                 promises.push(
                     supabase.from("services").select(`
-                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
                         service_categories:service_categories!category_id(name),
-                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
+                        partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                        show_price_in_store
                     `)
                         .in("id", servicosIds)
                         .eq("is_active", true)
@@ -553,7 +555,8 @@ async function searchMarketplacePostgresFTS(
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                 subcategory_id, subcategory:product_categories!subcategory_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
-                product_variants(variant_options, price_adjustment, is_active)
+                product_variants(variant_options, price_adjustment, is_active),
+                show_price_in_store
             `).eq("is_active", true).eq("show_in_marketplace", true)
             let reqJoined = req
             if (qRaw) {
@@ -587,9 +590,10 @@ async function searchMarketplacePostgresFTS(
 
         if (type === 'tudo' || type === 'servicos') {
             let req = supabase.from("services").select(`
-                id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
                 service_categories:service_categories!category_id(name),
-                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
+                partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
+                show_price_in_store
             `).eq("is_active", true).eq("show_in_marketplace", true)
             let reqJoined = req
             if (qRaw) {
@@ -705,7 +709,8 @@ async function searchMarketplaceByCity(
                             id, store_name, store_image_url, latitude, longitude,
                             addresses!inner(city, state)
                         ),
-                        product_variants(variant_options, price_adjustment, is_active)
+                        product_variants(variant_options, price_adjustment, is_active),
+                        show_price_in_store
                     `)
                     .eq("is_active", true)
                     .eq("show_in_marketplace", true)
@@ -717,12 +722,13 @@ async function searchMarketplaceByCity(
                 supabase
                     .from("services")
                     .select(`
-                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at,
+                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
                         service_categories:service_categories!category_id(name),
                         partners!inner(
                             id, store_name, store_image_url, latitude, longitude,
                             addresses!inner(city, state)
-                        )
+                        ),
+                        show_price_in_store
                     `)
                     .eq("is_active", true)
                     .eq("show_in_marketplace", true)

@@ -1,9 +1,11 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, FormSection, IconPlaceholder, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import { MapPinIcon } from "@/lib/icons"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
+import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
+import { IconPlaceholder } from "@/components/reusable"
 
 const fadeVariants = {
   open: { opacity: 1, transition: { duration: 0.2 } },
@@ -81,6 +83,8 @@ export type CheckoutFulfillmentPanelProps = {
   deliveryError: string | null
   addressProps: AddressBlockProps
   schedulingLines: Array<{ name: string; summary: string | null }>
+  lines?: MarketplaceCheckoutDisplayLine[]
+  onFulfillmentModeChange?: (cartItemId: string, mode: "on_site" | "customer_location") => void
 }
 
 export function CheckoutFulfillmentPanel({
@@ -95,6 +99,8 @@ export function CheckoutFulfillmentPanel({
   deliveryError,
   addressProps,
   schedulingLines,
+  lines = [],
+  onFulfillmentModeChange,
 }: CheckoutFulfillmentPanelProps) {
   const isPickup = deliveryType === "pickup"
   const canShowProductDelivery =
@@ -105,62 +111,30 @@ export function CheckoutFulfillmentPanel({
   const canShowProductPickup =
     requirements.showProductFulfillmentOptions && requirements.showPickupOption && pickupEnabled
 
-  const showAny =
-    requirements.showProductFulfillmentOptions ||
-    requirements.showPartnerLocation ||
-    requirements.showCustomerAddressSection ||
-    requirements.showSchedulingSummary
+  const productLines = lines.filter((l) => l.lineKind === "product")
+  const serviceLines = lines.filter((l) => l.lineKind === "service_booking")
 
-  if (!showAny) return null
+  const hasProducts = productLines.length > 0 || requirements.showProductFulfillmentOptions
+  const hasServices = serviceLines.length > 0 || requirements.showSchedulingSummary
 
-  const sectionTitle = requirements.showProductFulfillmentOptions
-    ? "Entrega"
-    : requirements.showSchedulingSummary
-      ? "Agendamento"
-      : "Atendimento"
+  const showProductsSection = hasProducts && (canShowProductDelivery || canShowProductPickup)
+  const showServicesSection = hasServices
 
-  const needsAddressForService =
-    requirements.showCustomerAddressSection &&
-    !requirements.showProductFulfillmentOptions
   const needsAddressForProductDelivery =
     requirements.showProductFulfillmentOptions && !isPickup && requirements.showDeliverySection
 
-  return (
-    <FormSection title={sectionTitle}>
-      <div className="space-y-6">
-        {requirements.showSchedulingSummary && schedulingLines.length > 0 && (
-          <div className="space-y-3">
-            {schedulingLines.map((line) => (
-              <div
-                key={line.name}
-                className="rounded-xl border border-brand-border dark:border-dark-border p-4"
-              >
-                <p className="font-semibold text-brand-dark dark:text-dark-heading">{line.name}</p>
-                {line.summary && (
-                  <p className="text-sm text-brand-inactive-text mt-1">{line.summary}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+  const anyServiceRequiresCustomerAddress = serviceLines.some(
+    (l) => l.fulfillmentMode === "customer_location"
+  )
+  const anyServiceRequiresOnSite = serviceLines.some(
+    (l) => l.fulfillmentMode === "on_site" || !l.fulfillmentMode
+  )
 
-        {requirements.showPartnerLocation && (
-          <div className="flex items-stretch gap-3">
-            <img
-              src="https://img.dudit.com.br/static/Map.png"
-              alt="Local"
-              className="w-12 h-12 object-cover rounded-xl shrink-0"
-            />
-            <div>
-              <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
-                Local do atendimento
-              </p>
-              <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
-            </div>
-          </div>
-        )}
-
-        {requirements.showProductFulfillmentOptions && (canShowProductDelivery || canShowProductPickup) && (
+  const renderProductsFulfillment = () => {
+    if (!showProductsSection) return null
+    return (
+      <FormSection title={hasServices ? "Produtos" : "Entrega"}>
+        <div className="space-y-6">
           <Tabs
             value={deliveryType}
             onValueChange={(val) => onDeliveryTypeChange(val as "delivery" | "pickup")}
@@ -171,41 +145,116 @@ export function CheckoutFulfillmentPanel({
               {canShowProductPickup && <TabsTrigger value="pickup">Retirada no local</TabsTrigger>}
             </TabsList>
           </Tabs>
-        )}
 
-        <AnimatePresence mode="wait">
-          {requirements.showProductFulfillmentOptions && isPickup && canShowProductPickup && (
-            <motion.div key="pickup" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-              <div className="flex items-stretch gap-3">
-                <img
-                  src="https://img.dudit.com.br/static/Map.png"
-                  alt="Retirada"
-                  className="w-12 h-12 object-cover rounded-xl shrink-0"
-                />
-                <div>
-                  <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
-                    Local de retirada
-                  </p>
-                  <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
-                  {preparationHint}
+          <AnimatePresence mode="wait">
+            {isPickup && canShowProductPickup && (
+              <motion.div key="pickup" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
+                <div className="flex items-stretch gap-3">
+                  <img
+                    src="https://img.dudit.com.br/static/Map.png"
+                    alt="Retirada"
+                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                  />
+                  <div>
+                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                      Local de retirada
+                    </p>
+                    <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
+                    {preparationHint}
+                  </div>
                 </div>
+              </motion.div>
+            )}
+
+            {!isPickup && canShowProductDelivery && (
+              <motion.div key="delivery" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
+                <AddressBlock {...addressProps} title="Endereço de entrega" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </FormSection>
+    )
+  }
+
+  const renderServicesFulfillment = () => {
+    if (!showServicesSection) return null
+    return (
+      <FormSection title="Serviços">
+        <div className="space-y-6">
+          {serviceLines.map((line) => {
+            const allowed = line.allowedFulfillmentModes || ["on_site"]
+            const supportsBoth = allowed.includes("on_site") && allowed.includes("customer_location")
+            const currentMode = line.fulfillmentMode || "on_site"
+
+            return (
+              <div
+                key={line.lineId}
+                className="rounded-2xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface space-y-4"
+              >
+                <div>
+                  <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
+                  {line.bookingSummary && (
+                    <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
+                  )}
+                </div>
+
+                {supportsBoth ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">Forma de Atendimento</p>
+                    <Tabs
+                      value={currentMode}
+                      onValueChange={(val) => onFulfillmentModeChange?.(line.lineId, val as "on_site" | "customer_location")}
+                      className="w-full"
+                    >
+                      <TabsList className="mb-0">
+                        <TabsTrigger value="customer_location">No meu endereço</TabsTrigger>
+                        <TabsTrigger value="on_site">No estabelecimento</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit">
+                    {allowed.includes("customer_location")
+                      ? "Realizado no endereço do cliente"
+                      : "Realizado no estabelecimento do parceiro"}
+                  </div>
+                )}
               </div>
-            </motion.div>
+            )
+          })}
+
+          {anyServiceRequiresCustomerAddress && (
+            <div className="pt-2">
+              <AddressBlock {...addressProps} title="Seu endereço para o atendimento" />
+            </div>
           )}
 
-          {needsAddressForProductDelivery && (
-            <motion.div key="delivery" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-              <AddressBlock {...addressProps} title="Endereço de entrega" />
-            </motion.div>
+          {anyServiceRequiresOnSite && (
+            <div className="flex items-stretch gap-3 border-t border-brand-border dark:border-dark-border pt-4">
+              <img
+                src="https://img.dudit.com.br/static/Map.png"
+                alt="Local"
+                className="w-12 h-12 object-cover rounded-xl shrink-0"
+              />
+              <div>
+                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                  Local do atendimento no estabelecimento
+                </p>
+                <p className="text-sm text-brand-inactive-text">{partnerAddressLabel}</p>
+              </div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
+      </FormSection>
+    )
+  }
 
-        {needsAddressForService && (
-          <AddressBlock {...addressProps} title="Seu endereço para o atendimento" />
-        )}
-
-        {deliveryError && <InfoCard message={deliveryError} color="red" />}
-      </div>
-    </FormSection>
+  return (
+    <div className="space-y-6">
+      {renderProductsFulfillment()}
+      {renderServicesFulfillment()}
+      {deliveryError && <InfoCard message={deliveryError} color="red" />}
+    </div>
   )
 }

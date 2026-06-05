@@ -11,6 +11,9 @@ import Link from "next/link"
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
+import { generateStaticPix } from "@/lib/utils/pix-generator"
+// @ts-ignore
+import QRCode from "qrcode"
 
 interface OrderDetailItem {
     id: string
@@ -61,6 +64,10 @@ interface PixPaymentWrapperProps {
         federalUnit?: string
     }
     mpAcceptedPaymentMethods?: MpAcceptedPaymentMethods
+    partnerPhone?: string | null
+    pixKey?: string | null
+    pixKeyType?: string | null
+    payDepositOnly?: boolean
 }
 
 export function PaymentWrapper({
@@ -68,6 +75,7 @@ export function PaymentWrapper({
     orderDetails, orderNumber, sellerName, buyerId,
     useMercadoPago = false, partnerId, mpPublicKey, userEmail, userName, userAddress,
     mpAcceptedPaymentMethods,
+    partnerPhone, pixKey, pixKeyType, payDepositOnly,
 }: PixPaymentWrapperProps) {
     const [copied, setCopied] = useState(false)
     const [isChecking, setIsChecking] = useState(false)
@@ -75,8 +83,16 @@ export function PaymentWrapper({
     const [isClosing, setIsClosing] = useState(false)
     const notification = useNotification()
 
-    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect">(
-        useMercadoPago && !initialPixData && !initialBoletoData ? "brick" : (initialPixData ? "pix" : initialBoletoData ? "boleto" : "success")
+    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect" | "manual_pix">(
+        !useMercadoPago && payDepositOnly && pixKey
+            ? "manual_pix"
+            : useMercadoPago && !initialPixData && !initialBoletoData
+                ? "brick"
+                : initialPixData
+                    ? "pix"
+                    : initialBoletoData
+                        ? "boleto"
+                        : "success"
     )
     const [actualOrderId, setActualOrderId] = useState<string | null>(null)
     const [actualOrderNumber, setActualOrderNumber] = useState<string | null>(null)
@@ -91,6 +107,8 @@ export function PaymentWrapper({
     const bricksBuilderRef = useRef<any>(null)
     const brickIdRef = useRef<any>(null)
     const brickInitializedRef = useRef(false)
+    const [manualPixQrCode, setManualPixQrCode] = useState<string | null>(null)
+    const [manualPixPayload, setManualPixPayload] = useState<string | null>(null)
 
     const handleClose = () => {
         setIsClosing(true)
@@ -145,6 +163,25 @@ export function PaymentWrapper({
             setStep("success")
         }
     }, [paymentConfirmed, step])
+
+    useEffect(() => {
+        if (step === "manual_pix" && pixKey) {
+            try {
+                const payload = generateStaticPix(
+                    pixKey,
+                    amount,
+                    sellerName || "Loja",
+                    ""
+                )
+                setManualPixPayload(payload)
+                QRCode.toDataURL(payload, { width: 256, margin: 1 })
+                    .then((url: string) => setManualPixQrCode(url))
+                    .catch((err: any) => console.error("Error generating static QR code:", err))
+            } catch (err) {
+                console.error("Error generating static Pix:", err)
+            }
+        }
+    }, [step, pixKey, amount, sellerName])
 
     useEffect(() => {
         if (brickInitializedRef.current) return
@@ -588,6 +625,121 @@ export function PaymentWrapper({
                                         className="w-full"
                                     >
                                         Voltar
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {step === "manual_pix" && (
+                        <motion.div
+                            key="manual_pix"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-transparent overflow-hidden px-4 sm:px-0 flex flex-col items-center"
+                        >
+                            <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
+                                <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-8 h-8 object-contain" />
+                            </div>
+
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
+                                Pague o sinal via Pix
+                            </h1>
+                            <p className="text-md text-brand-inactive-text text-center max-w-md mb-4">
+                                Para confirmar seu agendamento, faça o pagamento do sinal. O restante será pago diretamente no atendimento.
+                            </p>
+
+                            {manualPixQrCode && (
+                                <div className="mb-8 relative flex flex-col items-center">
+                                    <div className="w-64 h-64 p-2 bg-white border border-brand-border dark:border-dark-border rounded-2xl flex items-center justify-center shrink-0">
+                                        <img
+                                            src={manualPixQrCode}
+                                            alt="PIX QR Code"
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                    <div className="mt-4 flex flex-col items-center">
+                                        <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                        <span className="text-xs text-brand-inactive-text mt-1">Valor do sinal / entrada</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="w-full max-w-md">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <Separator className="flex-1" />
+                                    <span className="text-xs text-brand-inactive-text">ou copie manualmente</span>
+                                    <Separator className="flex-1" />
+                                </div>
+
+                                <div className="flex gap-2 w-full mb-6">
+                                    <Input value={manualPixPayload || ""} readOnly onChange={() => { }} />
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (manualPixPayload) {
+                                                navigator.clipboard.writeText(manualPixPayload)
+                                                setCopied(true)
+                                                notification.success("Código Pix copiado!", "Use a opção 'Pix Copia e Cola' no seu banco.")
+                                                setTimeout(() => setCopied(false), 2000)
+                                            }
+                                        }}
+                                        className="gap-2 shrink-0 h-[42px] w-[42px]"
+                                    >
+                                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                    </Button>
+                                </div>
+
+                                {partnerPhone && (
+                                    <div className="mb-6">
+                                        <InfoCard
+                                            message={
+                                                <div className="space-y-2">
+                                                    <p>
+                                                        Após realizar o pagamento, envie o comprovante para o WhatsApp do estabelecimento:
+                                                    </p>
+                                                    <p className="font-bold text-brand-dark dark:text-dark-heading text-base">
+                                                        {partnerPhone}
+                                                    </p>
+                                                    <a
+                                                        href={`https://wa.me/${partnerPhone.replace(/\D/g, "")}?text=Olá! Segue o comprovante do sinal referente ao meu agendamento no valor de ${formatCurrency(amount)}.`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-sm font-semibold text-brand-green hover:underline mt-1"
+                                                    >
+                                                        <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                                                            <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.96 9.96 0 0 0 1.358 4.963L2 22l5.221-1.37a9.936 9.936 0 0 0 4.79 1.22h.004c5.505 0 9.988-4.478 9.989-9.985 0-2.669-1.038-5.176-2.927-7.067A9.924 9.924 0 0 0 12.012 2zm5.727 14.06c-.313.882-1.823 1.728-2.5 1.782-.678.055-1.347.33-4.354-.925-3.007-1.254-4.937-4.322-5.086-4.524-.15-.2-.1.2-.1-.2.036-.347.161-.595.281-.762.12-.167.241-.334.362-.501.121-.167.162-.278.243-.464.08-.186.04-.347-.02-.501-.06-.154-.523-1.282-.724-1.762-.19-.482-.397-.406-.547-.413l-.466-.008c-.161 0-.422.06-.643.3-.222.24-.845.827-.845 2.017s.866 2.338.986 2.502c.12.164 1.705 2.616 4.131 3.666 2.427 1.05 2.427.7 3.255.626.828-.074 1.831-.75 2.083-1.44a1.79 1.79 0 0 0 .125-.8c-.06-.108-.242-.167-.523-.306-.282-.14-1.666-.827-1.928-.921-.261-.093-.452-.14-.643.14-.19.28-.744.921-.913 1.11-.169.189-.338.212-.619.073-.281-.14-1.189-.44-2.264-1.397-.837-.746-1.401-1.666-1.565-1.947-.165-.281-.018-.432.123-.572.127-.126.282-.328.422-.493.14-.165.187-.281.282-.47.095-.187.047-.353-.023-.493-.07-.14-.547-1.319-.747-1.802zm-5.739 5.727z" />
+                                                        </svg>
+                                                        Enviar comprovante pelo WhatsApp
+                                                    </a>
+                                                </div>
+                                            }
+                                            color="orange"
+                                            className="w-full"
+                                        />
+                                    </div>
+                                )}
+
+                                <Button
+                                    onClick={() => {
+                                        setPaymentConfirmed(true)
+                                        notification.success("Reserva Concluída!", "Sua reserva foi criada como pendente de aprovação do sinal.")
+                                    }}
+                                    className="w-full my-6 h-12 flex items-center justify-center gap-2"
+                                >
+                                    Já enviei o comprovante
+                                </Button>
+
+                                <div className="flex flex-col gap-4">
+                                    <Separator />
+                                    <Button
+                                        variant="link"
+                                        onClick={handleClose}
+                                        className="w-full"
+                                    >
+                                        Acompanhar meus pedidos
                                     </Button>
                                 </div>
                             </div>

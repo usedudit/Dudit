@@ -11,6 +11,7 @@ export function useMarketplaceCheckoutContext(params: {
   cartItemIds: string[]
   mpConnected?: boolean
   enabled?: boolean
+  refreshTrigger?: number
 }) {
   const [data, setData] = useState<Extract<MarketplaceCheckoutContextResult, { success: true }> | null>(
     null,
@@ -56,7 +57,7 @@ export function useMarketplaceCheckoutContext(params: {
     return () => {
       active = false
     }
-  }, [params.partnerId, cartKey, params.mpConnected, params.enabled])
+  }, [params.partnerId, cartKey, params.mpConnected, params.enabled, params.refreshTrigger])
 
   return { checkoutContext: data, contextError: error, contextLoading: loading }
 }

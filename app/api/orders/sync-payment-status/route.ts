@@ -139,6 +139,11 @@ export async function POST(request: NextRequest) {
         updateData.mp_date_approved = paymentData.date_approved
       }
 
+      if (newOrderStatus === "paid") {
+        updateData.amount_paid = order.total_amount
+        updateData.paid_amount = order.total_amount
+      }
+
       const { data: updatedOrder, error: updateError } = await supabaseAdmin
         .from("orders")
         .update(updateData)

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useMemo } from "react"
-import { Input, FormDropdown, Checkbox, MoneyInput, Combobox } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard } from "@/components/reusable"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
@@ -88,6 +88,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
     }, [serviceData.price, serviceData.cost_price])
 
     const isFree = serviceData.price_type === 'free'
+    const showPrice = serviceData.show_price_in_store ?? true
 
     return (
         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
@@ -152,19 +153,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             disabled={!isEditing}
                         />
 
-                        <FormDropdown
-                            label="Exigência de pagamento (vitrine)"
-                            options={[
-                                { value: "full_payment", label: "Pagamento integral online" },
-                                { value: "deposit_only", label: "Sinal / entrada (plano Grow+)" },
-                                { value: "pay_on_service", label: "Pagar no atendimento" },
-                            ]}
-                            value={serviceData.payment_requirement || "full_payment"}
-                            setValue={(v) => manualChange("payment_requirement", v)}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-
                     </div>
                 </div>
 
@@ -194,8 +182,8 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     name="price"
                                     value={serviceData.price || ""}
                                     onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                    disabled={!isEditing}
-                                    required
+                                    disabled={!isEditing || !showPrice}
+                                    required={showPrice}
                                     error={fieldErrors?.has("price")}
                                     errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
                                 />
@@ -208,7 +196,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     { value: "per_hour", label: "Por Hora" },
                                     { value: "per_day", label: "Por Dia" },
                                     { value: "per_week", label: "Por Semana" },
-                                    { value: "per_hour", label: "Por Mês" }, // Correcting duplicated per_hour to match AddServicePage options if needed, but let's keep original
+                                    { value: "per_month", label: "Por Mês" },
                                     { value: "per_year", label: "Por Ano" }
                                 ]}
                                 value={serviceData.billing_unit || 'per_service'}
@@ -221,21 +209,30 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                     {!isFree && !isQuickMode && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                            <MoneyInput label="Custo do Serviço" name="cost_price" value={serviceData.cost_price || ""} onChange={(val) => handleFieldChange({ target: { name: "cost_price", value: val } })} disabled={!isEditing} />
+                            <MoneyInput label="Custo do Serviço" name="cost_price" value={serviceData.cost_price || ""} onChange={(val) => handleFieldChange({ target: { name: "cost_price", value: val } })} disabled={!isEditing || !showPrice} />
                             <MoneyInput
                                 label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
                                 name="price"
                                 value={serviceData.price || ""}
                                 onChange={(val) => handleFieldChange({ target: { name: "price", value: val } })}
-                                disabled={!isEditing}
-                                required
+                                disabled={!isEditing || !showPrice}
+                                required={showPrice}
                                 error={fieldErrors?.has("price")}
                                 errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
                             />
                         </div>
                     )}
 
-                    {!isFree && !isQuickMode && (
+                    {!showPrice && !isFree && (
+                        <div className="mb-6">
+                            <InfoCard
+                                color="orange"
+                                message="Ao não mostrar o preço, o serviço será salvo com um valor de 0,00 e, na sua vitrine, será exibido o texto 'Valor sob consulta'"
+                            />
+                        </div>
+                    )}
+
+                    {showPrice && !isFree && !isQuickMode && (
                         <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
                             <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-brand-border dark:divide-dark-border gap-6 sm:gap-0">
                                 <div className="flex-1 px-4 first:pl-0"><span className="block text-sm text-brand-inactive-text mb-1">Preço do serviço</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(salesPrice)}</span></div>
@@ -245,50 +242,71 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     )}
 
-
-                </div>
-
-                {/* TEMPO */}
-                <div className="mt-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Duração e Agendamento</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
-                        <Input 
-                            label="Duração do Serviço (minutos)" 
-                            name="duration_minutes" 
-                            type="number" 
-                            value={serviceData.duration_minutes || ""} 
-                            onChange={handleFieldChange} 
-                            disabled={!isEditing}
-                            required
-                            error={fieldErrors?.has("duration_minutes")}
-                            errorMessage={fieldErrors?.has("duration_minutes") ? "Duração é obrigatória" : undefined}
-                        />
-                        {!isQuickMode && (
-                            <Input 
-                                label="Tempo de Buffer (minutos)" 
-                                name="buffer_minutes" 
-                                type="number" 
-                                value={serviceData.buffer_minutes || ""} 
-                                onChange={handleFieldChange} 
-                                disabled={!isEditing} 
-                                placeholder="Tempo de intervalo ou limpeza"
-                            />
-                        )}
-                    </div>
-                    {isQuickMode && (
-                        <div className="mt-10">
-                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
-                            <RichTextEditor
-                                label="Descrição Detalhada"
-                                value={serviceData?.description || ""}
-                                onChange={(val) => manualChange("description", val)}
+                    {!isFree && (
+                        <div className="flex items-center gap-2 cursor-pointer w-fit mt-2 mb-6">
+                            <Checkbox
+                                checked={showPrice}
+                                label="Exibir o preço na loja"
+                                onChange={(checked) => {
+                                    handleFieldChange({ target: { name: "show_price_in_store", value: checked } })
+                                    if (!checked) {
+                                        handleFieldChange({ target: { name: "price", value: 0 } })
+                                        handleFieldChange({ target: { name: "cost_price", value: 0 } })
+                                    }
+                                }}
+                                name="show_price_in_store"
                                 disabled={!isEditing}
                             />
                         </div>
                     )}
+
+
                 </div>
+
+                {/* TEMPO */}
+                {(!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
+                    <div className="mt-8">
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Duração e Agendamento</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
+                            <Input 
+                                label="Duração do Serviço (minutos)" 
+                                name="duration_minutes" 
+                                type="number" 
+                                value={serviceData.duration_minutes || ""} 
+                                onChange={handleFieldChange} 
+                                disabled={!isEditing}
+                                required
+                                error={fieldErrors?.has("duration_minutes")}
+                                errorMessage={fieldErrors?.has("duration_minutes") ? "Duração é obrigatória" : undefined}
+                            />
+                            {!isQuickMode && (
+                                <Input 
+                                    label="Tempo de Buffer (minutos)" 
+                                    name="buffer_minutes" 
+                                    type="number" 
+                                    value={serviceData.buffer_minutes || ""} 
+                                    onChange={handleFieldChange} 
+                                    disabled={!isEditing} 
+                                    placeholder="Tempo de intervalo ou limpeza"
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {isQuickMode && (
+                    <div className="mt-10">
+                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                        <RichTextEditor
+                            label="Descrição Detalhada"
+                            value={serviceData?.description || ""}
+                            onChange={(val) => manualChange("description", val)}
+                            disabled={!isEditing}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* DIREITA (Widgets) */}

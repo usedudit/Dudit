@@ -425,7 +425,7 @@ export default function CouponFormPage({
                                                         </div>
                                                         <div className="col-span-12 md:col-span-6">
                                                             <MoneyInput
-                                                                label="Valor mínimo do carrinho"
+                                                                label="Valor mínimo da sacola"
                                                                 value={Number(form.minCartValue || 0)}
                                                                 onChange={(value) => setForm((prev) => ({ ...prev, minCartValue: value }))}
                                                             />

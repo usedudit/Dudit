@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
-import { checkoutCartAction } from "@/app/actions/marketplace/cart"
+import { checkoutCartAction, updateCartItemFulfillmentModeAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
@@ -199,34 +199,34 @@ export function CheckoutPageClient() {
 
         legacyCartHydrationRef.current = true
         let active = true
-        ;(async () => {
-            try {
-                const csrfRes = await fetch("/api/csrf-token")
-                const { token } = await csrfRes.json()
-                const prep = await prepareProductBuyNowCheckoutAction({
-                    productId,
-                    partnerId: sessionData.partnerId,
-                    quantity: sessionData.products?.[0]?.quantity ?? 1,
-                    csrf_token: token,
-                })
-                if (!active || "error" in prep || !prep.cartItemId) return
-
-                const updated: CheckoutSessionData = {
-                    ...sessionData,
-                    source: "cart",
-                    cartItems: [{
-                        cartItemId: prep.cartItemId,
-                        itemType: "product",
+            ; (async () => {
+                try {
+                    const csrfRes = await fetch("/api/csrf-token")
+                    const { token } = await csrfRes.json()
+                    const prep = await prepareProductBuyNowCheckoutAction({
                         productId,
+                        partnerId: sessionData.partnerId,
                         quantity: sessionData.products?.[0]?.quantity ?? 1,
-                    }],
+                        csrf_token: token,
+                    })
+                    if (!active || "error" in prep || !prep.cartItemId) return
+
+                    const updated: CheckoutSessionData = {
+                        ...sessionData,
+                        source: "cart",
+                        cartItems: [{
+                            cartItemId: prep.cartItemId,
+                            itemType: "product",
+                            productId,
+                            quantity: sessionData.products?.[0]?.quantity ?? 1,
+                        }],
+                    }
+                    setSessionData(updated)
+                    sessionStorage.setItem("checkout_session", JSON.stringify(updated))
+                } catch {
+                    // Legacy session without cart line — checkout context stays disabled
                 }
-                setSessionData(updated)
-                sessionStorage.setItem("checkout_session", JSON.stringify(updated))
-            } catch {
-                // Legacy session without cart line — checkout context stays disabled
-            }
-        })()
+            })()
 
         return () => {
             active = false
@@ -243,6 +243,7 @@ export function CheckoutPageClient() {
     const [isLoading, setIsLoading] = useState(false)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [paymentError, setPaymentError] = useState<string | null>(null)
+    const [refreshTrigger, setRefreshTrigger] = useState(0)
 
     const products = sessionData?.products || []
     const partnerId = sessionData?.partnerId || ""
@@ -258,10 +259,25 @@ export function CheckoutPageClient() {
         cartItemIds,
         mpConnected: Boolean(partnerInfo?.mpConnected),
         enabled: Boolean(partnerId && cartItemIds.length > 0),
+        refreshTrigger,
     })
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
     const [payDepositOnly, setPayDepositOnly] = useState(false)
+
+    const handleFulfillmentModeChange = async (cartItemId: string, mode: "on_site" | "customer_location") => {
+        try {
+            const token = csrfToken || await fetch("/api/csrf-token").then((r) => r.json()).then((d) => d.token || "")
+            const result = await updateCartItemFulfillmentModeAction(cartItemId, mode, token)
+            if (result.success) {
+                setRefreshTrigger(prev => prev + 1)
+            } else {
+                notifyError("Erro", result.error || "Não foi possível alterar a forma de atendimento.")
+            }
+        } catch (err) {
+            notifyError("Erro", "Erro ao atualizar forma de atendimento.")
+        }
+    }
     const storeImage = partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
     const sellerName = partnerInfo?.store_name || "Loja"
 
@@ -441,6 +457,16 @@ export function CheckoutPageClient() {
             setPaymentOption("traditional")
         }
     }, [storefrontMethodsLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption])
+
+    useEffect(() => {
+        if (checkoutContext?.deposit.available) {
+            if (paymentOption === "traditional") {
+                setPayDepositOnly(true)
+            }
+        } else {
+            setPayDepositOnly(false)
+        }
+    }, [paymentOption, checkoutContext?.deposit.available])
 
     useEffect(() => {
         let active = true
@@ -626,7 +652,14 @@ export function CheckoutPageClient() {
     const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
 
     const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
-    const checkoutBaseTotal = Math.max(0, totalAmount - couponDiscount)
+    const checkoutBaseTotal = useMemo(() => {
+        if (payDepositOnly && checkoutContext?.deposit.available) {
+            const nonServiceSubtotal = (checkoutContext.productsSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
+            const serviceDeposit = checkoutContext.deposit.previewAmount || 0
+            return Math.max(0, nonServiceSubtotal + serviceDeposit - couponDiscount)
+        }
+        return Math.max(0, totalAmount - couponDiscount)
+    }, [payDepositOnly, checkoutContext, totalAmount, couponDiscount])
     const checkoutTotalWithDelivery =
         checkoutBaseTotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
     const paymentTypeLabelMap: Record<string, string> = {
@@ -664,6 +697,7 @@ export function CheckoutPageClient() {
     const showTraditionalPaymentOption = Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
+        requirements?.hasServiceLines ||
         (requirements?.hasProductLines && !requirements?.hasServiceLines),
     )
 
@@ -983,37 +1017,37 @@ export function CheckoutPageClient() {
                             ))}
                     </>
                 ) : (
-                products.map((item) => {
-                    const itemImage = item.image || "https://img.dudit.com.br/static/Placeholder.png"
-                    const qty = quantities[item.id] || item.quantity
+                    products.map((item) => {
+                        const itemImage = item.image || "https://img.dudit.com.br/static/Placeholder.png"
+                        const qty = quantities[item.id] || item.quantity
 
-                    return (
-                        <div
-                            key={item.id}
-                            className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
-                        >
-                            <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
-                                <img src={itemImage} alt={item.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
-                                    {item.name}
-                                </h4>
-                                {item.variant && (
-                                    <div className="text-xs text-brand-inactive-text mt-0.5">
-                                        {item.variant.includes(":") ? item.variant.split(":")[1].trim() : item.variant}
+                        return (
+                            <div
+                                key={item.id}
+                                className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                            >
+                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                    <img src={itemImage} alt={item.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
+                                        {item.name}
+                                    </h4>
+                                    {item.variant && (
+                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            {item.variant.includes(":") ? item.variant.split(":")[1].trim() : item.variant}
+                                        </div>
+                                    )}
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                        {formatCurrency(item.price)}
                                     </div>
-                                )}
-                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                    {formatCurrency(item.price)}
+                                </div>
+                                <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                    x{qty}
                                 </div>
                             </div>
-                            <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                x{qty}
-                            </div>
-                        </div>
-                    )
-                })
+                        )
+                    })
                 )}
             </div>
 
@@ -1053,7 +1087,7 @@ export function CheckoutPageClient() {
                 )}
                 {couponPartialWarning && appliedCoupon && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                        Este cupom não se aplica a alguns itens do seu carrinho. O desconto foi calculado apenas sobre os itens elegíveis.
+                        Este cupom não se aplica a alguns itens da sacola. O desconto foi calculado apenas sobre os itens elegíveis.
                     </p>
                 )}
             </div>
@@ -1070,23 +1104,23 @@ export function CheckoutPageClient() {
                     </div>
                 )}
                 {showDeliveryFeeRow && (
-                <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
-                    <span>Entrega</span>
-                    <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
-                        {isPickup
-                            ? "Grátis"
-                            : deliveryQuoteLoading
-                                ? "Calculando..."
-                                : deliveryFee > 0
-                                    ? formatCurrency(deliveryFee)
-                                    : hasFreeDeliveryCoupon
-                                        ? "Grátis"
-                                        : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
-                                            ? "A combinar"
-                                            : "Grátis"
-                        }
-                    </span>
-                </div>
+                    <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
+                        <span>Entrega</span>
+                        <span className={(isPickup || (deliveryFee === 0 && (hasFreeDeliveryCoupon || !productDeliveryQuoteActive))) ? "text-brand-green font-semibold" : "text-brand-dark dark:text-dark-heading"}>
+                            {isPickup
+                                ? "Grátis"
+                                : deliveryQuoteLoading
+                                    ? "Calculando..."
+                                    : deliveryFee > 0
+                                        ? formatCurrency(deliveryFee)
+                                        : hasFreeDeliveryCoupon
+                                            ? "Grátis"
+                                            : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress
+                                                ? "A combinar"
+                                                : "Grátis"
+                            }
+                        </span>
+                    </div>
                 )}
                 {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (
                     <div className="space-y-1 text-xs text-brand-inactive-text">
@@ -1365,7 +1399,11 @@ export function CheckoutPageClient() {
                     useMercadoPago: true,
                     partnerId: partnerId,
                     userEmail: userEmail,
-                    userName: userName
+                    userName: userName,
+                    payDepositOnly: payDepositOnly,
+                    partnerPhone: checkoutContext?.partner.phone || null,
+                    pixKey: checkoutContext?.partner.pixKey || null,
+                    pixKeyType: checkoutContext?.partner.pixKeyType || null,
                 })
                 setShowPixModal(true)
                 setIsLoading(false)
@@ -1390,15 +1428,19 @@ export function CheckoutPageClient() {
                 if (sessionData?.source === "cart") {
                     const items = sessionData.cartItems || []
                     const result = await checkoutCartAction(
-                        items.map(item => ({
-                            cartItemId: item.cartItemId,
-                            productId: item.productId || "",
-                            variantId: item.variantId,
-                            quantity:
-                                quantities[item.cartItemId]
-                                || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
-                                || item.quantity,
-                        })),
+                        items.map(item => {
+                            const matchedLine = checkoutContext?.lines?.find(l => l.lineId === item.cartItemId);
+                            return {
+                                cartItemId: item.cartItemId,
+                                productId: item.productId || "",
+                                variantId: item.variantId,
+                                quantity:
+                                    quantities[item.cartItemId]
+                                    || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
+                                    || item.quantity,
+                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                            }
+                        }),
                         formData.deliveryType,
                         formData.deliveryAddress,
                         formData.paymentMethod,
@@ -1439,7 +1481,11 @@ export function CheckoutPageClient() {
                         useMercadoPago: false,
                         partnerId: partnerId,
                         userEmail: userEmail,
-                        userName: userName
+                        userName: userName,
+                        payDepositOnly: payDepositOnly,
+                        partnerPhone: checkoutContext?.partner.phone || null,
+                        pixKey: checkoutContext?.partner.pixKey || null,
+                        pixKeyType: checkoutContext?.partner.pixKeyType || null,
                     })
                     setShowPixModal(true)
                     setIsLoading(false)
@@ -1487,7 +1533,11 @@ export function CheckoutPageClient() {
                         useMercadoPago: false,
                         partnerId: partnerId,
                         userEmail: userEmail,
-                        userName: userName
+                        userName: userName,
+                        payDepositOnly: payDepositOnly,
+                        partnerPhone: checkoutContext?.partner.phone || null,
+                        pixKey: checkoutContext?.partner.pixKey || null,
+                        pixKeyType: checkoutContext?.partner.pixKeyType || null,
                     })
                     setShowPixModal(true)
                     setIsLoading(false)
@@ -1608,6 +1658,8 @@ export function CheckoutPageClient() {
                                     partnerAddressLabel={partnerAddressLabel}
                                     deliveryError={deliveryError}
                                     schedulingLines={schedulingLines}
+                                    lines={checkoutContext?.lines || []}
+                                    onFulfillmentModeChange={handleFulfillmentModeChange}
                                     addressProps={{
                                         loadingAddresses,
                                         userAddresses,
@@ -1618,35 +1670,7 @@ export function CheckoutPageClient() {
                                 />
                             )}
 
-                            {checkoutContext?.deposit.available && (
-                                <FormSection title="Sinal / entrada">
-                                    <div className="space-y-3">
-                                        <Checkbox
-                                            label={`Pagar sinal de ${checkoutContext.deposit.percent}% agora (${formatCurrency(checkoutContext.deposit.previewAmount)})`}
-                                            checked={payDepositOnly}
-                                            onChange={() => setPayDepositOnly((v) => !v)}
-                                        />
-                                        {checkoutContext.deposit.manualOnly && payDepositOnly && (
-                                            <InfoCard
-                                                message="Sem Mercado Pago: sua reserva será confirmada e o restante será combinado diretamente com a loja."
-                                                color="blue"
-                                            />
-                                        )}
-                                        {requirements?.hasPayOnService && !payDepositOnly && (
-                                            <p className="text-sm text-brand-inactive-text">
-                                                Você também pode pagar integralmente no atendimento.
-                                            </p>
-                                        )}
-                                    </div>
-                                </FormSection>
-                            )}
 
-                            {requirements?.hasPayOnService && (
-                                <InfoCard
-                                    message="Parte do valor pode ser paga no atendimento. Use Mercado Pago para pagamento automático ou finalize para reservar com cobrança manual."
-                                    color="blue"
-                                />
-                            )}
 
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
@@ -1669,6 +1693,29 @@ export function CheckoutPageClient() {
                                                         />
                                                     }
                                                 />
+                                                {paymentOption === "mercadopago" && checkoutContext?.deposit.available && (
+                                                    <div className="ml-8 mt-1 mb-3 p-3 bg-brand-slate/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
+                                                        <span className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Opção de pagamento online:</span>
+                                                        <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                            <RadioButton
+                                                                name="mpPayModeDesktop"
+                                                                value="full"
+                                                                checked={!payDepositOnly}
+                                                                onChange={() => setPayDepositOnly(false)}
+                                                            />
+                                                            <span>Pagar valor integral ({formatCurrency(checkoutTotalWithDelivery)})</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                            <RadioButton
+                                                                name="mpPayModeDesktop"
+                                                                value="deposit"
+                                                                checked={payDepositOnly}
+                                                                onChange={() => setPayDepositOnly(true)}
+                                                            />
+                                                            <span>Pagar sinal / entrada ({formatCurrency(checkoutContext.deposit.previewAmount)})</span>
+                                                        </label>
+                                                    </div>
+                                                )}
                                                 {showTraditionalPaymentOption && (
                                                     <ListItem
                                                         icon={MoneyIcon}
@@ -1689,6 +1736,14 @@ export function CheckoutPageClient() {
                                                             />
                                                         }
                                                     />
+                                                )}
+                                                {paymentOption === "traditional" && checkoutContext?.deposit.available && (
+                                                    <div className="ml-8 mt-2">
+                                                        <InfoCard
+                                                            message={`Para confirmar seu agendamento, é necessário pagar o sinal de ${checkoutContext.deposit.percent}% (${formatCurrency(checkoutContext.deposit.previewAmount)}) via Pix na tela seguinte.`}
+                                                            color="orange"
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
 
@@ -1925,6 +1980,8 @@ export function CheckoutPageClient() {
                                             partnerAddressLabel={partnerAddressLabel}
                                             deliveryError={deliveryError}
                                             schedulingLines={schedulingLines}
+                                            lines={checkoutContext?.lines || []}
+                                            onFulfillmentModeChange={handleFulfillmentModeChange}
                                             addressProps={{
                                                 loadingAddresses,
                                                 userAddresses,
@@ -1933,29 +1990,7 @@ export function CheckoutPageClient() {
                                                 onOpenForm: () => setShowAddressForm(true),
                                             }}
                                         />
-                                        {checkoutContext?.deposit.available && (
-                                            <FormSection title="Sinal / entrada">
-                                                <div className="space-y-3">
-                                                    <Checkbox
-                                                        label={`Pagar sinal de ${checkoutContext.deposit.percent}% agora (${formatCurrency(checkoutContext.deposit.previewAmount)})`}
-                                                        checked={payDepositOnly}
-                                                        onChange={() => setPayDepositOnly((v) => !v)}
-                                                    />
-                                                    {checkoutContext.deposit.manualOnly && payDepositOnly && (
-                                                        <InfoCard
-                                                            message="Sem Mercado Pago: sua reserva será confirmada e o restante será combinado diretamente com a loja."
-                                                            color="blue"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </FormSection>
-                                        )}
-                                        {requirements.hasPayOnService && (
-                                            <InfoCard
-                                                message="Parte do valor pode ser paga no atendimento."
-                                                color="blue"
-                                            />
-                                        )}
+
                                     </>
                                 ) : null}
 
@@ -2002,6 +2037,29 @@ export function CheckoutPageClient() {
                                                     />
                                                 }
                                             />
+                                            {paymentOption === "mercadopago" && checkoutContext?.deposit.available && (
+                                                <div className="ml-8 mt-1 mb-3 p-3 bg-brand-slate/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
+                                                    <span className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Opção de pagamento online:</span>
+                                                    <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                        <RadioButton
+                                                            name="mpPayModeMobile"
+                                                            value="full"
+                                                            checked={!payDepositOnly}
+                                                            onChange={() => setPayDepositOnly(false)}
+                                                        />
+                                                        <span>Valor integral ({formatCurrency(checkoutTotalWithDelivery)})</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
+                                                        <RadioButton
+                                                            name="mpPayModeMobile"
+                                                            value="deposit"
+                                                            checked={payDepositOnly}
+                                                            onChange={() => setPayDepositOnly(true)}
+                                                        />
+                                                        <span>Sinal / entrada ({formatCurrency(checkoutContext.deposit.previewAmount)})</span>
+                                                    </label>
+                                                </div>
+                                            )}
                                             {showTraditionalPaymentOption && (
                                                 <ListItem
                                                     icon={MoneyIcon}
@@ -2022,6 +2080,14 @@ export function CheckoutPageClient() {
                                                         />
                                                     }
                                                 />
+                                            )}
+                                            {paymentOption === "traditional" && checkoutContext?.deposit.available && (
+                                                <div className="ml-8 mt-2">
+                                                    <InfoCard
+                                                        message={`Para confirmar seu agendamento, é necessário pagar o sinal de ${checkoutContext.deposit.percent}% (${formatCurrency(checkoutContext.deposit.previewAmount)}) via Pix na tela seguinte.`}
+                                                        color="orange"
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                     ) : (
@@ -2146,7 +2212,7 @@ export function CheckoutPageClient() {
                                         )}
                                         {couponPartialWarning && appliedCoupon && (
                                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                                Cupom elegível apenas para alguns itens do carrinho.
+                                                Cupom elegível apenas para alguns itens da sacola.
                                             </p>
                                         )}
                                     </FormSection>

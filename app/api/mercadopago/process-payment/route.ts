@@ -30,6 +30,7 @@ interface ProcessPaymentRequest {
   cartItemIds?: string[]
   couponCode?: string | null
   deliveryFee?: number
+  payDepositOnly?: boolean
 }
 
 /**
@@ -56,7 +57,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode } = body
+    const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly } = body
     const normalizedDeliveryType = (deliveryType === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
 
     // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
@@ -129,6 +130,13 @@ async function handler(request: NextRequest) {
     const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
 
     if (useUnifiedCart) {
+      // Update pay_deposit_only in DB
+      await adminClient
+        .from("cart_items")
+        .update({ pay_deposit_only: Boolean(payDepositOnly), updated_at: new Date().toISOString() })
+        .in("id", cartItemIds!)
+        .eq("user_id", buyerId)
+
       const priced = await priceMarketplaceCartCheckout(adminClient, {
         userId: buyerId,
         cartItemIds: cartItemIds!,
@@ -553,6 +561,8 @@ async function handler(request: NextRequest) {
         checkout_fulfillment: checkoutFulfillment,
         order_source: "Vitrine Online",
         promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
+        amount_paid: paymentStatus === "approved" ? totalAmount : 0,
+        paid_amount: paymentStatus === "approved" ? totalAmount : 0,
       })
       .select()
       .single()

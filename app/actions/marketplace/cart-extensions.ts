@@ -117,7 +117,7 @@ export async function prepareProductBuyNowCheckoutAction(input: {
   }
 
   const { data: row } = await query.maybeSingle()
-  if (!row?.id) return { error: "Item não encontrado no carrinho." }
+  if (!row?.id) return { error: "Item não encontrado na sacola." }
 
   await supabase.from("cart_items").update({ selected: true }).eq("id", row.id)
   await revalidateCart(user.id)

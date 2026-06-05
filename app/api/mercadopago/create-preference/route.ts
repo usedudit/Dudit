@@ -6,6 +6,7 @@ import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
+import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -26,6 +27,8 @@ interface PreferenceRequest {
   buyerId?: string
   couponCode?: string | null
   deliveryFee?: number
+  cartItemIds?: string[]
+  payDepositOnly?: boolean
 }
 
 async function handler(request: NextRequest) {
@@ -103,86 +106,120 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Sessão do Mercado Pago inválida ou expirada" }, { status: 400 })
     }
 
-    // SEGURANÃ‡A: SEMPRE validar preços no banco (nunca confiar em body.amount ou item.price)
-    // Otimização: Buscar todos os produtos e variantes de uma vez para evitar N+1 queries
-    const productIds = items.filter(i => !i.variant_id).map(i => i.id)
-    const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
-
-    const [productsRes, variantsRes] = await Promise.all([
-      adminClient
-        .from("products")
-        .select("id, price, promotional_price, stock_available, partner_id, name")
-        .in("id", productIds),
-      adminClient
-        .from("product_variants")
-        .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, name)")
-        .in("id", variantIds)
-    ])
-
-    const productsMap = new Map<string, any>(productsRes.data?.map((p: any) => [p.id, p]))
-    const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
-
     let totalAmount = 0
     const preferenceItems = []
+    let couponItems: any[] = []
 
-    for (const item of items) {
-      // Validar quantidade
-      if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 9999) {
-        return NextResponse.json({ error: `Quantidade inválida para ${item.name}` }, { status: 400 })
+    const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
+
+    if (useUnifiedCart) {
+      // Update pay_deposit_only in DB
+      await adminClient
+        .from("cart_items")
+        .update({ pay_deposit_only: Boolean(body.payDepositOnly), updated_at: new Date().toISOString() })
+        .in("id", body.cartItemIds!)
+        .eq("user_id", user.id)
+
+      const resolved = await resolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
+      if (!resolved.success) {
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
 
-      let resolvedPrice: number
-      let resolvedStock: number
-      let resolvedPartnerId: string
-      let resolvedName: string
+      for (const line of resolved.lines) {
+        preferenceItems.push({
+          title: line.lineName,
+          description: `Item: ${line.lineName}`,
+          unit_price: line.unitPrice,
+          quantity: line.quantity,
+          currency_id: "BRL",
+        })
+        totalAmount += line.unitPrice * line.quantity
+      }
 
-      const variant = item.variant_id ? variantsMap.get(item.variant_id) : (variantsMap.get(item.id) || null)
+      couponItems = resolved.lines.map(l => ({
+        productId: l.productId || null,
+        serviceId: l.serviceId || null,
+        recurringPlanId: l.recurringPlanId || null,
+      }))
+    } else {
+      const productIds = items.filter(i => !i.variant_id).map(i => i.id)
+      const variantIds = items.map(i => i.variant_id || i.id).filter(Boolean) as string[]
 
-      if (variant) {
-        // Encontrado como variante
-        const parentProduct = variant.products as any
-        resolvedPrice = variant.price_adjustment
-          ? Number(variant.price_adjustment)
-          : Number(parentProduct.price)
-        resolvedStock = variant.stock_available ?? 0
-        resolvedPartnerId = parentProduct.partner_id
-        resolvedName = parentProduct.name
-      } else {
-        // Tentar como produto
-        const product = productsMap.get(item.id)
-        if (product) {
-          const basePrice = Number(product.price)
-          const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
-          resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
-          resolvedStock = product.stock_available
-          resolvedPartnerId = product.partner_id
-          resolvedName = product.name
-        } else {
-          return NextResponse.json({ error: `Produto/Variante ${item.id} não encontrado` }, { status: 400 })
+      const [productsRes, variantsRes] = await Promise.all([
+        adminClient
+          .from("products")
+          .select("id, price, promotional_price, stock_available, partner_id, name")
+          .in("id", productIds),
+        adminClient
+          .from("product_variants")
+          .select("id, price_adjustment, stock_available, product_id, products!inner(partner_id, price, promotional_price, name)")
+          .in("id", variantIds)
+      ])
+
+      const productsMap = new Map<string, any>(productsRes.data?.map((p: any) => [p.id, p]))
+      const variantsMap = new Map<string, any>(variantsRes.data?.map((v: any) => [v.id, v]))
+
+      for (const item of items) {
+        // Validar quantidade
+        if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 9999) {
+          return NextResponse.json({ error: `Quantidade inválida para ${item.name}` }, { status: 400 })
         }
+
+        let resolvedPrice: number
+        let resolvedStock: number
+        let resolvedPartnerId: string
+        let resolvedName: string
+
+        const variant = item.variant_id ? variantsMap.get(item.variant_id) : (variantsMap.get(item.id) || null)
+
+        if (variant) {
+          // Encontrado como variante
+          const parentProduct = variant.products as any
+          resolvedPrice = variant.price_adjustment
+            ? Number(variant.price_adjustment)
+            : Number(parentProduct.price)
+          resolvedStock = variant.stock_available ?? 0
+          resolvedPartnerId = parentProduct.partner_id
+          resolvedName = parentProduct.name
+        } else {
+          // Tentar como produto
+          const product = productsMap.get(item.id)
+          if (product) {
+            const basePrice = Number(product.price)
+            const promoPrice = product.promotional_price ? Number(product.promotional_price) : 0
+            resolvedPrice = (promoPrice > 0 && promoPrice < basePrice) ? promoPrice : basePrice
+            resolvedStock = product.stock_available
+            resolvedPartnerId = product.partner_id
+            resolvedName = product.name
+          } else {
+            return NextResponse.json({ error: `Produto/Variante ${item.id} não encontrado` }, { status: 400 })
+          }
+        }
+
+        // Verificar que o produto pertence ao parceiro
+        if (resolvedPartnerId !== partnerId) {
+          SecureLogger.error("Product partner mismatch in preference", { productId: item.id })
+          return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
+        }
+
+        // Verificar estoque
+        if (resolvedStock < item.quantity) {
+          return NextResponse.json({ error: `Estoque insuficiente para ${resolvedName}` }, { status: 400 })
+        }
+
+        const itemTotal = resolvedPrice * item.quantity
+        totalAmount += itemTotal
+
+        preferenceItems.push({
+          title: resolvedName,
+          description: `Produto: ${resolvedName}`,
+          unit_price: resolvedPrice,
+          quantity: item.quantity,
+          currency_id: "BRL",
+        })
       }
 
-      // Verificar que o produto pertence ao parceiro
-      if (resolvedPartnerId !== partnerId) {
-        SecureLogger.error("Product partner mismatch in preference", { productId: item.id })
-        return NextResponse.json({ error: "Produto não pertence a este vendedor" }, { status: 400 })
-      }
-
-      // Verificar estoque
-      if (resolvedStock < item.quantity) {
-        return NextResponse.json({ error: `Estoque insuficiente para ${resolvedName}` }, { status: 400 })
-      }
-
-      const itemTotal = resolvedPrice * item.quantity
-      totalAmount += itemTotal
-
-      preferenceItems.push({
-        title: resolvedName,
-        description: `Produto: ${resolvedName}`,
-        unit_price: resolvedPrice,
-        quantity: item.quantity,
-        currency_id: "BRL",
-      })
+      couponItems = items.map(i => ({ productId: i.id }))
     }
 
     // DELIVERY FEE
@@ -206,7 +243,7 @@ async function handler(request: NextRequest) {
         customerId: user.id,
         subtotal: totalAmount - deliveryFee,
         shippingCost: deliveryFee,
-        items: items.map(i => ({ productId: i.id })) // simplified
+        items: couponItems
       }, adminClient)
 
       if (couponResult.valid) {

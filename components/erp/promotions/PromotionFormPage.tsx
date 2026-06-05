@@ -1396,7 +1396,7 @@ export default function PromotionFormPage({
                                                                 value={editingRule.apply_scope || "entire_cart"}
                                                                 setValue={(val) => setEditingRule({ ...editingRule, apply_scope: val })}
                                                                 options={[
-                                                                    { value: "entire_cart", label: "Todo o Carrinho" },
+                                                                    { value: "entire_cart", label: "Toda a Sacola" },
                                                                     { value: "specific_products", label: "Produtos Específicos" },
                                                                     { value: "category", label: "Categorias Específicas" },
                                                                     ...(scopeData.services && scopeData.services.length > 0 ? [{ value: "specific_services", label: "Serviços Específicos" }] : [])
@@ -1671,7 +1671,7 @@ export default function PromotionFormPage({
                                                                                     {promo.name || "Regra sem nome"} • Prioridade {promo.priority || 0}
                                                                                 </span>
                                                                                 <span className="block text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                    Escopo: {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
+                                                                                    Escopo: {promo.apply_scope === "entire_cart" && "Toda a Sacola"}
                                                                                     {promo.apply_scope === "specific_products" && "Produtos Específicos"}
                                                                                     {promo.apply_scope === "category" && "Categorias Específicas"}
                                                                                     {promo.apply_scope === "specific_services" && "Serviços Específicos"}
@@ -1767,7 +1767,7 @@ export default function PromotionFormPage({
                                                                                     </td>
                                                                                     <td className="py-4 px-6 border-b border-brand-border">
                                                                                         <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                                            {promo.apply_scope === "entire_cart" && "Todo o Carrinho"}
+                                                                                            {promo.apply_scope === "entire_cart" && "Toda a Sacola"}
                                                                                             {promo.apply_scope === "specific_products" && "Produtos Específicos"}
                                                                                             {promo.apply_scope === "category" && "Categorias Específicas"}
                                                                                             {promo.apply_scope === "specific_services" && "Serviços Específicos"}

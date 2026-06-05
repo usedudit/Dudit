@@ -29,12 +29,12 @@ import { ServiceMarketplaceTab } from "./ServiceMarketplaceTab"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 
 const NUMERIC_FIELDS = new Set(["price", "cost_price", "duration_minutes", "buffer_minutes"])
-const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "scheduling_enabled"])
+const BOOLEAN_FIELDS = new Set(["is_active", "show_in_marketplace", "highlight_service", "scheduling_enabled", "show_price_in_store"])
 
 const REQUIRED_FIELDS = [
     { field: "name", tab: "general", validate: (v: any) => !!v?.trim(), message: "Nome é obrigatório" },
-    { field: "price", tab: "general", validate: (v: any, data: any) => data.price_type === 'free' || Number(v) > 0, message: "Preço é obrigatório" },
-    { field: "duration_minutes", tab: "general", validate: (v: any) => Number(v) > 0, message: "Duração é obrigatória" },
+    { field: "price", tab: "general", validate: (v: any, data: any) => data.show_price_in_store === false || data.price_type === 'free' || Number(v) > 0, message: "Preço é obrigatório" },
+    { field: "duration_minutes", tab: "general", validate: (v: any, data: any) => (data.billing_unit && data.billing_unit !== 'per_service') || Number(v) > 0, message: "Duração é obrigatória" },
 ]
 
 const getEmptyService = () => ({
@@ -42,7 +42,8 @@ const getEmptyService = () => ({
     price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
-    is_active: true, show_in_marketplace: true, highlight_service: false,
+    is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true,
+    scheduling_enabled: true, fulfillment_modes: ["on_site"],
     warranty: "", technical_details: null,
     tags: [], resources: [], assigned_staff: { all: true, staff_ids: [] },
     notes: ""
@@ -379,6 +380,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 service_type: serviceData.service_type,
                 show_in_marketplace: !!serviceData.show_in_marketplace,
                 highlight_service: !!serviceData.highlight_service,
+                show_price_in_store: serviceData.show_price_in_store !== false,
+                scheduling_enabled: serviceData.scheduling_enabled !== false,
+                fulfillment_modes: serviceData.fulfillment_modes || ["on_site"],
+                payment_requirement: serviceData.payment_requirement || "full_payment",
                 tags: serviceData.tags || [],
                 notes: serviceData.notes,
                 video_type: serviceData.video_type || null,

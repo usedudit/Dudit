@@ -88,7 +88,7 @@ async function createBookingFromMetadata(
       needs_reschedule: false,
       pricing_unit: "Por Serviço",
       notes: params.meta.notes || null,
-      status: params.paymentStatus === "paid" ? "Confirmado" : "Reservado",
+      status: (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid") ? "Confirmado" : "Reservado",
       source: "appointment",
       marketplace_order_id: params.orderId,
     })
@@ -221,18 +221,6 @@ export async function fulfillMarketplaceOrder(
   orderId: string,
   options?: { force?: boolean },
 ): Promise<{ success: boolean; result?: CheckoutFulfillmentResult; skipped?: boolean; error?: string }> {
-  const idempotencyKey = `fulfill:order:${orderId}`
-
-  const { data: existingFulfillment } = await supabase
-    .from("checkout_fulfillments")
-    .select("id, status, result")
-    .eq("idempotency_key", idempotencyKey)
-    .maybeSingle()
-
-  if (existingFulfillment?.status === "completed") {
-    return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
-  }
-
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(`
@@ -246,7 +234,69 @@ export async function fulfillMarketplaceOrder(
     return { success: false, error: "Pedido não encontrado." }
   }
 
+  const idempotencyKey = `fulfill:order:${orderId}`
+
+  const { data: existingFulfillment } = await supabase
+    .from("checkout_fulfillments")
+    .select("id, status, result")
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle()
+
   const situation = String(order.situation || "").toLowerCase()
+
+  if (existingFulfillment?.status === "completed") {
+    if (situation === "paid" || situation === "approved") {
+      const appointmentIds = (existingFulfillment.result as CheckoutFulfillmentResult)?.appointmentIds || []
+      const payload = order.checkout_fulfillment as CheckoutFulfillmentPayload | null
+      if (appointmentIds.length > 0 && payload?.lines) {
+        for (const line of payload.lines) {
+          if (line.itemType === "service_booking" && line.bookingMetadata) {
+            const fullPrice = line.fullPrice ?? line.bookingMetadata.price
+            const paidAmount = line.payDepositOnly
+              ? (line.depositAmount ?? line.unitPrice * line.quantity)
+              : line.unitPrice * line.quantity
+            const paymentStatus = line.payDepositOnly ? "partially_paid" : "paid"
+            
+            await supabase
+              .from("appointments")
+              .update({
+                paid_amount: paidAmount,
+                payment_status: paymentStatus,
+                status: "Confirmado"
+              })
+              .eq("marketplace_order_id", orderId)
+
+            const remaining = Math.max(0, fullPrice - paidAmount)
+            const { data: appts } = await supabase
+              .from("appointments")
+              .select("id, customer_id")
+              .eq("marketplace_order_id", orderId)
+            
+            for (const appt of appts || []) {
+              const receivableId = await syncAppointmentReceivable({
+                supabase,
+                partnerId: order.partner_id,
+                appointmentId: appt.id,
+                customerId: appt.customer_id,
+                serviceName: line.bookingMetadata.serviceName,
+                startDate: line.bookingMetadata.date,
+                remaining,
+                paidAmount,
+              })
+              if (receivableId) {
+                await supabase
+                  .from("appointments")
+                  .update({ receivable_transaction_id: receivableId })
+                  .eq("id", appt.id)
+              }
+            }
+          }
+        }
+      }
+    }
+    return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
+  }
+
   if (!options?.force && situation !== "paid" && situation !== "approved") {
     return { success: false, error: "Pedido ainda não está pago." }
   }
@@ -264,6 +314,7 @@ export async function fulfillMarketplaceOrder(
       status: "pending",
     })
   }
+
 
   const { data: profile } = await supabase
     .from("user_profiles")
@@ -294,16 +345,16 @@ export async function fulfillMarketplaceOrder(
         !line.bookingMetadata.instantPurchase &&
         line.bookingMetadata.staffId
       ) {
+        const isOrderPaid = situation === "paid" || situation === "approved"
         const fullPrice = line.fullPrice ?? line.bookingMetadata.price
-        const paidAmount = line.payDepositOnly
-          ? (line.depositAmount ?? line.unitPrice * line.quantity)
-          : line.unitPrice * line.quantity
-        const paymentStatus =
-          paidAmount >= fullPrice - 0.01
-            ? "paid"
-            : paidAmount > 0.01
-              ? "partially_paid"
-              : "unpaid"
+        const paidAmount = isOrderPaid
+          ? (line.payDepositOnly
+              ? (line.depositAmount ?? line.unitPrice * line.quantity)
+              : line.unitPrice * line.quantity)
+          : 0
+        const paymentStatus = isOrderPaid
+          ? (line.payDepositOnly ? "partially_paid" : "paid")
+          : "unpaid"
 
         const bookingResult = await createBookingFromMetadata(supabase, {
           partnerId: order.partner_id,

@@ -17,6 +17,7 @@ import {
 } from "@/lib/commerce/capabilities"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { formatDateToBR } from "@/lib/utils/formatters"
 
 export type ResolvedCartLine = {
   cartItemId: string
@@ -47,12 +48,12 @@ export type ResolvedCartLine = {
 
 export type ResolveCartResult =
   | {
-      success: true
-      lines: ResolvedCartLine[]
-      partnerId: string
-      hasProducts: boolean
-      hasDeliveryLines: boolean
-    }
+    success: true
+    lines: ResolvedCartLine[]
+    partnerId: string
+    hasProducts: boolean
+    hasDeliveryLines: boolean
+  }
   | { success: false; error: string }
 
 function resolveLineFulfillmentMode(
@@ -101,11 +102,11 @@ export async function resolveCheckoutCartLines(
     .in("id", cartItemIds)
 
   if (error || !rows?.length) {
-    return { success: false, error: "Itens do carrinho não encontrados." }
+    return { success: false, error: "Itens da sacola não encontrados." }
   }
 
   if (rows.length !== cartItemIds.length) {
-    return { success: false, error: "Alguns itens do carrinho não foram encontrados." }
+    return { success: false, error: "Alguns itens da sacola não foram encontrados." }
   }
 
   const partnerIds = [...new Set(rows.map((r: any) => r.partner_id))]
@@ -226,7 +227,7 @@ export async function resolveCheckoutCartLines(
       const service = row.services
       const meta = row.booking_metadata as ServiceBookingMetadata | null
       if (!service?.is_active || !meta) {
-        return { success: false, error: "Agendamento inválido no carrinho." }
+        return { success: false, error: "Agendamento inválido na sacola." }
       }
 
       const caps = serviceCatalogCapabilities(service)
@@ -262,7 +263,7 @@ export async function resolveCheckoutCartLines(
         serviceId: row.service_id,
         quantity: qty,
         unitPrice,
-        lineName: `${service.name} — ${meta.date} ${meta.time}`,
+        lineName: `${service.name} — ${formatDateToBR(meta.date)} ${meta.time}`,
         fulfillmentMode,
         bookingMetadata: meta,
         payDepositOnly,

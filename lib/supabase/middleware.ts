@@ -320,10 +320,12 @@ export async function middleware(request: NextRequest) {
   // 5. SUPABASE AUTH (ONLY for routes that need it)
   // CRITICAL: Skip auth for public cacheable pages to avoid Set-Cookie headers
   // that would prevent Cloudflare from caching the response.
+  // Exception: If they have an active auth cookie, we must verify their status (banned check).
   const NEEDS_AUTH_CHECK = ["/erp", "/account", "/perfil", "/pedidos", "/auth/login", "/select-erp", "/ddt-admin", "/cart", "/banned"]
   const isPost = request.method === "POST"
   const isAction = request.headers.has("Next-Action")
-  const needsAuthCheck = isPost || isAction || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
+  const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+  const needsAuthCheck = isPost || isAction || hasAuthCookie || NEEDS_AUTH_CHECK.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"))
 
   if (needsAuthCheck) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -379,7 +381,14 @@ export async function middleware(request: NextRequest) {
           // ================================================================
           // BAN CHECK: Verifica se o usuário está banido antes de permitir acesso
           // ================================================================
-          if (pathname !== "/banned") {
+          const isAllowedWhenBanned = 
+            pathname === "/banned" || pathname.startsWith("/banned/") ||
+            pathname === "/institucional" || pathname.startsWith("/institucional/") ||
+            pathname === "/ajuda" || pathname.startsWith("/ajuda/") ||
+            pathname === "/auth/sign-out" || pathname.startsWith("/auth/sign-out/") ||
+            pathname === "/auth/callback" || pathname.startsWith("/auth/callback/")
+
+          if (!isAllowedWhenBanned) {
             const { data: profile } = await supabase
               .from("user_profiles")
               .select("banned_at, banned_until")
@@ -404,6 +413,28 @@ export async function middleware(request: NextRequest) {
                 console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
                 const bannedUrl = new URL("/banned", request.url)
                 return NextResponse.redirect(bannedUrl)
+              }
+            }
+          }
+
+          // ================================================================
+          // ERP STATUS CHECK: Verifica se o parceiro está suspenso ou desativado
+          // ================================================================
+          if (pathname.startsWith("/erp")) {
+            const activePartnerId = request.cookies.get("active_partner_id")?.value
+            if (activePartnerId) {
+              const { data: partner } = await supabase
+                .from("partners")
+                .select("is_active, erp_disabled")
+                .eq("id", activePartnerId)
+                .maybeSingle()
+
+              if (partner && (partner.is_active === false || partner.erp_disabled === true)) {
+                console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
+                const selectErpUrl = new URL("/select-erp", request.url)
+                const responseRedirect = NextResponse.redirect(selectErpUrl)
+                responseRedirect.cookies.delete("active_partner_id")
+                return responseRedirect
               }
             }
           }

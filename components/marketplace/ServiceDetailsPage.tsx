@@ -22,12 +22,14 @@ import {
     ArrowLeftRightIcon,
     PlusIcon,
     TagIcon,
+    WhatsappIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { FavoriteButton } from "./FavoriteButton"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Separator, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
+import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useNotification } from "@/hooks/use-notification"
@@ -108,13 +110,13 @@ const getReadyDayLabel = (estimate: any) => {
     if (!estimate) return ""
     const now = new Date(estimate.now || Date.now())
     const readyAt = new Date(estimate.readyAt)
-    
+
     const readyDate = new Date(readyAt.getFullYear(), readyAt.getMonth(), readyAt.getDate())
     const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    
+
     const diffTime = readyDate.getTime() - nowDate.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays === 0) {
         return "hoje"
     } else if (diffDays === 1) {
@@ -183,12 +185,15 @@ export function ServiceDetailsPageClient({
         zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false
     })
 
+    const showPrice = service.show_price_in_store !== false
+
     const partner = useMemo(() => {
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
         const address = p?.addresses?.[0] || {}
         return {
             id: p?.id || service.partner_id,
             user_id: p?.user_id,
+            phone: p?.phone,
             store_name: p?.store_name || "Profissional",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
@@ -519,6 +524,10 @@ export function ServiceDetailsPageClient({
     const price = Number(service.price || 0)
     const schedulingEnabled = service.scheduling_enabled !== false
     const categoryName = (service as any).service_categories?.name || "Serviço"
+    const isStartingAt = service.price_type === "starting_at"
+    const isFree = service.price_type === "free"
+    const pricePrefix = isStartingAt ? "A partir de " : ""
+    const billingSuffix = getBillingUnitSuffix(service.billing_unit)
 
     const pricing = useMemo(() => {
         const base = Number(service.price) || 0
@@ -772,7 +781,7 @@ export function ServiceDetailsPageClient({
             })
             if (result.success) {
                 invalidateCartCache()
-                notifySuccess("Adicionado à sacola", "O agendamento foi adicionado ao carrinho.")
+                notifySuccess("Adicionado à sacola", "O agendamento foi adicionado à sacola.")
             } else {
                 notifyError("Erro", result.error || "Não foi possível adicionar à sacola.")
             }
@@ -791,7 +800,13 @@ export function ServiceDetailsPageClient({
             <div className="flex items-center gap-2 mb-4">
                 <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">{categoryName}</span>
                 <span className="text-gray-300 text-xs">|</span>
-                <span className="text-[13px] font-semibold text-brand-inactive-text">Serviço</span>
+                <span className="text-[13px] font-semibold text-brand-inactive-text">
+                    {service.service_type === "online" ? "Remoto" : service.service_type === "hybrid" ? "Híbrido" : "Presencial"}
+                </span>
+                <span className="text-gray-300 text-xs">|</span>
+                <span className="text-[13px] font-semibold text-brand-inactive-text">
+                    {schedulingEnabled ? "Agendamento necessário" : "Compra direta"}
+                </span>
             </div>
 
             {/* Rating */}
@@ -808,7 +823,7 @@ export function ServiceDetailsPageClient({
                 {service.name}
             </h1>
 
-            {activePromo && (
+            {showPrice && activePromo && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}
@@ -818,7 +833,23 @@ export function ServiceDetailsPageClient({
 
             {/* Price */}
             <div className="mb-6">
-                {(() => {
+                {!showPrice ? (
+                    <div className="space-y-1">
+                        <p className="text-3xl leading-none font-bold text-brand-dark">
+                            Preço sob consulta
+                        </p>
+                    </div>
+                ) : (() => {
+                    if (isFree) {
+                        return (
+                            <div className="space-y-1">
+                                <p className="text-3xl leading-none font-bold text-brand-dark">
+                                    Gratuito
+                                </p>
+                            </div>
+                        )
+                    }
+
                     const hasPromo = pricing.hasPromo;
                     const hasPix = pricing.pixDiscountPercent > 0;
                     const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
@@ -831,13 +862,13 @@ export function ServiceDetailsPageClient({
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
-                                        {formatCurrency(pixUnitPrice)}
+                                        {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                     </p>
                                     <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                     <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                    ou {formatCurrency(pricing.current)} em outros meios
+                                    ou {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
                                     ver opções de pagamento
@@ -853,7 +884,7 @@ export function ServiceDetailsPageClient({
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
                                 <div className="flex items-center gap-2">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
-                                        {formatCurrency(pricing.current)}
+                                        {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix}
                                     </p>
                                     <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
@@ -871,12 +902,12 @@ export function ServiceDetailsPageClient({
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
-                                        {formatCurrency(pixUnitPrice)}
+                                        {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                     </p>
                                     <span className="text-sm text-brand-green font-medium mt-auto">{pricing.pixDiscountPercent}% no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                    ou {formatCurrency(pricing.original)} em outros meios
+                                    ou {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
                                     ver opções de pagamento
@@ -889,7 +920,7 @@ export function ServiceDetailsPageClient({
                     return (
                         <div className="space-y-1">
                             <p className="text-3xl leading-none font-bold text-brand-dark">
-                                {formatCurrency(pricing.current)}
+                                {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
                                 ver opções de pagamento
@@ -898,17 +929,19 @@ export function ServiceDetailsPageClient({
                     );
                 })()}
 
-                <div className="flex items-center gap-2 text-sm text-brand-inactive-text mt-3">
-                    <ClockIcon size={14} />
-                    <span>{formatDuration(durationMinutes)}</span>
-                    {bufferMinutes > 0 && (
-                        <span className="text-xs text-brand-inactive-text/70">+ {bufferMinutes}min intervalo</span>
-                    )}
-                </div>
+                {showPrice && (!service.billing_unit || service.billing_unit === 'per_service') && (
+                    <div className="flex items-center gap-2 text-sm text-brand-inactive-text mt-3">
+                        <ClockIcon size={14} />
+                        <span>{formatDuration(durationMinutes)}</span>
+                        {bufferMinutes > 0 && (
+                            <span className="text-xs text-brand-inactive-text/70">+ {bufferMinutes}min intervalo</span>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* ── Staff Selection ── */}
-            {staff.length > 0 && (
+            {showPrice && staff.length > 0 && (
                 <div className="mb-6">
                     <label className="block text-sm font-bold text-brand-dark mb-3">Profissional</label>
                     <div className="flex flex-wrap gap-2">
@@ -931,6 +964,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Date Selection ── */}
+            {showPrice && (
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-4">
                     <label className="text-sm font-bold text-brand-dark capitalize">{currentMonth}</label>
@@ -974,8 +1008,10 @@ export function ServiceDetailsPageClient({
                     })}
                 </div>
             </div>
+            )}
 
             {/* ── Time Slots ── */}
+            {showPrice && (
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-4">
                     <label className="text-sm font-bold text-brand-dark">Horários disponíveis</label>
@@ -1019,8 +1055,10 @@ export function ServiceDetailsPageClient({
                     </div>
                 )}
             </div>
+            )}
 
             {/* ── Selected Summary ── */}
+            {showPrice && (
             <AnimatePresence>
                 {selectedTime && (
                     <motion.div
@@ -1049,21 +1087,45 @@ export function ServiceDetailsPageClient({
                                     <span>Horário</span>
                                     <span className="font-bold text-brand-dark">{selectedTime}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span>Duração</span>
-                                    <span className="font-bold text-brand-dark">{formatDuration(durationMinutes)}</span>
-                                </div>
+                                {(!service.billing_unit || service.billing_unit === 'per_service') && (
+                                    <div className="flex justify-between">
+                                        <span>Duração</span>
+                                        <span className="font-bold text-brand-dark">{formatDuration(durationMinutes)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between pt-2 border-t border-emerald-200 mt-2">
                                     <span className="font-bold text-brand-dark">Valor</span>
-                                    <span className="font-bold text-brand-dark text-base">{formatCurrency(price)}</span>
+                                    <span className="font-bold text-brand-dark text-base">{pricePrefix}{formatCurrency(price)}{billingSuffix}</span>
                                 </div>
                             </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
+            )}
 
             {/* ── CTA Buttons ── */}
+            {!showPrice ? (
+                <div className="hidden lg:block mb-4">
+                    {(() => {
+                        const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                        const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber o preço.`)
+                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                        return (
+                            <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                            >
+                                <WhatsappIcon size={20} className="fill-white" />
+                                Consultar preço
+                            </a>
+                        )
+                    })()}
+                </div>
+            ) : (
             <div className="hidden lg:block space-y-2 mb-4">
                 <Button
                     disabled={(schedulingEnabled && !selectedTime) || isBooking}
@@ -1095,6 +1157,7 @@ export function ServiceDetailsPageClient({
                     </Button>
                 )}
             </div>
+            )}
 
             {/* Shipping */}
             {!isProductOwner && (
@@ -1907,31 +1970,53 @@ export function ServiceDetailsPageClient({
 
                     {/* Mobile bottom bar */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-2 lg:hidden shadow-lg">
-                        <div className="flex-1 flex flex-col justify-center min-w-0">
-                            <span className="text-lg font-bold text-brand-dark leading-none">
-                                {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
-                            </span>
-                            <span className="text-xs text-brand-inactive-text truncate">
-                                {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
-                            </span>
-                        </div>
-                        {schedulingEnabled && (
-                            <Button
-                                variant="outline"
-                                className="rounded-full px-3"
-                                disabled={!selectedTime || isBooking}
-                                onClick={handleAddBookingToCart}
-                            >
-                                Sacola
-                            </Button>
+                        {!showPrice ? (
+                            (() => {
+                                const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                                const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber o preço.`)
+                                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                                return (
+                                    <a
+                                        href={whatsappUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-grow h-12 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-sm"
+                                    >
+                                        <WhatsappIcon size={20} className="fill-white" />
+                                        Consultar preço
+                                    </a>
+                                )
+                            })()
+                        ) : (
+                            <>
+                                <div className="flex-1 flex flex-col justify-center min-w-0">
+                                    <span className="text-lg font-bold text-brand-dark leading-none">
+                                        {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
+                                    </span>
+                                    <span className="text-xs text-brand-inactive-text truncate">
+                                        {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
+                                    </span>
+                                </div>
+                                {schedulingEnabled && (
+                                    <Button
+                                        variant="outline"
+                                        className="rounded-full px-3"
+                                        disabled={!selectedTime || isBooking}
+                                        onClick={handleAddBookingToCart}
+                                    >
+                                        Sacola
+                                    </Button>
+                                )}
+                                <Button
+                                    className="flex-1 rounded-full min-w-[120px]"
+                                    disabled={(schedulingEnabled && !selectedTime) || isBooking}
+                                    onClick={handleBookNowCheckout}
+                                >
+                                    {isBooking ? "..." : schedulingEnabled && !selectedTime ? "Horário" : "Reservar"}
+                                </Button>
+                            </>
                         )}
-                        <Button
-                            className="flex-1 rounded-full min-w-[120px]"
-                            disabled={(schedulingEnabled && !selectedTime) || isBooking}
-                            onClick={handleBookNowCheckout}
-                        >
-                            {isBooking ? "..." : schedulingEnabled && !selectedTime ? "Horário" : "Reservar"}
-                        </Button>
                     </div>
                 </div>
             </motion.div>

@@ -9,6 +9,7 @@ import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-image
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
+import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { Badge } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -306,6 +307,8 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
         else if (freq === "daily") frequencyText = "/dia"
     }
 
+    const showPrice = (product as any).show_price_in_store !== false
+
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
             <Link
@@ -321,12 +324,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         loading="lazy"
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
-                        {hasDiscount && (
+                        {showPrice && hasDiscount && (
                             <Badge variant="orange" icon={null} className="whitespace-nowrap">
                                 -{discountPercent}%
                             </Badge>
                         )}
-                        {activePromo && (
+                        {showPrice && activePromo && (
                             <span title={activePromo.name}>
                                 <Badge variant="blue" icon={<TagIcon size={10} />} className="whitespace-nowrap p-1.5 w-6 h-6 justify-center" />
                             </span>
@@ -351,14 +354,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
 
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex flex-col">
-                            {product.originalPrice && (
+                            {showPrice && product.originalPrice && (
                                 <span className="text-xs text-brand-inactive-text line-through">
                                     {formatCurrency(product.originalPrice)}
                                 </span>
                             )}
                             <div className="flex items-center gap-1.5">
                                 <span className="text-base font-bold text-brand-dark leading-tight">
-                                    {formatCurrency(product.price)}{frequencyText}
+                                    {!showPrice ? (
+                                        "Preço sob consulta"
+                                    ) : (
+                                        <>
+                                            {itemType === "servico" && (product as any).price_type === "starting_at" ? "A partir de " : ""}
+                                            {formatCurrency(product.price)}
+                                            {frequencyText || (itemType === "servico" ? getBillingUnitSuffix((product as any).billing_unit) : "")}
+                                        </>
+                                    )}
                                 </span>
                             </div>
                         </div>

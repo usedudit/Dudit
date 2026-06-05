@@ -232,7 +232,7 @@ export default function PromotionsPage({
 
   const handleRunSimulation = async () => {
     if (simCart.length === 0) {
-      toast({ title: "Adicione pelo menos um item ao carrinho da simulação." })
+      toast({ title: "Adicione pelo menos um item à sacola de simulação." })
       return
     }
     setIsSimulating(true)
@@ -585,11 +585,11 @@ export default function PromotionsPage({
                     <Div className="lg:col-span-2 space-y-6">
                       <Div className="rounded-2xl border border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface shadow-sm space-y-4">
                         <h3 className="text-md font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                          <SparklesIcon className="text-brand-primary h-5 w-5" /> Montar Carrinho de Simulação
+                          <SparklesIcon className="text-brand-primary h-5 w-5" /> Montar Sacola de Simulação
                         </h3>
 
                         <Div className="space-y-2">
-                          <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Adicionar Produto ao Carrinho</label>
+                          <label className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Adicionar Produto à Sacola</label>
                           <select
                             onChange={(e) => {
                               if (!e.target.value) return
@@ -614,7 +614,7 @@ export default function PromotionsPage({
                         </Div>
 
                         <Div className="space-y-3">
-                          <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Itens no Carrinho ({simCart.length})</h3>
+                          <h3 className="text-xs font-bold uppercase text-brand-inactive-text">Itens na Sacola ({simCart.length})</h3>
                           {simCart.length > 0 ? (
                             <Div className="space-y-2">
                               {simCart.map((item, idx) => (
@@ -645,7 +645,7 @@ export default function PromotionsPage({
                               ))}
                             </Div>
                           ) : (
-                            <P className="text-sm text-brand-inactive-text py-4">O carrinho de simulação está vazio.</P>
+                            <P className="text-sm text-brand-inactive-text py-4">A sacola de simulação está vazia.</P>
                           )}
                         </Div>
 
@@ -785,7 +785,7 @@ export default function PromotionsPage({
                           ) : (
                             <Div className="text-center py-12 text-brand-inactive-text">
                               <PlayIcon className="mx-auto h-12 w-12 opacity-30 mb-2" />
-                              <P className="text-sm">Configure o carrinho de teste e clique em "Executar Simulação" para ver os resultados.</P>
+                              <P className="text-sm">Configure a sacola de teste e clique em "Executar Simulação" para ver os resultados.</P>
                             </Div>
                           )}
                         </Div>

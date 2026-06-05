@@ -184,7 +184,7 @@ export default function PromotionDetailPage({
 
             {/* Target scope list */}
             <Div className="border-t border-brand-border dark:border-dark-border pt-6 space-y-4">
-                <H3 className="text-xs font-bold uppercase text-brand-inactive-text tracking-wider">Escopo de Elegibilidade ({promotion.apply_scope === "entire_cart" ? "Carrinho Inteiro" : promotion.apply_scope === "category" ? "Categorias" : "Produtos"})</H3>
+                <H3 className="text-xs font-bold uppercase text-brand-inactive-text tracking-wider">Escopo de Elegibilidade ({promotion.apply_scope === "entire_cart" ? "Toda a Sacola" : promotion.apply_scope === "category" ? "Categorias" : "Produtos"})</H3>
 
                 {promotion.apply_scope === "entire_cart" && (
                     <Div className="text-sm text-brand-inactive-text bg-gray-50 dark:bg-dark-border/20 p-4 rounded-xl flex items-center gap-2">

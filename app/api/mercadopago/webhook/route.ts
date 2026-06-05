@@ -332,6 +332,11 @@ async function processWebhookWithRetry(
       updateData.mp_date_approved = paymentInfo.date_approved
     }
 
+    if (orderStatus === "paid") {
+      updateData.amount_paid = orderData.total_amount
+      updateData.paid_amount = orderData.total_amount
+    }
+
     console.log(`[WEBHOOK] Updating order ${orderId}: "${previousSituation}" → "${orderStatus}"`)
 
     const { error: updateError } = await supabase

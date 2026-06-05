@@ -109,16 +109,16 @@ export function ReportModal({
                 <div className="h-[180px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                     <img
                         src="https://img.dudit.com.br/static/illustrations/DenunciarItem.png"
-                        alt="Denunciar Item"
+                        alt="Comunicar algo errado"
                         className="w-64 h-auto object-contain transform translate-y-6"
                     />
                 </div>
 
                 <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
-                    Denunciar {targetType === "partner" ? "vendedor" : "produto"}
+                    Comunicar algo errado sobre este {targetType === "partner" ? "vendedor" : "produto"}
                 </h4>
                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-8 text-center leading-relaxed">
-                    Você está denunciando <strong>{targetName}</strong>. Sua denúncia é anônima e ajuda a manter nossa comunidade segura.
+                    Percebeu algo que não parece correto em <strong>{targetName}</strong>? Conte para nós. Seu relato é anônimo e será analisado pela nossa equipe.
                 </p>
 
                 <div className="space-y-6">

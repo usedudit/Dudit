@@ -38,6 +38,18 @@ export function formatDate(date: Date | string | number): string {
 }
 
 /**
+ * Robust string-based formatter from YYYY-MM-DD to DD-MM-YYYY without timezone shift.
+ */
+export function formatDateToBR(dateStr?: string | null): string {
+  if (!dateStr) return ""
+  const parts = dateStr.split("-")
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`
+  }
+  return dateStr
+}
+
+/**
  * Formats a date as "DD de Mês de YYYY, HH:mm" (Timezone: America/Sao_Paulo).
  */
 export function formatFullDate(date: Date | string | number): string {
@@ -252,3 +264,25 @@ export function formatPercent(value: number | string, decimals = 2): string {
     maximumFractionDigits: decimals,
   }).format((num || 0) / 100)
 }
+
+/**
+ * Returns the suffix string corresponding to a billing unit.
+ */
+export function getBillingUnitSuffix(unit?: string | null): string {
+  if (!unit) return ""
+  switch (unit) {
+    case "per_hour":
+      return "/hora"
+    case "per_day":
+      return "/dia"
+    case "per_week":
+      return "/semana"
+    case "per_month":
+      return "/mês"
+    case "per_year":
+      return "/ano"
+    default:
+      return ""
+  }
+}
+

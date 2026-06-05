@@ -587,7 +587,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             setProducts((prev) => [createdProduct, ...prev])
             addToCart(createdProduct)
             setIsQuickProductSheetOpen(false)
-            notifySuccess("Produto criado e adicionado ao carrinho.")
+            notifySuccess("Produto criado e adicionado à sacola.")
         } finally {
             setIsCreatingQuickProduct(false)
         }
@@ -1559,7 +1559,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 notifySuccess("Item removido.")
                             }}
                             title="Remover Item?"
-                            description="Você tem certeza que deseja remover este item do carrinho?"
+                            description="Você tem certeza que deseja remover este item da sacola?"
                             confirmText="Remover"
                             cancelText="Cancelar"
                             variant="danger"

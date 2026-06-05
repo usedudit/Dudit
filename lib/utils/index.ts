@@ -4,3 +4,5 @@ export * from "./revalidation"
 export * from "./query-optimizer"
 export * from "./product-helpers"
 export * from "./formatters"
+export * from "./pix-generator"
+

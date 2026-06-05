@@ -215,7 +215,7 @@ export async function createReport(data: {
         review: "reviews",
     }
     const tableName = targetTable[data.targetType]
-    
+
     // We use adminClient to verify existence to bypass RLS false-negatives (user just needs to know if it exists)
     const adminClient = getAdminClient()
     const { data: target, error: targetError } = await adminClient
@@ -421,9 +421,9 @@ export async function getReports(
             .from("user_profiles")
             .select("user_id, full_name")
             .in("user_id", reporterIds)
-        ;(reporters || []).forEach((p: any) => {
-            if (p.full_name) reporterNames.set(p.user_id, p.full_name)
-        })
+            ; (reporters || []).forEach((p: any) => {
+                if (p.full_name) reporterNames.set(p.user_id, p.full_name)
+            })
     }
 
     const mapped: Report[] = items.map((r: any) => {
@@ -717,14 +717,14 @@ export async function removeProductFromMarketplace(
     }
 
     const adminClient = getAdminClient()
-    
+
     // Validate product exists
     const { data: product, error: productError } = await adminClient
         .from("products")
         .select("id, partner_id, name")
         .eq("id", id)
         .single()
-        
+
     if (productError || !product) {
         return { success: false, error: "Produto não encontrado" }
     }

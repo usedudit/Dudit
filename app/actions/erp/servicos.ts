@@ -184,6 +184,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
                 ? (data.show_in_marketplace !== undefined ? data.show_in_marketplace : (data.showInMarketplace !== undefined ? data.showInMarketplace : true))
                 : (data.show_in_marketplace || data.showInMarketplace || false),
             highlight_service: data.highlight_service || data.highlightService || false,
+            show_price_in_store: data.show_price_in_store !== false && data.showPriceInStore !== false,
             marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,
             tags: data.tags || [],
             notes: data.notes || null,
@@ -331,6 +332,8 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.fulfillmentModes !== undefined) payload.fulfillment_modes = data.fulfillmentModes
         if (data.payment_requirement !== undefined) payload.payment_requirement = data.payment_requirement
         if (data.paymentRequirement !== undefined) payload.payment_requirement = data.paymentRequirement
+        if (data.show_price_in_store !== undefined) payload.show_price_in_store = data.show_price_in_store
+        if (data.showPriceInStore !== undefined) payload.show_price_in_store = data.showPriceInStore
 
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)

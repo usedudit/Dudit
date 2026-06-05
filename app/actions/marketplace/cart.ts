@@ -510,7 +510,7 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
     .single()
 
   if (fetchError || !currentItem) {
-    return { error: "Item não encontrado no carrinho." }
+    return { error: "Item não encontrado na sacola." }
   }
 
   // Check if an item with the new variant already exists in the cart
@@ -525,14 +525,14 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
   if (existingItem) {
     // If it already exists, merge/update quantity of the existing one and delete the old one
     const newQty = existingItem.quantity + currentItem.quantity
-    
+
     // We should also check the stock limit for the new variant
     const { data: variantData } = await supabase
       .from("product_variants")
       .select("stock_available, stock_quantity")
       .eq("id", newVariantId)
       .single()
-      
+
     const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
     const finalQty = Math.min(newQty, stock)
 
@@ -557,7 +557,7 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
       .select("stock_available, stock_quantity")
       .eq("id", newVariantId)
       .single()
-      
+
     const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
     const finalQty = Math.min(currentItem.quantity, stock)
 
@@ -614,14 +614,12 @@ export async function checkoutCartAction(
 
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId).filter(Boolean)
 
-  if (payDepositOnly) {
-    await adminClient
-      .from("cart_items")
-      .update({ pay_deposit_only: true, updated_at: new Date().toISOString() })
-      .in("id", cartItemIds)
-      .eq("user_id", user.id)
-      .eq("item_type", "service_booking")
-  }
+  await adminClient
+    .from("cart_items")
+    .update({ pay_deposit_only: Boolean(payDepositOnly), updated_at: new Date().toISOString() })
+    .in("id", cartItemIds)
+    .eq("user_id", user.id)
+    .eq("item_type", "service_booking")
 
   const defaultProductMode = deliveryType === "delivery" ? "delivery" : "pickup"
   for (const item of partnerItems) {
@@ -699,19 +697,19 @@ export async function checkoutCartAction(
       .maybeSingle(),
     hasDeliveryLines && deliveryAddress
       ? quoteDeliveryFeeAction({
-          partnerId,
-          destinationAddress: deliveryAddress,
-          freeDeliveryCoupon: false,
-          orderSubtotal: totalAmount,
-        })
+        partnerId,
+        destinationAddress: deliveryAddress,
+        freeDeliveryCoupon: false,
+        orderSubtotal: totalAmount,
+      })
       : Promise.resolve({ success: true, fee: 0, distanceKm: null, breakdown: null }),
     listActivePromotionsForMarketplaceAction(partnerId, user.id),
     (isUuid && !useMercadoPago)
       ? supabase
-          .from("payment_methods")
-          .select("*, payment_method_installment_fees(installment_number, fee_percent)")
-          .eq("id", paymentMethod)
-          .single()
+        .from("payment_methods")
+        .select("*, payment_method_installment_fees(installment_number, fee_percent)")
+        .eq("id", paymentMethod)
+        .single()
       : Promise.resolve({ data: null, error: null }),
   ])
 
@@ -921,11 +919,11 @@ export async function checkoutCartAction(
 
   const orderPreparation = hasProducts
     ? computeOrderPreparationEstimate({
-        products: products || [],
-        openingHours: (partner as any)?.opening_hours || null,
-        pickupWindowMinutes: 30,
-        deliveryTimeEstimateMinutes: 0,
-      })
+      products: products || [],
+      openingHours: (partner as any)?.opening_hours || null,
+      pickupWindowMinutes: 30,
+      deliveryTimeEstimateMinutes: 0,
+    })
     : null
 
   const preparationPayload = orderPreparation ? {
@@ -1074,8 +1072,9 @@ export async function checkoutCartAction(
   // SECURITY FIX (MED-02): Scope cart deletion to current user
   await supabase.from("cart_items").delete().in("id", cartItemIds).eq("user_id", user.id)
 
-  if (!useMercadoPago && String(order.situation).toLowerCase() === "paid") {
-    await fulfillMarketplaceOrder(adminClient, order.id)
+  const hasServiceLines = resolvedLines.some((l) => l.itemType === "service_booking")
+  if (!useMercadoPago && (String(order.situation).toLowerCase() === "paid" || hasServiceLines)) {
+    await fulfillMarketplaceOrder(adminClient, order.id, { force: true })
   }
 
   if (couponIdToSave) {
@@ -1119,4 +1118,33 @@ export async function checkoutCartAction(
     couponDiscount: couponDiscountAmount,
     finalTotal: paymentAwareTotal,
   }
+}
+
+export async function updateCartItemFulfillmentModeAction(cartItemId: string, mode: string, csrf_token?: string) {
+  await requireRateLimit(RateLimitCategory.CART)
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) return { error: csrfValidation.error }
+
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  // Verify ownership
+  const { data: item } = await supabase
+    .from("cart_items")
+    .select("user_id")
+    .eq("id", cartItemId)
+    .single()
+
+  if (!item || item.user_id !== user.id) return { error: "Sem permissão" }
+
+  const { error } = await supabase
+    .from("cart_items")
+    .update({ fulfillment_mode: mode, updated_at: new Date().toISOString() })
+    .eq("id", cartItemId)
+
+  if (error) return { error: error.message }
+
+  await revalidateCart(user.id)
+  return { success: true }
 }

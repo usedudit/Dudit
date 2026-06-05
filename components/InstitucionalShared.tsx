@@ -141,7 +141,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             />
                         </Link>
                         <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-                            Descubra produtos, serviços e negócios da sua cidade - ou mostre o que você oferece na Dudit.
+                            Descubra, compre, venda e organize. Tudo em um só lugar.
                         </p>
                     </div>
 

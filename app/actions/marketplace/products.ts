@@ -33,10 +33,11 @@ async function _getMarketplaceProductBase(id: string) {
       location_id, location:storage_locations!location_id(name),
       images, rating, partner_id, sku, 
       condition, show_in_marketplace, technical_specs, created_at,
+      show_price_in_store,
       video_type, video_url, video_thumbnail, video_duration, video_provider_id,
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, store_name, store_description, rating, user_id, 
+        id, store_name, store_description, rating, user_id, phone,
         store_image_url, banner_url, max_installments, interest_rate_percent,
         mp_user_id, mp_public_key, opening_hours,
         logo_moderation_status, banner_moderation_status,

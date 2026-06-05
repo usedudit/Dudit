@@ -7,6 +7,7 @@ import { AlertCircleIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import { InfoCard } from "@/components/reusable"
 import MarketplaceFooter from "../marketplace/MarketplaceFooter"
+import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 // ─── Background ──────────────────────────────────────────────────────────────
 const WavesBackground = React.memo(() => (
@@ -64,6 +65,16 @@ export default function BannedView({ profile }: { profile: any }) {
     const banDate = profile?.banned_at ? new Date(profile.banned_at).toLocaleDateString('pt-BR') : "Desconhecida"
     const unbanDate = profile?.banned_until ? new Date(profile.banned_until).toLocaleDateString('pt-BR') : "Permanente"
 
+    const handleSignOut = async (e: React.FormEvent) => {
+        e.preventDefault()
+        try {
+            await supabase.auth.signOut({ scope: "local" })
+            window.location.href = "/auth/login"
+        } catch (error) {
+            console.error("Erro ao sair da conta:", error)
+        }
+    }
+
     return (
         <Shell>
             <div className="mx-auto h-20 w-20 bg-brand-red/10 text-brand-red rounded-full flex items-center justify-center">
@@ -101,7 +112,7 @@ export default function BannedView({ profile }: { profile: any }) {
                 </a>
             </Button>
 
-            <form action="/auth/sign-out" method="POST" className="w-full flex justify-center">
+            <form onSubmit={handleSignOut} className="w-full flex justify-center">
                 <button type="submit" className="text-sm text-brand-inactive-text hover:text-brand-red mt-4 font-medium">
                     ← Sair da conta
                 </button>

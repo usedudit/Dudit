@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon } from "@/lib/icons"
+import { createPortal } from "react-dom"
+import { AnimatePresence, motion } from "framer-motion"
+import { Search, StarIcon, ArrowLeftIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -41,6 +43,12 @@ interface VendorPageClientProps {
 }
 
 const getImageUrl = (path?: string | null) => getR2ImageUrl(path)
+
+const slideVariants = {
+    enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (dir: number) => ({ x: dir > 0 ? "-100%" : "100%", opacity: 0 }),
+}
 
 const formatJoinDate = (createdAt: string | Date) => {
     const month = formatMonth(createdAt)
@@ -774,7 +782,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 <HeartIcon size={20} />
                             </button>
                             {!isStoreOwner && (
-                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Denunciar vendedor">
+                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Comunicar algo errado sobre este vendedor">
                                     <FlagIcon size={20} />
                                 </button>
                             )}
@@ -1042,7 +1050,50 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
     const [cropModalOpen, setCropModalOpen] = useState(false)
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const [selectedLightboxImage, setSelectedLightboxImage] = useState<string | null>(null)
+
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+    const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
+    const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
+    const lightboxJustOpened = useRef(false)
+    const [isMounted, setIsMounted] = useState(false)
+
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
+    const galleryItems = useMemo(() => {
+        return localImages.map(img => ({
+            type: "image" as const,
+            src: img.startsWith("data:") ? img : getR2ImageUrl(img)
+        }))
+    }, [localImages])
+
+    const lightboxNav = useCallback((dir: 1 | -1) => {
+        lightboxJustOpened.current = false
+        setSlideDirection(dir)
+        setLightboxActiveImg((p: number) => (p + dir + galleryItems.length) % galleryItems.length)
+    }, [galleryItems.length])
+
+    const openLightbox = useCallback((index: number) => {
+        lightboxJustOpened.current = true
+        setLightboxActiveImg(index)
+        setIsLightboxOpen(true)
+    }, [])
+
+    useEffect(() => {
+        if (!isLightboxOpen) return
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "ArrowLeft") {
+                lightboxNav(-1)
+            } else if (e.key === "ArrowRight") {
+                lightboxNav(1)
+            } else if (e.key === "Escape") {
+                setIsLightboxOpen(false)
+            }
+        }
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+    }, [isLightboxOpen, lightboxNav])
 
     const planLimits = {
         free: 1,
@@ -1142,7 +1193,7 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                                     src={srcUrl}
                                     alt={`Galeria ${idx + 1}`}
                                     className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                                    onClick={() => setSelectedLightboxImage(srcUrl)}
+                                    onClick={() => openLightbox(idx)}
                                 />
                                 {isStoreOwner && (
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
@@ -1211,23 +1262,113 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                 aspectRatio={1}
             />
 
-            {selectedLightboxImage && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 animate-fade-in"
-                    onClick={() => setSelectedLightboxImage(null)}
-                >
-                    <button
-                        className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
-                        onClick={() => setSelectedLightboxImage(null)}
-                    >
-                        ✕
-                    </button>
-                    <img
-                        src={selectedLightboxImage}
-                        alt="Visualização em tela cheia"
-                        className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl selection:bg-transparent"
-                    />
-                </div>
+            {isMounted && createPortal(
+                <AnimatePresence>
+                    {isLightboxOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
+                            className="fixed inset-0 z-[9999] flex flex-col bg-black lg:bg-black/90 lg:backdrop-blur-sm select-none"
+                        >
+                            {/* ── Mobile / Tablet top bar (hidden on lg) ── */}
+                            <div className="flex lg:hidden items-center justify-between px-6 pt-12 pb-4 shrink-0">
+                                <button onClick={() => setIsLightboxOpen(false)}
+                                    className="w-10 h-10 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                    <XIcon size={20} />
+                                </button>
+                                <span className="text-white text-sm font-semibold">
+                                    {lightboxActiveImg + 1}/{galleryItems.length}
+                                </span>
+                                <div className="w-10" />
+                            </div>
+
+                            {/* ── Desktop layout ── */}
+                            <div className="hidden lg:flex flex-1 min-h-0 relative">
+                                {/* Close button */}
+                                <button onClick={() => setIsLightboxOpen(false)}
+                                    className="absolute top-6 right-6 z-10 w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors">
+                                    <XIcon size={22} />
+                                </button>
+
+                                {/* Thumbnails column */}
+                                <div className="flex flex-col gap-2 w-[120px] shrink-0 overflow-y-auto px-5 py-6">
+                                    {galleryItems.map((item, i: number) => (
+                                        <div key={i} onClick={() => { lightboxJustOpened.current = false; setSlideDirection(i > lightboxActiveImg ? 1 : -1); setLightboxActiveImg(i) }}
+                                            className={`w-full aspect-square rounded-md border-2 cursor-pointer overflow-hidden shrink-0 transition-all
+                                                ${lightboxActiveImg === i ? "border-white" : "border-white/20 hover:border-white/50"}`}>
+                                            <img src={item.src} className="w-full h-full object-cover" alt={`Foto da galeria ${i + 1}`} />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Main image */}
+                                <div className="relative flex-1 flex items-center justify-center min-w-0 p-8">
+                                    <AnimatePresence mode="wait" custom={slideDirection}
+                                        onExitComplete={() => { lightboxJustOpened.current = false }}>
+                                        <motion.img
+                                            key={galleryItems[lightboxActiveImg].src}
+                                            src={galleryItems[lightboxActiveImg].src}
+                                            className="max-w-full max-h-full object-contain"
+                                            alt={`Foto da galeria ${lightboxActiveImg + 1}`}
+                                            custom={slideDirection}
+                                            variants={slideVariants}
+                                            initial="enter"
+                                            animate="center"
+                                            exit="exit"
+                                            transition={{ duration: 0.2 }}
+                                        />
+                                    </AnimatePresence>
+                                    {galleryItems.length > 1 && (
+                                        <>
+                                            <Button variant="filled" onClick={() => lightboxNav(-1)}
+                                                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border-none text-white transition-colors">
+                                                <ChevronLeftIcon size={26} />
+                                            </Button>
+                                            <Button variant="filled" onClick={() => lightboxNav(1)}
+                                                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border-none text-white transition-colors">
+                                                <ChevronRightIcon size={26} />
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── Mobile image area ── */}
+                            <div className="flex lg:hidden flex-1 min-h-0 relative items-center justify-center">
+                                <AnimatePresence mode="wait" custom={slideDirection}
+                                    onExitComplete={() => { lightboxJustOpened.current = false }}>
+                                    <motion.img
+                                        key={galleryItems[lightboxActiveImg].src}
+                                        src={galleryItems[lightboxActiveImg].src}
+                                        className="max-w-full max-h-full object-contain px-4"
+                                        alt={`Foto da galeria ${lightboxActiveImg + 1}`}
+                                        custom={slideDirection}
+                                        variants={slideVariants}
+                                        initial="enter"
+                                        animate="center"
+                                        exit="exit"
+                                        transition={{ duration: 0.2 }}
+                                    />
+                                </AnimatePresence>
+                                {galleryItems.length > 1 && (
+                                    <>
+                                        <button onClick={() => lightboxNav(-1)}
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/30 text-white active:bg-black/50 transition-colors">
+                                            <ChevronLeftIcon size={22} />
+                                        </button>
+                                        <button onClick={() => lightboxNav(1)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-black/30 text-white active:bg-black/50 transition-colors">
+                                            <ChevronRightIcon size={22} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
             )}
         </div>
     )

@@ -77,11 +77,15 @@ export const getCurrentPartner = cache(async (resolvedUser?: User | any): Promis
   const supabase = await getSupabaseServerClient()
   const { data: partner } = await supabase
     .from("partners")
-    .select("id, user_id")
+    .select("id, user_id, is_active, erp_disabled")
     .eq("user_id", user.id)
-    .single()
+    .maybeSingle()
 
-  return partner
+  if (!partner || partner.is_active === false || partner.erp_disabled === true) {
+    return null
+  }
+
+  return { id: partner.id, user_id: partner.user_id }
 })
 
 /**
@@ -145,7 +149,7 @@ const checkPartnerAccess = async (
   const template = await getPermissionTemplate()
   const [invitedAccessRes, ownedPartnerRes] = await Promise.all([
     admin.from("partner_users").select("role_id, roles:roles!inner(permissions)").eq("partner_id", partnerId).eq("user_id", userId).maybeSingle(),
-    admin.from("partners").select("user_id").eq("id", partnerId).single()
+    admin.from("partners").select("user_id, is_active, erp_disabled").eq("id", partnerId).single()
   ]);
 
   if (invitedAccessRes.error || ownedPartnerRes.error) {
@@ -161,6 +165,11 @@ const checkPartnerAccess = async (
       });
       return null;
     }
+  }
+
+  // If the partner itself is inactive or disabled, block any access.
+  if (ownedPartnerRes.data && (ownedPartnerRes.data.is_active === false || ownedPartnerRes.data.erp_disabled === true)) {
+    return null
   }
 
   // Explicitly validate returned truthy data

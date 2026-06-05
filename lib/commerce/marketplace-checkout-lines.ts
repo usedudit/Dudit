@@ -1,6 +1,7 @@
 import type { ResolvedCartLine } from "@/lib/services/marketplace-cart-resolver"
 import type { CheckoutLineContext, CheckoutLineKind } from "@/lib/commerce/checkout-requirements"
 import type { ServiceBookingMetadata } from "@/lib/types/marketplace-cart"
+import { formatDateToBR } from "@/lib/utils/formatters"
 
 export function buildCheckoutLineContextsFromResolved(
   lines: ResolvedCartLine[],
@@ -39,6 +40,7 @@ export type MarketplaceCheckoutDisplayLine = {
   fulfillmentMode: string | null
   paymentRequirement: string
   bookingSummary?: string | null
+  allowedFulfillmentModes?: string[]
 }
 
 export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): MarketplaceCheckoutDisplayLine[] {
@@ -46,7 +48,7 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
     const meta = line.bookingMetadata
     let bookingSummary: string | null = null
     if (meta && !meta.instantPurchase && meta.date && meta.time) {
-      bookingSummary = `${meta.staffName} · ${meta.date} às ${meta.time}`
+      bookingSummary = `${meta.staffName} · ${formatDateToBR(meta.date)} às ${meta.time}`
     }
 
     return {
@@ -59,6 +61,7 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
       fulfillmentMode: line.fulfillmentMode,
       paymentRequirement: line.capabilities.paymentRequirement,
       bookingSummary,
+      allowedFulfillmentModes: line.capabilities.fulfillmentModes || [],
     }
   })
 }

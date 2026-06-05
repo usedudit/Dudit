@@ -128,10 +128,10 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
             admin.from("partner_users").select(`
                     partner_id, user_id, role_id,
                     roles:roles!inner (id, permissions),
-                    partners!inner (store_name, user_id, business_info)
+                    partners!inner (store_name, user_id, business_info, is_active, erp_disabled)
                 `).eq("user_id", userId),
             admin.from("partners").select(`
-                    id, user_id, store_name, business_info
+                    id, user_id, store_name, business_info, is_active, erp_disabled
                 `).eq("user_id", userId)
         ])
 
@@ -143,6 +143,9 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
 
         if (ownedData) {
             for (const store of ownedData) {
+                if (store.is_active === false || store.erp_disabled === true) {
+                    continue
+                }
                 accessRecords[store.id] = {
                     partnerId: store.id,
                     userId: userId,
@@ -158,6 +161,9 @@ const getCachedUserAccess = (userId: string) => unstable_cache(
 
         if (invitedData) {
             for (const record of invitedData as any[]) {
+                if (record.partners?.is_active === false || record.partners?.erp_disabled === true) {
+                    continue
+                }
                 if (!accessRecords[record.partner_id]) {
                     const ownerId = record.partners.user_id
                     if (ownerId) ownerUserIds.add(ownerId)

@@ -34,6 +34,9 @@ export type MarketplaceCheckoutContextResult =
         address: Record<string, unknown> | null
         storeName: string | null
         mpConnected: boolean
+        phone: string | null
+        pixKey: string | null
+        pixKeyType: string | null
       }
       delivery: {
         planEnabled: boolean
@@ -77,16 +80,23 @@ export async function getMarketplaceCheckoutContextAction(input: {
     } else subscriptionsSubtotal += total
   }
 
-  const [{ data: partnerRow }, plan, deliveryConfig] = await Promise.all([
+  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult] = await Promise.all([
     admin
       .from("partners")
       .select(
-        "store_name, service_deposit_enabled, service_deposit_percentage, mp_user_id, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "store_name, service_deposit_enabled, service_deposit_percentage, mp_user_id, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
     getPartnerPlan(resolved.partnerId),
     getPartnerDeliveryConfigAction(resolved.partnerId),
+    admin
+      .from("payment_methods")
+      .select("pix_key, pix_key_type")
+      .eq("partner_id", resolved.partnerId)
+      .eq("type", "pix")
+      .eq("is_active", true)
+      .maybeSingle(),
   ])
 
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
@@ -120,6 +130,9 @@ export async function getMarketplaceCheckoutContextAction(input: {
       address: (partnerAddress as Record<string, unknown>) || null,
       storeName: partnerRow?.store_name || null,
       mpConnected,
+      phone: partnerRow?.phone || null,
+      pixKey: pixMethodResult?.data?.pix_key || null,
+      pixKeyType: pixMethodResult?.data?.pix_key_type || null,
     },
     delivery: {
       planEnabled: deliveryConfig.success ? deliveryConfig.capability.deliveryEnabled : false,

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -99,13 +99,13 @@ const getReadyDayLabel = (estimate: any) => {
     if (!estimate) return ""
     const now = new Date(estimate.now || Date.now())
     const readyAt = new Date(estimate.readyAt)
-    
+
     const readyDate = new Date(readyAt.getFullYear(), readyAt.getMonth(), readyAt.getDate())
     const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    
+
     const diffTime = readyDate.getTime() - nowDate.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays === 0) {
         return "hoje"
     } else if (diffDays === 1) {
@@ -126,6 +126,7 @@ export function ProductDetailsPageClient({
     hideHeaderAndFooter = false,
 }: ProductDetailsPageClientProps) {
     const router = useRouter()
+    const showPrice = product.show_price_in_store !== false
     const { user, supabase, isLoading } = useSupabase()
 
     const [userId, setUserId] = useState<string | null | undefined>(initialUserId || user?.id)
@@ -174,6 +175,7 @@ export function ProductDetailsPageClient({
         return {
             id: p?.id || product.partner_id || "1",
             user_id: p?.user_id,
+            phone: p?.phone,
             store_name: p?.store_name || "Vendedor da Dudit",
             city: address?.city || "Brasil",
             state: address?.state || "BR",
@@ -678,13 +680,13 @@ export function ProductDetailsPageClient({
             const { token } = await fetch("/api/csrf-token").then((r) => r.json())
             const result = await addToCartAction(product.id, quantity, token, selectedVariant?.id)
             if (result.error) {
-                notifyError("Erro ao adicionar ao carrinho", result.error)
+                notifyError("Erro ao adicionar à sacola", result.error)
             } else {
                 invalidateCartCache()
-                notifySuccess("Sucesso", "Produto adicionado ao carrinho!")
+                notifySuccess("Sucesso", "Produto adicionado à sacola!")
             }
         } catch {
-            notifyError("Erro", "Erro ao adicionar ao carrinho")
+            notifyError("Erro", "Erro ao adicionar à sacola")
         } finally {
             setLoading(false)
             isActionInProgress.current = false
@@ -863,7 +865,7 @@ export function ProductDetailsPageClient({
                     </div>
                 )
             })}
-            {!isProductOwner && (
+            {showPrice && !isProductOwner && (
                 <div className="mt-4">
                     <div className="flex items-center gap-2 mb-1.5">
                         <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Quantidade</label>
@@ -889,7 +891,7 @@ export function ProductDetailsPageClient({
                 </div>
             )}
         </div>
-    ), [attributeKeys, processedVariants, selectedAttributes, handleAttributeSelect, MAX_STOCK, isOutOfStock, quantity, isProductOwner])
+    ), [attributeKeys, processedVariants, selectedAttributes, handleAttributeSelect, MAX_STOCK, isOutOfStock, quantity, isProductOwner, showPrice])
 
     const BuyPanel = (
         <div className="bg-white relative">
@@ -904,7 +906,7 @@ export function ProductDetailsPageClient({
                     )}
                     <span className="text-gray-300 text-xs">|</span>
                     <span className="text-[13px] font-semibold text-brand-inactive-text">
-                        {product.product_type === "digital" ? "Produto Digital" : product.product_type === "service" ? "Serviço" : "Produto Físico"}
+                        {product.product_type?.toLowerCase() === "digital" ? "Produto Digital" : (product.product_type?.toLowerCase() === "service" || product.product_type?.toLowerCase() === "serviço" || product.product_type?.toLowerCase() === "servico") ? "Serviço" : "Produto Físico"}
                     </span>
                 </div>
                 {reviews.length > 0 && (
@@ -922,7 +924,7 @@ export function ProductDetailsPageClient({
                 {product.name}
             </h1>
 
-            {activePromo && (
+            {showPrice && activePromo && (
                 <div className="mb-6 flex">
                     <Badge variant="blue" icon={<TagIcon size={12} />} className="text-xs">
                         {activePromo.name}
@@ -932,7 +934,13 @@ export function ProductDetailsPageClient({
 
             {/* Price */}
             <div className="mb-6">
-                {(() => {
+                {!showPrice ? (
+                    <div className="space-y-1">
+                        <p className="text-3xl leading-none font-bold text-brand-dark">
+                            Preço sob consulta
+                        </p>
+                    </div>
+                ) : (() => {
                     const hasPromo = pricing.hasPromo;
                     const hasPix = pricing.pixDiscountPercent > 0;
                     const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
@@ -1023,6 +1031,26 @@ export function ProductDetailsPageClient({
                     color="orange"
                     className="mb-8"
                 />
+            ) : !showPrice ? (
+                <div className="hidden lg:block">
+                    {(() => {
+                        const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                        const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
+                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                        return (
+                            <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full mb-8 h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                            >
+                                <WhatsappIcon size={20} className="fill-white" />
+                                Consultar preço
+                            </a>
+                        )
+                    })()}
+                </div>
             ) : (
                 <div className="hidden lg:block">
                     <Button disabled={isOutOfStock || loading} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
@@ -1293,7 +1321,7 @@ export function ProductDetailsPageClient({
                     className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text hover:text-[#d32f2f] transition-colors"
                 >
                     <FlagIcon size={14} />
-                    Denunciar este produto
+                    Comunicar algo errado
                 </button>
             )}
         </div>
@@ -1912,13 +1940,35 @@ export function ProductDetailsPageClient({
                     {/* Mobile bottom bar */}
                     {!isProductOwner && (
                         <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-3 lg:hidden shadow-lg">
-                            <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
-                                disabled={isOutOfStock || loading} onClick={handleAddToCart}>
-                                <ShoppingCartIcon size={20} />
-                            </Button>
-                            <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
-                                {isOutOfStock ? "Esgotado" : "Comprar Agora"}
-                            </Button>
+                            {!showPrice ? (
+                                (() => {
+                                    const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                                    const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                                    const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
+                                    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                                    return (
+                                        <a
+                                            href={whatsappUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-grow h-12 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-full transition-colors text-sm"
+                                        >
+                                            <WhatsappIcon size={20} className="fill-white" />
+                                            Consultar preço
+                                        </a>
+                                    )
+                                })()
+                            ) : (
+                                <>
+                                    <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
+                                        disabled={isOutOfStock || loading} onClick={handleAddToCart}>
+                                        <ShoppingCartIcon size={20} />
+                                    </Button>
+                                    <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
+                                        {isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>

@@ -15,7 +15,7 @@ import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/c
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDateToBR } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 
@@ -121,7 +121,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         if (type === "service_booking") {
             const meta = item.booking_metadata
             if (meta?.date && meta?.time) {
-                return `${item.services?.name || meta.serviceName} — ${meta.date} ${meta.time}`
+                return `${item.services?.name || meta.serviceName} — ${formatDateToBR(meta.date)} ${meta.time}`
             }
             return item.services?.name || meta?.serviceName || "Serviço"
         }
