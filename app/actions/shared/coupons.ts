@@ -17,7 +17,7 @@ const CouponSchema = z.object({
     ),
     discountType: z.enum(["percentage", "fixed", "free_shipping"]),
     discountValue: z.number().nullable(),
-    applyScope: z.enum(["all", "categories", "products", "services"]),
+    applyScope: z.enum(["all", "categories", "products", "services", "subscriptions"]),
     allowCombination: z.boolean().default(true),
     minCartValue: z.number().min(0).default(0),
     maxDiscountValue: z.number().min(0).nullable(),
@@ -295,11 +295,15 @@ export async function listApplicableMarketplaceCouponsAction(input: {
         return { success: false, error: error.message, coupons: [] }
     }
 
+    const validationPromises = (coupons || []).map(async (coupon: any) => {
+        const result = await validateCouponRow(admin, coupon, input)
+        return { coupon, result }
+    })
+
+    const validationResults = await Promise.all(validationPromises)
     const applicableCoupons = []
 
-    for (const coupon of coupons || []) {
-        const result = await validateCouponRow(admin, coupon, input)
-
+    for (const { coupon, result } of validationResults) {
         if (!result.valid) continue
 
         applicableCoupons.push({

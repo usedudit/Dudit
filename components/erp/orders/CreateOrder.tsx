@@ -644,6 +644,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             const quote = await quoteDeliveryFeeAction({
                 partnerId,
                 destinationAddress,
+                orderSubtotal: subtotal,
             })
             if (!active) return
 
@@ -1447,7 +1448,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                             <TabsContent value="settings" className="xl:hidden mt-0">
                                 <FadeIn key="settings">
-                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6">
+                                    <div className="bg-white dark:bg-dark-surface flex flex-col gap-6">
                                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Configurações do Pedido</h3>
 
                                         {isPaidOrder ? (
@@ -1515,20 +1516,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                             })
                                                         }}
                                                         options={accountOptions}
-                                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : { label: "Criar conta", onClick: () => {
-                                                            setNewAccountName("")
-                                                            setNewAccountType("cash")
-                                                            setNewAccountInitialBalance(0)
-                                                            setNewAccountIsDefault(
-                                                                !financeAccounts.some(
-                                                                    (acc) =>
-                                                                        acc.type === "cash" &&
-                                                                        (!acc.integration_source || acc.integration_source !== "mercadopago"),
-                                                                ),
-                                                            )
-                                                            setNewAccountIsActive(true)
-                                                            setIsAccountModalOpen(true)
-                                                        } }}
+                                                        actionItem={isMarketplaceLocked && isPaidOrder ? undefined : {
+                                                            label: "Criar conta", onClick: () => {
+                                                                setNewAccountName("")
+                                                                setNewAccountType("cash")
+                                                                setNewAccountInitialBalance(0)
+                                                                setNewAccountIsDefault(
+                                                                    !financeAccounts.some(
+                                                                        (acc) =>
+                                                                            acc.type === "cash" &&
+                                                                            (!acc.integration_source || acc.integration_source !== "mercadopago"),
+                                                                    ),
+                                                                )
+                                                                setNewAccountIsActive(true)
+                                                                setIsAccountModalOpen(true)
+                                                            }
+                                                        }}
                                                         error={fieldErrors?.has("financeAccountId")}
                                                     />
                                                 )}

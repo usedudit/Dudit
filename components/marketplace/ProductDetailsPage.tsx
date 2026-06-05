@@ -94,6 +94,27 @@ function ActionButtons({ productId, onShareClick, className = "" }: { productId:
     )
 }
 
+const getReadyDayLabel = (estimate: any) => {
+    if (!estimate) return ""
+    const now = new Date(estimate.now || Date.now())
+    const readyAt = new Date(estimate.readyAt)
+    
+    const readyDate = new Date(readyAt.getFullYear(), readyAt.getMonth(), readyAt.getDate())
+    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
+    const diffTime = readyDate.getTime() - nowDate.getTime()
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) {
+        return "hoje"
+    } else if (diffDays === 1) {
+        return "amanhã"
+    } else {
+        const weekday = readyAt.toLocaleDateString("pt-BR", { weekday: "long" })
+        return weekday.charAt(0).toUpperCase() + weekday.slice(1)
+    }
+}
+
 export function ProductDetailsPageClient({
     product,
     variants,
@@ -321,6 +342,7 @@ export function ProductDetailsPageClient({
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
                     destinationAddress: addressStr,
+                    orderSubtotal: pricing.total,
                 })
                 if (!active) return
                 if (quote.success) {
@@ -382,6 +404,7 @@ export function ProductDetailsPageClient({
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: partner.id,
                     destinationAddress: addressStr,
+                    orderSubtotal: pricing.total,
                 })
                 if (!active) return
                 if (quote.success) {
@@ -1074,9 +1097,9 @@ export function ProductDetailsPageClient({
                         <div className="flex justify-between items-start py-4 px-4">
                             <div>
                                 <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                                {preparationEstimate && Number(product.availability_value || 0) > 0 && (
+                                {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                                     <p className="text-xs text-brand-inactive-text">
-                                        Pronto entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                        Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                                     </p>
                                 )}
                             </div>

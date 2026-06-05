@@ -195,7 +195,7 @@ export default function CouponsPage({
             })
         }
 
-        const applyScopeOptions = ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos"].filter((opt) =>
+        const applyScopeOptions = ["Todos os itens", "Categorias especificas", "Produtos especificos", "Servicos especificos", "Assinaturas especificas"].filter((opt) =>
             availableScopes.has(opt)
         )
         if (applyScopeOptions.length > 0) {

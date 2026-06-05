@@ -936,7 +936,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                             {/* LEFT SIDE - EDITOR */}
                             <div
-                                className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}
+                                className={`w-full lg:w-1/2 flex flex-col flex-1 min-h-0 lg:flex-none lg:shrink-0 lg:h-full border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}
                             >
                                 {/* Header now inside the left column */}
                                 <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">

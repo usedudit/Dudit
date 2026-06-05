@@ -470,7 +470,7 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                                 singularItemName="movimentação"
                                             />
                                             {effectiveViewMode === 'grid' ? (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginatedMovements.map((mov) => {
                                                         const prefetch = getPrefetchProps(mov.id)
                                                         return (

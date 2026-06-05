@@ -72,6 +72,7 @@ export async function priceMarketplaceCartCheckout(
       partnerId,
       destinationAddress: params.deliveryAddress,
       freeDeliveryCoupon: false,
+      orderSubtotal: subtotal,
     })
     if (!quote.success) return { success: false, error: quote.error || "Erro na cotação de entrega." }
     deliveryFee = Number(quote.fee || 0)
@@ -129,6 +130,7 @@ export async function priceMarketplaceCartCheckout(
       partnerId,
       destinationAddress: params.deliveryAddress,
       freeDeliveryCoupon: true,
+      orderSubtotal: subtotal,
     })
     if (quote.success) {
       deliveryFee = Number(quote.fee || 0)

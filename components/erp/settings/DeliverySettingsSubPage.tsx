@@ -28,6 +28,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
         extraKmPrice: "0",
         maxDeliveryKm: "",
         isDeliveryEnabled: true,
+        isPickupEnabled: true,
+        freeDeliveryThreshold: "",
     })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
@@ -54,6 +56,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                 extraKmPrice: String(res.settings.extraKmPrice || 0),
                 maxDeliveryKm: res.settings.maxDeliveryKm == null ? "" : String(res.settings.maxDeliveryKm),
                 isDeliveryEnabled: Boolean(res.settings.isDeliveryEnabled),
+                isPickupEnabled: Boolean(res.settings.isPickupEnabled ?? true),
+                freeDeliveryThreshold: res.settings.freeDeliveryThreshold == null ? "" : String(res.settings.freeDeliveryThreshold),
             })
             setRules(res.rules || [])
         }
@@ -113,6 +117,8 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                                 extraKmPrice: Number(settings.extraKmPrice || 0),
                                                 maxDeliveryKm: settings.maxDeliveryKm ? Number(settings.maxDeliveryKm) : null,
                                                 isDeliveryEnabled: settings.isDeliveryEnabled,
+                                                isPickupEnabled: settings.isPickupEnabled,
+                                                freeDeliveryThreshold: settings.freeDeliveryThreshold ? Number(settings.freeDeliveryThreshold) : null,
                                             },
                                         })
                                         await reload()
@@ -151,153 +157,188 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-1 flex-1">
-                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Taxa base</span>
-                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor fixo cobrado por cada entrega</span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Retirada ativa</span>
+                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Permitir que clientes retirem o pedido no local</span>
                                         </div>
-                                        <div className="w-[140px]">
-                                            <MoneyInput
-                                                value={settings.baseFee}
-                                                onChange={(val) => setSettings((s) => ({ ...s, baseFee: String(val) }))}
-                                                className="text-right"
-                                            />
-                                        </div>
+                                        <Switch
+                                            checked={settings.isPickupEnabled}
+                                            onCheckedChange={(checked) => setSettings(s => ({ ...s, isPickupEnabled: checked }))}
+                                            className={isFree ? "opacity-50 pointer-events-none" : ""}
+                                        />
                                     </div>
+
+                                    {settings.isDeliveryEnabled && (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex flex-col gap-1 flex-1">
+                                                    <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Taxa base</span>
+                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor fixo cobrado por cada entrega</span>
+                                                </div>
+                                                <div className="w-[140px]">
+                                                    <MoneyInput
+                                                        value={settings.baseFee}
+                                                        onChange={(val) => setSettings((s) => ({ ...s, baseFee: String(val) }))}
+                                                        className="text-right"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex flex-col gap-1 flex-1">
+                                                    <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Entrega grátis a partir de</span>
+                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Valor mínimo do pedido para ter frete grátis (deixe vazio ou 0 para desativar)</span>
+                                                </div>
+                                                <div className="w-[140px]">
+                                                    <MoneyInput
+                                                        value={settings.freeDeliveryThreshold}
+                                                        onChange={(val) => setSettings((s) => ({ ...s, freeDeliveryThreshold: val ? String(val) : "" }))}
+                                                        className="text-right"
+                                                        placeholder="R$ 0,00"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </FormSection>
 
                             {/* Distância */}
-                            <div className="mt-8">
-                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <Accordion
-                                    title={
-                                        <span className="flex items-center gap-2">
-                                            Distância e Entrega
-                                            {!advancedEnabled && (
-                                                <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                            )}
-                                        </span>
-                                    }
-                                    defaultOpen={false}
-                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
-                                    onToggle={(isOpen) => {
-                                        if (isOpen && !advancedEnabled) {
-                                            openPlanUpgrade("escalar")
-                                            return false
+                            {settings.isDeliveryEnabled && (
+                                <div className="mt-8">
+                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                    <Accordion
+                                        title={
+                                            <span className="flex items-center gap-2">
+                                                Distância e Entrega
+                                                {!advancedEnabled && (
+                                                    <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                )}
+                                            </span>
                                         }
-                                    }}
-                                >
-                                    <div className="space-y-6 pb-4">
-                                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega baseados na distância da loja.</p>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <Input
-                                                disabled={!advancedEnabled}
-                                                label="KM incluído"
-                                                value={settings.includedKm}
-                                                onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
-                                                suffix="km"
-                                            />
-                                            <MoneyInput
-                                                disabled={!advancedEnabled}
-                                                label="Preço por KM extra"
-                                                value={settings.extraKmPrice}
-                                                onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
-                                            />
-                                            <Input
-                                                disabled={!advancedEnabled}
-                                                label="Distância máxima"
-                                                value={settings.maxDeliveryKm}
-                                                onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
-                                                suffix="km"
-                                            />
-                                        </div>
-                                    </div>
-                                </Accordion>
-                            </div>
-
-                            {/* Regras por horário */}
-                            <div className="mt-8">
-                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <Accordion
-                                    title={
-                                        <span className="flex items-center gap-2">
-                                            Regras por Horário
-                                            {!advancedEnabled && (
-                                                <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                            )}
-                                        </span>
-                                    }
-                                    defaultOpen={false}
-                                    triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
-                                    onToggle={(isOpen) => {
-                                        if (isOpen && !advancedEnabled) {
-                                            openPlanUpgrade("escalar")
-                                            return false
-                                        }
-                                    }}
-                                >
-                                    <div className="space-y-6 pb-4">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={!advancedEnabled}
-                                                onClick={() => setIsRuleModalOpen(true)}
-                                                leftIcon={<PlusIcon className="w-4 h-4" />}
-                                            >
-                                                Adicionar regra
-                                            </Button>
-                                        </div>
-
-                                        {rules.length === 0 ? (
-                                            <IconPlaceholder
-                                                icon={ClockIcon}
-                                                title="Nenhuma regra cadastrada"
-                                                subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
-                                            />
-                                        ) : (
-                                            <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Início</th>
-                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Fim</th>
-                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Tipo</th>
-                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Valor</th>
-                                                                <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-center w-20">Ações</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {rules.map((rule) => (
-                                                                <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
-                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
-                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
-                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                        {rule.type === "fixed" ? "Fixo" : "Multiplicador"}
-                                                                    </td>
-                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}
-                                                                    </td>
-                                                                    <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
-                                                                        <button
-                                                                            onClick={async () => { await deleteDeliveryFeeRuleAction(partnerId, rule.id); await reload() }}
-                                                                            className="p-2 text-brand-inactive-text hover:text-brand-red transition-colors"
-                                                                        >
-                                                                            <TrashIcon className="w-4 h-4" />
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
+                                        defaultOpen={false}
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                        onToggle={(isOpen) => {
+                                            if (isOpen && !advancedEnabled) {
+                                                openPlanUpgrade("escalar")
+                                                return false
+                                            }
+                                        }}
+                                    >
+                                        <div className="space-y-6 pb-4">
+                                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Configure os limites e custos de entrega por distância</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <Input
+                                                    disabled={!advancedEnabled}
+                                                    label="KM incluído"
+                                                    value={settings.includedKm}
+                                                    onChange={(e) => setSettings((s) => ({ ...s, includedKm: e.target.value }))}
+                                                    suffix="km"
+                                                />
+                                                <Input
+                                                    disabled={!advancedEnabled}
+                                                    label="Distância máxima"
+                                                    value={settings.maxDeliveryKm}
+                                                    onChange={(e) => setSettings((s) => ({ ...s, maxDeliveryKm: e.target.value }))}
+                                                    suffix="km"
+                                                />
+                                                <MoneyInput
+                                                    disabled={!advancedEnabled}
+                                                    label="Preço por KM extra"
+                                                    value={settings.extraKmPrice}
+                                                    onChange={(val) => setSettings((s) => ({ ...s, extraKmPrice: String(val) }))}
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                </Accordion>
-                            </div>
+                                        </div>
+                                    </Accordion>
+                                </div>
+                            )}
+ 
+                            {/* Regras por horário */}
+                            {settings.isDeliveryEnabled && (
+                                <div className="mt-8">
+                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                    <Accordion
+                                        title={
+                                            <span className="flex items-center gap-2">
+                                                Regras por Horário
+                                                {!advancedEnabled && (
+                                                    <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                )}
+                                            </span>
+                                        }
+                                        defaultOpen={false}
+                                        triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left"
+                                        onToggle={(isOpen) => {
+                                            if (isOpen && !advancedEnabled) {
+                                                openPlanUpgrade("escalar")
+                                                return false
+                                            }
+                                        }}
+                                    >
+                                        <div className="space-y-6 pb-4">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Altere o valor da entrega em horários específicos.</p>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={!advancedEnabled}
+                                                    onClick={() => setIsRuleModalOpen(true)}
+                                                    leftIcon={<PlusIcon className="w-4 h-4" />}
+                                                >
+                                                    Adicionar regra
+                                                </Button>
+                                            </div>
+ 
+                                            {rules.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={ClockIcon}
+                                                    title="Nenhuma regra cadastrada"
+                                                    subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
+                                                />
+                                            ) : (
+                                                <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Início</th>
+                                                                    <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Fim</th>
+                                                                    <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Tipo</th>
+                                                                    <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border">Valor</th>
+                                                                    <th className="py-3.5 px-5 text-[13px] font-bold text-brand-dark dark:text-dark-heading border-b border-brand-border dark:border-dark-border text-center w-20">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {rules.map((rule) => (
+                                                                    <tr key={rule.id} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background">
+                                                                        <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.startTime}</td>
+                                                                        <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">{rule.endTime}</td>
+                                                                        <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                            {rule.type === "fixed" ? "Fixo" : "Multiplicador"}
+                                                                        </td>
+                                                                        <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                            {rule.type === "fixed" ? formatCurrency(rule.value) : `${rule.value}x`}
+                                                                        </td>
+                                                                        <td className="py-4 px-5 border-b border-brand-border dark:border-dark-border text-center">
+                                                                            <button
+                                                                                onClick={async () => { await deleteDeliveryFeeRuleAction(partnerId, rule.id); await reload() }}
+                                                                                className="p-2 text-brand-inactive-text hover:text-brand-red transition-colors"
+                                                                            >
+                                                                                <TrashIcon className="w-4 h-4" />
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Accordion>
+                                </div>
+                            )}
                         </div>
 
                         {/* Sidebar Info (Optional) */}

@@ -3,8 +3,8 @@
 import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, StoreIcon, InfoIcon, FileTextIcon, ChevronLeftIcon } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon } from "@/lib/icons"
+import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Textarea } from "@/components/ui/textarea"
@@ -90,6 +90,8 @@ interface UserAddress {
     state: string
     zip_code: string
     is_default: boolean
+    latitude?: number | string | null
+    longitude?: number | string | null
 }
 
 interface MarketplaceAvailableCoupon {
@@ -134,6 +136,27 @@ interface MarketplacePaymentPreview {
 const fadeVariants = {
     open: { opacity: 1, transition: { duration: 0.2 } },
     closed: { opacity: 0, transition: { duration: 0.2 } },
+}
+
+const getReadyDayLabel = (estimate: any) => {
+    if (!estimate) return ""
+    const now = new Date(estimate.now || Date.now())
+    const readyAt = new Date(estimate.readyAt)
+
+    const readyDate = new Date(readyAt.getFullYear(), readyAt.getMonth(), readyAt.getDate())
+    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    const diffTime = readyDate.getTime() - nowDate.getTime()
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) {
+        return "hoje"
+    } else if (diffDays === 1) {
+        return "amanhã"
+    } else {
+        const weekday = readyAt.toLocaleDateString("pt-BR", { weekday: "long" })
+        return weekday.charAt(0).toUpperCase() + weekday.slice(1)
+    }
 }
 
 export function CheckoutPageClient() {
@@ -249,6 +272,7 @@ export function CheckoutPageClient() {
     const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false)
     const [deliveryEnabled, setDeliveryEnabled] = useState(true)
     const [deliveryPlanEnabled, setDeliveryPlanEnabled] = useState(true)
+    const [pickupEnabled, setPickupEnabled] = useState(true)
     const [deliveryFee, setDeliveryFee] = useState(0)
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<{
@@ -358,9 +382,15 @@ export function CheckoutPageClient() {
                 if (!active || !config.success) return
                 setDeliveryPlanEnabled(config.capability.deliveryEnabled)
                 setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
+                setPickupEnabled(Boolean(config.settings.isPickupEnabled ?? true))
                 setDeliverySettings(config.settings)
-                if (!config.capability.deliveryEnabled || !config.settings.isDeliveryEnabled) {
+
+                const canDel = config.capability.deliveryEnabled && config.settings.isDeliveryEnabled
+                const canPick = Boolean(config.settings.isPickupEnabled ?? true)
+                if (!canDel && canPick) {
                     setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
+                } else if (canDel && !canPick) {
+                    setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
                 }
             })()
         return () => { active = false }
@@ -584,20 +614,23 @@ export function CheckoutPageClient() {
         paymentOption === "traditional" &&
         formData.paymentMethod
     )
-    const couponItems = useMemo(() => {
-        if (sessionData?.source === "cart" && sessionData.cartItems?.length) {
-            return sessionData.cartItems.map((item) => ({
+    const serializedCouponItems = useMemo(() => {
+        const items = (sessionData?.source === "cart" && sessionData.cartItems?.length)
+            ? sessionData.cartItems.map((item) => ({
                 productId: item.itemType === "product" || !item.itemType ? item.productId : null,
                 serviceId: item.itemType === "service_booking" ? (item.serviceId || item.productId) : null,
                 recurringPlanId: item.itemType === "subscription" ? (item.recurringPlanId || item.productId) : null,
             }))
-        }
-        return products.map((product) => (
-            sessionData?.itemType === "service" || sessionData?.source === "service"
-                ? { serviceId: product.id }
-                : { productId: product.id }
-        ))
+            : products.map((product) => (
+                sessionData?.itemType === "service" || sessionData?.source === "service"
+                    ? { serviceId: product.id }
+                    : { productId: product.id }
+            ));
+        return JSON.stringify(items);
     }, [products, sessionData])
+
+    const couponItems = useMemo(() => JSON.parse(serializedCouponItems), [serializedCouponItems])
+
     const appliedCoupon = useMemo(
         () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
         [availableCoupons, couponCode]
@@ -619,6 +652,9 @@ export function CheckoutPageClient() {
                 partnerId,
                 destinationAddress: formData.deliveryAddress,
                 freeDeliveryCoupon: hasFreeDeliveryCoupon,
+                destinationCoords: selectedAddress?.latitude && selectedAddress?.longitude
+                    ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                    : undefined,
             })
             if (!active) return
             if (quote.success) {
@@ -709,13 +745,6 @@ export function CheckoutPageClient() {
         }
     }, [paymentPreview, formData.installments])
 
-    useEffect(() => {
-        if (isCashPayment && !isPickup && wantsChange === null && !showChangeModal) {
-            setTempWantsChange(null)
-            setTempPayWithAmount("")
-            setShowChangeModal(true)
-        }
-    }, [isCashPayment, isPickup, wantsChange, showChangeModal])
 
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutTotalWithDelivery)
@@ -896,9 +925,9 @@ export function CheckoutPageClient() {
                         {deliveryBreakdown.timeAdjustmentTotal > 0 && <div className="flex justify-between"><span>Ajuste horário</span><span>{formatCurrency(deliveryBreakdown.timeAdjustmentTotal)}</span></div>}
                     </div>
                 )}
-                {isPickup && preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
+                {isPickup && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                     <div className="text-xs text-brand-inactive-text">
-                        Retirada entre {pickupStartLabel} e {pickupEndLabel}
+                        Retirada {getReadyDayLabel(preparationEstimate)} entre {pickupStartLabel} e {pickupEndLabel}
                     </div>
                 )}
                 {paymentOption === "traditional" && paymentPreviewLoading && (
@@ -1032,7 +1061,7 @@ export function CheckoutPageClient() {
 
     useEffect(() => {
         void loadApplicableCoupons()
-    }, [partnerId, userId, totalAmount, couponItems])
+    }, [partnerId, userId, totalAmount, serializedCouponItems])
 
     const refreshCouponPartialWarning = async (code: string) => {
         if (!partnerId || !code.trim()) {
@@ -1388,7 +1417,9 @@ export function CheckoutPageClient() {
                                                 {canUseDelivery && (
                                                     <TabsTrigger value="delivery">Entrega</TabsTrigger>
                                                 )}
-                                                <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
+                                                {pickupEnabled && (
+                                                    <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
+                                                )}
                                             </TabsList>
                                         </Tabs>
                                     </div>
@@ -1405,9 +1436,12 @@ export function CheckoutPageClient() {
                                                     <div className="flex flex-col justify-center">
                                                         <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
                                                         <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(partnerInfo.address)}</p>
-                                                        {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
+                                                        {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                                                             <p className="text-xs text-brand-inactive-text mt-1">
-                                                                Pronto em {preparationEstimate.readyInMinutes} minutos • Retirar a partir de {pickupStartLabel}
+                                                                {getReadyDayLabel(preparationEstimate) === "hoje"
+                                                                    ? `Pronto em ${preparationEstimate.readyInMinutes} minutos`
+                                                                    : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
+                                                                } • Retirar a partir de {pickupStartLabel}
                                                             </p>
                                                         )}
                                                     </div>
@@ -1520,25 +1554,25 @@ export function CheckoutPageClient() {
                                                                 }
                                                             />
                                                         ) : (
-                                                        <ListItem
-                                                            icon={
-                                                                selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                                                    selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                        selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                            MoneyIcon
-                                                            }
-                                                            title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
-                                                            description={
-                                                                selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                                    selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                                        wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                                            wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
-                                                            }
-                                                            className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                            right={
-                                                                <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
-                                                            }
-                                                        />
+                                                            <ListItem
+                                                                icon={
+                                                                    selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                                        selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                            selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                                MoneyIcon
+                                                                }
+                                                                title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                                description={
+                                                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                                }
+                                                                className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                                right={
+                                                                    <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                                }
+                                                            />
                                                         )}
                                                         {renderChangeSection()}
                                                         {selectedStorefrontMethod?.cardBrand && (
@@ -1602,25 +1636,25 @@ export function CheckoutPageClient() {
                                                         }
                                                     />
                                                 ) : (
-                                                <ListItem
-                                                    icon={
-                                                        selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                                            selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                    MoneyIcon
-                                                    }
-                                                    title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
-                                                    description={
-                                                        selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                            selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
-                                                    }
-                                                    className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                    right={
-                                                        <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
-                                                    }
-                                                />
+                                                    <ListItem
+                                                        icon={
+                                                            selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                                selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                    selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                                        MoneyIcon
+                                                        }
+                                                        title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
+                                                        description={
+                                                            selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                                selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                    wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                        wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                        }
+                                                        className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
+                                                        right={
+                                                            <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                        }
+                                                    />
                                                 )}
                                                 {renderChangeSection()}
                                                 {selectedStorefrontMethod?.cardBrand && (
@@ -1710,95 +1744,131 @@ export function CheckoutPageClient() {
                     <div className="block lg:hidden space-y-6">
                         {mobileStep === 1 && (
                             <div className="space-y-6 pb-24">
-                                <div className="space-y-4">
-                                    <Tabs
-                                        value={formData.deliveryType}
-                                        onValueChange={(val) => {
-                                            const type = val as "delivery" | "pickup"
-                                            setFormData(prev => ({ ...prev, deliveryType: type }))
-                                            if (type === "pickup" && partnerInfo.mpConnected) {
-                                                setPaymentOption("mercadopago")
-                                            }
-                                        }}
-                                        className="w-full"
-                                    >
-                                        <TabsList className="mb-6">
-                                            {canUseDelivery && (
-                                                <TabsTrigger value="delivery">Entrega</TabsTrigger>
-                                            )}
-                                            <TabsTrigger value="pickup">Retirada no local</TabsTrigger>
-                                        </TabsList>
-                                    </Tabs>
-                                </div>
-
-                                {formData.deliveryType === "delivery" ? (
-                                    <div className="space-y-4">
-                                        {loadingAddresses ? (
-                                            <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
-                                        ) : userAddresses.length > 0 && selectedAddress ? (
-                                            <div className="flex items-center justify-between w-full p-0 border-none bg-transparent shadow-none">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <img
-                                                        src="https://img.dudit.com.br/static/Map.png"
-                                                        alt="Mapa"
-                                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                    />
-                                                    <div className="flex flex-col min-w-0">
-                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                            {selectedAddress.street}, {selectedAddress.number}
-                                                        </p>
-                                                        <p className="text-xs text-brand-inactive-text truncate">
-                                                            {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
-                                                        </p>
+                                <FormSection title="Entrega ou Retirada">
+                                    <div className="space-y-6">
+                                        {/* Address Block */}
+                                        {formData.deliveryType === "delivery" ? (
+                                            <div className="w-full">
+                                                {loadingAddresses ? (
+                                                    <div className="py-4 text-center text-sm text-gray-400">Carregando endereços...</div>
+                                                ) : userAddresses.length > 0 && selectedAddress ? (
+                                                    <div className="flex items-center justify-between w-full p-0 border-none bg-transparent shadow-none">
+                                                        <div className="flex items-stretch gap-3 min-w-0">
+                                                            <img
+                                                                src="https://img.dudit.com.br/static/Map.png"
+                                                                alt="Mapa"
+                                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                            />
+                                                            <div className="flex flex-col justify-center min-w-0">
+                                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    Seu Endereço de Entrega
+                                                                </p>
+                                                                <p className="text-xs text-brand-inactive-text truncate">
+                                                                    {selectedAddress.street}, {selectedAddress.number}
+                                                                </p>
+                                                                <p className="text-xs text-brand-inactive-text truncate">
+                                                                    {selectedAddress.neighborhood} - {selectedAddress.city}/{selectedAddress.state}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <Button variant="link" size="sm" onClick={() => setShowAddressModal(true)}>
+                                                            Trocar
+                                                        </Button>
                                                     </div>
-                                                </div>
-                                                <Button variant="link" size="sm" onClick={() => setShowAddressModal(true)}>
-                                                    Trocar
-                                                </Button>
+                                                ) : (
+                                                    <div className="flex flex-col items-center p-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
+                                                        <p className="text-sm text-brand-inactive-text mb-4 text-center">Nenhum endereço selecionado</p>
+                                                        <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)}>
+                                                            Adicionar endereço
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                {deliveryError && (
+                                                    <div className="mt-4">
+                                                        <InfoCard message={deliveryError} color="red" />
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col items-center p-6 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
-                                                <p className="text-sm text-brand-inactive-text mb-4 text-center">Nenhum endereço selecionado</p>
-                                                <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)}>
-                                                    Adicionar endereço
-                                                </Button>
+                                            <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
+                                                <img
+                                                    src="https://img.dudit.com.br/static/Map.png"
+                                                    alt="Mapa"
+                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                                    <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
+                                                        {formatPartnerAddress(partnerInfo.address)}
+                                                    </p>
+                                                </div>
                                             </div>
                                         )}
 
-                                        {/* Static delivery fee display */}
-                                        {!deliveryQuoteLoading && !deliveryError && formData.deliveryAddress && (
-                                            <div className="flex justify-between items-center py-3 border-t border-brand-border dark:border-dark-border">
-                                                <span className="text-sm font-medium text-brand-inactive-text">Taxa de entrega</span>
-                                                <span className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark dark:text-dark-heading" : "text-brand-green font-semibold"}`}>
-                                                    {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {deliveryError && (
-                                            <InfoCard message={deliveryError} color="red" />
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-start gap-3 p-0 border-none bg-transparent shadow-none">
-                                        <img
-                                            src="https://img.dudit.com.br/static/Map.png"
-                                            alt="Mapa"
-                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                        />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                            <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
-                                                {formatPartnerAddress(partnerInfo.address)}
-                                            </p>
-                                            {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
-                                                <p className="text-[11px] text-brand-inactive-text mt-1.5 font-medium">
-                                                    Pronto em {preparationEstimate.readyInMinutes} min • Retirar das {pickupStartLabel} às {pickupEndLabel}
-                                                </p>
+                                        {/* Selection list (Delivery vs Pickup) */}
+                                        <div className="space-y-3 pt-2">
+                                            {canUseDelivery && (
+                                                <ListItem
+                                                    icon={TruckIcon}
+                                                    title="Entrega"
+                                                    description="Receba em casa"
+                                                    className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${formData.deliveryType === "delivery" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
+                                                    onClick={() => setFormData({ ...formData, deliveryType: "delivery" })}
+                                                    right={
+                                                        <span className={`text-xs font-bold ${deliveryFee > 0 ? "text-brand-dark dark:text-dark-heading" : "text-brand-green font-semibold"}`}>
+                                                            {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                                        </span>
+                                                    }
+                                                />
+                                            )}
+                                            {pickupEnabled && (
+                                                <ListItem
+                                                    icon={StoreIcon}
+                                                    title="Retirada no local"
+                                                    description="Retire imediatamente"
+                                                    className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${formData.deliveryType === "pickup" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
+                                                    onClick={() => {
+                                                        setFormData({ ...formData, deliveryType: "pickup" })
+                                                        if (partnerInfo.mpConnected) setPaymentOption("mercadopago")
+                                                    }}
+                                                    right={
+                                                        <span className="text-xs font-bold text-brand-green font-semibold">Grátis</span>
+                                                    }
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Status notice */}
+                                        <div className="flex gap-2.5 pt-2">
+                                            <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                {formData.deliveryType === "delivery" ? (
+                                                    <>
+                                                        Você receberá seu pedido no endereço informado •{" "}
+                                                        <span className={deliveryFee > 0 ? "" : "text-brand-green font-semibold"}>
+                                                            {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        Você retirará o pedido no local informado •{" "}
+                                                        <span className="text-brand-green font-semibold">Grátis</span>
+                                                    </>
+                                                )}
+                                                {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
+                                                    <>
+                                                        {" • "}
+                                                        {getReadyDayLabel(preparationEstimate) === "hoje"
+                                                            ? `Pronto em ${preparationEstimate.readyInMinutes} min`
+                                                            : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
+                                                        }
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
                                     </div>
-                                )}
+                                </FormSection>
 
 
 
@@ -1883,10 +1953,10 @@ export function CheckoutPageClient() {
                                                 title={formData.paymentMethod ? (selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando...") : "Escolher meio de pagamento"}
                                                 description={
                                                     !formData.paymentMethod ? "Clique para selecionar" :
-                                                    selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
-                                                        selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
-                                                            wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
-                                                                wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
+                                                        selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
+                                                            selectedStorefrontMethod?.type.includes("card") ? "Pagamento com maquininha" :
+                                                                wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
+                                                                    wantsChange === false ? "Dinheiro (Valor exato)" : "Pagamento em dinheiro"
                                                 }
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                 right={
@@ -2049,13 +2119,13 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Fixed Bottom Bar Step 2 */}
-                                <div className="fixed bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
+                                <div className="fixed bg-white bottom-0 left-0 right-0 p-2 z-[100] flex gap-3">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setMobileStep(1)}
                                         disabled={isLoading}
-                                        className="w-[120px] h-12 bg-transparent"
+                                        className="flex-1 h-12 bg-transparent"
                                     >
                                         Voltar
                                     </Button>
@@ -2176,9 +2246,12 @@ export function CheckoutPageClient() {
                                     <p className="text-xs text-brand-inactive-text whitespace-pre-line leading-snug">
                                         {formatPartnerAddress(partnerInfo.address)}
                                     </p>
-                                    {preparationEstimate && preparationEstimate.preparationTimeMinutes > 0 && (
+                                    {preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
                                         <p className="text-[11px] text-brand-inactive-text mt-1.5 font-medium">
-                                            Pronto em {preparationEstimate.readyInMinutes} min • Retirar das {pickupStartLabel} às {pickupEndLabel}
+                                            {getReadyDayLabel(preparationEstimate) === "hoje"
+                                                ? `Pronto em ${preparationEstimate.readyInMinutes} min`
+                                                : `Pronto ${getReadyDayLabel(preparationEstimate)} a partir das ${pickupStartLabel}`
+                                            } • Retirar das {pickupStartLabel} às {pickupEndLabel}
                                         </p>
                                     )}
                                 </div>
@@ -2425,66 +2498,200 @@ export function CheckoutPageClient() {
                 title="Meio de Pagamento"
                 maxWidth="md"
             >
-                <div className="space-y-3 pb-4">
-                    {storefrontMethods.map((m) => {
-                        const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                            m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                    <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+                <div className="pb-4">
+                    {partnerInfo.mpConnected ? (
+                        <Tabs defaultValue={paymentOption || "mercadopago"} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago")}>
+                            <TabsList className="mb-4">
+                                <TabsTrigger value="mercadopago">Pagar Online</TabsTrigger>
+                                <TabsTrigger value="traditional">{isPickup ? "Pagar na Retirada" : "Pagar na Entrega"}</TabsTrigger>
+                            </TabsList>
 
-                        const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
-
-                        return (
-                            <div
-                                key={m.id}
-                                onClick={() => {
-                                    setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                    setShowPaymentModal(false)
-                                }}
-                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
-                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3 p-4">
-                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
-                                        {icon}
+                            <TabsContent value="mercadopago" className="pt-2">
+                                <div
+                                    onClick={() => {
+                                        setPaymentOption("mercadopago")
+                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                        setShowPaymentModal(false)
+                                    }}
+                                    className={`group rounded-2xl border p-4 transition-all cursor-pointer flex items-center gap-3 ${formData.paymentMethod === "mercadopago" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"}`}
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
+                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
+                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Mercado Pago</h3>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">Cartão, Pix ou saldo MP</p>
                                     </div>
                                     <div className="shrink-0 ml-4">
                                         <RadioButton
                                             name="paymentSelect"
-                                            value={m.id}
-                                            checked={formData.paymentMethod === m.id}
+                                            value="mercadopago"
+                                            checked={formData.paymentMethod === "mercadopago"}
                                             onChange={() => {
-                                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                setPaymentOption("mercadopago")
+                                                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
                                                 setShowPaymentModal(false)
                                             }}
                                         />
                                     </div>
                                 </div>
-                                {m.type.includes("card") && m.cardBrand && (
-                                    <>
-                                        <Separator className="mx-4 my-0" />
-                                        <div className="px-4 py-3 flex flex-wrap gap-2">
-                                            {m.cardBrand.split(/[;,]/).map(b => {
-                                                const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
-                                                if (!brand) return null
-                                                return (
-                                                    <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
-                                                        <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
+                            </TabsContent>
+
+                            <TabsContent value="traditional" className="pt-2">
+                                <div className="space-y-3">
+                                    {storefrontMethods.map((m) => {
+                                        const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                            m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                    <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+
+                                        const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
+
+                                        return (
+                                            <div
+                                                key={m.id}
+                                                onClick={() => {
+                                                    setPaymentOption("traditional")
+                                                    setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                    setShowPaymentModal(false)
+                                                    if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                        setTempWantsChange(null)
+                                                        setTempPayWithAmount("")
+                                                        setShowChangeModal(true)
+                                                    }
+                                                }}
+                                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
+                                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-3 p-4">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                                                        {icon}
                                                     </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </>
-                                )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
+                                                    </div>
+                                                    <div className="shrink-0 ml-4">
+                                                        <RadioButton
+                                                            name="paymentSelect"
+                                                            value={m.id}
+                                                            checked={formData.paymentMethod === m.id}
+                                                            onChange={() => {
+                                                                setPaymentOption("traditional")
+                                                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                                setShowPaymentModal(false)
+                                                                if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                                    setTempWantsChange(null)
+                                                                    setTempPayWithAmount("")
+                                                                    setShowChangeModal(true)
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                {m.type.includes("card") && m.cardBrand && (
+                                                    <>
+                                                        <Separator className="mx-4 my-0" />
+                                                        <div className="px-4 py-3 flex flex-wrap gap-2">
+                                                            {m.cardBrand.split(/[;,]/).map(b => {
+                                                                const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                                if (!brand) return null
+                                                                return (
+                                                                    <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
+                                                                        <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+                    ) : (
+                        <div className="space-y-3 pt-2">
+                            <div className="flex gap-3 mb-2 px-1">
+                                <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
+                                <p className="text-sm text-brand-inactive-text">Pagamento direto com o vendedor (na entrega ou retirada).</p>
                             </div>
-                        )
-                    })}
+                            {storefrontMethods.map((m) => {
+                                const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                    m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                        m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                            <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+
+                                const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
+
+                                return (
+                                    <div
+                                        key={m.id}
+                                        onClick={() => {
+                                            setPaymentOption("traditional")
+                                            setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                            setShowPaymentModal(false)
+                                            if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                setTempWantsChange(null)
+                                                setTempPayWithAmount("")
+                                                setShowChangeModal(true)
+                                            }
+                                        }}
+                                        className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
+                                            ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3 p-4">
+                                            <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                                                {icon}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
+                                            </div>
+                                            <div className="shrink-0 ml-4">
+                                                <RadioButton
+                                                    name="paymentSelect"
+                                                    value={m.id}
+                                                    checked={formData.paymentMethod === m.id}
+                                                    onChange={() => {
+                                                        setPaymentOption("traditional")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                        setShowPaymentModal(false)
+                                                        if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                            setTempWantsChange(null)
+                                                            setTempPayWithAmount("")
+                                                            setShowChangeModal(true)
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        {m.type.includes("card") && m.cardBrand && (
+                                            <>
+                                                <Separator className="mx-4 my-0" />
+                                                <div className="px-4 py-3 flex flex-wrap gap-2">
+                                                    {m.cardBrand.split(/[;,]/).map(b => {
+                                                        const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                        if (!brand) return null
+                                                        return (
+                                                            <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
+                                                                <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
             </DefaultModal>
 
@@ -2530,10 +2737,11 @@ export function CheckoutPageClient() {
                 maxWidth="sm"
                 footer={
                     <>
-                        <Button variant="outline" onClick={() => setShowChangeModal(false)}>
+                        <Button type="button" variant="outline" onClick={() => setShowChangeModal(false)}>
                             Cancelar
                         </Button>
                         <Button
+                            type="button"
                             onClick={() => {
                                 setWantsChange(tempWantsChange)
                                 if (tempWantsChange === true) {

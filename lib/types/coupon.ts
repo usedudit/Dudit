@@ -193,6 +193,7 @@ export function getCouponApplyScopeLabel(scope: CouponApplyScope) {
   if (scope === "categories") return "Categorias especificas"
   if (scope === "products") return "Produtos especificos"
   if (scope === "services") return "Servicos especificos"
+  if (scope === "subscriptions") return "Assinaturas especificas"
   return "Todos os itens"
 }
 

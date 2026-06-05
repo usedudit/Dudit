@@ -6,6 +6,8 @@ export type DeliverySettings = {
   extraKmPrice: number
   maxDeliveryKm: number | null
   isDeliveryEnabled: boolean
+  isPickupEnabled: boolean
+  freeDeliveryThreshold: number | null
 }
 
 export type DeliveryFeeRule = {
@@ -33,6 +35,7 @@ export type CalculateDeliveryFeeInput = {
   settings: DeliverySettings
   rules: DeliveryFeeRule[]
   freeDeliveryCoupon?: boolean
+  orderSubtotal?: number
 }
 
 function roundMoney(value: number): number {
@@ -70,7 +73,11 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
     throw new Error("Endereço fora do raio máximo de entrega.")
   }
 
-  if (input.freeDeliveryCoupon) {
+  const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
+  const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
+  const isFreeByThreshold = freeDeliveryThreshold !== null && orderSubtotal !== null && orderSubtotal >= freeDeliveryThreshold
+
+  if (input.freeDeliveryCoupon || isFreeByThreshold) {
     return {
       fee: 0,
       breakdown: {
@@ -79,7 +86,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         timeFixedAdjustments: 0,
         timeMultiplierFactor: 1,
         timeAdjustmentTotal: roundMoney(-baseFee),
-        appliedRuleIds: ["coupon:free_delivery"],
+        appliedRuleIds: input.freeDeliveryCoupon ? ["coupon:free_delivery"] : ["threshold:free_delivery"],
         distanceKm: roundMoney(distanceKm),
       },
     }

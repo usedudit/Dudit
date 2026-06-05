@@ -165,7 +165,7 @@ export async function validateCouponRow(
           valid: true,
           discountAmount: 0,
           partialApplicabilityWarning: items.length > 0,
-          couponId: null,
+          couponId: undefined,
           pricingCoupon: null,
         }
       }
@@ -185,7 +185,7 @@ export async function validateCouponRow(
           valid: true,
           discountAmount: 0,
           partialApplicabilityWarning: items.length > 0,
-          couponId: null,
+          couponId: undefined,
           pricingCoupon: null,
         }
       }
@@ -204,7 +204,7 @@ export async function validateCouponRow(
           valid: true,
           discountAmount: 0,
           partialApplicabilityWarning: items.length > 0,
-          couponId: null,
+          couponId: undefined,
           pricingCoupon: null,
         }
       }
@@ -223,7 +223,7 @@ export async function validateCouponRow(
           valid: true,
           discountAmount: 0,
           partialApplicabilityWarning: items.length > 0,
-          couponId: null,
+          couponId: undefined,
           pricingCoupon: null,
         }
       }
@@ -364,8 +364,14 @@ export async function findBestAutomaticCoupon(input: AutoCouponInput, supabaseOv
   // Validate each and pick the one with the highest discount
   let bestResult: CouponValidationResult = { valid: false, discountAmount: 0 }
 
-  for (const coupon of autoCoupons) {
-    const result = await validateCouponRow(supabase, coupon, input)
+  const results = await Promise.all(
+    autoCoupons.map(async (coupon: any) => {
+      const result = await validateCouponRow(supabase, coupon, input)
+      return { coupon, result }
+    })
+  )
+
+  for (const { result } of results) {
     if (result.valid && result.discountAmount > bestResult.discountAmount) {
       bestResult = result
     }

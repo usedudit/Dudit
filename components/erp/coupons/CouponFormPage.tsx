@@ -55,7 +55,7 @@ interface CouponFormPageProps {
     isLoadingScope: boolean
 }
 
-type PickerMode = "products" | "services" | "categories" | "customers" | null
+type PickerMode = "products" | "services" | "categories" | "customers" | "subscriptions" | null
 
 const SidebarCard = ({
     children,
@@ -493,6 +493,7 @@ export default function CouponFormPage({
                                                                     { value: "categories", label: "Categorias específicas" },
                                                                     { value: "products", label: "Produtos específicos" },
                                                                     { value: "services", label: "Serviços específicos" },
+                                                                    { value: "subscriptions", label: "Assinaturas específicas" },
                                                                 ]}
                                                             />
                                                         </ScopeField>

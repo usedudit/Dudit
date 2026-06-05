@@ -856,7 +856,7 @@ export default function ProductsPage({
                                                     singularItemName="produto"
                                                 />
                                                 {effectiveViewMode === "grid" ? (
-                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                    <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((product) => {
                                                             const prefetch = getPrefetchProps(product.id)
                                                             return (

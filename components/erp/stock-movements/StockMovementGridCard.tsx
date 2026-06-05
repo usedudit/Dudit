@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
+import { Badge, ActionsDropdown, Checkbox, Tooltip } from "@/components/reusable"
 import { ChevronDownIcon, ChevronUpIcon, Package } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
@@ -58,13 +58,13 @@ const StockMovementGridCard = React.memo(
                                     {movement.displayId}
                                 </h3>
 
-                                <Badge
-                                    variant={movement.type === 'in' ? "green" : "red"}
-                                    icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
-                                    className="whitespace-nowrap scale-90"
-                                >
-                                    {movement.type === 'in' ? "Entrada" : "Saída"}
-                                </Badge>
+                                <Tooltip text={movement.type === 'in' ? "Entrada" : "Saída"}>
+                                    <Badge
+                                        variant={movement.type === 'in' ? "green" : "red"}
+                                        icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                                        className="whitespace-nowrap scale-90"
+                                    />
+                                </Tooltip>
                             </div>
 
                             {onSelect && (
@@ -91,14 +91,14 @@ const StockMovementGridCard = React.memo(
                     {/* Motivo e Referência */}
                     <div className="flex gap-4">
                         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">Motivo</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate" title={movement.reason}>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Motivo</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={movement.reason}>
                                 {movement.reason || '-'}
                             </span>
                         </div>
-                        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Referência</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate" title={movement.reference}>
+                        <div className="flex-1 flex flex-col gap-0.5 min-w-0 items-end">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body text-right">Referência</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate text-right" title={movement.reference}>
                                 {movement.reference || '-'}
                             </span>
                         </div>
@@ -106,9 +106,11 @@ const StockMovementGridCard = React.memo(
 
                     {/* Data e Ações */}
                     <div className="flex items-end justify-between mt-1">
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{movement.date.split(',')[0]}</span>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{movement.date.split(',')[1]}</span>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
+                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                {movement.date.replace(', ', ' - ')}
+                            </span>
                         </div>
 
                         <div className="flex items-center gap-2">

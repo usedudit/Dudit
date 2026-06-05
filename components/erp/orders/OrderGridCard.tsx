@@ -69,31 +69,37 @@ const OrderGridCard = React.memo(
                                 </h3>
                                 {Number(order.returnCount || 0) > 0 && (
                                     <Tooltip text="Possui histórico de trocas/devoluções">
-                                        <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                        <Badge variant="gray" icon={<ReturnIcon />} className="whitespace-nowrap">
                                             {Number(order.returnCount || 0) > 1 && order.returnCount}
                                         </Badge>
                                     </Tooltip>
                                 )}
                                 <div className="flex items-center gap-1 shrink-0">
                                     {order.situation === "cancelled" ? (
-                                        <Badge
-                                            variant="red"
-                                            icon={<CancelCircleIcon />}
-                                            className="whitespace-nowrap scale-90"
-                                        />
+                                        <Tooltip text="Cancelado">
+                                            <Badge
+                                                variant="red"
+                                                icon={<CancelCircleIcon />}
+                                                className="whitespace-nowrap"
+                                            />
+                                        </Tooltip>
                                     ) : (
                                         <>
-                                            <Badge
-                                                variant={order.statusColor}
-                                                icon={<MoneyIcon />}
-                                                className="whitespace-nowrap scale-90"
-                                            />
-                                            {!order.hasOnlyServices && (
+                                            <Tooltip text={order.statusLabel}>
                                                 <Badge
-                                                    variant={order.deliveryStatusColor || "gray"}
-                                                    icon={<TruckIcon />}
-                                                    className="whitespace-nowrap scale-90"
+                                                    variant={order.statusColor}
+                                                    icon={<MoneyIcon />}
+                                                    className="whitespace-nowrap"
                                                 />
+                                            </Tooltip>
+                                            {!order.hasOnlyServices && (
+                                                <Tooltip text={order.deliveryStatusLabel || "Não informado"}>
+                                                    <Badge
+                                                        variant={order.deliveryStatusColor || "gray"}
+                                                        icon={<TruckIcon />}
+                                                        className="whitespace-nowrap"
+                                                    />
+                                                </Tooltip>
                                             )}
                                         </>
                                     )}
@@ -148,7 +154,7 @@ const OrderGridCard = React.memo(
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Canal</span>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
-                                    {order.store_name || "Loja"}
+                                    {order.order_source || "Manual"}
                                 </span>
                             </div>
                         </div>

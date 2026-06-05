@@ -3,13 +3,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
-import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
+import { cancelBuyerOrderAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
+import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
 import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from '@/lib/returns/calculations';
@@ -39,10 +40,80 @@ const formatPartnerAddress = (addresses: any) => {
     return `${addr.street || ""}, ${addr.number || "S/N"}${addr.complement ? ` - ${addr.complement}` : ""}${addr.neighborhood ? ` - ${addr.neighborhood}` : ""}, ${addr.city || ""} - ${addr.state || ""}`.replace(/\s+/g, ' ').trim()
 };
 
+const getClientTimelineSteps = (order: any) => {
+    const dateStrFull = formatFullDate(order.created_at);
+    const dateStrTime = formatTime(order.created_at);
+    const updateDateStr = order.updated_at ? formatFullDate(order.updated_at) : null;
+    const updateTimeStr = order.updated_at ? formatTime(order.updated_at) : null;
+
+    const steps: { label: string; active: boolean; date?: string; time?: string }[] = [];
+
+    const isPaid = ["paid", "partially_paid"].includes(order.situation);
+    const isCancelled = order.situation === "cancelled";
+
+    if (isCancelled) {
+        steps.push({
+            label: isPaid ? "Pago" : "Aguardando Pagamento",
+            active: true,
+            date: dateStrFull,
+            time: dateStrTime
+        });
+        steps.push({
+            label: "Cancelado",
+            active: true,
+            date: updateDateStr || dateStrFull,
+            time: updateTimeStr || dateStrTime
+        });
+        return steps;
+    }
+
+    // Step 1: Aguardando Pagamento / Pago
+    steps.push({
+        label: isPaid ? "Pago" : "Aguardando Pagamento",
+        active: true,
+        date: dateStrFull,
+        time: dateStrTime
+    });
+
+    // Step 2: Preparando
+    const isPreparing = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
+    steps.push({
+        label: "Preparando",
+        active: isPaid && isPreparing,
+        date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
+        time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
+    });
+
+    // Step 3: Enviado / Pronto para retirada
+    const isSent = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(order.delivery_status);
+    const isPickup = order.delivery_type === "pickup";
+    steps.push({
+        label: isPickup ? "Pronto para retirada" : "Enviado",
+        active: isPaid && isSent,
+        date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
+        time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
+    });
+
+    // Step 4: Entregue / Retirado / Não entregue
+    const isDelivered = ["delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
+    let finalLabel = isPickup ? "Retirado" : "Entregue";
+    if (order.delivery_status === "delivery_failed") {
+        finalLabel = "Não entregue";
+    }
+    steps.push({
+        label: finalLabel,
+        active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available" || order.delivery_status === "delivery_failed"),
+        date: isPaid && isDelivered ? (updateDateStr || dateStrFull) : undefined,
+        time: isPaid && isDelivered ? (updateTimeStr || dateStrTime) : undefined
+    });
+
+    return steps;
+};
+
 const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onClose: () => void; order: any }) => {
     if (!isOpen) return null;
-    const dateStr = formatFullDate(order.created_at);
     const deliveryTypeStr = order.delivery_type === "delivery" ? "Delivery" : "Retirada no local";
+    const steps = getClientTimelineSteps(order);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -65,21 +136,19 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                         </div>
                         <div className="relative pl-2 space-y-8">
                             <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-zinc-700"></div>
-                            <div className="relative flex gap-4">
-                                <div className="w-6 h-6 rounded-full bg-brand-dark dark:bg-white border-4 border-white dark:border-dark-surface z-10 shrink-0"></div>
-                                <div>
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pedido Realizado</div>
-                                    <div className="text-xs text-brand-inactive-text mt-1">{dateStr}</div>
-                                </div>
-                            </div>
-                            <div className="relative flex gap-4">
-                                <div className={`w-6 h-6 rounded-full ${order.situation === "paid" ? "bg-brand-dark dark:bg-white" : "bg-gray-200 dark:bg-zinc-700"} border-4 border-white dark:border-dark-surface z-10 shrink-0`}></div>
-                                <div>
-                                    <div className={`text-sm ${order.situation === "paid" ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
-                                        {order.situation === "pending" ? "Aguardando Pagamento" : "Pagamento Aprovado"}
+                            {steps.map((step, idx) => (
+                                <div key={idx} className="relative flex gap-4">
+                                    <div className={`w-6 h-6 rounded-full ${step.active ? "bg-brand-dark dark:bg-white" : "bg-gray-200 dark:bg-zinc-700"} border-4 border-white dark:border-dark-surface z-10 shrink-0`}></div>
+                                    <div>
+                                        <div className={`text-sm ${step.active ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
+                                            {step.label}
+                                        </div>
+                                        {step.active && step.date && (
+                                            <div className="text-xs text-brand-inactive-text mt-1">{step.date} às {step.time}</div>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                     <div className="border-t border-brand-border dark:border-dark-border pt-6">
@@ -145,6 +214,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const handleBack = useCallback(() => onBack(), [onBack]);
 
     const [userAddresses, setUserAddresses] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<"details" | "history">("details");
+    const [historyEntries, setHistoryEntries] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyLoaded, setHistoryLoaded] = useState(false);
 
     useEffect(() => {
         if (!order?.buyer_id) return;
@@ -156,6 +229,36 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             })
             .catch(err => console.error("Error fetching user addresses:", err));
     }, [order?.buyer_id]);
+
+    useEffect(() => {
+        async function loadHistory() {
+            if (activeTab !== "history" || historyLoaded) return;
+            try {
+                setHistoryLoading(true);
+                const res = await getOrderHistoryForBuyerAction(order.id);
+                if (res.success && res.data) {
+                    setHistoryEntries(res.data);
+                    setHistoryLoaded(true);
+                } else {
+                    toast({
+                        title: "Erro ao carregar histórico",
+                        description: res.error || "Tente novamente.",
+                        variant: "destructive"
+                    });
+                }
+            } catch (err: any) {
+                console.error("Error loading order history:", err);
+                toast({
+                    title: "Erro ao carregar histórico",
+                    description: "Erro interno ao buscar histórico.",
+                    variant: "destructive"
+                });
+            } finally {
+                setHistoryLoading(false);
+            }
+        }
+        loadHistory();
+    }, [activeTab, historyLoaded, order.id, toast]);
 
     if (!order) return null;
 
@@ -444,7 +547,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </Button>
                     <div className="text-left flex-1 min-w-0">
                         <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Pedido #{orderNumber}</h1>
-                        <p className="text-md text-brand-inactive-text mt-1">{dateStrFull} às {dateStrTime}</p>
+                        <p className="text-md text-brand-inactive-text mt-1">{dateStrFull}</p>
                     </div>
                     <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
                         <statusConfig.icon size={16} />
@@ -453,258 +556,269 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 </div>
 
                 <div className="max-w-3xl lg:max-w-[1400px] mx-auto w-full pb-32">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* Left Column (Sections 1, 2, 3, 4, 5) */}
-                        <div className="lg:col-span-8 space-y-8">
-                            {/* Section 1: Detalhes do Pedido (Chave-Valor estilo ERP) */}
-                            <FormSection title={`Pedido #${orderNumber}`}>
-                                <div>
-                                    <DetailRow
-                                        label="Status do Pagamento"
-                                        value={
-                                            <span className={statusConfig.color}>
-                                                {statusConfig.label}
-                                            </span>
-                                        }
-                                    />
-                                    <DetailRow
-                                        label="Status da Entrega"
-                                        value={
-                                            order.delivery_status === 'pending' ? 'Pendente' :
-                                                order.delivery_status === 'preparing' ? 'Preparando' :
-                                                    order.delivery_status === 'sent' ? 'Enviado' :
-                                                        order.delivery_status === 'delivered' ? 'Entregue' :
-                                                            order.delivery_status === 'pickup_available' ? 'Disponível para retirada' :
-                                                                order.delivery_status === 'delivery_failed' ? 'Não entregue' :
-                                                                    order.delivery_status
-                                        }
-                                    />
-                                    <DetailRow
-                                        label="Data do Pedido"
-                                        value={`${dateStrFull} às ${dateStrTime}`}
-                                    />
-                                    <DetailRow
-                                        label="Tipo de Envio"
-                                        value={isDelivery ? "Entrega via Delivery" : "Retirada no Local"}
-                                    />
-                                </div>
-                            </FormSection>
+                    <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
+                        <TabsList className="mb-8">
+                            <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
+                            <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
+                        </TabsList>
 
-                            {/* Section 2: Itens do Pedido */}
-                            <FormSection title="Itens do Pedido">
-                                <div className="space-y-4">
-                                    {order.order_items?.map((item: any) => {
-                                        const itemImage = getPrimaryProductDisplayImage({
-                                            images: item.products?.images || null,
-                                            video_thumbnail: item.products?.video_thumbnail || null,
-                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                        });
-                                        return (
-                                            <Link
-                                                href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
-                                                prefetch={true}
-                                                key={item.id}
-                                                className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
-                                            >
-                                                <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
-                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
-                                                        {item.products?.name || item.product_name}
-                                                    </h3>
-                                                    {item.product_variants?.variant_name && (
-                                                        <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
-                                                    )}
-                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                        {formatCurrency(item.product_price)}
-                                                    </div>
-                                                </div>
-                                                <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                                    x{item.quantity}
-                                                </div>
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            </FormSection>
+                        <TabsContent value="details" className="mt-0 focus-visible:ring-0">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                {/* Left Column (Sections 1, 2, 3, 4, 5) */}
+                                <div className="lg:col-span-8 space-y-8">
+                                    {/* Mobile/Tablet Order Summary Card */}
+                                    <div className="block lg:hidden">
+                                        <FormSection title={`Pedido #${orderNumber}`}>
+                                            <DetailRow 
+                                                label="Status do Pedido" 
+                                                value={
+                                                    <span className={statusConfig.color}>
+                                                        {statusConfig.label}
+                                                    </span>
+                                                } 
+                                            />
+                                            <DetailRow 
+                                                label="Data do Pedido" 
+                                                value={`${dateStrFull} às ${dateStrTime}`} 
+                                            />
+                                        </FormSection>
+                                    </div>
 
-                            {/* Section 3: Endereço de entrega / retirada */}
-                            <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
-                                {isDelivery ? (
-                                    <div
-                                        onClick={() => setIsShippingModalOpen(true)}
-                                        className="flex items-stretch gap-3 cursor-pointer"
-                                    >
-                                        <img
-                                            src="https://img.dudit.com.br/static/Map.png"
-                                            alt="Endereço de entrega"
-                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                        />
-                                        <div className="flex flex-col justify-center">
-                                            <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                {addressTypeLabel || "Endereço de Entrega"}
-                                            </p>
-                                            <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
+                                    {/* Section 1: Itens do Pedido */}
+                                    <FormSection title="Itens do Pedido">
+                                        <div className="space-y-4">
+                                            {order.order_items?.map((item: any) => {
+                                                const itemImage = getPrimaryProductDisplayImage({
+                                                    images: item.products?.images || null,
+                                                    video_thumbnail: item.products?.video_thumbnail || null,
+                                                    fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                                });
+                                                return (
+                                                    <Link
+                                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                                                        prefetch={true}
+                                                        key={item.id}
+                                                        className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                                    >
+                                                        <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                                            <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
+                                                                {item.products?.name || item.product_name}
+                                                            </h3>
+                                                            {item.product_variants?.variant_name && (
+                                                                <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                            )}
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                                                {formatCurrency(item.product_price)}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
+                                                            x{item.quantity}
+                                                        </div>
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
+                                    </FormSection>
+
+                                    {/* Section 2: Endereço de entrega / retirada */}
+                                    <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
+                                        {isDelivery ? (
+                                            <div
+                                                onClick={() => setIsShippingModalOpen(true)}
+                                                className="flex items-stretch gap-3 cursor-pointer"
+                                            >
+                                                <img
+                                                    src="https://img.dudit.com.br/static/Map.png"
+                                                    alt="Endereço de entrega"
+                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                />
+                                                <div className="flex flex-col justify-center">
+                                                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                        {addressTypeLabel || "Endereço de Entrega"}
+                                                    </p>
+                                                    <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => setIsShippingModalOpen(true)}
+                                                className="flex items-stretch gap-3 cursor-pointer"
+                                            >
+                                                <img
+                                                    src="https://img.dudit.com.br/static/Map.png"
+                                                    alt="Local de Retirada"
+                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                />
+                                                <div className="flex flex-col justify-center">
+                                                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                                    <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </FormSection>
+
+                                    {/* Section 3: Pagamento */}
+                                    <FormSection title="Pagamento">
+                                        <div>
+                                            <ListItem
+                                                icon={PaymentIconEl}
+                                                title={
+                                                    loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
+                                                        <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                            {paymentMethodName}
+                                                        </span>
+                                                }
+                                                description={
+                                                    <span className="text-xs lg:text-sm text-brand-inactive-text font-normal">
+                                                        {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
+                                                    </span>
+                                                }
+                                                className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                onClick={handlePixClick}
+                                                right={
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                                }
+                                            />
+                                        </div>
+                                    </FormSection>
+
+                                    {/* Section 4: Vendedor */}
+                                    <FormSection title="Vendedor">
+                                        <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
+                                                <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
+                                                <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
+                                            </div>
+                                            <ChevronRightIcon size={18} className="text-brand-inactive-text" />
+                                        </Link>
+                                    </FormSection>
+
+                                    {/* Mobile/Tablet Section 5: Resumo dos Valores */}
+                                    <div className="block lg:hidden">
+                                        <FormSection title="Resumo dos Valores">
+                                            <div>
+                                                {renderPriceSummary()}
+                                            </div>
+                                        </FormSection>
+                                    </div>
+
+                                    {/* Mobile/Tablet Actions / Buttons */}
+                                    <div className="block lg:hidden space-y-4 pt-4">
+                                        {canCancelOrder && (
+                                            <Button
+                                                variant="outlinered"
+                                                className="w-full h-12 font-bold"
+                                                onClick={() => setIsCancelModalOpen(true)}
+                                                disabled={isCanceling}
+                                            >
+                                                {isCanceling ? (
+                                                    <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                                ) : (
+                                                    "Cancelar pedido"
+                                                )}
+                                            </Button>
+                                        )}
+
+                                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                            </div>
+                                        )}
+
+                                        {canRequestResolution && (
+                                            <>
+                                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full h-12 font-bold"
+                                                    onClick={() => setIsReturnModalOpen(true)}
+                                                >
+                                                    Solicitar troca ou devolucao
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right Column (resumo dos valores + actions) - Desktop only */}
+                                <div className="hidden lg:block lg:col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                                        <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                            Resumo dos Valores
+                                        </div>
+                                        <div className="p-6">
+                                            {renderPriceSummary()}
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop Actions / Buttons */}
+                                    <div className="space-y-4 pt-4">
+                                        {canCancelOrder && (
+                                            <Button
+                                                variant="outlinered"
+                                                className="w-full h-12 font-bold"
+                                                onClick={() => setIsCancelModalOpen(true)}
+                                                disabled={isCanceling}
+                                            >
+                                                {isCanceling ? (
+                                                    <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                                ) : (
+                                                    "Cancelar pedido"
+                                                )}
+                                            </Button>
+                                        )}
+
+                                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                            </div>
+                                        )}
+
+                                        {canRequestResolution && (
+                                            <>
+                                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full h-12 font-bold"
+                                                    onClick={() => setIsReturnModalOpen(true)}
+                                                >
+                                                    Solicitar troca ou devolucao
+                                                </Button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="history" className="mt-0 focus-visible:ring-0">
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8">
+                                {historyLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-3 animate-pulse">
+                                        <Spinner size={24} className="text-brand-green" />
+                                        <p className="text-sm text-brand-inactive-text">Carregando histórico...</p>
                                     </div>
                                 ) : (
-                                    <div
-                                        onClick={() => setIsShippingModalOpen(true)}
-                                        className="flex items-stretch gap-3 cursor-pointer"
-                                    >
-                                        <img
-                                            src="https://img.dudit.com.br/static/Map.png"
-                                            alt="Local de Retirada"
-                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                        />
-                                        <div className="flex flex-col justify-center">
-                                            <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                            <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </FormSection>
-
-                            {/* Section 4: Pagamento */}
-                            <FormSection title="Pagamento">
-                                <div>
-                                    <ListItem
-                                        icon={PaymentIconEl}
-                                        title={
-                                            loadingPayment ? <Spinner size={14} className="text-brand-dark" /> :
-                                                <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                    {paymentMethodName}
-                                                </span>
-                                        }
-                                        description={
-                                            <span className="text-xs lg:text-sm text-brand-inactive-text font-normal">
-                                                {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
-                                            </span>
-                                        }
-                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
-                                        onClick={handlePixClick}
-                                        right={
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                                        }
+                                    <HistoryTimeline
+                                        entries={historyEntries}
+                                        title="Histórico do Pedido"
+                                        subtitle="Acompanhe todas as movimentações e alterações de status realizadas neste pedido."
+                                        emptyMessage="Nenhum histórico encontrado para este pedido."
                                     />
-                                </div>
-                            </FormSection>
-
-                            {/* Section 5: Vendedor */}
-                            <FormSection title="Vendedor">
-                                <Link href={getPartnerUrl({ ...order.partners, id: order.partner_id })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
-                                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
-                                        <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">{sellerName}</div>
-                                        <div className="text-xs lg:text-sm text-brand-inactive-text mt-0.5 max-w-sm">Acessar perfil do vendedor</div>
-                                    </div>
-                                    <ChevronRightIcon size={18} className="text-brand-inactive-text" />
-                                </Link>
-                            </FormSection>
-
-                            {/* Mobile/Tablet Section 6: Resumo dos Valores */}
-                            <div className="block lg:hidden">
-                                <FormSection title="Resumo dos Valores">
-                                    <div>
-                                        {renderPriceSummary()}
-                                    </div>
-                                </FormSection>
-                            </div>
-
-                            {/* Mobile/Tablet Actions / Buttons */}
-                            <div className="block lg:hidden space-y-4 pt-4">
-                                {canCancelOrder && (
-                                    <Button
-                                        variant="outlinered"
-                                        className="w-full h-12 font-bold"
-                                        onClick={() => setIsCancelModalOpen(true)}
-                                        disabled={isCanceling}
-                                    >
-                                        {isCanceling ? (
-                                            <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
-                                        ) : (
-                                            "Cancelar pedido"
-                                        )}
-                                    </Button>
-                                )}
-
-                                {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                        Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
-                                    </div>
-                                )}
-
-                                {canRequestResolution && (
-                                    <>
-                                        <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                            Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full h-12 font-bold"
-                                            onClick={() => setIsReturnModalOpen(true)}
-                                        >
-                                            Solicitar troca ou devolucao
-                                        </Button>
-                                    </>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Right Column (resumo dos valores + actions) - Desktop only */}
-                        <div className="hidden lg:block lg:col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
-                            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
-                                <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
-                                    Resumo dos Valores
-                                </div>
-                                <div className="p-6">
-                                    {renderPriceSummary()}
-                                </div>
-                            </div>
-
-                            {/* Desktop Actions / Buttons */}
-                            <div className="space-y-4 pt-4">
-                                {canCancelOrder && (
-                                    <Button
-                                        variant="outlinered"
-                                        className="w-full h-12 font-bold"
-                                        onClick={() => setIsCancelModalOpen(true)}
-                                        disabled={isCanceling}
-                                    >
-                                        {isCanceling ? (
-                                            <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
-                                        ) : (
-                                            "Cancelar pedido"
-                                        )}
-                                    </Button>
-                                )}
-
-                                {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                        Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
-                                    </div>
-                                )}
-
-                                {canRequestResolution && (
-                                    <>
-                                        <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                            Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full h-12 font-bold"
-                                            onClick={() => setIsReturnModalOpen(true)}
-                                        >
-                                            Solicitar troca ou devolucao
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                        </TabsContent>
+                    </Tabs>
                 </div>
 
                 <AnimatePresence>

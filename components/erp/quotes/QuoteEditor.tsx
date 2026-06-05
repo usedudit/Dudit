@@ -15,7 +15,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection } from '@/components/reusable';
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
@@ -155,6 +155,42 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                             )}
                         </div></>
                     )}
+
+                    {/* Customer Selection - Mobile/Tablet only */}
+                    <div className="block lg:hidden mb-6">
+                        <FormSection title="" hasSeparator={false} className="mt-0">
+                            {props.selectedCustomer ? (
+                                <ListItem
+                                    left={
+                                        <UserProfileImage
+                                            fullName={props.selectedCustomer.name || "Cliente"}
+                                            imageUrl={props.selectedCustomer.avatar_url || props.selectedCustomer.avatar}
+                                            className="w-10 h-10 text-base"
+                                        />
+                                    }
+                                    title={props.selectedCustomer.name}
+                                    description={props.selectedCustomer.email || "Sem e-mail cadastrado"}
+                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                    showChevron={true}
+                                    onClick={customerLocked ? undefined : () => props.setIsCustomerSheetOpen(true)}
+                                />
+                            ) : (
+                                <ListItem
+                                    left={
+                                        <div className="w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center border border-brand-border dark:border-dark-border shrink-0">
+                                            <UserIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                        </div>
+                                    }
+                                    title="Nenhum cliente selecionado"
+                                    description="Clique para selecionar um cliente"
+                                    className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                    showChevron={true}
+                                    onClick={customerLocked ? undefined : () => props.setIsCustomerSheetOpen(true)}
+                                />
+                            )}
+                        </FormSection>
+                        <div className="border-t border-brand-border dark:border-dark-border w-full my-6"></div>
+                    </div>
 
                     {/* 1. PRODUCT SEARCH & TABLE */}
                     <div className="mb-8">
@@ -516,7 +552,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                     <div className="border-t border-brand-border dark:border-dark-border w-full my-8"></div>
 
                     {/* 2. CUSTOMER SECTION */}
-                    <div className="mb-8">
+                    <div className="hidden lg:block mb-8">
                         <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading mb-6">Cliente</h3>
 
                         {props.selectedCustomer ? (
@@ -556,7 +592,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         )}
                     </div>
 
-                    <div className="border-t border-brand-border dark:border-dark-border w-full my-8"></div>
+                    <div className="hidden lg:block border-t border-brand-border dark:border-dark-border w-full my-8"></div>
 
                     {/* 3. SETTINGS SECTION */}
                     <div className="mb-8">

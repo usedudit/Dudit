@@ -681,6 +681,7 @@ export async function checkoutCartAction(
           partnerId,
           destinationAddress: deliveryAddress,
           freeDeliveryCoupon: false,
+          orderSubtotal: totalAmount,
         })
       : Promise.resolve({ success: true, fee: 0, distanceKm: null, breakdown: null }),
     listActivePromotionsForMarketplaceAction(partnerId, user.id),

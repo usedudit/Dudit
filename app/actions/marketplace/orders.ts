@@ -174,15 +174,46 @@ export async function cancelBuyerOrderAction(orderId: string) {
       new Set(
         (order.order_items || [])
           .map((item: { product_id?: string | null }) => item.product_id)
-          .filter((productId): productId is string => typeof productId === "string" && productId.length > 0),
+          .filter((productId: string | null | undefined): productId is string => typeof productId === "string" && productId.length > 0),
       ),
     )
 
     for (const productId of productIds) {
-      await invalidateProductCache(productId, order.partner_id, "update", { silent: true })
+      await invalidateProductCache(productId as string, order.partner_id, "update", { silent: true })
     }
   }
 
   revalidateOrdersCache()
   return { success: true }
+}
+
+export async function getOrderHistoryForBuyerAction(orderId: string) {
+  const user = await requireUser()
+  if (!user) {
+    return { error: "Não autenticado" }
+  }
+
+  const supabase = await getSupabaseServerClient()
+  const { data: order, error: fetchError } = await supabase
+    .from("orders")
+    .select("buyer_id, partner_id")
+    .eq("id", orderId)
+    .single()
+
+  if (fetchError || !order) {
+    return { error: "Pedido não encontrado" }
+  }
+
+  if (order.buyer_id !== user.id) {
+    return { error: "Sem permissão" }
+  }
+
+  const { getOrderHistoryEntries } = await import("@/lib/services/order-history.service")
+  try {
+    const entries = await getOrderHistoryEntries(orderId, order.partner_id)
+    return { success: true, data: entries }
+  } catch (err: any) {
+    console.error("[getOrderHistoryForBuyerAction] error:", err)
+    return { error: err.message || "Erro ao buscar histórico" }
+  }
 }

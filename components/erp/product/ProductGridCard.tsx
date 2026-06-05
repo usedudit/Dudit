@@ -88,12 +88,12 @@ const ProductGridCard = React.memo(
                                         </Tooltip>
                                     )}
                                 </h3>
-                                <Badge
-                                    variant={product.is_active ? "green" : "red"}
-                                    className="whitespace-nowrap scale-90 shrink-0"
-                                >
-                                    {product.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
+                                <Tooltip text={product.is_active ? "Ativo" : "Inativo"}>
+                                    <Badge
+                                        variant={product.is_active ? "green" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
                             </div>
 
                             {/* Checkbox com stopPropagation para não abrir os detalhes ao clicar */}

@@ -191,43 +191,66 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const getTimelineSteps = (status: string) => {
         const baseDate = formatDayMonth(order.created_at)
         const baseTime = formatTime(order.created_at)
-        if (order.situation === "cancelled") {
+
+        const isPaid = ["paid", "partially_paid"].includes(order.situation)
+        const isCancelled = order.situation === "cancelled"
+
+        if (isCancelled) {
             const cancelledAt = order.updated_at || order.created_at
-            const cancelLabel = hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado"
             return [
-                { label: cancelLabel, date: baseDate, time: baseTime, active: true },
-                { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true },
+                { label: hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: isPaid ? "Pago" : "Aguardando pagamento", date: baseDate, time: baseTime, active: true },
+                { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true }
             ]
         }
 
-        // Dynamic labels based on item types
-        const stepLabels = hasOnlyServices
-            ? { first: "Agendamento Confirmado", preparing: "Serviço Preparado", sent: "Em Execução", delivered: "Concluído", pickup: "Concluído" }
-            : hasMixedItems
-                ? { first: "Pedido Realizado", preparing: "Preparando Itens", sent: "Em Andamento", delivered: "Concluído", pickup: "Retirado / Concluído" }
-                : { first: "Pedido Realizado", preparing: "Preparando", sent: "Enviado", delivered: "Entregue", pickup: "Pedido Retirado" }
+        const isPreparing = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(status)
+        const isSent = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(status)
+        const isDelivered = ["delivered", "pickup_available", "delivery_failed"].includes(status)
 
-        if (isPickupOrder) {
-            const pickedUp = ["delivered", "pickup_available"].includes(status)
-            const pickedMeta = timelineDate(pickedUp)
-            return [
-                { label: stepLabels.first, date: baseDate, time: baseTime, active: true },
-                { label: stepLabels.pickup, date: pickedMeta.date, time: pickedMeta.time, active: pickedUp },
-            ]
+        const preparingMeta = timelineDate(isPaid && isPreparing)
+        const sentMeta = timelineDate(isPaid && isSent)
+        const finalMeta = timelineDate(isPaid && isDelivered)
+        const paymentMeta = timelineDate(isPaid)
+
+        const isPickup = isPickupOrder
+
+        let finalLabel = isPickup ? "Pedido Retirado" : "Entregue"
+        if (status === "delivery_failed") {
+            finalLabel = "Entrega não realizada"
         }
-
-        const preparingActive = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(status)
-        const sentActive = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(status)
-        const finalActive = ["delivered", "pickup_available", "delivery_failed"].includes(status)
-        const preparingMeta = timelineDate(preparingActive)
-        const sentMeta = timelineDate(sentActive)
-        const finalMeta = timelineDate(finalActive)
 
         return [
-            { label: stepLabels.first, date: baseDate, time: baseTime, active: true },
-            { label: stepLabels.preparing, date: preparingMeta.date, time: preparingMeta.time, active: preparingActive },
-            { label: status === "pickup_available" ? "Disponível para retirada" : stepLabels.sent, date: sentMeta.date, time: sentMeta.time, active: sentActive },
-            { label: status === "delivery_failed" ? "Entrega não realizada" : stepLabels.delivered, date: finalMeta.date, time: finalMeta.time, active: finalActive }
+            {
+                label: hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado",
+                date: baseDate,
+                time: baseTime,
+                active: true
+            },
+            {
+                label: isPaid ? "Pago" : "Aguardando pagamento",
+                date: isPaid ? paymentMeta.date : baseDate,
+                time: isPaid ? paymentMeta.time : baseTime,
+                active: true
+            },
+            {
+                label: hasOnlyServices ? "Serviço Preparado" : "Preparando",
+                date: isPaid && isPreparing ? preparingMeta.date : undefined,
+                time: isPaid && isPreparing ? preparingMeta.time : undefined,
+                active: isPaid && isPreparing
+            },
+            {
+                label: isPickup ? "Pronto para retirada" : "Enviado",
+                date: isPaid && isSent ? sentMeta.date : undefined,
+                time: isPaid && isSent ? sentMeta.time : undefined,
+                active: isPaid && isSent
+            },
+            {
+                label: finalLabel,
+                date: isPaid && isDelivered ? finalMeta.date : undefined,
+                time: isPaid && isDelivered ? finalMeta.time : undefined,
+                active: isPaid && isDelivered
+            }
         ]
     }
 

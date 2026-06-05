@@ -15,6 +15,8 @@ function mapSettingsRow(row: any): DeliverySettings {
     extraKmPrice: Number(row?.extra_km_price || 0),
     maxDeliveryKm: row?.max_delivery_km == null ? null : Number(row.max_delivery_km),
     isDeliveryEnabled: Boolean(row?.is_delivery_enabled ?? true),
+    isPickupEnabled: Boolean(row?.is_pickup_enabled ?? true),
+    freeDeliveryThreshold: row?.free_delivery_threshold == null ? null : Number(row.free_delivery_threshold),
   }
 }
 
@@ -72,6 +74,8 @@ export async function upsertPartnerDeliveryConfigAction(input: {
       ? (input.settings.maxDeliveryKm == null ? null : Math.max(0, Number(input.settings.maxDeliveryKm)))
       : null,
     isDeliveryEnabled: Boolean(input.settings.isDeliveryEnabled),
+    isPickupEnabled: Boolean(input.settings.isPickupEnabled),
+    freeDeliveryThreshold: input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold)),
   }
 
   const { error } = await supabase.from("delivery_settings").upsert({
@@ -81,6 +85,8 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     extra_km_price: normalized.extraKmPrice,
     max_delivery_km: normalized.maxDeliveryKm,
     is_delivery_enabled: normalized.isDeliveryEnabled,
+    is_pickup_enabled: normalized.isPickupEnabled,
+    free_delivery_threshold: normalized.freeDeliveryThreshold,
     updated_at: new Date().toISOString(),
   })
 
@@ -133,6 +139,8 @@ export async function quoteDeliveryFeeAction(input: {
   destinationAddress: string
   currentTimeIso?: string
   freeDeliveryCoupon?: boolean
+  destinationCoords?: { lat: number; lng: number } | null
+  orderSubtotal?: number
 }) {
   const supabase = getAdminClient()
 
@@ -173,7 +181,11 @@ export async function quoteDeliveryFeeAction(input: {
       return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
     }
 
-    const destinationCoords = await geocodeAddress(input.destinationAddress)
+    let destinationCoords = input.destinationCoords;
+    if (!destinationCoords) {
+      destinationCoords = await geocodeAddress(input.destinationAddress)
+    }
+    
     if (!destinationCoords) {
       return { success: false as const, error: "Não foi possível encontrar as coordenadas do seu endereço para entrega." }
     }
@@ -194,6 +206,7 @@ export async function quoteDeliveryFeeAction(input: {
       settings,
       rules,
       freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
+      orderSubtotal: input.orderSubtotal,
     })
     
     return {

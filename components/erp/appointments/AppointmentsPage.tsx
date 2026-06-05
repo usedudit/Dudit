@@ -957,20 +957,12 @@ const AppointmentsPage = ({
                                                                             imageSrc="https://img.dudit.com.br/static/mascots/Agendamentos.png"
                                                                             imageAlt="Nenhum agendamento encontrado"
                                                                             title="Nenhum agendamento encontrado"
-                                                                            subtitle=""
+                                                                            subtitle="Não há agendamentos para este período"
                                                                             itemButton={{
                                                                                 text: "Novo agendamento",
                                                                                 action: () => handleOpenCreate(),
                                                                             }}
                                                                         />
-                                                                        <div className="p-20 text-center">
-                                                                            <h3 className="text-brand-dark dark:text-dark-heading font-bold mb-1">
-                                                                                Nenhum agendamento encontrado
-                                                                            </h3>
-                                                                            <p className="text-sm text-brand-inactive-text">
-                                                                                Nao ha agendamentos para este periodo ou filtros.
-                                                                            </p>
-                                                                        </div>
                                                                     </td>
                                                                 </tr>
                                                             )}
