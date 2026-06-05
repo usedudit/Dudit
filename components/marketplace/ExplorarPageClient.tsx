@@ -448,8 +448,8 @@ export function ExplorarPageClient({
             return res
         },
         dedupeKey: (item) => String(item?.itemType || "") + ":" + String(item?.id || ""),
-        staleTime: 60000,
-        refetchOnMount: false,
+        staleTime: 30000,
+        refetchOnMount: true,
         refetchOnWindowFocus: false,
     })
 
@@ -550,18 +550,16 @@ export function ExplorarPageClient({
     }
 
     const activeCategoriesList = useMemo(() => {
-        const active = categoriesList.filter(cat => {
-            return dataToFilter.some(p => matchCategory(p.category, cat.name))
-        })
+        const all = [...categoriesList]
         const hasOutros = dataToFilter.some(p => {
             if (p.itemType === 'loja') return false
             const itemCat = p.category
             return !itemCat || !isStandardCategory(itemCat)
         })
-        if (hasOutros) {
-            active.push({ name: "Outros", icon_url: null })
+        if (hasOutros && !all.some(c => c.name === "Outros")) {
+            all.push({ name: "Outros", icon_url: null })
         }
-        return active
+        return all
     }, [categoriesList, dataToFilter])
 
     const outrosItems = useMemo(() => {
@@ -751,21 +749,21 @@ export function ExplorarPageClient({
         const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
         const term = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
         if (term) {
-            return `Ainda não temos vendedores ou resultados para <strong class='text-brand-dark'>"${term}"</strong> em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro ou convidar um vendedor?`
+            return `Ainda não encontramos resultados para <strong class='text-brand-dark'>"${term}"</strong> em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Conhece alguém que vende? Convide pra Dudit!`
         }
         if (currentType === "produtos") {
-            return `Ainda não temos vendedores ou produtos cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a vender seus produtos de graça, sem comissão nenhuma?`
+            return `Nenhum produto cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a vender aqui — é gratuito e sem comissão!`
         }
         if (currentType === "servicos") {
-            return `Ainda não temos profissionais ou serviços cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a oferecer seus serviços de graça, sem comissão nenhuma?`
+            return `Nenhum serviço cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer seus serviços — é gratuito e sem comissão!`
         }
         if (currentType === "planos") {
-            return `Ainda não temos vendedores ou planos recorrentes cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a oferecer planos de assinatura de graça, sem comissão nenhuma?`
+            return `Nenhum plano recorrente cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro a oferecer assinaturas — é gratuito e sem comissão!`
         }
         if (currentType === "vitrines") {
-            return `Ainda não temos lojas ou empresas cadastradas em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e criar a vitrine do seu negócio de graça, sem comissão nenhuma?`
+            return `Nenhuma loja cadastrada em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Crie sua vitrine — é gratuito e sem comissão!`
         }
-        return `Ainda não temos vendedores, produtos ou serviços cadastrados em <strong class='text-brand-dark'>${cityNameOnly}</strong>. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`
+        return `Nenhum vendedor cadastrado em <strong class='text-brand-dark'>${cityNameOnly}</strong> ainda. Seja o primeiro ou convide quem você conhece!`
     }, [currentType, selectedCitySlug, query, selectedCategories])
 
     const handleInvite = useCallback(() => {
@@ -796,7 +794,7 @@ export function ExplorarPageClient({
                 )}
 
                 {/* 2. CATEGORIES RECTANGULAR SLIDER */}
-                {(currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines') && activeCategoriesList.length > 0 && (
+                {(currentType === 'tudo' || currentType === 'produtos' || currentType === 'vitrines' || currentType === 'servicos') && activeCategoriesList.length > 0 && (
                     <div className="bg-white py-6">
                         <div className="container mx-auto px-4 max-w-[1400px]">
                             <div className="flex gap-3 overflow-x-auto scrollbar-none py-2 px-1">
@@ -978,14 +976,14 @@ export function ExplorarPageClient({
                                         subtitle={emptySubtitle}
                                         buttons={[
                                             {
-                                                text: "Começar a vender na Dudit",
+                                                text: "Eu vendo algo",
                                                 action: () => {
                                                     router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
                                                 },
                                                 variant: "default"
                                             },
                                             {
-                                                text: "Convidar um vendedor",
+                                                text: "Conheço quem vende",
                                                 action: handleInvite,
                                                 variant: "outline"
                                             }
@@ -1216,10 +1214,24 @@ export function ExplorarPageClient({
                                                         <div className="py-12 flex flex-col items-center">
                                                             <IconPlaceholder
                                                                 placeholderType="image"
-                                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                                imageAlt="Nenhum item encontrado nesta categoria"
-                                                                title="Nenhum item encontrado"
-                                                                subtitle="Ainda não temos parceiros ativos nessa cidade com produtos não categorizados."
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                                                                imageAlt="Estamos Chegando!"
+                                                                title="Estamos Chegando!"
+                                                                subtitle={`Ainda não temos itens diversos em <strong class='text-brand-dark'>${selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : "sua cidade"}</strong>. Conhece alguém que vende? Convide pra Dudit!`}
+                                                                buttons={[
+                                                                    {
+                                                                        text: "Eu vendo algo",
+                                                                        action: () => {
+                                                                            router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                                        },
+                                                                        variant: "default" as const
+                                                                    },
+                                                                    {
+                                                                        text: "Conheço quem vende",
+                                                                        action: handleInvite,
+                                                                        variant: "outline" as const
+                                                                    }
+                                                                ]}
                                                             />
                                                         </div>
                                                     ) : (
@@ -1284,10 +1296,24 @@ export function ExplorarPageClient({
                                                         <div className="py-12 flex flex-col items-center">
                                                             <IconPlaceholder
                                                                 placeholderType="image"
-                                                                imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                                                                imageAlt="Nenhum item encontrado nesta categoria"
-                                                                title="Nenhum item encontrado nesta categoria"
-                                                                subtitle="Ainda não temos parceiros ativos nessa cidade para esta categoria."
+                                                                imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                                                                imageAlt="Estamos Chegando!"
+                                                                title="Estamos Chegando!"
+                                                                subtitle={`Ainda não temos itens de <strong class='text-brand-dark'>${selectedCategories[0]}</strong> em <strong class='text-brand-dark'>${selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : "sua cidade"}</strong>. Conhece alguém que vende? Convide pra Dudit!`}
+                                                                buttons={[
+                                                                    {
+                                                                        text: "Eu vendo algo",
+                                                                        action: () => {
+                                                                            router.push(userProfile ? "/erp/switch" : "/auth/login?mode=partner")
+                                                                        },
+                                                                        variant: "default" as const
+                                                                    },
+                                                                    {
+                                                                        text: "Conheço quem vende",
+                                                                        action: handleInvite,
+                                                                        variant: "outline" as const
+                                                                    }
+                                                                ]}
                                                             />
                                                         </div>
                                                     )}

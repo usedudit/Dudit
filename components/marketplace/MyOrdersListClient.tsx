@@ -288,7 +288,7 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                         </div>
 
                                                         {/* Right Side: Actions */}
-                                                        <div className="flex flex-row items-center gap-3 flex-wrap justify-end">
+                                                        <div className="flex flex-row items-center flex-wrap justify-end">
                                                             {reviewedOrderIds.has(order.id) && (
                                                                 <span className="text-xs sm:text-sm font-medium text-brand-green flex items-center gap-1.5">
                                                                     <CheckCircleIcon size={16} /> Pedido avaliado

@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { ExplorarPageClient } from "@/components/marketplace/ExplorarPageClient"
 import { getCachedExploreProducts } from "@/app/actions/marketplace/products"
 import type { Metadata } from "next"
@@ -124,16 +125,18 @@ export default async function ExplorarPage({
         <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-            <ExplorarPageClient
-                initialResults={productsWithDistance}
-                query={query}
-                type={type}
-                cidade={cidade}
-                categoria={categoria}
-                userProfile={userProfile}
-                cartCount={cartCount}
-                hideHeaderAndFooter={true}
-            />
+            <Suspense>
+                <ExplorarPageClient
+                    initialResults={productsWithDistance}
+                    query={query}
+                    type={type}
+                    cidade={cidade}
+                    categoria={categoria}
+                    userProfile={userProfile}
+                    cartCount={cartCount}
+                    hideHeaderAndFooter={true}
+                />
+            </Suspense>
 
             <MarketplaceFooter />
         </div>

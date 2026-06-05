@@ -99,7 +99,7 @@ const Header: React.FC<HeaderProps> = ({
 
     const { setDirection } = useTransitionDirection()
     const isHome = useMemo(() => currentView === "home" || pathname === "/", [currentView, pathname])
-    const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/cart"].includes(pathname), [isHome, pathname])
+    const showDeliveryInfo = useMemo(() => isHome || ["/perfil", "/pedidos", "/cart"].includes(pathname) || pathname.startsWith("/explorar"), [isHome, pathname])
 
     const [searchValue, setSearchValue] = useState("")
     const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])

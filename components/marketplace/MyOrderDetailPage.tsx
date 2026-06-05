@@ -569,17 +569,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     {/* Mobile/Tablet Order Summary Card */}
                                     <div className="block lg:hidden">
                                         <FormSection title={`Pedido #${orderNumber}`}>
-                                            <DetailRow 
-                                                label="Status do Pedido" 
+                                            <DetailRow
+                                                label="Status do Pedido"
                                                 value={
                                                     <span className={statusConfig.color}>
                                                         {statusConfig.label}
                                                     </span>
-                                                } 
+                                                }
                                             />
-                                            <DetailRow 
-                                                label="Data do Pedido" 
-                                                value={`${dateStrFull} às ${dateStrTime}`} 
+                                            <DetailRow
+                                                label="Data do Pedido"
+                                                value={`${dateStrFull} às ${dateStrTime}`}
                                             />
                                         </FormSection>
                                     </div>
