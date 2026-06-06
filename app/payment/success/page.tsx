@@ -23,17 +23,24 @@ export default async function PaymentSuccessPage({
 
   const { data: order } = await supabase
     .from("orders")
-    .select("order_number, total_amount, situation, delivery_fee, discount_amount, payment_method_discount_amount, order_items(subtotal, product_price, quantity)")
+    .select("order_number, total_amount, situation, delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, order_items(subtotal, product_price, quantity)")
     .eq("id", orderId)
     .single()
 
-  const subtotal = (order?.order_items || []).reduce(
+  const checkoutPricing = (Array.isArray(order?.payment_breakdown) ? order?.payment_breakdown : [])
+    .find((entry: any) => entry?.checkoutPricing)?.checkoutPricing
+  const subtotal = checkoutPricing?.subtotal ?? (order?.order_items || []).reduce(
     (sum: number, item: any) => sum + Number(item.subtotal ?? Number(item.product_price || 0) * Number(item.quantity || 0)),
     0,
   )
-  const deliveryFee = Math.max(0, Number(order?.delivery_fee || 0))
-  const couponDiscount = Math.max(0, Number(order?.discount_amount || 0))
-  const paymentMethodDiscount = Math.max(0, Number(order?.payment_method_discount_amount || 0))
+  const deliveryFee = Math.max(0, Number(checkoutPricing?.deliveryFee ?? order?.delivery_fee ?? 0))
+  const couponDiscount = Math.max(0, Number(checkoutPricing?.couponDiscount ?? order?.discount_amount ?? 0))
+  const paymentMethodDiscount = Math.max(0, Number(checkoutPricing?.paymentMethodDiscount ?? order?.payment_method_discount_amount ?? 0))
+  const paymentMethodExtra = Math.max(0, Number(
+    checkoutPricing
+      ? Number(checkoutPricing.paymentMethodInterest || 0) + Number(checkoutPricing.paymentMethodFee || 0)
+      : order?.payment_method_extra_amount || 0,
+  ))
 
   return (
     <div className="container max-w-2xl mx-auto py-12 px-4">
@@ -55,6 +62,7 @@ export default async function PaymentSuccessPage({
                 <p className="flex justify-between"><span>Entrega</span><span>{formatCurrency(deliveryFee)}</span></p>
                 {couponDiscount > 0 && <p className="flex justify-between text-green-700"><span>Cupom</span><span>-{formatCurrency(couponDiscount)}</span></p>}
                 {paymentMethodDiscount > 0 && <p className="flex justify-between text-green-700"><span>Pagamento</span><span>-{formatCurrency(paymentMethodDiscount)}</span></p>}
+                {paymentMethodExtra > 0 && <p className="flex justify-between"><span>Juros e taxas</span><span>+{formatCurrency(paymentMethodExtra)}</span></p>}
                 <p className="flex justify-between text-lg font-bold pt-2 border-t"><span>Total</span><span>{formatCurrency(order.total_amount)}</span></p>
               </div>
               <p className="text-sm">

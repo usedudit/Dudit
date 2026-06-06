@@ -7,7 +7,7 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { releaseOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { getAdminClient } from "@/lib/supabase/admin"
-import { checkoutCartAction } from "@/app/actions/marketplace/cart"
+import { checkoutCartAction, type MarketplaceCheckoutPricingSnapshot } from "@/app/actions/marketplace/cart"
 import {
   prepareProductBuyNowCheckoutAction,
 } from "@/app/actions/marketplace/cart-extensions"
@@ -33,6 +33,7 @@ export async function createOrderAction(data: {
   couponCode?: string | null
   wantsChange?: boolean
   payWithAmount?: number
+  checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null
 }) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
@@ -93,6 +94,8 @@ export async function createOrderAction(data: {
     data.csrf_token,
     data.wantsChange,
     data.payWithAmount,
+    undefined,
+    data.checkoutPricingSnapshot,
   )
 }
 

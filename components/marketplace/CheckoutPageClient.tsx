@@ -446,7 +446,7 @@ export function CheckoutPageClient() {
 
 
     useEffect(() => {
-        if (formData.paymentMethod && storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod)) {
+        if (formData.paymentMethod && formData.paymentMethod !== "mercadopago" && storefrontMethods.length > 0 && !storefrontMethods.some(m => m.id === formData.paymentMethod || m.type === formData.paymentMethod)) {
             setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
         }
     }, [storefrontMethods, formData.paymentMethod])
@@ -502,8 +502,9 @@ export function CheckoutPageClient() {
                 if (result.success && result.methods.length > 0) {
                     setStorefrontMethods(result.methods)
                     // Se o método atual não está entre os disponíveis, limpa a seleção
-                    const availableTypes = result.methods.map((m) => m.type)
-                    if (formData.paymentMethod && !availableTypes.includes(formData.paymentMethod as any)) {
+                    const hasSelectedMethod = formData.paymentMethod === "mercadopago" ||
+                        result.methods.some((m) => m.id === formData.paymentMethod || m.type === formData.paymentMethod)
+                    if (formData.paymentMethod && !hasSelectedMethod) {
                         setFormData((prev) => ({ ...prev, paymentMethod: "", installments: 1 }))
                     }
                 }
@@ -670,7 +671,7 @@ export function CheckoutPageClient() {
         other: "Outros",
     }
     const visibleStorefrontMethods = useMemo(() => {
-        if (!requirements || requirements.allowPayOnDelivery) return storefrontMethods
+        if (!requirements || requirements.allowPayOnDelivery || requirements.hasPayOnService) return storefrontMethods
         return storefrontMethods.filter((m) => m.type !== "cash")
     }, [storefrontMethods, requirements])
 
@@ -908,6 +909,38 @@ export function CheckoutPageClient() {
     const checkoutTotalToCharge = paymentOption === "traditional" && paymentPreview?.success
         ? Number(paymentPreview.finalAmount || checkoutTotalWithDelivery)
         : checkoutTotalWithDelivery
+    const checkoutPricingSnapshot = useMemo(() => {
+        const chargedBase = checkoutTotalWithDelivery
+        const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
+            ? Number(paymentPreview.paymentMethodDiscountAmount || 0)
+            : 0
+        const methodInterest = paymentOption === "traditional" && paymentPreview?.success
+            ? Number(paymentPreview.interestAmount || 0)
+            : 0
+        const chargedFee = Math.max(0, Number((
+            checkoutTotalToCharge - (chargedBase - methodDiscount + methodInterest)
+        ).toFixed(2)))
+
+        return {
+            subtotal: totalAmount,
+            couponDiscount,
+            paymentMethodDiscount: methodDiscount,
+            paymentMethodInterest: methodInterest,
+            paymentMethodFee: chargedFee,
+            deliveryFee: showDeliveryFeeRow && !isPickup ? deliveryFee : 0,
+            finalTotal: checkoutTotalToCharge,
+        }
+    }, [
+        totalAmount,
+        couponDiscount,
+        paymentOption,
+        paymentPreview,
+        showDeliveryFeeRow,
+        isPickup,
+        deliveryFee,
+        checkoutTotalWithDelivery,
+        checkoutTotalToCharge,
+    ])
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
             availability_value: Number(product.availabilityValue || 0),
@@ -1389,6 +1422,7 @@ export function CheckoutPageClient() {
                         couponCode: couponCode || null,
                         couponDiscount: couponDiscount,
                         deliveryFee: isPickup ? 0 : deliveryFee,
+                        checkoutPricing: checkoutPricingSnapshot,
                         cartItemIds:
                             sessionData?.source === "cart"
                                 ? (sessionData.cartItems || []).map((item) => item.cartItemId)
@@ -1452,6 +1486,7 @@ export function CheckoutPageClient() {
                         wantsChange || false,
                         payWithAmount || undefined,
                         payDepositOnly,
+                        checkoutPricingSnapshot,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -1476,6 +1511,7 @@ export function CheckoutPageClient() {
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
                             deliveryFee: showDeliveryFeeRow && !isPickup ? deliveryFee : 0,
+                            checkoutPricing: checkoutPricingSnapshot,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                         useMercadoPago: false,
@@ -1505,6 +1541,7 @@ export function CheckoutPageClient() {
                         couponCode: couponCode || null,
                         wantsChange: wantsChange || false,
                         payWithAmount: payWithAmount || undefined,
+                        checkoutPricingSnapshot,
                     })
                     if (result.error) throw new Error(result.error)
                     sessionStorage.removeItem("checkout_session")
@@ -1528,6 +1565,7 @@ export function CheckoutPageClient() {
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
                             deliveryFee: isPickup ? 0 : deliveryFee,
+                            checkoutPricing: checkoutPricingSnapshot,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                         useMercadoPago: false,

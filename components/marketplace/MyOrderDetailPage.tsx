@@ -11,7 +11,7 @@ import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequ
 import { cancelBuyerOrderAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
-import { getProductUrl, getPartnerUrl } from '@/lib/utils/url-generator';
+import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
 import { useR2Upload } from '@/hooks/use-r2-upload';
 import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from '@/lib/returns/calculations';
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
@@ -66,20 +66,51 @@ const findFulfillmentLine = (order: any, item: any) => {
     });
 };
 
+const getCheckoutPricingSnapshot = (order: any) => {
+    const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+    const snapshot = breakdown.find((entry: any) => entry?.checkoutPricing)?.checkoutPricing;
+    if (!snapshot) return null;
+    return {
+        subtotal: Number(snapshot.subtotal || 0),
+        couponDiscount: Number(snapshot.couponDiscount || 0),
+        paymentMethodDiscount: Number(snapshot.paymentMethodDiscount || 0),
+        paymentMethodInterest: Number(snapshot.paymentMethodInterest || 0),
+        paymentMethodFee: Number(snapshot.paymentMethodFee || 0),
+        deliveryFee: Number(snapshot.deliveryFee || 0),
+        finalTotal: Number(snapshot.finalTotal || 0),
+    };
+};
+
 const getClientTimelineSteps = (order: any) => {
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
     const updateDateStr = order.updated_at ? formatFullDate(order.updated_at) : null;
     const updateTimeStr = order.updated_at ? formatTime(order.updated_at) : null;
 
-    const steps: { label: string; active: boolean; date?: string; time?: string }[] = [];
-
     const isPaid = ["paid", "partially_paid"].includes(order.situation);
     const isCancelled = order.situation === "cancelled";
 
+    const orderItems = order.order_items || [];
+    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking");
+    const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
+    const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
+    const hasMixedItems = hasAnyService && hasProducts;
+
+    const isPreparing = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
+    const isSent = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(order.delivery_status);
+    const isDelivered = ["delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
+    const isPickup = order.delivery_type === "pickup";
+
+    const steps: { label: string; active: boolean; date?: string; time?: string; subLabel?: string | string[] }[] = [];
+
     if (isCancelled) {
+        if (hasOnlyServices) {
+            steps.push({ label: "Agendamento Criado", active: true, date: dateStrFull, time: dateStrTime });
+        } else {
+            steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
+        }
         steps.push({
-            label: isPaid ? "Pago" : "Aguardando Pagamento",
+            label: isPaid ? "Pago" : "Aguardando pagamento",
             active: true,
             date: dateStrFull,
             time: dateStrTime
@@ -93,45 +124,99 @@ const getClientTimelineSteps = (order: any) => {
         return steps;
     }
 
-    // Step 1: Aguardando Pagamento / Pago
-    steps.push({
-        label: isPaid ? "Pago" : "Aguardando Pagamento",
-        active: true,
-        date: dateStrFull,
-        time: dateStrTime
-    });
-
-    // Step 2: Preparando
-    const isPreparing = ["preparing", "sent", "delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
-    steps.push({
-        label: "Preparando",
-        active: isPaid && isPreparing,
-        date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
-        time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
-    });
-
-    // Step 3: Enviado / Pronto para retirada
-    const isSent = ["sent", "delivered", "delivery_failed", "pickup_available"].includes(order.delivery_status);
-    const isPickup = order.delivery_type === "pickup";
-    steps.push({
-        label: isPickup ? "Pronto para retirada" : "Enviado",
-        active: isPaid && isSent,
-        date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
-        time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
-    });
-
-    // Step 4: Entregue / Retirado / Não entregue
-    const isDelivered = ["delivered", "pickup_available", "delivery_failed"].includes(order.delivery_status);
-    let finalLabel = isPickup ? "Retirado" : "Entregue";
-    if (order.delivery_status === "delivery_failed") {
-        finalLabel = "Não entregue";
+    // 1. First Step
+    if (hasOnlyServices) {
+        steps.push({ label: "Agendamento Criado", active: true, date: dateStrFull, time: dateStrTime });
+    } else {
+        steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
     }
+
+    // 2. Second Step: Payment
     steps.push({
-        label: finalLabel,
-        active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available" || order.delivery_status === "delivery_failed"),
-        date: isPaid && isDelivered ? (updateDateStr || dateStrFull) : undefined,
-        time: isPaid && isDelivered ? (updateTimeStr || dateStrTime) : undefined
+        label: isPaid ? "Pago" : "Aguardando pagamento",
+        active: true,
+        date: isPaid ? (updateDateStr || dateStrFull) : undefined,
+        time: isPaid ? (updateTimeStr || dateStrTime) : undefined
     });
+
+    if (hasOnlyServices) {
+        // Service-only order:
+        // 3. Em progresso
+        steps.push({
+            label: "Em progresso",
+            active: isPaid && isPreparing,
+            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
+        });
+        // 4. Concluído
+        steps.push({
+            label: "Concluído",
+            active: isPaid && isDelivered && order.delivery_status === "delivered",
+            date: isPaid && isDelivered && order.delivery_status === "delivered" ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isDelivered && order.delivery_status === "delivered" ? (updateTimeStr || dateStrTime) : undefined
+        });
+    } else if (hasMixedItems) {
+        // Mixed order:
+        // 3. Em Execução (with sub-labels)
+        const servicesCount = orderItems.filter((item: any) => item.service_id || item.line_type === "service_booking").length;
+        const productsCount = orderItems.filter((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription").length;
+        
+        const serviceText = servicesCount === 1 ? "1 serviço sendo realizado" : `${servicesCount} serviços sendo realizados`;
+        const productText = productsCount === 1 ? "1 produto sendo preparado" : `${productsCount} produtos sendo preparados`;
+
+        steps.push({
+            label: "Em Execução",
+            active: isPaid && isPreparing,
+            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined,
+            subLabel: [serviceText, productText]
+        });
+
+        // 4. Pronto para Retirada/Enviado (only for products)
+        steps.push({
+            label: isPickup ? "Pronto para retirada" : "Enviado",
+            active: isPaid && isSent,
+            date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
+        });
+
+        // 5. Concluído
+        steps.push({
+            label: "Concluído",
+            active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available"),
+            date: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") ? (updateTimeStr || dateStrTime) : undefined
+        });
+    } else {
+        // Standard product-only order:
+        // 3. Preparando
+        steps.push({
+            label: "Preparando",
+            active: isPaid && isPreparing,
+            date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
+        });
+
+        // 4. Pronto para retirada / Enviado
+        steps.push({
+            label: isPickup ? "Pronto para retirada" : "Enviado",
+            active: isPaid && isSent,
+            date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
+        });
+
+        // 5. Entregue / Retirado
+        let finalLabel = isPickup ? "Retirado" : "Entregue";
+        if (order.delivery_status === "delivery_failed") {
+            finalLabel = "Não entregue";
+        }
+        steps.push({
+            label: finalLabel,
+            active: isPaid && isDelivered && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available" || order.delivery_status === "delivery_failed"),
+            date: isPaid && isDelivered ? (updateDateStr || dateStrFull) : undefined,
+            time: isPaid && isDelivered ? (updateTimeStr || dateStrTime) : undefined
+        });
+    }
 
     return steps;
 };
@@ -171,6 +256,19 @@ const ShippingDetailsModal = ({ isOpen, onClose, order }: { isOpen: boolean; onC
                                         </div>
                                         {step.active && step.date && (
                                             <div className="text-xs text-brand-inactive-text mt-1">{step.date} às {step.time}</div>
+                                        )}
+                                        {step.subLabel && (
+                                            <div className="text-xs text-brand-inactive-text mt-1 font-normal ml-1">
+                                                {Array.isArray(step.subLabel) ? (
+                                                    <ul className="list-disc pl-4 space-y-0.5">
+                                                        {step.subLabel.map((sl, slIdx) => (
+                                                            <li key={slIdx}>{sl}</li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <p>{step.subLabel}</p>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -299,6 +397,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isDelivery = order.delivery_type === "delivery";
     const sellerName = order.partners?.store_name || "Loja Parceira";
     const totalAmount = Number(order.total_amount);
+
+    const orderItems = order.order_items || [];
+    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking");
+    const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking");
+    const hasProducts = orderItems.some((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription");
+    const hasMixedItems = hasAnyService && hasProducts;
     const canCancelOrder = canRequestOrderCancellation(order);
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
@@ -347,14 +451,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     );
 
     // Pricing details mapping
+    const pricingSnapshot = getCheckoutPricingSnapshot(order);
     const itemsSubtotal = (order.order_items || []).reduce(
         (sum: number, item: any) => sum + Number(item.subtotal ?? Number(item.product_price || 0) * Number(item.quantity || 0)),
         0
     );
-    const couponDiscountVal = Math.max(0, Number(order.discount_amount ?? order.discount_total ?? 0));
-    const paymentMethodDiscountVal = Math.max(0, Number(order.payment_method_discount_amount || 0));
-    const shippingVal = Math.max(0, Number(order.delivery_fee ?? order.shipping_total ?? 0));
-    const subtotalVal = Number(order.subtotal_original || itemsSubtotal || totalAmount - shippingVal + couponDiscountVal + paymentMethodDiscountVal);
+    const couponDiscountVal = Math.max(0, Number(pricingSnapshot?.couponDiscount ?? order.discount_amount ?? order.discount_total ?? 0));
+    const paymentMethodDiscountVal = Math.max(0, Number(pricingSnapshot?.paymentMethodDiscount ?? order.payment_method_discount_amount ?? 0));
+    const paymentMethodInterestVal = Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
+    const paymentMethodFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFee ?? order.payment_method_extra_amount ?? 0));
+    const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
+    const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
 
     const renderPriceSummary = () => {
@@ -385,6 +492,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <div className="flex justify-between text-sm text-brand-green">
                         <span>Desconto do pagamento</span>
                         <span className="font-medium">-{formatCurrency(paymentMethodDiscountVal)}</span>
+                    </div>
+                )}
+                {(paymentMethodInterestVal + paymentMethodFeeVal) > 0 && (
+                    <div className="flex justify-between text-sm text-brand-inactive-text">
+                        <span>Juros e taxas do pagamento</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">+{formatCurrency(paymentMethodInterestVal + paymentMethodFeeVal)}</span>
                     </div>
                 )}
                 <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
@@ -546,7 +659,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </>
                     );
 
-                    if (!item.product_id) {
+                    const isService = !!item.service_id || item.line_type === "service_booking";
+                    const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                    
+                    let itemUrl = "";
+                    if (isService) {
+                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
+                    } else if (isPlan) {
+                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
+                    } else if (item.product_id) {
+                        itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
+                    }
+
+                    if (!itemUrl) {
                         return (
                             <div
                                 key={item.id}
@@ -558,7 +683,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     }
                     return (
                         <Link
-                            href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                            href={itemUrl}
                             prefetch={true}
                             key={item.id}
                             className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
@@ -679,7 +804,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         </div>
                                                     </>
                                                 );
-                                                if (!item.product_id) {
+                                                const isService = !!item.service_id || item.line_type === "service_booking";
+                                                const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                                                
+                                                let itemUrl = "";
+                                                if (isService) {
+                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
+                                                } else if (isPlan) {
+                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
+                                                } else if (item.product_id) {
+                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
+                                                }
+
+                                                if (!itemUrl) {
                                                     return (
                                                         <div
                                                             key={item.id}
@@ -691,7 +828,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 }
                                                 return (
                                                     <Link
-                                                        href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)}
+                                                        href={itemUrl}
                                                         prefetch={true}
                                                         key={item.id}
                                                         className="group flex flex-row items-center gap-4 cursor-pointer py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
@@ -704,41 +841,43 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </FormSection>
 
                                     {/* Section 2: Endereço de entrega / retirada */}
-                                    <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
-                                        {isDelivery ? (
-                                            <div
-                                                onClick={() => setIsShippingModalOpen(true)}
-                                                className="flex items-stretch gap-3 cursor-pointer"
-                                            >
-                                                <img
-                                                    src="https://img.dudit.com.br/static/Map.png"
-                                                    alt="Endereço de entrega"
-                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                />
-                                                <div className="flex flex-col justify-center">
-                                                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                        {addressTypeLabel || "Endereço de Entrega"}
-                                                    </p>
-                                                    <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
+                                    {hasProducts && (
+                                        <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
+                                            {isDelivery ? (
+                                                <div
+                                                    onClick={() => setIsShippingModalOpen(true)}
+                                                    className="flex items-stretch gap-3 cursor-pointer"
+                                                >
+                                                    <img
+                                                        src="https://img.dudit.com.br/static/Map.png"
+                                                        alt="Endereço de entrega"
+                                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                    />
+                                                    <div className="flex flex-col justify-center">
+                                                        <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                            {addressTypeLabel || "Endereço de Entrega"}
+                                                        </p>
+                                                        <p className="text-xs lg:text-sm text-brand-inactive-text">{order.delivery_address || 'Endereço não informado'}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div
-                                                onClick={() => setIsShippingModalOpen(true)}
-                                                className="flex items-stretch gap-3 cursor-pointer"
-                                            >
-                                                <img
-                                                    src="https://img.dudit.com.br/static/Map.png"
-                                                    alt="Local de Retirada"
-                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                />
-                                                <div className="flex flex-col justify-center">
-                                                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
-                                                    <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
+                                            ) : (
+                                                <div
+                                                    onClick={() => setIsShippingModalOpen(true)}
+                                                    className="flex items-stretch gap-3 cursor-pointer"
+                                                >
+                                                    <img
+                                                        src="https://img.dudit.com.br/static/Map.png"
+                                                        alt="Local de Retirada"
+                                                        className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                    />
+                                                    <div className="flex flex-col justify-center">
+                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                                        <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </FormSection>
+                                            )}
+                                        </FormSection>
+                                    )}
 
                                     {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
                                     <FormSection title="Atendimento e Assinaturas">
@@ -917,7 +1056,41 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsContent>
 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8">
+                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8 space-y-8">
+                                {/* Visual Step Tracker Timeline */}
+                                <div className="border-b border-brand-border dark:border-dark-border pb-8">
+                                    <h3 className="font-bold text-md text-brand-dark dark:text-dark-heading mb-6">Status do Acompanhamento</h3>
+                                    <div className="relative pl-2 space-y-8">
+                                        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-zinc-700"></div>
+                                        {getClientTimelineSteps(order).map((step, idx) => (
+                                            <div key={idx} className="relative flex gap-4">
+                                                <div className={`w-6 h-6 rounded-full ${step.active ? "bg-brand-green border-4 border-green-100 dark:border-green-950" : "bg-gray-200 dark:bg-zinc-700"} z-10 shrink-0`}></div>
+                                                <div>
+                                                    <div className={`text-sm ${step.active ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
+                                                        {step.label}
+                                                    </div>
+                                                    {step.active && step.date && (
+                                                        <div className="text-xs text-brand-inactive-text mt-1">{step.date} às {step.time}</div>
+                                                    )}
+                                                    {step.subLabel && (
+                                                        <div className="text-xs text-brand-inactive-text mt-1 font-normal">
+                                                            {Array.isArray(step.subLabel) ? (
+                                                                <ul className="list-disc pl-4 space-y-0.5 mt-1">
+                                                                    {step.subLabel.map((sl, slIdx) => (
+                                                                        <li key={slIdx}>{sl}</li>
+                                                                    ))}
+                                                                </ul>
+                                                            ) : (
+                                                                <p className="mt-1">{step.subLabel}</p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 {historyLoading ? (
                                     <div className="flex flex-col items-center justify-center py-12 gap-3 animate-pulse">
                                         <Spinner size={24} className="text-brand-green" />
@@ -926,8 +1099,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 ) : (
                                     <HistoryTimeline
                                         entries={historyEntries}
-                                        title="Histórico do Pedido"
-                                        subtitle="Acompanhe todas as movimentações e alterações de status realizadas neste pedido."
+                                        title="Histórico de Alterações"
+                                        subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
                                         emptyMessage="Nenhum histórico encontrado para este pedido."
                                     />
                                 )}

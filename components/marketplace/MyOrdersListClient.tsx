@@ -11,7 +11,7 @@ import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger } 
 import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getProductUrl } from "@/lib/utils/url-generator";
+import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate } from "@/lib/utils";
 
@@ -25,12 +25,14 @@ const getStatusConfig = (status: string) => {
     }
 };
 
-export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { orders: any[], reviewedOrderIdsArray: string[], userId: string }) {
+export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {
     const searchParams = useSearchParams();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<string>("todos");
 
-    const reviewedOrderIds = new Set(reviewedOrderIdsArray || []);
+    const reviewedItemsSet = useMemo(() => {
+        return new Set((reviewedItemsArray || []).map(r => `${r.order_id}:${r.product_id || r.service_id}`));
+    }, [reviewedItemsArray]);
 
     useEffect(() => {
         const tab = searchParams.get('tab');
@@ -75,7 +77,15 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
 
     const handleCardClick = (e: React.MouseEvent, id: string, orderNumber: string) => {
         const target = e.target as HTMLElement;
-        if (target.closest('a') || target.closest('button')) {
+        if (
+            target.closest('a') ||
+            target.closest('button') ||
+            target.closest('textarea') ||
+            target.closest('input') ||
+            target.closest('[role="dialog"]') ||
+            target.closest('[class*="Dialog"]') ||
+            target.closest('[class*="Modal"]')
+        ) {
             return;
         }
         handleOpenDetails(id, orderNumber);
@@ -181,7 +191,12 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                         const storeImage = order.partners?.store_image_url
                                             ? getR2ImageUrl(order.partners.store_image_url)
                                             : "https://img.dudit.com.br/static/Placeholder.png";
-                                        const hasReviewAction = (order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0]) || reviewedOrderIds.has(order.id);
+                                        
+                                        const orderItems = order.order_items || [];
+                                        const reviewableItems = orderItems.filter((item: any) => item.product_id || item.service_id);
+                                        const unreviewedItems = reviewableItems.filter((item: any) => !reviewedItemsSet.has(`${order.id}:${item.product_id || item.service_id}`));
+                                        const isOrderFullyReviewed = reviewableItems.length > 0 && unreviewedItems.length === 0;
+
                                         const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
                                         return (
@@ -241,21 +256,33 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                     <div className="space-y-4">
                                                         {order.order_items?.map((item: any) => {
                                                             const itemImage = getPrimaryProductDisplayImage({
-                                                                images: item.products?.images || null,
+                                                                images: item.products?.images || item.services?.images || null,
                                                                 video_thumbnail: item.products?.video_thumbnail || null,
                                                                 fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                                             });
 
-                                                            return (
-                                                                <Link href={getProductUrl({ ...item.products, id: item.product_id }, order.partners)} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors">
+                                                            const isService = !!item.service_id || item.line_type === "service_booking";
+                                                            const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+
+                                                            let itemUrl = "";
+                                                            if (isService) {
+                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
+                                                            } else if (isPlan) {
+                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, order.partners);
+                                                            } else if (item.product_id) {
+                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id }, order.partners);
+                                                            }
+
+                                                            const cardContent = (
+                                                                <>
                                                                     <div className="w-16 h-16 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center p-1 shrink-0">
-                                                                        <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                                                        <img src={itemImage} alt={item.products?.name || item.services?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                                         <div className="flex justify-between items-start">
                                                                             <div>
                                                                                 <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
-                                                                                    {item.products?.name || item.product_name}
+                                                                                    {item.products?.name || item.services?.name || item.product_name}
                                                                                 </h4>
 
                                                                                 {item.product_variants?.variant_name && (
@@ -272,6 +299,20 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
                                                                             </div>
                                                                         </div>
                                                                     </div>
+                                                                </>
+                                                            );
+
+                                                            if (!itemUrl) {
+                                                                return (
+                                                                    <div key={item.id} className="flex gap-4 p-2 -mx-2 rounded-lg transition-colors">
+                                                                        {cardContent}
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <Link href={itemUrl} prefetch={true} key={item.id} className="flex gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 p-2 -mx-2 rounded-lg transition-colors group">
+                                                                    {cardContent}
                                                                 </Link>
                                                             );
                                                         })}
@@ -289,20 +330,19 @@ export function MyOrdersListClient({ orders, reviewedOrderIdsArray, userId }: { 
 
                                                         {/* Right Side: Actions */}
                                                         <div className="flex flex-row items-center flex-wrap justify-end">
-                                                            {reviewedOrderIds.has(order.id) && (
+                                                            {isOrderFullyReviewed && (
                                                                 <span className="text-xs sm:text-sm font-medium text-brand-green flex items-center gap-1.5">
                                                                     <CheckCircleIcon size={16} /> Pedido avaliado
                                                                 </span>
                                                             )}
 
-                                                            {order.situation === 'paid' && !reviewedOrderIds.has(order.id) && order.order_items?.[0] && (
+                                                            {order.situation === 'paid' && !isOrderFullyReviewed && reviewableItems.length > 0 && (
                                                                 <ReviewButton
                                                                     orderId={order.id}
                                                                     partnerId={order.partner_id}
-                                                                    productId={order.order_items[0].product_id}
-                                                                    serviceId={null}
+                                                                    items={order.order_items}
                                                                     userId={userId}
-                                                                    itemName={order.order_items[0].products?.name || order.order_items[0].product_name}
+                                                                    reviewedItemsSet={reviewedItemsSet}
                                                                 />
                                                             )}
 

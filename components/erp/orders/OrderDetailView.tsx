@@ -198,7 +198,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (isCancelled) {
             const cancelledAt = order.updated_at || order.created_at
             return [
-                { label: hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: hasOnlyServices ? "Agendamento Criado" : "Pedido Realizado", date: baseDate, time: baseTime, active: true },
                 { label: isPaid ? "Pago" : "Aguardando pagamento", date: baseDate, time: baseTime, active: true },
                 { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true }
             ]
@@ -220,9 +220,79 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             finalLabel = "Entrega não realizada"
         }
 
+        if (hasOnlyServices) {
+            return [
+                {
+                    label: "Agendamento Criado",
+                    date: baseDate,
+                    time: baseTime,
+                    active: true
+                },
+                {
+                    label: isPaid ? "Pago" : "Aguardando pagamento",
+                    date: isPaid ? paymentMeta.date : baseDate,
+                    time: isPaid ? paymentMeta.time : baseTime,
+                    active: true
+                },
+                {
+                    label: "Em progresso",
+                    date: isPaid && isPreparing ? preparingMeta.date : undefined,
+                    time: isPaid && isPreparing ? preparingMeta.time : undefined,
+                    active: isPaid && isPreparing
+                },
+                {
+                    label: "Concluído",
+                    date: isPaid && isDelivered && status === "delivered" ? finalMeta.date : undefined,
+                    time: isPaid && isDelivered && status === "delivered" ? finalMeta.time : undefined,
+                    active: isPaid && isDelivered && status === "delivered"
+                }
+            ]
+        }
+
+        if (hasMixedItems) {
+            const servicesCount = orderItems.filter((item: any) => !item.product_id && !item.variant_id).length;
+            const productsCount = orderItems.filter((item: any) => item.product_id || item.variant_id).length;
+            const serviceText = servicesCount === 1 ? "1 serviço sendo realizado" : `${servicesCount} serviços sendo realizados`;
+            const productText = productsCount === 1 ? "1 produto sendo preparado" : `${productsCount} produtos sendo preparados`;
+
+            return [
+                {
+                    label: "Pedido Realizado",
+                    date: baseDate,
+                    time: baseTime,
+                    active: true
+                },
+                {
+                    label: isPaid ? "Pago" : "Aguardando pagamento",
+                    date: isPaid ? paymentMeta.date : baseDate,
+                    time: isPaid ? paymentMeta.time : baseTime,
+                    active: true
+                },
+                {
+                    label: "Em Execução",
+                    date: isPaid && isPreparing ? preparingMeta.date : undefined,
+                    time: isPaid && isPreparing ? preparingMeta.time : undefined,
+                    active: isPaid && isPreparing,
+                    subLabel: [serviceText, productText]
+                },
+                {
+                    label: isPickup ? "Pronto para retirada" : "Enviado",
+                    date: isPaid && isSent ? sentMeta.date : undefined,
+                    time: isPaid && isSent ? sentMeta.time : undefined,
+                    active: isPaid && isSent
+                },
+                {
+                    label: "Concluído",
+                    date: isPaid && isDelivered ? finalMeta.date : undefined,
+                    time: isPaid && isDelivered ? finalMeta.time : undefined,
+                    active: isPaid && isDelivered
+                }
+            ]
+        }
+
         return [
             {
-                label: hasOnlyServices ? "Agendamento Confirmado" : "Pedido Realizado",
+                label: "Pedido Realizado",
                 date: baseDate,
                 time: baseTime,
                 active: true
@@ -234,7 +304,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 active: true
             },
             {
-                label: hasOnlyServices ? "Serviço Preparado" : "Preparando",
+                label: "Preparando",
                 date: isPaid && isPreparing ? preparingMeta.date : undefined,
                 time: isPaid && isPreparing ? preparingMeta.time : undefined,
                 active: isPaid && isPreparing

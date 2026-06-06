@@ -29,6 +29,9 @@ interface PreferenceRequest {
   deliveryFee?: number
   cartItemIds?: string[]
   payDepositOnly?: boolean
+  checkoutPricing?: {
+    finalTotal: number
+  }
 }
 
 async function handler(request: NextRequest) {
@@ -263,6 +266,20 @@ async function handler(request: NextRequest) {
     }
 
     // SEGURANÃ‡A: Validar total
+    const checkoutFinalTotal = Number(body.checkoutPricing?.finalTotal || 0)
+    if (checkoutFinalTotal > 0) {
+      const adjustment = Math.round((checkoutFinalTotal - totalAmount + Number.EPSILON) * 100) / 100
+      if (Math.abs(adjustment) > 0.01) {
+        preferenceItems.push({
+          title: "Ajuste do checkout",
+          unit_price: adjustment,
+          quantity: 1,
+          currency_id: "BRL",
+        })
+      }
+      totalAmount = checkoutFinalTotal
+    }
+
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid preference total amount", { totalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })

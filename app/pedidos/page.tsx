@@ -19,23 +19,27 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   const adminClient = await createAdminClient()
   const orderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
-    delivery_fee, discount_amount, payment_method_discount_amount, checkout_fulfillment, created_at, payment_method,
+    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
-      products(id, name, images, video_thumbnail))
+      products(id, name, images, video_thumbnail),
+      services(id, name, images),
+      recurring_plans(id, name))
   `
   const fallbackOrderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
-    delivery_fee, discount_amount, payment_method_discount_amount, checkout_fulfillment, created_at, payment_method,
+    delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, buyer_id, mp_payment_id,
     partners(id, store_name, store_image_url, addresses(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status),
-    order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id)
+    order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
+      services(id, name, images),
+      recurring_plans(id, name))
   `
 
   // Parallelize all independent data fetches
@@ -46,7 +50,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       .eq("buyer_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50),
-    adminClient.from("reviews").select("order_id").eq("user_id", user.id),
+    adminClient.from("reviews").select("order_id, product_id, service_id").eq("user_id", user.id),
     getUserSessionData(user.id),
   ])
 
@@ -76,7 +80,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     }
   }
 
-  const reviewedOrderIdsArray = reviewsResult.data?.map((r: any) => r.order_id) || []
+  const reviewedItemsArray = reviewsResult.data || []
 
   const userProfile = sessionData?.profile
     ? {
@@ -98,7 +102,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
 
       <MyOrdersListClient
         orders={orders}
-        reviewedOrderIdsArray={reviewedOrderIdsArray}
+        reviewedItemsArray={reviewedItemsArray}
         userId={user.id}
       />
 

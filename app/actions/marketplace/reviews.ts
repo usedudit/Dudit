@@ -42,15 +42,25 @@ async function checkFraudulentReview(
     }
     orders = data;
   } else if (serviceId) {
-    // Serviços atualmente não possuem relacionamento explícito em order_items.
-    // Necessita implementação futura via appointments ou similar.
-    return { isSuspicious: true, reason: "Não foi possível verificar a compra deste serviço." }
+    const { data, error } = await supabase
+      .from("orders")
+      .select("id, order_items!inner(service_id)")
+      .eq("buyer_id", userId)
+      .eq("partner_id", partnerId)
+      .in("situation", ["paid", "shipped", "delivered"])
+      .eq("order_items.service_id", serviceId)
+
+    if (error) {
+      console.error(`[REVIEW CHECK] Database error querying orders: ${error.message}`)
+      return { isSuspicious: true, reason: "Erro ao verificar histórico de compras" }
+    }
+    orders = data;
   }
 
   console.log(`[REVIEW CHECK] Found ${orders?.length || 0} matching paid orders`)
 
   if (!orders || orders.length === 0) {
-    return { isSuspicious: true, reason: "Você precisa comprar este produto antes de avaliá-lo" }
+    return { isSuspicious: true, reason: productId ? "Você precisa comprar este produto antes de avaliá-lo" : "Você precisa comprar este serviço antes de avaliá-lo" }
   }
 
   // 3. Verificar se já avaliou este produto antes
@@ -64,6 +74,17 @@ async function checkFraudulentReview(
 
     if (existingReview) {
       return { isSuspicious: true, reason: "Você já avaliou este produto" }
+    }
+  } else if (serviceId) {
+    const { data: existingReview } = await supabase
+      .from("reviews")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("service_id", serviceId)
+      .maybeSingle()
+
+    if (existingReview) {
+      return { isSuspicious: true, reason: "Você já avaliou este serviço" }
     }
   }
 
@@ -492,4 +513,27 @@ export async function getPartnerReviews(partnerId: string) {
     ...r,
     profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
   }))
+}
+
+export async function getBuyerReviewsAction() {
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  const { data: reviewsData, error } = await supabase
+    .from("reviews")
+    .select(`
+      *,
+      products(id, name, images, video_thumbnail, slug),
+      services(id, name, images),
+      partners(id, store_name, store_image_url, slug, addresses(id, city, state))
+    `)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+
+  if (error || !reviewsData) {
+    console.error("[Reviews] Fetch error:", error?.message)
+    return { success: false, error: error?.message || "Erro ao buscar avaliações" }
+  }
+
+  return { success: true, data: reviewsData }
 }

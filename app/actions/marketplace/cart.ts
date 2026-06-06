@@ -25,6 +25,46 @@ import {
 } from "@/lib/services/marketplace-cart-resolver"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 
+export type MarketplaceCheckoutPricingSnapshot = {
+  subtotal: number
+  couponDiscount: number
+  paymentMethodDiscount: number
+  paymentMethodInterest: number
+  paymentMethodFee: number
+  deliveryFee: number
+  finalTotal: number
+}
+
+const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
+const moneyOrZero = (value: unknown) => {
+  const n = Number(value || 0)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, roundMoney(n))
+}
+
+function normalizeCheckoutPricingSnapshot(input?: Partial<MarketplaceCheckoutPricingSnapshot> | null) {
+  if (!input) return null
+  const snapshot: MarketplaceCheckoutPricingSnapshot = {
+    subtotal: moneyOrZero(input.subtotal),
+    couponDiscount: moneyOrZero(input.couponDiscount),
+    paymentMethodDiscount: moneyOrZero(input.paymentMethodDiscount),
+    paymentMethodInterest: moneyOrZero(input.paymentMethodInterest),
+    paymentMethodFee: moneyOrZero(input.paymentMethodFee),
+    deliveryFee: moneyOrZero(input.deliveryFee),
+    finalTotal: moneyOrZero(input.finalTotal),
+  }
+  const expected = roundMoney(
+    snapshot.subtotal
+    + snapshot.deliveryFee
+    - snapshot.couponDiscount
+    - snapshot.paymentMethodDiscount
+    + snapshot.paymentMethodInterest
+    + snapshot.paymentMethodFee,
+  )
+  if (Math.abs(expected - snapshot.finalTotal) > 0.01) return null
+  return snapshot
+}
+
 export async function getCartItemCountAction() {
   try {
     const user = await getCurrentUser()
@@ -592,6 +632,7 @@ export async function checkoutCartAction(
   wantsChange?: boolean,
   payWithAmount?: number,
   payDepositOnly?: boolean,
+  checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -874,6 +915,7 @@ export async function checkoutCartAction(
 
   let paymentAwareTotal = totalAmount
   let paymentMethodDiscountAmount = 0
+  let paymentMethodExtraAmount = 0
   if (bestMethod?.id) {
     let fees = bestMethod.payment_method_installment_fees
     if (!fees) {
@@ -900,13 +942,52 @@ export async function checkoutCartAction(
     })
     paymentAwareTotal = Number(calc.finalAmount || totalAmount)
     paymentMethodDiscountAmount = Number(calc.paymentMethodDiscountAmount || 0)
+    paymentMethodExtraAmount = Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0)
+  }
+
+  const normalizedSnapshot = normalizeCheckoutPricingSnapshot(checkoutPricingSnapshot)
+  if (checkoutPricingSnapshot && !normalizedSnapshot) {
+    return { error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }
+  }
+
+  const persistedSubtotal = normalizedSnapshot?.subtotal ?? pricingResult.subtotal
+  const persistedDeliveryFee = normalizedSnapshot?.deliveryFee ?? deliveryFee
+  const persistedCouponDiscount = normalizedSnapshot?.couponDiscount ?? couponDiscountAmount
+  const persistedPaymentMethodDiscount = normalizedSnapshot?.paymentMethodDiscount ?? paymentMethodDiscountAmount
+  const persistedPaymentMethodExtra = normalizedSnapshot
+    ? roundMoney(normalizedSnapshot.paymentMethodInterest + normalizedSnapshot.paymentMethodFee)
+    : paymentMethodExtraAmount
+  const persistedTotal = normalizedSnapshot?.finalTotal ?? paymentAwareTotal
+  const persistedCheckoutPricing = normalizedSnapshot || {
+    subtotal: persistedSubtotal,
+    couponDiscount: persistedCouponDiscount,
+    paymentMethodDiscount: persistedPaymentMethodDiscount,
+    paymentMethodInterest: 0,
+    paymentMethodFee: persistedPaymentMethodExtra,
+    deliveryFee: persistedDeliveryFee,
+    finalTotal: persistedTotal,
+  }
+
+  if (normalizedSnapshot) {
+    console.info("[CHECKOUT_PRICING_AUDIT]", {
+      source: "checkoutCartAction",
+      checkout: normalizedSnapshot,
+      serverRecalculated: {
+        subtotal: pricingResult.subtotal,
+        couponDiscount: couponDiscountAmount,
+        paymentMethodDiscount: paymentMethodDiscountAmount,
+        paymentMethodExtra: paymentMethodExtraAmount,
+        deliveryFee,
+        finalTotal: paymentAwareTotal,
+      },
+    })
   }
 
   if (chosenType === "cash" && deliveryType === "delivery") {
     if (wantsChange === undefined || wantsChange === null) {
       return { error: "Por favor, informe se precisa de troco para o pagamento em dinheiro." }
     }
-    if (wantsChange && (payWithAmount === undefined || payWithAmount === null || payWithAmount < paymentAwareTotal)) {
+    if (wantsChange && (payWithAmount === undefined || payWithAmount === null || payWithAmount < persistedTotal)) {
       return { error: "O valor informado para o troco é menor que o total do pedido." }
     }
   }
@@ -977,8 +1058,8 @@ export async function checkoutCartAction(
       buyer_id: user.id,
       customer_name: buyerProfile?.full_name || null,
       partner_id: partnerId,
-      total_amount: paymentAwareTotal,
-      delivery_fee: deliveryFee,
+      total_amount: persistedTotal,
+      delivery_fee: persistedDeliveryFee,
       distance_km: distanceKm,
       delivery_breakdown: deliveryBreakdown,
       delivery_type: orderDelivery,
@@ -988,13 +1069,14 @@ export async function checkoutCartAction(
         ? []
         : [{
           method: chosenType,
-          amount: paymentAwareTotal,
+          amount: persistedTotal,
           paymentMethodId: bestMethod.id,
           installmentNumber: Math.max(1, Number(installments || 1)),
+          checkoutPricing: persistedCheckoutPricing,
           ...(chosenType === "cash" && deliveryType === "delivery" ? {
             wantsChange,
             payWithAmount: wantsChange ? payWithAmount : null,
-            changeAmount: wantsChange ? Number((payWithAmount! - paymentAwareTotal).toFixed(2)) : 0
+            changeAmount: wantsChange ? Number((payWithAmount! - persistedTotal).toFixed(2)) : 0
           } : {})
         }],
       payment_provider: useMercadoPago ? "Mercado Pago" : null,
@@ -1002,8 +1084,9 @@ export async function checkoutCartAction(
       notes,
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
-      discount_amount: couponDiscountAmount,
-      payment_method_discount_amount: paymentMethodDiscountAmount,
+      discount_amount: persistedCouponDiscount,
+      payment_method_discount_amount: persistedPaymentMethodDiscount,
+      payment_method_extra_amount: persistedPaymentMethodExtra,
       promotions_applied: promotionsAppliedSnapshot,
       checkout_fulfillment: fulfillmentPayload,
       order_source: "Vitrine Online",
@@ -1124,8 +1207,8 @@ export async function checkoutCartAction(
     orderNumber: order.order_number,
     useMercadoPago,
     couponApplied: Boolean(couponIdToSave),
-    couponDiscount: couponDiscountAmount,
-    finalTotal: paymentAwareTotal,
+    couponDiscount: persistedCouponDiscount,
+    finalTotal: persistedTotal,
   }
 }
 

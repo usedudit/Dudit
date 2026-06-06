@@ -31,6 +31,45 @@ interface ProcessPaymentRequest {
   couponCode?: string | null
   deliveryFee?: number
   payDepositOnly?: boolean
+  checkoutPricing?: {
+    subtotal: number
+    couponDiscount: number
+    paymentMethodDiscount: number
+    paymentMethodInterest: number
+    paymentMethodFee: number
+    deliveryFee: number
+    finalTotal: number
+  }
+}
+
+const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
+const moneyOrZero = (value: unknown) => {
+  const n = Number(value || 0)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, roundMoney(n))
+}
+
+function normalizeCheckoutPricing(input?: ProcessPaymentRequest["checkoutPricing"] | null) {
+  if (!input) return null
+  const snapshot = {
+    subtotal: moneyOrZero(input.subtotal),
+    couponDiscount: moneyOrZero(input.couponDiscount),
+    paymentMethodDiscount: moneyOrZero(input.paymentMethodDiscount),
+    paymentMethodInterest: moneyOrZero(input.paymentMethodInterest),
+    paymentMethodFee: moneyOrZero(input.paymentMethodFee),
+    deliveryFee: moneyOrZero(input.deliveryFee),
+    finalTotal: moneyOrZero(input.finalTotal),
+  }
+  const expected = roundMoney(
+    snapshot.subtotal
+    + snapshot.deliveryFee
+    - snapshot.couponDiscount
+    - snapshot.paymentMethodDiscount
+    + snapshot.paymentMethodInterest
+    + snapshot.paymentMethodFee,
+  )
+  if (Math.abs(expected - snapshot.finalTotal) > 0.01) return null
+  return snapshot
 }
 
 /**
@@ -58,6 +97,10 @@ async function handler(request: NextRequest) {
 
     const body: ProcessPaymentRequest = await request.json()
     const { paymentFormData, items, partnerId, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly } = body
+    const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
+    if (body.checkoutPricing && !checkoutPricing) {
+      return NextResponse.json({ error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }, { status: 400 })
+    }
     const normalizedDeliveryType = (deliveryType === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
 
     // SEGURANÃ‡A: Validação de campos obrigatórios ANTES de qualquer operação
@@ -121,6 +164,8 @@ async function handler(request: NextRequest) {
     let orderItemsForInsert: Record<string, unknown>[] = []
     let resolvedOrderDeliveryType = normalizedDeliveryType
     let resolvedOrderDeliveryAddress = deliveryAddress || null
+    let paymentMethodDiscountAmount = 0
+    let paymentMethodExtraAmount = 0
     const validatedItems: Array<{
       product_id: string
       variant_id: string | null
@@ -317,6 +362,23 @@ async function handler(request: NextRequest) {
     }
 
     // SEGURANÇA: Validar que o total é positivo e razoável
+    if (checkoutPricing) {
+      console.info("[CHECKOUT_PRICING_AUDIT]", {
+        source: "mercadopago-process-payment",
+        checkout: checkoutPricing,
+        serverRecalculated: {
+          couponDiscount: couponDiscountAmount,
+          deliveryFee,
+          finalTotal: totalAmount,
+        },
+      })
+      totalAmount = checkoutPricing.finalTotal
+      deliveryFee = checkoutPricing.deliveryFee
+      couponDiscountAmount = checkoutPricing.couponDiscount
+      paymentMethodDiscountAmount = checkoutPricing.paymentMethodDiscount
+      paymentMethodExtraAmount = roundMoney(checkoutPricing.paymentMethodInterest + checkoutPricing.paymentMethodFee)
+    }
+
     if (totalAmount <= 0 || totalAmount > 999999) {
       SecureLogger.error("Invalid total amount calculated", { totalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
@@ -562,9 +624,23 @@ async function handler(request: NextRequest) {
         mp_payment_id: mpPaymentId.toString(),
         coupon_id: couponIdToSave,
         discount_amount: couponDiscountAmount,
-        payment_method_discount_amount: 0,
+        payment_method_discount_amount: paymentMethodDiscountAmount,
+        payment_method_extra_amount: paymentMethodExtraAmount,
         delivery_fee: deliveryFee,
-        payment_breakdown: [{ method: paymentMethodDisplayName, amount: totalAmount, provider: "Mercado Pago" }],
+        payment_breakdown: [{
+          method: paymentMethodDisplayName,
+          amount: totalAmount,
+          provider: "Mercado Pago",
+          checkoutPricing: checkoutPricing || {
+            subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+            couponDiscount: couponDiscountAmount,
+            paymentMethodDiscount: paymentMethodDiscountAmount,
+            paymentMethodInterest: 0,
+            paymentMethodFee: paymentMethodExtraAmount,
+            deliveryFee,
+            finalTotal: totalAmount,
+          },
+        }],
         checkout_fulfillment: checkoutFulfillment,
         order_source: "Vitrine Online",
         promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,

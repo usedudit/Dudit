@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { UserIcon, MapPinIcon, LockIcon } from "@/lib/icons"
+import { UserIcon, MapPinIcon, LockIcon, StarIcon } from "@/lib/icons"
 import { fade, View } from "./profile-shared"
 import { ListItem } from "../reusable"
 
@@ -26,6 +26,7 @@ export const MainView = ({ navigate }: MainViewProps) => (
       <ListItem icon={MapPinIcon} title="Endereço" description="Atualize seu endereço de entrega ou cobrança." className="px-4 py-3 gap-4" onClick={() => navigate("enderecos")} showChevron />
       <ListItem icon={LockIcon} title="Segurança" description="Altere sua senha de acesso à conta." className="px-4 py-3 gap-4" onClick={() => navigate("seguranca")} showChevron />
       <ListItem icon={LockIcon} title="Autenticação 2FA" description="Adicione uma camada extra de segurança com autenticador." className="px-4 py-3 gap-4" onClick={() => navigate("two-factor")} showChevron />
+      <ListItem icon={StarIcon} title="Minhas avaliações" description="Veja e edite suas avaliações de produtos e serviços." className="px-4 py-3 gap-4" onClick={() => navigate("avaliacoes")} showChevron />
     </div>
   </motion.div>
 )

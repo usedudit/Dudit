@@ -15,7 +15,7 @@ export const fade = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type View = "main" | "informacoes-da-conta" | "enderecos" | "seguranca" | "two-factor"
+export type View = "main" | "informacoes-da-conta" | "enderecos" | "seguranca" | "two-factor" | "avaliacoes"
 export type EditField = "name" | "cpf" | "phone" | "password" | "address" | "secPhone" | "secEmail"
 
 // ─── Shared Components ────────────────────────────────────────────────────────

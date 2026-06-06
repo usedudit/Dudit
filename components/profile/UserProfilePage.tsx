@@ -16,6 +16,7 @@ import { AccountView } from "./AccountView"
 import { AddressView } from "./AddressView"
 import { SecurityView } from "./SecurityView"
 import { TwoFactorView } from "./TwoFactorView"
+import { ReviewsView } from "./ReviewsView"
 
 interface UserProfilePageProps {
     userId: string
@@ -346,6 +347,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
             case "enderecos": return "Endereço"
             case "seguranca": return "Segurança"
             case "two-factor": return "Autenticação 2FA"
+            case "avaliacoes": return "Minhas avaliações"
             default: return "Meu perfil"
         }
     }
@@ -434,6 +436,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             />
                         )}
                         {currentView === "two-factor" && <TwoFactorView key="2fa" navigate={navigate} />}
+                        {currentView === "avaliacoes" && <ReviewsView key="avaliacoes" navigate={navigate} />}
                     </AnimatePresence>
                 </div>
                 <MarketplaceFooter />

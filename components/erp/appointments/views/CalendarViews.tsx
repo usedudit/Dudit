@@ -1,12 +1,11 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarX, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, RotateCcw, X, CalendarPlus, CalendarOff, User, MoreHorizontal, LayoutList, LayoutGrid, Clock, ArrowUpDown, Plus, Edit3, Utensils, Briefcase, AlertTriangle } from 'lucide-react';
+import { CalendarX, X, CalendarPlus, CalendarOff, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { MoneyIcon, PartiallyPaidIcon, LikeIcon, PlayIcon, EyeOffIcon, ClockIcon, BlockedIcon } from '@/lib/icons';
-import { Button, Dropdown, DropdownItem, Badge, Checkbox as FormCheckbox } from '../../../reusable';
-import { Appointment, LayoutAppointment, StaffMember, PopoverState } from '../types';
-import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, formatDuration, isMultiDay, getMultiDayStyle, parseLocalDate, checkAppointmentCollision } from '../utils';
-import { AppointmentListRow } from '../AppointmentListRow';
+import { Button } from '../../../reusable';
+import { Appointment, StaffMember } from '../types';
+import { getAppointmentStyle, getEndTime, formatDateStr, getWeekDays, arrangeAppointments, isMultiDay, checkAppointmentCollision } from '../utils';
 import { AppointmentListCard } from '../AppointmentListCard';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 
@@ -23,7 +22,7 @@ const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, dura
     const dName = DAYS_OF_WEEK[dateObj.getDay()];
     const dConfig = openingHours[dName];
     if (!dConfig || !dConfig.enabled) return true;
-    
+
     const parseTimeToMinutes = (timeStr: string) => {
         if (!timeStr || !timeStr.includes(':')) return -1;
         const [h, m] = timeStr.split(':').map(Number);
@@ -32,10 +31,10 @@ const checkOutsideOperatingHours = (aptDateStr: string, aptTimeStr: string, dura
 
     const fromMin = parseTimeToMinutes(dConfig.from);
     const toMin = parseTimeToMinutes(dConfig.to);
-    
+
     const aptStartMin = parseTimeToMinutes(aptTimeStr);
     const aptEndMin = aptStartMin + durationMinutes;
-    
+
     return aptStartMin < fromMin || aptEndMin > toMin;
 };
 
@@ -43,10 +42,10 @@ const getClosedBlocks = (date: Date, openingHours: any, startHour: number, endHo
     if (!openingHours) return [];
     const dName = DAYS_OF_WEEK[date.getDay()];
     const dConfig = openingHours[dName];
-    
+
     const startMin = startHour * 60; // e.g. 8 * 60 = 480
     const endMin = (endHour + 1) * 60; // e.g. 20 * 60 = 1200
-    
+
     if (!dConfig || !dConfig.enabled) {
         return [{
             top: 0,
@@ -54,18 +53,18 @@ const getClosedBlocks = (date: Date, openingHours: any, startHour: number, endHo
             label: "Fechado"
         }];
     }
-    
+
     const parseTimeToMinutes = (timeStr: string) => {
         if (!timeStr || !timeStr.includes(':')) return -1;
         const [h, m] = timeStr.split(':').map(Number);
         return h * 60 + m;
     };
-    
+
     const fromMin = parseTimeToMinutes(dConfig.from);
     const toMin = parseTimeToMinutes(dConfig.to);
-    
+
     const blocks = [];
-    
+
     if (fromMin > startMin) {
         const duration = fromMin - startMin;
         blocks.push({
@@ -74,7 +73,7 @@ const getClosedBlocks = (date: Date, openingHours: any, startHour: number, endHo
             label: "Fora do Expediente"
         });
     }
-    
+
     if (toMin < endMin) {
         const duration = endMin - toMin;
         const top = ((toMin - startMin) / 60) * 80;
@@ -84,7 +83,7 @@ const getClosedBlocks = (date: Date, openingHours: any, startHour: number, endHo
             label: "Fora do Expediente"
         });
     }
-    
+
     return blocks;
 };
 
@@ -215,7 +214,7 @@ export const MobileView = ({
                 {/* Left Fade/Shadow */}
                 <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-surface to-transparent pointer-events-none z-10" />
 
-                <div 
+                <div
                     ref={scrollContainerRef}
                     className="flex overflow-x-auto gap-4 px-8 no-scrollbar snap-x items-center justify-between text-center"
                 >
@@ -227,12 +226,12 @@ export const MobileView = ({
                             className="flex flex-col items-center gap-1 cursor-pointer group min-w-[50px] snap-center"
                         >
                             <div className={`w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-all relative ${dayItem.isSelected
-                                ? 'bg-brand-dark dark:bg-white text-white dark:text-brand-dark shadow-md'
-                                : 'text-brand-dark dark:text-dark-heading border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface'
+                                ? 'bg-brand-green text-white'
+                                : 'text-brand-dark border border-brand-border'
                                 }`}>
                                 <span className="leading-none mt-0.5">{dayItem.dayNumber}</span>
                                 {dayItem.hasAppointments && (
-                                    <div className={`w-1 h-1 rounded-full mt-0.5 ${dayItem.isSelected ? 'bg-white/70 dark:bg-brand-dark/70' : 'bg-brand-green'}`}></div>
+                                    <div className={`w-1 h-1 rounded-full mt-0.5 ${dayItem.isSelected ? 'bg-white/70' : 'bg-brand-green'}`}></div>
                                 )}
                             </div>
                             <span className={`text-[10px] font-medium uppercase tracking-wide ${dayItem.isSelected ? 'text-brand-dark dark:text-dark-heading' : 'text-brand-inactive-text dark:text-dark-body'}`}>
@@ -246,7 +245,7 @@ export const MobileView = ({
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-surface to-transparent pointer-events-none z-10" />
             </div>
             <AnimatePresence mode='wait'>
-                <motion.div key={currentDate.toISOString()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex-1 overflow-y-auto px-4 pb-20 space-y-3">
+                <motion.div key={currentDate.toISOString()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex-1 overflow-y-auto pb-20 space-y-3">
                     {selectedDateApps.length > 0 ? (
                         <div className="space-y-3 mt-2">
                             {selectedDateApps.map((apt: Appointment) => (
@@ -509,7 +508,7 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                         return (
                             <div key={idx} className="flex-1 border-r border-brand-border dark:border-dark-border flex flex-col items-center justify-center bg-white dark:bg-dark-surface relative min-w-[140px]">
                                 <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isToday ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'}`}>
-                                     {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                    {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
                                 </span>
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isToday ? 'bg-brand-dark text-white' : 'text-brand-dark dark:text-dark-heading'}`}>
                                     {day.getDate()}
@@ -574,9 +573,8 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                     return (
                                         <div
                                             key={dIdx}
-                                            className={`flex-1 border-r border-brand-border dark:border-dark-border relative min-w-[140px] p-2 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group ${
-                                                isClosed ? 'bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.03),rgba(239,68,68,0.03)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5' : ''
-                                            }`}
+                                            className={`flex-1 border-r border-brand-border dark:border-dark-border relative min-w-[140px] p-2 hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer group ${isClosed ? 'bg-[repeating-linear-gradient(-45deg,rgba(239,68,68,0.03),rgba(239,68,68,0.03)_10px,transparent_10px,transparent_20px)] bg-red-50/5 dark:bg-red-950/5' : ''
+                                                }`}
                                             onClick={(e) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const x = e.clientX;

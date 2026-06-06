@@ -4,18 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import {
-    ShoppingBagIcon,
-    MapPinIcon,
-    ChevronDownIcon,
-    SearchIcon,
-    ChevronRightIcon,
-    ChevronLeftIcon,
-    Package,
-    HeartIcon,
-    ShareIcon,
-    XIcon,
-} from "@/lib/icons"
+import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button, DefaultModal, Input } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
@@ -608,12 +597,12 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     <div className="py-2">
-                        {[
+                        {([
                             { label: "Seu perfil", href: "/perfil" },
                             { label: "Meus Favoritos", href: "/favoritos" },
-                            { label: "Lojas favoritas", action: () => setView?.("vendor") },
+                            { label: "Minhas avaliações", href: "/perfil?tab=avaliacoes" },
                             { label: "Central do Parceiro", href: "/erp/switch" },
-                        ].map((item, idx) => {
+                        ] as any[]).map((item, idx) => {
                             const ItemWrapper: any = item.href ? Link : "div";
                             const wrapProps = item.href
                                 ? { href: item.href, prefetch: true }
@@ -798,12 +787,12 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
 
                                     <div className="py-2">
-                                        {[
+                                        {([
                                             { label: "Seu perfil", href: "/perfil" },
                                             { label: "Meus Favoritos", href: "/favoritos" },
-                                            { label: "Lojas favoritas", action: () => setView?.("vendor") },
+                                            { label: "Minhas avaliações", href: "/perfil?tab=avaliacoes" },
                                             { label: "Central do Parceiro", href: "/erp/switch" },
-                                        ].map((item, idx) => {
+                                        ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
                                                 ? { href: item.href, prefetch: true }
