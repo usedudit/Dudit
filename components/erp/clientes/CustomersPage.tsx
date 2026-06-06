@@ -89,6 +89,7 @@ export default function CustomersPage({
     const { toast } = useToast()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const queryKey = useMemo(() => ["erp", "customers", partnerId] as const, [partnerId])
 
@@ -129,6 +130,7 @@ export default function CustomersPage({
     // ── UI State (non-URL) ────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Bloqueado">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
@@ -477,7 +479,7 @@ export default function CustomersPage({
                                         </FadeIn>
                                     ) : (
                                         <FadeIn
-                                            key={activeTab + viewMode}
+                                            key={activeTab + effectiveViewMode}
                                             className="w-full"
                                         >
                                             <SelectionBanner
@@ -488,56 +490,8 @@ export default function CustomersPage({
                                                 itemName="clientes"
                                                 singularItemName="cliente"
                                             />
-                                            {isMobile ? (
-                                                <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                    {paginated.map((c: Customer) => {
-                                                        const prefetch = getPrefetchProps(c.originalId)
-                                                        return (
-                                                            <div
-                                                                key={c.originalId}
-                                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                                onClick={() => handleDetailsCustomer(c)}
-                                                                onTouchStart={prefetch.onTouchStart}
-                                                            >
-                                                                <UserProfileImage
-                                                                    fullName={c.name || "Cliente"}
-                                                                    className="w-14 h-14 text-xl"
-                                                                />
-
-                                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <div className="flex flex-col min-w-0 pr-1">
-                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                {c.name}
-                                                                            </h3>
-                                                                            <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                                {c.id !== '-' ? c.id : "Cliente"}
-                                                                            </span>
-                                                                        </div>
-                                                                        <Badge variant={c.status === 'ativo' ? 'green' : c.status === 'inativo' ? 'gray' : 'red'} className="shrink-0 text-[10px] h-5 px-1.5">
-                                                                            {c.status === 'ativo' ? "Ativo" : c.status === 'inativo' ? "Inativo" : "Bloqueado"}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <div className="flex justify-between items-center mt-1">
-                                                                        <span className="text-[14px] font-bold text-brand-primary">
-                                                                            {c.totalOrderValue ? formatCurrency(c.totalOrderValue) : "-"}
-                                                                        </span>
-                                                                        <div className="flex items-center gap-4">
-                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                {c.orders} pedido{c.orders !== 1 && 's'}
-                                                                            </span>
-                                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(c.originalId); }}>
-                                                                                <Checkbox checked={selection.ids.has(c.originalId)} onChange={() => handleSelectRow(c.originalId)} />
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            ) : viewMode === "grid" ? (
-                                                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                            {effectiveViewMode === "grid" ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginated.map((c: Customer) => {
                                                         const prefetch = getPrefetchProps(c.originalId)
                                                         return (

@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Badge, Button } from "@/components/reusable"
+import { Badge, Button, Tooltip } from "@/components/reusable"
 import { ClockIcon, BlockedIcon, PlayIcon } from "@/lib/icons"
 import type { RecurringSubscription } from "@/lib/types/recurring"
 import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
@@ -42,9 +42,9 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
           <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
             {sub.plan?.name || "Plano"}
           </h3>
-          <Badge variant={statusVariant(sub.status)}>
-            {getRecurringStatusLabel(sub.status)}
-          </Badge>
+          <Tooltip text={`Status: ${getRecurringStatusLabel(sub.status)}`}>
+            <Badge variant={statusVariant(sub.status)} />
+          </Tooltip>
         </div>
         
         <p className="text-xs text-brand-inactive-text dark:text-dark-body font-semibold mb-3">
@@ -112,9 +112,9 @@ export const SubscriptionGridCard: React.FC<SubscriptionGridCardProps> = ({
                 <div key={exec.id} className="text-xs flex flex-col gap-1 border-b border-brand-border dark:border-dark-border pb-1.5 last:border-0">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{formatFullDate(exec.scheduled_for).slice(0, 10)}</span>
-                    <Badge variant={exec.status === "completed" ? "green" : exec.status === "failed" ? "red" : "gray"}>
-                      {exec.status}
-                    </Badge>
+                    <Tooltip text={`Status: ${exec.status}`}>
+                      <Badge variant={exec.status === "completed" ? "green" : exec.status === "failed" ? "red" : "gray"} />
+                    </Tooltip>
                   </div>
                   {exec.orders?.order_number && (
                     <div className="text-[11px] text-brand-inactive-text">Pedido #{exec.orders.order_number}</div>

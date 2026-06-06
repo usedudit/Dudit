@@ -178,6 +178,7 @@ export default function TransactionsPage({
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
     const setActiveTab = forcedTab ? () => { } : setActiveTabState
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
@@ -1858,7 +1859,7 @@ export default function TransactionsPage({
                     onAddTransaction={() => openEntity("create")}
                     filters={filters}
                     setFilters={setFilters}
-                    viewMode={viewMode}
+                    viewMode={effectiveViewMode}
                     onViewModeChange={setViewModeState}
                     hasActiveFilters={hasActiveFilters}
                     addDisabled={false}
@@ -1934,80 +1935,11 @@ export default function TransactionsPage({
                             </FadeIn>
                         ) : (
                             <FadeIn
-                                key={activeTab + (isTablet ? "mobile" : viewMode)}
+                                key={activeTab + effectiveViewMode}
                                 className="w-full"
                             >
-                                {isTablet ? (
-                                    <div className="flex flex-col w-full">
-                                        {paginatedTransactions.map((transaction) => {
-                                            const PaymentIcon = getPaymentIcon(transaction.paymentType)
-                                            const isRecurring = !!transaction.recurringId || !!transaction.isRecurringOccurrence
-
-                                            return (
-                                                <div
-                                                    key={transaction.id}
-                                                    className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 flex items-start gap-3"
-                                                    onClick={() => handleOpenTransactionDetail(transaction)}
-                                                >
-                                                    <div className="shrink-0 pt-1" onClick={(e) => e.stopPropagation()}>
-                                                        <Checkbox checked={selection.ids.has(transaction.id)} onChange={() => handleSelectRow(transaction.id)} />
-                                                    </div>
-
-                                                    <div className="shrink-0 w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex items-center justify-center">
-                                                        <PaymentIcon className="text-brand-dark dark:text-dark-heading" />
-                                                    </div>
-
-                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                        <div className="flex justify-between items-start gap-2">
-                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                {transaction.description}
-                                                            </h3>
-                                                            <span className={`text-[15px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
-                                                                {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                                                                {formatCurrency(transaction.amount)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-1 flex items-center">
-                                                            <PaymentMethodIndicator label={transaction.paymentType} />
-                                                        </div>
-
-                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                                                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {transaction.contactName}
-                                                            </span>
-                                                            <span className="text-brand-inactive-text">•</span>
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {transaction.category} ({transaction.originSource || "Manual"})
-                                                            </span>
-                                                            <span className="text-brand-inactive-text">•</span>
-                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {transaction.dueDate}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <Badge variant={transaction.statusVariant} className="scale-90 origin-left">
-                                                                {transaction.status}
-                                                            </Badge>
-                                                            {transaction.installmentGroupId && (
-                                                                <Badge variant="orange" className="scale-90 origin-left">
-                                                                    Parcelado
-                                                                </Badge>
-                                                            )}
-                                                            {isRecurring && (
-                                                                <Badge variant="purple" className="scale-90 origin-left">
-                                                                    Recorrente
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                        {/* <div ref={observerTarget} className="h-10" /> */}
-                                    </div>
-                                ) : viewMode === "grid" ? (
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                {effectiveViewMode === "grid" ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginatedTransactions.map((transaction) => (
                                             <TransactionGridCard
                                                 key={transaction.id}

@@ -127,6 +127,7 @@ export default function CashRegisterPage({
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [page, setPage] = useState(1)
     const [viewMode, setViewModeState] = useState<"grid" | "list">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [modals, setModals] = useState({ filter: false })
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -539,7 +540,7 @@ export default function CashRegisterPage({
                             onOpenSession={() => setOpenModal(true)}
                             filters={filters}
                             setFilters={setFilters}
-                            viewMode={viewMode}
+                            viewMode={effectiveViewMode}
                             onViewModeChange={setViewModeState}
                             hasActiveFilters={hasActiveFilters}
                         />
@@ -569,96 +570,11 @@ export default function CashRegisterPage({
                                     </FadeIn>
                                 ) : (
                                     <FadeIn
-                                        key={isTablet ? "stacked" : viewMode}
+                                        key={effectiveViewMode}
                                         className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300"
                                     >
-                                        {isTablet ? (
-                                            <div className="rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                {paginated.map((session, index) => (
-                                                    <div key={session.id}>
-                                                        <button
-                                                            type="button"
-                                                            className="w-full text-left px-4 py-5 hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors"
-                                                            onClick={() => handleViewDetails(session.id)}
-                                                        >
-                                                            <div className="flex items-start justify-between gap-3">
-                                                                <div className="min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            Sessão {session.id.slice(0, 8).toUpperCase()}
-                                                                        </h3>
-                                                                        <Badge variant={session.status === "open" ? "green" : "gray"} className="whitespace-nowrap">
-                                                                            {session.status === "open" ? "Aberto" : "Fechado"}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                        Abriu: {session.opened_by_name || session.user_name}
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                        Fechou: {session.closed_by_name || "-"}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="text-right shrink-0">
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Gaveta
-                                                                    </p>
-                                                                    <p className="text-[15px] font-bold text-brand-primary">
-                                                                        {formatCurrency(Number(session.expected_drawer_total || 0))}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Abertura
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {formatDateTime(session.opened_at)}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Fechamento
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {formatDateTime(session.closed_at)}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Saldo inicial
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(Number(session.initial_amount || 0))}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Recebido na sessão
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(Number(session.total_received_amount || 0))}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        Data da sessão
-                                                                    </p>
-                                                                    <p className="mt-1 text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                        {formatShortDate(session.closed_at || session.opened_at)}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </button>
-                                                        {index < paginated.length - 1 && (
-                                                            <Separator className="bg-brand-border dark:bg-dark-border" />
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : viewMode === "grid" ? (
-                                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                        {effectiveViewMode === "grid" ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                 {paginated.map((session) => (
                                                     <CashSessionGridCard
                                                         key={session.id}

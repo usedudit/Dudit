@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { ActionsDropdown, Badge, Checkbox } from "@/components/reusable"
+import { ActionsDropdown, Badge, Checkbox, Tooltip } from "@/components/reusable"
 import { SparklesIcon, TagIcon, Users } from "@/lib/icons"
 import {
     CouponRow,
@@ -43,14 +43,18 @@ const CouponGridCard = React.memo(
                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                     {coupon.code}
                                 </h3>
-                                <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap scale-90 shrink-0">
-                                    {getCouponStatusLabel(coupon)}
-                                </Badge>
+                                <Tooltip text={`Status: ${getCouponStatusLabel(coupon)}`}>
+                                    <Badge variant={getCouponStatusVariant(coupon)} className="whitespace-nowrap scale-90 shrink-0" />
+                                </Tooltip>
                                 {coupon.is_automatic && (
-                                    <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    <Tooltip text="Tipo: Automático">
+                                        <Badge variant="purple" icon={<SparklesIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {coupon.customer_scope === "specific" && (
-                                    <Badge variant="gray" icon={<Users />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    <Tooltip text="Público: Segmentado">
+                                        <Badge variant="gray" icon={<Users />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                             </div>
 

@@ -17,7 +17,9 @@ async function checkFraudulentReview(
   console.log(`[REVIEW CHECK] User: ${userId}, Partner: ${partnerId}, Product: ${productId}, Service: ${serviceId}`)
 
   // 1. Verificar se o usuário é o próprio dono do parceiro
-  const { data: partner } = await supabase.from("partners").select("user_id").eq("id", partnerId).single()
+  const { createAdminClient } = await import("@/lib/supabase/server")
+  const adminSupabase = createAdminClient()
+  const { data: partner } = await adminSupabase.from("partners").select("user_id").eq("id", partnerId).single()
 
   if (partner && partner.user_id === userId) {
     return { isSuspicious: true, reason: "Você não pode avaliar seus próprios produtos" }
@@ -102,7 +104,7 @@ async function checkFraudulentReview(
       await supabase.from("fraud_checks").insert({
         user_id: userId,
         action_type: "suspicious_multiple_high_ratings",
-        related_user_id: partner.user_id,
+        related_user_id: partner?.user_id || null,
         metadata: {
           partner_id: partnerId,
           review_count: userReviews.length,
@@ -523,7 +525,7 @@ export async function getBuyerReviewsAction() {
     .from("reviews")
     .select(`
       *,
-      products(id, name, images, video_thumbnail, slug),
+      products(id, name, images, video_thumbnail),
       services(id, name, images),
       partners(id, store_name, store_image_url, slug, addresses(id, city, state))
     `)

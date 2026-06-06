@@ -94,6 +94,7 @@ export default function CouponsPage({
     const { openPlanUpgrade } = usePlanUpgrade()
     const { canCreate, canEdit, canDelete } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
 
     const canCreateCoupons = canCreate("marketing_coupons")
     const canEditCoupons = canEdit("marketing_coupons")
@@ -139,7 +140,7 @@ export default function CouponsPage({
     const [scrollState, setScrollState] = useState({ left: false, right: false })
     const totalCoupons = initialTotal ?? initialCoupons.length
 
-    const effectiveViewMode = isMobile ? "grid" : viewMode
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const selectedCoupon = useMemo(
         () => coupons.find((coupon) => coupon.id === selectedCouponId) || null,
         [coupons, selectedCouponId],
@@ -800,68 +801,12 @@ export default function CouponsPage({
                                             </FadeIn>
                                         ) : (
                                             <FadeIn
-                                                key={`${isMobile ? "mobile" : effectiveViewMode}-${activeTab}-${debouncedSearch}`}
+                                                key={`${effectiveViewMode}-${activeTab}-${debouncedSearch}`}
                                                 className="w-full"
                                             >
-                                                {isMobile ? (
-                                                    <div className="px-4 pb-6 flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                        {paginatedCoupons.map((coupon) => (
-                                                            <div
-                                                                key={coupon.id}
-                                                                className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4 animate-fade-in"
-                                                                onClick={() => openDetails(coupon)}
-                                                            >
-                                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                    <TagIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
-                                                                </div>
-
-                                                                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                    <div className="flex justify-between items-start">
-                                                                        <div className="flex flex-col min-w-0 pr-1">
-                                                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                {coupon.code}
-                                                                            </h3>
-                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                {getCouponPrimaryMeta(coupon)}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex flex-wrap justify-end gap-1.5 shrink-0">
-                                                                            {coupon.is_automatic && (
-                                                                                <Badge variant="purple" icon={<SparklesIcon />} className="text-[10px] h-5 px-1.5 whitespace-nowrap">
-                                                                                    Auto
-                                                                                </Badge>
-                                                                            )}
-                                                                            <Badge variant={getCouponStatusVariant(coupon)} className="text-[10px] h-5 px-1.5 whitespace-nowrap">
-                                                                                {getCouponStatusLabel(coupon)}
-                                                                            </Badge>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="flex justify-between items-center mt-1">
-                                                                        <div className="flex flex-col gap-0.5 min-w-0">
-                                                                            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                                                {getCouponApplyScopeLabel(coupon.apply_scope)}
-                                                                            </span>
-                                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                {getCouponCustomerScopeLabel(coupon.customer_scope)}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-4 shrink-0">
-                                                                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                                                {getCouponUsageSummary(coupon)}
-                                                                            </span>
-                                                                            <div onClick={(e) => { e.stopPropagation(); handleSelectRow(coupon.id); }}>
-                                                                                <Checkbox checked={selection.ids.has(coupon.id)} onChange={() => handleSelectRow(coupon.id)} />
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : effectiveViewMode === "grid" ? (
+                                                {effectiveViewMode === "grid" ? (
                                                     <div className="px-4 md:px-8 pb-6">
-                                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                             <AnimatePresence>
                                                                 {paginatedCoupons.map((coupon) => (
                                                                     <CouponGridCard

@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
+import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatDate } from "@/lib/utils"
 import { ReturnRequest } from "./types"
 import { getReturnStatusMeta } from "./ReturnListRow"
@@ -36,7 +36,9 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
             {returnRequest.customerName}
           </p>
         </div>
-        <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+        <Tooltip text={`Status: ${statusMeta.label}`}>
+          <Badge variant={statusMeta.variant} />
+        </Tooltip>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 flex-1">

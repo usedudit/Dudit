@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { ClockIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils";
 
@@ -65,13 +65,13 @@ const QuoteGridCard = React.memo(
                                     {quote.displayId}
                                 </h3>
                                 <div className="flex items-center shrink-0">
-                                    <Badge
-                                        variant={quote.statusColor}
-                                        icon={quote.statusIcon ?? undefined}
-                                        className="whitespace-nowrap scale-90 shrink-0"
-                                    >
-                                        {quote.statusLabel}
-                                    </Badge>
+                                    <Tooltip text={`Status: ${quote.statusLabel}`}>
+                                        <Badge
+                                            variant={quote.statusColor}
+                                            icon={quote.statusIcon ?? undefined}
+                                            className="whitespace-nowrap scale-90 shrink-0"
+                                        />
+                                    </Tooltip>
                                 </div>
                             </div>
 

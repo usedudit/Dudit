@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate } from "@/lib/utils"
@@ -60,9 +60,9 @@ export const PlanGridCard: React.FC<PlanGridCardProps> = ({
               <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={plan.name}>
                 {plan.name}
               </h3>
-              <Badge variant={statusVariant(plan.status)} className="whitespace-nowrap scale-90 shrink-0">
-                {statusLabel(plan.status)}
-              </Badge>
+              <Tooltip text={`Status: ${statusLabel(plan.status)}`}>
+                <Badge variant={statusVariant(plan.status)} className="whitespace-nowrap scale-90 shrink-0" />
+              </Tooltip>
             </div>
             <div className="shrink-0 -mt-1 -mr-1" onClick={(e) => e.stopPropagation()}>
               <Checkbox checked={selected} onChange={onSelect} />

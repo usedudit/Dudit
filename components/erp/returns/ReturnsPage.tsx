@@ -67,6 +67,7 @@ function mapLegacyReason(reason: unknown) {
 export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
     const { toast } = useToast()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
     const canManage = roleId === "owner" || roleId === "admin" || roleId === "manager"
 
@@ -77,6 +78,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
     const [debouncedSearch, setDebouncedSearch] = useState("")
     const [activeTab, setActiveTab] = useState<ActiveTab>("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>({
         key: "date",
@@ -291,7 +293,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                             onSearchChange={setSearch}
                             onOpenFilter={() => undefined}
                             onAdd={canManage ? () => openEntity("create") : undefined}
-                            viewMode={viewMode}
+                            viewMode={effectiveViewMode}
                             onViewModeChange={setViewModeState}
                         />
 
@@ -312,44 +314,8 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                                             itemButton={!hasActiveFilters && canManage ? { text: "Criar devolução", action: () => openEntity("create") } : undefined}
                                         />
                                     </FadeIn>
-                                ) : isMobile ? (
-                                    <FadeIn key="mobile-list" className="px-1 pb-6 flex flex-col border-b border-brand-border dark:border-dark-border">
-                                        {paginatedReturns.map((item) => (
-                                            <div key={item.id} className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex flex-col gap-3 animate-fade-in" onClick={() => openEntity("view", item.id)}>
-                                                <div className="flex justify-between items-center">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border">
-                                                            <ReturnIcon className="w-4 h-4 text-brand-inactive-text" />
-                                                        </div>
-                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                            {`RET-${item.id.slice(0, 6).toUpperCase()}`}
-                                                        </span>
-                                                    </div>
-                                                    <Badge variant={getReturnStatusMeta(item.status).variant}>{getReturnStatusMeta(item.status).label}</Badge>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-y-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    <div>
-                                                        <span className="block text-[11px] text-gray-400">Pedido:</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold">{item.orderNumber}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="block text-[11px] text-gray-400">Cliente:</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold truncate block">{item.customerName}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="block text-[11px] text-gray-400">Data:</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading">{formatDate(item.createdAt)}</span>
-                                                    </div>
-                                                    <div>
-                                                        <span className="block text-[11px] text-gray-400">Resolução:</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading">{getReturnResolutionLabel(item.approvedResolution || item.desiredResolution || "")}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </FadeIn>
-                                ) : viewMode === "grid" ? (
-                                    <FadeIn key="grid" className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                ) : effectiveViewMode === "grid" ? (
+                                    <FadeIn key="grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                         {paginatedReturns.map((item) => (
                                             <ReturnGridCard
                                                 key={item.id}

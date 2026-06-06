@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, Checkbox } from "@/components/reusable"
+import { Badge, Checkbox, Tooltip } from "@/components/reusable"
 import { ChevronDownIcon, ClockIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
@@ -47,12 +47,12 @@ const CashSessionGridCard = React.memo(
                                     Sessão {session.id.slice(0, 8).toUpperCase()}
                                 </h3>
 
-                                <Badge
-                                    variant={session.status === 'open' ? "green" : "gray"}
-                                    className="whitespace-nowrap scale-90"
-                                >
-                                    {session.status === 'open' ? "Aberto" : "Fechado"}
-                                </Badge>
+                                <Tooltip text={`Status: ${session.status === 'open' ? "Aberto" : "Fechado"}`}>
+                                    <Badge
+                                        variant={session.status === 'open' ? "green" : "gray"}
+                                        className="whitespace-nowrap scale-90"
+                                    />
+                                </Tooltip>
                             </div>
 
                             {onSelect && (

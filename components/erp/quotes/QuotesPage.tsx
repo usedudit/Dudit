@@ -173,6 +173,7 @@ export default function QuotesPage({
 
     const [activeTab, setActiveTab] = useState<"Todos" | "Enviados" | "Aprovados" | "Rejeitados" | "Expirados">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
 
@@ -619,7 +620,7 @@ export default function QuotesPage({
                                     ) : (
                                         <AnimatePresence mode="wait">
                                             <FadeIn
-                                                key={activeTab + viewMode}
+                                                key={activeTab + effectiveViewMode}
                                                 className="w-full"
                                             >
                                                 <SelectionBanner
@@ -630,48 +631,7 @@ export default function QuotesPage({
                                                     itemName="orçamentos"
                                                     singularItemName="orçamento"
                                                 />
-                                                {isTablet ? (
-                                                    <div className="flex flex-col w-full">
-                                                        {paginated.map((q: Quote, idx) => {
-                                                            const prefetch = getPrefetchProps(q.originalId)
-                                                            return (
-                                                                <React.Fragment key={q.originalId}>
-                                                                    <div
-                                                                        className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                                                        onClick={() => handleViewQuote(q)}
-                                                                        onTouchStart={prefetch.onTouchStart}
-                                                                    >
-                                                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                            <div className="flex justify-between items-start">
-                                                                                <div className="flex flex-col min-w-0 pr-1">
-                                                                                    <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                                                        {q.displayId}
-                                                                                    </h3>
-                                                                                    <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                                                                        {q.customer_name} • {q.formattedIssueDate}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <Badge variant={q.statusColor} icon={q.statusIcon ?? undefined} className="shrink-0 text-[10px] h-5 px-1.5">
-                                                                                    {q.statusLabel}
-                                                                                </Badge>
-                                                                            </div>
-                                                                            <div className="flex justify-between items-center mt-1">
-                                                                                <span className="text-[14px] font-bold text-brand-primary">
-                                                                                    {formatCurrency(q.total_amount)}
-                                                                                </span>
-                                                                                <div className="flex items-center gap-4">
-                                                                                    <div onClick={(e) => { e.stopPropagation(); handleSelectRow(q.originalId); }}>
-                                                                                        <Checkbox checked={selection.ids.has(q.originalId)} />
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </React.Fragment>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ) : viewMode === "grid" ? (
+                                                {effectiveViewMode === "grid" ? (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((q: Quote) => {
                                                             const prefetch = getPrefetchProps(q.originalId)

@@ -12,7 +12,6 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 
 // Actions
 import {
@@ -256,7 +255,7 @@ export default function ServicesPage({
         bulkInactive: false
     })
 
-    const effectiveViewMode = viewMode
+    const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
 
     const containerRef = useRef<HTMLDivElement>(null)
@@ -575,7 +574,7 @@ export default function ServicesPage({
                                                     singularItemName="serviço"
                                                 />
                                                 {effectiveViewMode === "grid" ? (
-                                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                         {paginated.map((service) => {
                                                             const prefetch = getPrefetchProps(service.id)
                                                             return (
@@ -589,24 +588,6 @@ export default function ServicesPage({
                                                                     onDelete={() => handleDeleteService(service)}
                                                                     onDetails={() => handleDetailsService(service)}
                                                                     onShare={() => setSharingService(service)}
-                                                                    onPrefetchMouseEnter={prefetch.onMouseEnter}
-                                                                    onPrefetchMouseLeave={prefetch.onMouseLeave}
-                                                                    onPrefetchTouchStart={prefetch.onTouchStart}
-                                                                />
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ) : isTabletOrMobile ? (
-                                                    <div className="w-full">
-                                                        {paginated.map((service) => {
-                                                            const prefetch = getPrefetchProps(service.id)
-                                                            return (
-                                                                <ServiceMobileItem
-                                                                    key={service.id}
-                                                                    service={service}
-                                                                    onClick={handleDetailsService}
-                                                                    isSelected={selection.ids.has(service.id)}
-                                                                    onSelect={handleSelectRow}
                                                                     onPrefetchMouseEnter={prefetch.onMouseEnter}
                                                                     onPrefetchMouseLeave={prefetch.onMouseLeave}
                                                                     onPrefetchTouchStart={prefetch.onTouchStart}

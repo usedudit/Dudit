@@ -85,9 +85,6 @@ export function HistoryTimeline({
             )}
 
             <div className="relative space-y-0">
-                {/* Vertical Line */}
-                <div className="absolute left-[19px] top-4 bottom-4 w-px bg-brand-border dark:bg-dark-border" />
-
                 {entries.map((entry, index) => {
                     const Icon = getEntryIcon(entry)
                     const isSystem = entry.actor_name.toLowerCase() === "sistema"
@@ -98,11 +95,11 @@ export function HistoryTimeline({
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.3, delay: index * 0.05 }}
-                            className="relative pl-12 pb-10 last:pb-0 group"
+                            className="relative pl-14 pb-8 last:pb-0 group"
                         >
                             {/* Icon Circle */}
                             <div className={cn(
-                                "w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0"
+                                "absolute left-0 top-0 w-10 h-10 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0"
                             )}>
                                 <Icon
                                     size={16}
@@ -110,8 +107,13 @@ export function HistoryTimeline({
                                 />
                             </div>
 
+                            {/* Connecting Line to next item */}
+                            {index < entries.length - 1 && (
+                                <div className="absolute left-[19.5px] top-10 bottom-0 w-[1px] bg-brand-border dark:bg-dark-border" />
+                            )}
+
                             {/* Content */}
-                            <div className="pt-1.5">
+                            <div className="pt-2">
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
                                     <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
                                         {entry.actor_name}

@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
+import { Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { Package, SubcategoryIcon } from "@/lib/icons"
 
@@ -43,12 +43,12 @@ const FinancialCategoryCard = React.memo(
                                 <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                     {item.name}
                                 </h3>
-                                <Badge
-                                    variant={item.is_active ? "green" : "red"}
-                                    className="whitespace-nowrap scale-90 shrink-0"
-                                >
-                                    {item.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
+                                <Tooltip text={item.is_active ? "Status: Ativo" : "Status: Inativo"}>
+                                    <Badge
+                                        variant={item.is_active ? "green" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
                             </div>
                         </div>
 

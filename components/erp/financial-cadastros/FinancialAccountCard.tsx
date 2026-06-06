@@ -2,10 +2,10 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
+import { Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { DropdownItem } from "@/components/reusable/Dropdown"
-import { MoneyIcon } from "@/lib/icons"
+import { MoneyIcon, LinkIcon, KeyIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 
 const TYPE_LABELS: Record<string, string> = {
@@ -70,25 +70,25 @@ const FinancialAccountCard = React.memo(
                                     {item.name}
                                 </h3>
                                 {item.integration_source === "mercadopago" && item.is_system_managed && (
-                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
-                                        Mercado Pago
-                                    </Badge>
+                                    <Tooltip text="Integração: Mercado Pago">
+                                        <Badge variant="blue" icon={<LinkIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {item.integration_source === "mercadopago" && (
-                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
-                                        Gateway
-                                    </Badge>
+                                    <Tooltip text="Tipo: Gateway">
+                                        <Badge variant="blue" icon={<KeyIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
-                                <Badge
-                                    variant={item.is_active ? "green" : "red"}
-                                    className="whitespace-nowrap scale-90 shrink-0"
-                                >
-                                    {item.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
+                                <Tooltip text={item.is_active ? "Status: Ativo" : "Status: Inativo"}>
+                                    <Badge
+                                        variant={item.is_active ? "green" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
                                 {item.is_default ? (
-                                    <Badge variant="blue" className="whitespace-nowrap scale-90 shrink-0">
-                                        Padrão ({TYPE_LABELS[item.type] || item.type})
-                                    </Badge>
+                                    <Tooltip text={`Padrão: ${TYPE_LABELS[item.type] || item.type}`}>
+                                        <Badge variant="blue" icon={<StarIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 ) : null}
                             </div>
                         </div>

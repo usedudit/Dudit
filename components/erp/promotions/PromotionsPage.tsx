@@ -31,6 +31,7 @@ import {
 } from "@/app/actions/shared/promotions"
 import { formatCurrency } from "@/lib/utils/formatters"
 import PromotionFormPage from "./PromotionFormPage"
+import PromotionGridCard from "./PromotionGridCard"
 import { PlusIcon, SearchIcon, TagIcon, SparklesIcon, TrashIcon, EditIcon, EyeIcon, PlayIcon, InfoIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -55,6 +56,7 @@ export default function PromotionsPage({
 }) {
   const { toast } = useToast()
   const isMobile = useMediaQuery("(max-width: 767px)")
+  const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
   const [activeTab, setActiveTab] = useState<"list" | "simulator">("list")
 
   const queryKey = useMemo(() => ["erp", "promotions", partnerId] as const, [partnerId])
@@ -436,50 +438,28 @@ export default function PromotionsPage({
                           singularItemName="campanha"
                         />
 
-                        {isMobile ? (
-                          <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                        {isTabletOrMobile ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                             {paginatedCampaigns.map((camp: any) => {
                               const isSelected = selection.ids.has(camp.id)
                               const campPromos = promotions.filter(p => p.campaign_id === camp.id)
                               return (
-                                <div
+                                <PromotionGridCard
                                   key={camp.id}
-                                  className="py-5 border-b border-brand-border dark:border-dark-border last:border-0 cursor-pointer flex items-center gap-4"
-                                  onClick={() => openEntity('view', camp.id)}
-                                >
-                                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                    <div className="flex justify-between items-start">
-                                      <div className="flex flex-col min-w-0 pr-1">
-                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                          {camp.name}
-                                        </h3>
-                                        <span className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                                          {camp.customer_scope === "specific" ? "Segmentado" : "Público Geral"}
-                                        </span>
-                                      </div>
-                                      <Badge variant={camp.is_active ? 'green' : 'gray'} className="shrink-0 text-[10px] h-5 px-1.5">
-                                        {camp.is_active ? "Ativo" : "Inativo"}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-1">
-                                      <span className="text-[14px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                                        {campPromos.length} regra{campPromos.length !== 1 && 's'}
-                                      </span>
-                                      <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                          {camp.starts_at ? new Date(camp.starts_at).toLocaleDateString() : "Sem início"}
-                                        </span>
-                                        <Checkbox checked={isSelected} onChange={() => {
-                                          setSelection(p => {
-                                            const s = new Set(p.ids)
-                                            s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
-                                            return { ids: s }
-                                          })
-                                        }} />
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                                  campaign={camp}
+                                  campaignPromotions={campPromos}
+                                  selected={isSelected}
+                                  onSelect={() => {
+                                    setSelection(p => {
+                                      const s = new Set(p.ids)
+                                      s.has(camp.id) ? s.delete(camp.id) : s.add(camp.id)
+                                      return { ids: s }
+                                    })
+                                  }}
+                                  onDetails={() => openEntity('view', camp.id)}
+                                  onEdit={() => openEntity('edit', camp.id)}
+                                  onDelete={() => handleDeleteCampaign(camp)}
+                                />
                               )
                             })}
                           </div>

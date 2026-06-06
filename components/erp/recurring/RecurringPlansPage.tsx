@@ -63,6 +63,7 @@ export default function RecurringPlansPage({
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
+    const isTablet = useMediaQuery("(max-width: 1024px)")
     const { canCreate, canEdit } = usePermissions()
     const canManage = canCreate("recurring_plans") || canEdit("recurring_plans")
 
@@ -116,6 +117,7 @@ export default function RecurringPlansPage({
     // UI States
     const [activeTab, setActiveTab] = useState<"Todos" | "Ativo" | "Inativo" | "Arquivado">("Todos")
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+    const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
 
@@ -379,7 +381,7 @@ export default function RecurringPlansPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onAddPlan={handleAddPlan}
-                                    viewMode={viewMode}
+                                    viewMode={effectiveViewMode}
                                     onViewModeChange={setViewModeState}
                                     canManage={canManage}
                                 />
@@ -434,8 +436,8 @@ export default function RecurringPlansPage({
                                             />
                                         </FadeIn>
                                     ) : (
-                                        <FadeIn key={activeTab + viewMode} className="w-full">
-                                            {isMobile || viewMode === "grid" ? (
+                                        <FadeIn key={activeTab + effectiveViewMode} className="w-full">
+                                            {effectiveViewMode === "grid" ? (
                                                 /* Grid & Mobile Layout */
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginated.map((plan: RecurringPlan) => (

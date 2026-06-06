@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -61,12 +61,12 @@ const CustomerGridCard = React.memo(
                                 >
                                     <span className="truncate">{customer.name}</span>
                                 </h3>
-                                <Badge
-                                    variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}
-                                    className="whitespace-nowrap scale-90 shrink-0"
-                                >
-                                    {customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}
-                                </Badge>
+                                <Tooltip text={`Status: ${customer.status === 'ativo' ? "Ativo" : customer.status === 'inativo' ? "Inativo" : "Bloqueado"}`}>
+                                    <Badge
+                                        variant={customer.status === 'ativo' ? "green" : customer.status === 'inativo' ? "gray" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
                             </div>
 
                             {/* Checkbox com stopPropagation */}

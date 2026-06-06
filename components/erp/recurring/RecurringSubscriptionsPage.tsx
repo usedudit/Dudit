@@ -53,6 +53,7 @@ export default function RecurringSubscriptionsPage({
 }) {
   const { toast } = useToast()
   const isMobile = useMediaQuery("(max-width: 767px)")
+  const isTablet = useMediaQuery("(max-width: 1024px)")
   const { canEdit } = usePermissions()
   const canManage = canEdit("recurring_subscriptions")
 
@@ -67,6 +68,7 @@ export default function RecurringSubscriptionsPage({
   const [debouncedSearch, setDebouncedSearch] = useState("")
 
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
+  const effectiveViewMode = isTablet ? "grid" : viewMode
   const [page, setPage] = useState(1)
 
   // Execution history state
@@ -233,7 +235,7 @@ export default function RecurringSubscriptionsPage({
           setStatusFilter={setStatusFilter}
           search={search}
           onSearchChange={setSearch}
-          viewMode={viewMode}
+          viewMode={effectiveViewMode}
           onViewModeChange={setViewModeState}
         />
 
@@ -260,8 +262,8 @@ export default function RecurringSubscriptionsPage({
                 />
               </FadeIn>
             ) : (
-              <FadeIn key={statusFilter + viewMode} className="w-full">
-                {isMobile || viewMode === "grid" ? (
+              <FadeIn key={statusFilter + effectiveViewMode} className="w-full">
+                {effectiveViewMode === "grid" ? (
                   /* Cards / Mobile Layout */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                     {paginated.map((sub: any) => (

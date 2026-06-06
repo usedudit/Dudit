@@ -1057,40 +1057,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8 space-y-8">
-                                {/* Visual Step Tracker Timeline */}
-                                <div className="border-b border-brand-border dark:border-dark-border pb-8">
-                                    <h3 className="font-bold text-md text-brand-dark dark:text-dark-heading mb-6">Status do Acompanhamento</h3>
-                                    <div className="relative pl-2 space-y-8">
-                                        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-zinc-700"></div>
-                                        {getClientTimelineSteps(order).map((step, idx) => (
-                                            <div key={idx} className="relative flex gap-4">
-                                                <div className={`w-6 h-6 rounded-full ${step.active ? "bg-brand-green border-4 border-green-100 dark:border-green-950" : "bg-gray-200 dark:bg-zinc-700"} z-10 shrink-0`}></div>
-                                                <div>
-                                                    <div className={`text-sm ${step.active ? "font-bold text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text"}`}>
-                                                        {step.label}
-                                                    </div>
-                                                    {step.active && step.date && (
-                                                        <div className="text-xs text-brand-inactive-text mt-1">{step.date} às {step.time}</div>
-                                                    )}
-                                                    {step.subLabel && (
-                                                        <div className="text-xs text-brand-inactive-text mt-1 font-normal">
-                                                            {Array.isArray(step.subLabel) ? (
-                                                                <ul className="list-disc pl-4 space-y-0.5 mt-1">
-                                                                    {step.subLabel.map((sl, slIdx) => (
-                                                                        <li key={slIdx}>{sl}</li>
-                                                                    ))}
-                                                                </ul>
-                                                            ) : (
-                                                                <p className="mt-1">{step.subLabel}</p>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 {historyLoading ? (
                                     <div className="flex flex-col items-center justify-center py-12 gap-3 animate-pulse">
                                         <Spinner size={24} className="text-brand-green" />
@@ -1099,7 +1065,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 ) : (
                                     <HistoryTimeline
                                         entries={historyEntries}
-                                        title="Histórico de Alterações"
+                                        title="Status do Acompanhamento"
                                         subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
                                         emptyMessage="Nenhum histórico encontrado para este pedido."
                                     />

@@ -135,9 +135,9 @@ const ProductGridCard = React.memo(
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Visibilidade</span>
-                            <Badge variant={product.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90">
-                                {product.show_in_marketplace ? "Visível" : "Oculto"}
-                            </Badge>
+                            <Tooltip text={product.show_in_marketplace ? "Visibilidade: Visível" : "Visibilidade: Oculto"}>
+                                <Badge variant={product.show_in_marketplace ? "green" : "gray"} className="whitespace-nowrap scale-90" />
+                            </Tooltip>
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end">
@@ -155,9 +155,9 @@ const ProductGridCard = React.memo(
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque</span>
                             <div className="flex items-center gap-2.5">
                                 <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{stock}</span>
-                                <Badge variant={status.variant} className="whitespace-nowrap scale-90">
-                                    {status.label}
-                                </Badge>
+                                <Tooltip text={`Estoque: ${status.label}`}>
+                                    <Badge variant={status.variant} className="whitespace-nowrap scale-90" />
+                                </Tooltip>
                             </div>
                             {hasVariations && (
                                 <span className="text-[10px] font-bold text-brand-green underline decoration-brand-green/30 mt-0.5">

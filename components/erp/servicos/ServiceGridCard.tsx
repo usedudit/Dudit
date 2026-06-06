@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge } from "@/components/reusable"
+import { Checkbox, Badge, Tooltip } from "@/components/reusable"
 import { ActionsDropdown } from "@/components/reusable/Accordion"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -79,12 +79,12 @@ const ServiceGridCard = React.memo(
                                 >
                                     <span className="truncate">{service.name}</span>
                                 </h3>
-                                <Badge
-                                    variant={service.is_active ? "green" : "red"}
-                                    className="whitespace-nowrap scale-90 shrink-0"
-                                >
-                                    {service.is_active ? "Ativo" : "Inativo"}
-                                </Badge>
+                                <Tooltip text={service.is_active ? "Status: Ativo" : "Status: Inativo"}>
+                                    <Badge
+                                        variant={service.is_active ? "green" : "red"}
+                                        className="whitespace-nowrap scale-90 shrink-0"
+                                    />
+                                </Tooltip>
                             </div>
 
                             {/* Checkbox com stopPropagation para não abrir os detalhes ao clicar */}

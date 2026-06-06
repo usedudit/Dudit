@@ -2,8 +2,8 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reusable"
-import { CreditCardIcon, FileIcon, MoneyIcon } from "@/lib/icons"
+import { ActionsDropdown, Badge, Checkbox, DropdownItem, Tooltip } from "@/components/reusable"
+import { CreditCardIcon, FileIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
@@ -57,23 +57,23 @@ const TransactionGridCard = React.memo(
                                     {transaction.description}
                                 </h3>
                                 {transaction.installmentGroupId && (
-                                    <Badge variant="orange" className="whitespace-nowrap scale-90 shrink-0">
-                                        Parcelado
-                                    </Badge>
+                                    <Tooltip text="Faturamento: Parcelado">
+                                        <Badge variant="orange" icon={<InstallmentIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {!transaction.isInstallmentGroup && transaction.installmentNumber && transaction.installmentTotalCount && (
-                                    <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
-                                        {transaction.installmentNumber}/{transaction.installmentTotalCount}
-                                    </Badge>
+                                    <Tooltip text={`Parcela: ${transaction.installmentNumber}/${transaction.installmentTotalCount}`}>
+                                        <Badge variant="gray" icon={<InstallmentIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
                                 {isRecurring && (
-                                    <Badge variant="purple" className="whitespace-nowrap scale-90 shrink-0">
-                                        Recorrente
-                                    </Badge>
+                                    <Tooltip text="Faturamento: Recorrente">
+                                        <Badge variant="purple" icon={<RepeatIcon />} className="whitespace-nowrap scale-90 shrink-0" />
+                                    </Tooltip>
                                 )}
-                                <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0">
-                                    {transaction.status}
-                                </Badge>
+                                <Tooltip text={`Status: ${transaction.status}`}>
+                                    <Badge variant={transaction.statusVariant} className="whitespace-nowrap scale-90 shrink-0" />
+                                </Tooltip>
                             </div>
 
                             <div className="shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
