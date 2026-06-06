@@ -202,7 +202,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
 
     const { data: method } = await supabase
         .from("payment_methods")
-        .select("id, partner_id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments")
+        .select("id, partner_id, fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments, type, payment_type")
         .eq("id", input.paymentMethodId)
         .single()
 
@@ -230,7 +230,38 @@ export async function calculatePaymentMethodAmountsAction(input: {
         },
     })
 
-    return { success: true, ...result }
+    const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
+    const maxInst = Math.max(1, Number(method.max_installments || 1))
+    const installmentOptions = []
+
+    if (chosenType === "credit_card" && maxInst > 1) {
+        for (let i = 1; i <= maxInst; i++) {
+            const calc = calculatePaymentAmounts({
+                originalAmount: Math.max(0, Number(input.originalAmount || 0)),
+                installmentNumber: i,
+                paymentMethod: {
+                    feePercent: Number(method.fee_percent || 0),
+                    feeFixed: Number(method.fee_fixed || 0),
+                    feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+                    discountPercent: Number(method.discount_percent || 0),
+                    maxInstallments: Number(method.max_installments || 1),
+                    installmentFees: (fees || []).map((row: any) => ({
+                        installmentNumber: Number(row.installment_number || 1),
+                        feePercent: Number(row.fee_percent || 0),
+                    })),
+                },
+            })
+            installmentOptions.push({
+                installments: i,
+                installmentValue: calc.installmentAmounts[0] || 0,
+                hasInterest: calc.interestAmount > 0,
+                totalInterest: calc.interestAmount,
+                finalAmount: calc.finalAmount
+            })
+        }
+    }
+
+    return { success: true, installmentOptions, ...result }
 }
 
 /**

@@ -20,7 +20,7 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, InfoCard } from '@/components/reusable';
+import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, InfoCard, FormDropdown } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
@@ -365,6 +365,7 @@ const PaymentModal = ({
     const [selectedMethodType, setSelectedMethodType] = useState<string | null>(null);
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
+    const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
     const [splitPreview, setSplitPreview] = useState<
@@ -400,6 +401,7 @@ const PaymentModal = ({
     const resetSelectedMethodPricing = (options?: { clearType?: boolean; resetInstallments?: boolean }) => {
         setSelectedMethodId(null);
         setPaymentCalculation(null);
+        setInstallmentOptions([]);
         setIsPaymentCalculationLoading(false);
         setIsPixGenerated(false);
         if (options?.clearType) {
@@ -508,6 +510,7 @@ const PaymentModal = ({
             setSelectedMethodId(null);
             setSelectedMethodType(null);
             setPaymentCalculation(null);
+            setInstallmentOptions([]);
             setIsPaymentCalculationLoading(false);
             setSplitPreview(null);
             setSuccessSnapshot(null);
@@ -874,6 +877,14 @@ const PaymentModal = ({
         }
     }, [view, editingPaymentIndex, chargeTarget, payments]);
 
+    // Debounce base amount input typing to recalculate payment method details
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setCalcBaseAmount(paymentBaseAmount);
+        }, 200);
+        return () => clearTimeout(handler);
+    }, [paymentBaseAmount]);
+
     useEffect(() => {
         if (view !== 'money') return;
         const nextAmount = Math.max(0, Number(paymentBaseAmount || 0));
@@ -885,12 +896,14 @@ const PaymentModal = ({
         let active = true;
         if (!selectedMethodId) {
             setPaymentCalculation(null);
+            setInstallmentOptions([]);
             setIsPaymentCalculationLoading(false);
             return;
         }
         const currentViewIsCardLike = view === "card" || view === "pix" || view === "money";
         if (!currentViewIsCardLike) {
             setPaymentCalculation(null);
+            setInstallmentOptions([]);
             setIsPaymentCalculationLoading(false);
             return;
         }
@@ -905,13 +918,12 @@ const PaymentModal = ({
             if (!active) return;
             if (res?.success) {
                 setPaymentCalculation(res);
-                // Auto-fill "Valor a receber" com o valor final calculado (com desconto/taxa) — apenas uma vez
-                const calculatedFinal = Number(res.finalAmount || 0);
-                if (calculatedFinal > 0.009 && editingPaymentIndex === null) {
-                    setPaymentBaseAmount(calculatedFinal);
+                if (res.installmentOptions) {
+                    setInstallmentOptions(res.installmentOptions);
                 }
             } else {
                 setPaymentCalculation(null);
+                setInstallmentOptions([]);
             }
             setIsPaymentCalculationLoading(false);
         });
@@ -973,15 +985,15 @@ const PaymentModal = ({
         if (editingPaymentIndex !== null) {
             return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
         }
-        // Para pagamento único: compara o que o operador digitou vs o valor final a cobrar (com desconto/taxa)
-        return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: finalDueForLeg };
-    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalDueForLeg, legFinalCharged]);
+        // Para pagamento único: compara o que o operador digitou vs o valor total base do pedido
+        return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: chargeTarget };
+    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount]);
 
-    // Compara o valor que o operador digitou contra o valor final a cobrar (já com desconto/taxa)
-    const isAllocationUnderpaid = paymentBaseAmount < finalDueForLeg - 0.005;
+    // Compara o valor base que o operador digitou contra o valor total base
+    const isAllocationUnderpaid = paymentBaseAmount < chargeTarget - 0.005;
     const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
-    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalDueForLeg + 0.005;
-    const changeAmount = isOverpaid ? paymentBaseAmount - finalDueForLeg : 0;
+    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > chargeTarget + 0.005;
+    const changeAmount = isOverpaid ? paymentBaseAmount - chargeTarget : 0;
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
     const totalPaidCalculated = useMemo(() => {
@@ -1273,9 +1285,7 @@ const PaymentModal = ({
                         }
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
-                    amount: legFinalCharged != null && Number.isFinite(legFinalCharged)
-                        ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.005 ? calcBaseAmount : getBaseAmountFromFinal(paymentBaseAmount))
-                        : Number(paymentBaseAmount || 0),
+                    amount: Number(paymentBaseAmount || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -1291,7 +1301,7 @@ const PaymentModal = ({
 
         const singleRegisterAmount =
             view !== 'split' && paymentCalculation?.success && legFinalCharged != null && Number.isFinite(legFinalCharged)
-                ? (Math.abs(paymentBaseAmount - legFinalCharged) < 0.01 ? legFinalCharged : Number(paymentBaseAmount || 0))
+                ? legFinalCharged
                 : view !== 'split'
                     ? Number(paymentBaseAmount || 0)
                     : 0;
@@ -1738,13 +1748,9 @@ const PaymentModal = ({
                                         <motion.div key="card" variants={contentVariants} initial="initial" animate="animate" exit="exit" className={cn("flex flex-col items-center justify-start pt-6 w-full max-w-sm mx-auto", isSinglePricingBusy && "opacity-60")}>
                                             <CompactPaymentStatusAlert totalPaid={compactAlertPaid} totalNeed={compactAlertNeed} />
                                             <div className="mb-8 text-center">
-                                                <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-100 dark:border-green-900/30">
-                                                    <CreditCardIcon size={40} className="text-green-600 dark:text-green-400" />
-                                                </div>
                                                 <div className="text-4xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                                                     {formatCurrency(paymentBaseAmount)}
                                                 </div>
-                                                <p className="text-brand-inactive-text">Aguardando leitura do cartão...</p>
                                             </div>
                                             <div className="w-full text-left space-y-4">
                                                 <div className="min-w-0 flex-1">
@@ -1759,7 +1765,19 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
-                                                <Input label="Parcelas" name="installments" type="number" value={installments} onChange={(e: any) => setInstallments(e.target.value)} min="1" className="w-full text-lg font-bold" />
+                                                <FormDropdown
+                                                    label="Parcelas"
+                                                    value={String(installments)}
+                                                    setValue={(value) => setInstallments(value)}
+                                                    options={
+                                                        installmentOptions.length > 0
+                                                            ? installmentOptions.map(opt => ({
+                                                                value: String(opt.installments),
+                                                                label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`
+                                                            }))
+                                                            : [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }]
+                                                    }
+                                                />
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
