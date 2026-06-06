@@ -2,7 +2,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
     PlusIcon,
+    ExportFileIcon,
 } from '@/lib/icons';
+import { useErpExport } from '@/hooks/use-erp-export';
 import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
 import { Settings, CalendarOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -143,6 +145,7 @@ const AppointmentsPage = ({
     const [draftData, setDraftData] = useState<{ services: any[], client: any, staffId?: number } | null>(null);
     const [preSelectedStaffId, setPreSelectedStaffId] = useState<string | undefined>(undefined);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const { exportData, isExporting } = useErpExport();
 
     const mapDbAppointment = useCallback((row: any): Appointment => ({
         id: String(row.id),
@@ -563,6 +566,20 @@ const AppointmentsPage = ({
 
     const hasActiveFilters = appointmentFilters.teamIds.length > 0;
 
+    const handleExport = useCallback(() => {
+        const { startDate, endDate } = computeVisibleDateRange(currentDate, calendarView);
+        void exportData({
+            partnerId,
+            module: "appointments",
+            format: "xlsx",
+            filters: {
+                startDate,
+                endDate,
+                staffIds: appointmentFilters.teamIds,
+            },
+        });
+    }, [exportData, partnerId, currentDate, calendarView, appointmentFilters.teamIds]);
+
     const visibleStaffMembers = useMemo(() => {
         if (appointmentFilters.teamIds.length === 0) return realStaffMembers;
         const selected = new Set(appointmentFilters.teamIds);
@@ -752,6 +769,9 @@ const AppointmentsPage = ({
                                 </div>
 
                                 <div className="flex items-center gap-3">
+                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                        {isExporting ? "Exportando..." : "Exportar"}
+                                    </Button>
                                     <Button onClick={() => handleOpenCreate()} leftIcon={<PlusIcon size={18} />}>
                                         Novo agendamento
                                     </Button>

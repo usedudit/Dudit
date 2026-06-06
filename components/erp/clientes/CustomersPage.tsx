@@ -34,6 +34,7 @@ import {
     CheckCircleIcon
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useErpExport } from "@/hooks/use-erp-export"
 
 // --- TYPES & INTERFACES ---
 
@@ -87,6 +88,7 @@ export default function CustomersPage({
     initialHasMore: boolean
 }) {
     const { toast } = useToast()
+    const { exportData, isExporting } = useErpExport()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -287,6 +289,19 @@ export default function CustomersPage({
     const hasActiveFilters = filters.status.length > 0 || debouncedSearch.length > 0
     const hasCustomers = (rawCustomers?.length || 0) > 0
 
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "customers",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                status: filters.status,
+            },
+        })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters.status])
+
     // Handlers (URL-driven)
     const handleAddCustomer = () => openEntity('create')
     const handleEditCustomer = (customer: any) => openEntity('edit', customer.originalId || customer.id)
@@ -415,8 +430,8 @@ export default function CustomersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={() => { }} leftIcon={<ExportFileIcon size={18} />}>
-                                        Exportar
+                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+                                        {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
 
                                     <Button onClick={handleAddCustomer} leftIcon={<PlusIcon size={18} />}>
@@ -432,7 +447,7 @@ export default function CustomersPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals({ filter: true })}
-                                    onExport={() => { }}
+                                    onExport={handleExport}
                                     onAddCustomer={handleAddCustomer}
                                     filters={filters}
                                     setFilters={setFilters as any}

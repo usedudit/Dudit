@@ -17,6 +17,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
+import { useErpExport } from "@/hooks/use-erp-export"
 
 // Actions
 import {
@@ -284,7 +285,8 @@ export default function ProductsPage({
         bulkDelete: false,
         bulkInactive: false
     })
-    const [modals, setModals] = useState({ filter: false, import: false, export: false })
+    const [modals, setModals] = useState({ filter: false, import: false })
+    const { exportData, isExporting } = useErpExport()
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
 
@@ -330,6 +332,21 @@ export default function ProductsPage({
         !!filters.priceRange.max
 
     const isFiltered = search.length > 0 || hasActiveFilters
+
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "products",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                status: filters.status,
+                categories: filters.categories,
+                stockStatus: filters.stocks,
+            },
+        })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -789,8 +806,8 @@ export default function ProductsPage({
                                         <DropdownItem onClick={() => setModals((p) => ({ ...p, import: true }))}>
                                             <UploadIcon size={16} /> Importar XML
                                         </DropdownItem>
-                                        <DropdownItem onClick={() => setModals((p) => ({ ...p, export: true }))}>
-                                            <ExportFileIcon size={16} /> Exportar
+                                        <DropdownItem onClick={handleExport} disabled={isExporting}>
+                                            <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
                                     </Dropdown>
 
@@ -812,7 +829,7 @@ export default function ProductsPage({
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals((p) => ({ ...p, filter: true }))}
                                     onOpenImport={() => setModals((p) => ({ ...p, import: true }))}
-                                    onOpenExport={() => setModals((p) => ({ ...p, export: true }))}
+                                    onOpenExport={handleExport}
                                     onAddProduct={handleAddFirstProduct}
                                     filters={filters}
                                     setFilters={setFilters}
@@ -1075,15 +1092,6 @@ export default function ProductsPage({
                 storeId={selectedStore?.id || ""}
                 onImportSuccess={() => { }}
             />
-            <DefaultModal
-                isOpen={modals.export}
-                onClose={() => setModals((p) => ({ ...p, export: false }))}
-                title="Exportar"
-                footer={<Button onClick={() => setModals((p) => ({ ...p, export: false }))}> Fechar</Button>}
-            >
-                <div className="p-8 text-center text-gray-500">Funcionalidade de exportação em breve.</div>
-            </DefaultModal>
-
             {sharingProduct && (
                 <ShareModal
                     isOpen={!!sharingProduct}

@@ -1,0 +1,89 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { sanitizeSearchTerm } from "../filters"
+import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
+import {
+  applyProductStockFilter,
+  mapProductRow,
+  PRODUCT_EXPORT_COLUMNS,
+} from "../mappers"
+import type { ProductsExportFilters } from "../types"
+import { EXPORT_CHUNK_SIZE } from "../constants"
+
+const PRODUCT_SELECT =
+  "id, name, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name)"
+
+const TAB_STOCK: Record<string, string> = {
+  normal: "Normal",
+  low: "Baixo",
+  out_of_stock: "Esgotado",
+}
+
+export async function fetchProductsExport(
+  supabase: SupabaseClient,
+  partnerId: string,
+  filters: ProductsExportFilters,
+): Promise<import("../types").ExportResult> {
+  const categoryNames = (filters.categories || []).filter(Boolean)
+  let categoryIds: string[] = []
+
+  if (categoryNames.length) {
+    const { data: cats } = await supabase
+      .from("product_categories")
+      .select("id, name")
+      .eq("partner_id", partnerId)
+      .in("name", categoryNames)
+    categoryIds = (cats || []).map((c) => c.id)
+    if (!categoryIds.length) {
+      return { columns: PRODUCT_EXPORT_COLUMNS, rows: [], rowCount: 0 }
+    }
+  }
+
+  const stockLabels = [...(filters.stockStatus || [])]
+  if (filters.activeTab && filters.activeTab !== "all") {
+    const tabLabel = TAB_STOCK[filters.activeTab]
+    if (tabLabel) stockLabels.push(tabLabel)
+  }
+
+  const statusLabels = filters.status || []
+  const search = sanitizeSearchTerm(filters.search)
+
+  const rawRows = await fetchAllPages<any>({
+    chunkSize: EXPORT_CHUNK_SIZE,
+    fetchPage: async (cursor) => {
+      let query = supabase.from("products").select(PRODUCT_SELECT).eq("partner_id", partnerId)
+
+      if (statusLabels.length === 1) {
+        query = query.eq("is_active", statusLabels[0] === "Ativo")
+      }
+
+      if (categoryIds.length) query = query.in("category_id", categoryIds)
+
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+      }
+
+      const orFilter = buildKeysetOrFilter(cursor)
+      if (orFilter) query = query.or(orFilter)
+
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(EXPORT_CHUNK_SIZE)
+
+      if (error) throw error
+      const rows = (data || []).map((p: any) => ({
+        ...p,
+        category: p.category?.name || null,
+      }))
+      const last = rows[rows.length - 1]
+      return {
+        rows,
+        nextCursor: last ? { createdAt: String(last.created_at), id: String(last.id) } : null,
+      }
+    },
+  })
+
+  const filtered = rawRows.filter((row) => applyProductStockFilter(row, stockLabels))
+  const rows = filtered.map(mapProductRow)
+  return { columns: PRODUCT_EXPORT_COLUMNS, rows, rowCount: rows.length }
+}

@@ -113,13 +113,13 @@ export function HistoryTimeline({
                             )}
 
                             {/* Content */}
-                            <div className="pt-2">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+                            <div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                     <span className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
                                         {entry.actor_name}
                                     </span>
                                     <span className="text-[14px] text-brand-inactive-text dark:text-dark-body">
-                                        {formatDateTime(entry.created_at)}
+                                        - {formatDateTime(entry.created_at)}
                                     </span>
                                     <span className="text-[13px] font-medium text-brand-inactive-text/60 dark:text-dark-body/60">
                                         • {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true, locale: ptBR })}

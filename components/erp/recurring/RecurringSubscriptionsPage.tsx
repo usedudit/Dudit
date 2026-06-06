@@ -31,6 +31,9 @@ import {
 import type { RecurringSubscription } from "@/lib/types/recurring"
 import { getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { formatFullDate } from "@/lib/utils"
+import { useErpExport } from "@/hooks/use-erp-export"
+import { ExportFileIcon } from "@/lib/icons"
+import { Button } from "@/components/reusable"
 
 const COLUMNS = [
   { id: "customer", label: "Cliente", align: "left" as const, width: "250px" },
@@ -52,6 +55,7 @@ export default function RecurringSubscriptionsPage({
   initialNextCursor: string | null
 }) {
   const { toast } = useToast()
+  const { exportData, isExporting } = useErpExport()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTablet = useMediaQuery("(max-width: 1024px)")
   const { canEdit } = usePermissions()
@@ -196,6 +200,18 @@ export default function RecurringSubscriptionsPage({
     }
   }, [page, totalPages, hasMore, loadingMore, loadMore])
 
+  const handleExport = useCallback(() => {
+    void exportData({
+      partnerId,
+      module: "subscriptions",
+      format: "xlsx",
+      filters: {
+        status: statusFilter,
+        search: debouncedSearch,
+      },
+    })
+  }, [exportData, partnerId, statusFilter, debouncedSearch])
+
   const statusVariant = (status: string) => {
     if (status === "active") return "green" as const
     if (status === "paused") return "orange" as const
@@ -227,6 +243,9 @@ export default function RecurringSubscriptionsPage({
               Acompanhe assinaturas ativas e o histórico de execuções automáticas de cobrança.
             </p>
           </div>
+          <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
+            {isExporting ? "Exportando..." : "Exportar"}
+          </Button>
         </div>
 
         {/* Tabs & Controls */}

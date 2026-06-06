@@ -12,6 +12,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { useErpExport } from "@/hooks/use-erp-export"
 
 // Actions
 import {
@@ -146,6 +147,7 @@ export default function ServicesPage({
     partner,
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
     const { toast } = useToast()
+    const { exportData, isExporting } = useErpExport()
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
@@ -269,6 +271,20 @@ export default function ServicesPage({
         !!filters.priceRange.max
 
     const isFiltered = search.length > 0 || hasActiveFilters
+
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "services",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                status: filters.status,
+                categories: filters.categories,
+            },
+        })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
 
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
@@ -534,7 +550,7 @@ export default function ServicesPage({
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => { }}
                                     onOpenImport={() => { }}
-                                    onOpenExport={() => { }}
+                                    onOpenExport={handleExport}
                                     onAddService={handleAddFirstService}
                                     filters={filters}
                                     setFilters={setFilters}

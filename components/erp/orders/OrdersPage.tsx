@@ -58,6 +58,7 @@ import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
 import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
+import { useErpExport } from "@/hooks/use-erp-export"
 
 // --- TYPES & INTERFACES ---
 
@@ -127,6 +128,7 @@ export default function OrdersPage({
     partnerId: string
 }) {
     const { toast } = useToast()
+    const { exportData, isExporting } = useErpExport()
     const { selectedStore, isLoading: storeLoading } = useStore()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const { profile: userProfile } = useUserProfile()
@@ -396,6 +398,21 @@ export default function OrdersPage({
         debouncedSearch.length > 0 ||
         isDatePeriodFilterActive(filters.datePeriod)
     const hasOrders = (effectiveOrders?.length || 0) > 0
+
+    const handleExport = useCallback(() => {
+        void exportData({
+            partnerId,
+            module: "orders",
+            format: "xlsx",
+            filters: {
+                search: debouncedSearch,
+                activeTab,
+                status: filters.status,
+                channels: filters.channel,
+                datePeriod: filters.datePeriod,
+            },
+        })
+    }, [exportData, partnerId, debouncedSearch, activeTab, filters])
 
     // Handlers
     const handleAddOrder = useCallback(() => {
@@ -797,8 +814,8 @@ export default function OrdersPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={() => { }}>
-                                        <ExportFileIcon className="w-[18px] h-[18px]" /> Exportar
+                                    <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+                                        <ExportFileIcon className="w-[18px] h-[18px]" /> {isExporting ? "Exportando..." : "Exportar"}
                                     </Button>
 
                                     <Button onClick={handleAddOrder} leftIcon={<PlusIcon size={18} />} >
@@ -814,7 +831,7 @@ export default function OrdersPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals({ filter: true })}
-                                    onExport={() => { }}
+                                    onExport={handleExport}
                                     onAddOrder={handleAddOrder}
                                     filters={filters}
                                     setFilters={setFilters as any}
