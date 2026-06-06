@@ -41,6 +41,10 @@ export type MarketplaceCheckoutDisplayLine = {
   paymentRequirement: string
   bookingSummary?: string | null
   allowedFulfillmentModes?: string[]
+  imageUrl?: string | null
+  baseName?: string | null
+  variantName?: string | null
+  bookingMetadata?: ServiceBookingMetadata | null
 }
 
 export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): MarketplaceCheckoutDisplayLine[] {
@@ -62,6 +66,10 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
       paymentRequirement: line.capabilities.paymentRequirement,
       bookingSummary,
       allowedFulfillmentModes: line.capabilities.fulfillmentModes || [],
+      imageUrl: line.imageUrl,
+      baseName: line.baseName,
+      variantName: line.variantName,
+      bookingMetadata: line.bookingMetadata,
     }
   })
 }

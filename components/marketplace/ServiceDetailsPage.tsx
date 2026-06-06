@@ -43,6 +43,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
+import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -632,6 +633,20 @@ export function ServiceDetailsPageClient({
         return dates[0].date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
     }, [dates])
 
+    const isClosedOnSelectedDate = useMemo(() => {
+        if (!selectedDate) return false
+        if (!partner.opening_hours) return false
+
+        const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+        const [year, month, day] = selectedDate.split("-").map(Number)
+        const dateObj = new Date(year, month - 1, day)
+        const dayOfWeek = DAYS_OF_WEEK[dateObj.getDay()]
+
+        const normalized = normalizeOpeningHours(partner.opening_hours)
+        const daySchedule = normalized[dayOfWeek]
+        return daySchedule ? !daySchedule.enabled : false
+    }, [selectedDate, partner.opening_hours])
+
     // ─── Fetch slots on date/staff change ─────────────────────────────────────
 
     useEffect(() => {
@@ -767,7 +782,7 @@ export function ServiceDetailsPageClient({
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
             return
         }
-        if (!selectedDate || !selectedTime || !selectedStaffId) {
+        if (schedulingEnabled && (!selectedDate || !selectedTime || !selectedStaffId)) {
             notifyError("Erro", "Selecione data, horário e profissional.")
             return
         }
@@ -775,13 +790,22 @@ export function ServiceDetailsPageClient({
         setIsBooking(true)
         try {
             const { token } = await (await fetch("/api/csrf-token")).json()
-            const result = await addServiceBookingToCartAction({
-                ...buildBookingPayload(),
-                csrf_token: token,
-            })
+            let result
+            if (schedulingEnabled) {
+                result = await addServiceBookingToCartAction({
+                    ...buildBookingPayload(),
+                    csrf_token: token,
+                })
+            } else {
+                result = await addPurchasableServiceToCartAction({
+                    serviceId: service.id,
+                    partnerId: partner.id,
+                    csrf_token: token,
+                })
+            }
             if (result.success) {
                 invalidateCartCache()
-                notifySuccess("Adicionado à sacola", "O agendamento foi adicionado à sacola.")
+                notifySuccess("Adicionado à sacola", "O serviço foi adicionado à sacola.")
             } else {
                 notifyError("Erro", result.error || "Não foi possível adicionar à sacola.")
             }
@@ -790,7 +814,7 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, notifySuccess, notifyError])
+    }, [userId, router, schedulingEnabled, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service.id, partner.id, notifySuccess, notifyError])
 
     // ─── Booking Panel ────────────────────────────────────────────────────────
 
@@ -798,9 +822,7 @@ export function ServiceDetailsPageClient({
         <div className="bg-white relative">
             {/* Service Info Header */}
             <div className="flex items-center gap-2 mb-4">
-                <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">{categoryName}</span>
-                <span className="text-gray-300 text-xs">|</span>
-                <span className="text-[13px] font-semibold text-brand-inactive-text">
+                <span className="text-[11px] font-bold text-brand-dark bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
                     {service.service_type === "online" ? "Remoto" : service.service_type === "hybrid" ? "Híbrido" : "Presencial"}
                 </span>
                 <span className="text-gray-300 text-xs">|</span>
@@ -870,7 +892,7 @@ export function ServiceDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     ver opções de pagamento
                                 </Button>
                             </div>
@@ -888,7 +910,7 @@ export function ServiceDetailsPageClient({
                                     </p>
                                     <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     ver opções de pagamento
                                 </Button>
                             </div>
@@ -909,7 +931,7 @@ export function ServiceDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     ver opções de pagamento
                                 </Button>
                             </div>
@@ -922,7 +944,7 @@ export function ServiceDetailsPageClient({
                             <p className="text-3xl leading-none font-bold text-brand-dark">
                                 {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix}
                             </p>
-                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
+                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                 ver opções de pagamento
                             </Button>
                         </div>
@@ -941,7 +963,7 @@ export function ServiceDetailsPageClient({
             </div>
 
             {/* ── Staff Selection ── */}
-            {showPrice && staff.length > 0 && (
+            {showPrice && schedulingEnabled && staff.length > 0 && (
                 <div className="mb-6">
                     <label className="block text-sm font-bold text-brand-dark mb-3">Profissional</label>
                     <div className="flex flex-wrap gap-2">
@@ -964,144 +986,152 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── Date Selection ── */}
-            {showPrice && (
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                    <label className="text-sm font-bold text-brand-dark capitalize">{currentMonth}</label>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
-                            disabled={weekOffset === 0}
-                            className="text-brand-inactive-text hover:text-brand-dark disabled:opacity-30 transition-colors"
-                        >
-                            <ChevronLeftIcon size={16} />
-                        </button>
-                        <button
-                            onClick={() => setWeekOffset(weekOffset + 1)}
-                            className="text-brand-dark transition-colors"
-                        >
-                            <ChevronRightIcon size={16} />
-                        </button>
+            {showPrice && schedulingEnabled && (
+                <div className="mb-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <label className="text-sm font-bold text-brand-dark capitalize">{currentMonth}</label>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
+                                disabled={weekOffset === 0}
+                                className="text-brand-inactive-text hover:text-brand-dark disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronLeftIcon size={16} />
+                            </button>
+                            <button
+                                onClick={() => setWeekOffset(weekOffset + 1)}
+                                className="text-brand-dark transition-colors"
+                            >
+                                <ChevronRightIcon size={16} />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        {dates.map((d) => {
+                            const isSelected = selectedDate === d.dateStr
+                            return (
+                                <div
+                                    key={d.dateStr}
+                                    className="flex flex-col gap-2 cursor-pointer group items-center"
+                                    onClick={() => { setSelectedDate(d.dateStr); setSelectedTime("") }}
+                                >
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${isSelected
+                                        ? "bg-brand-dark text-white"
+                                        : "text-brand-dark border border-gray-200 hover:border-brand-dark"
+                                        }`}>
+                                        {d.num}
+                                    </div>
+                                    <span className={`text-xs font-medium ${isSelected ? "text-brand-dark" : "text-brand-inactive-text"
+                                        }`}>
+                                        {d.day}
+                                    </span>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
-                <div className="flex justify-between items-center">
-                    {dates.map((d) => {
-                        const isSelected = selectedDate === d.dateStr
-                        return (
-                            <div
-                                key={d.dateStr}
-                                className="flex flex-col gap-2 cursor-pointer group items-center"
-                                onClick={() => { setSelectedDate(d.dateStr); setSelectedTime("") }}
-                            >
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${isSelected
-                                    ? "bg-brand-dark text-white"
-                                    : "text-brand-dark border border-gray-200 hover:border-brand-dark"
-                                    }`}>
-                                    {d.num}
-                                </div>
-                                <span className={`text-xs font-medium ${isSelected ? "text-brand-dark" : "text-brand-inactive-text"
-                                    }`}>
-                                    {d.day}
-                                </span>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
             )}
 
             {/* ── Time Slots ── */}
-            {showPrice && (
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                    <label className="text-sm font-bold text-brand-dark">Horários disponíveis</label>
-                </div>
+            {showPrice && schedulingEnabled && (
+                <div className="mb-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <label className="text-sm font-bold text-brand-dark">Horários disponíveis</label>
+                    </div>
 
-                {!selectedDate ? (
-                    <div className="text-center py-8">
-                        <IconPlaceholder
-                            icon={CalendarIcon}
-                            title="Selecione uma data"
-                            subtitle="Escolha uma data acima para ver os horários."
-                        />
-                    </div>
-                ) : isLoadingSlots ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-3">
-                        <div className="w-6 h-6 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
-                        <span className="text-sm text-brand-inactive-text font-medium">Verificando disponibilidade...</span>
-                    </div>
-                ) : availableSlots.length === 0 ? (
-                    <div className="text-center py-8">
-                        <IconPlaceholder
-                            icon={CalendarIcon}
-                            title="Nenhum horário disponível"
-                            subtitle="Tente outra data ou outro profissional."
-                        />
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {availableSlots.map((slot) => (
-                            <button
-                                key={slot}
-                                onClick={() => setSelectedTime(slot)}
-                                className={`p-2.5 rounded-xl border text-sm font-bold transition-all text-center ${selectedTime === slot
-                                    ? "border-brand-dark bg-brand-dark text-white"
-                                    : "border-brand-border hover:border-gray-300 text-brand-dark"
-                                    }`}
-                            >
-                                {slot}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
+                    {!selectedDate ? (
+                        <div className="text-center py-8">
+                            <IconPlaceholder
+                                icon={CalendarIcon}
+                                title="Selecione uma data"
+                                subtitle="Escolha uma data acima para ver os horários."
+                            />
+                        </div>
+                    ) : isLoadingSlots ? (
+                        <div className="flex flex-col items-center justify-center py-10 gap-3">
+                            <div className="w-6 h-6 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                            <span className="text-sm text-brand-inactive-text font-medium">Verificando disponibilidade...</span>
+                        </div>
+                    ) : isClosedOnSelectedDate ? (
+                        <div className="text-center py-8">
+                            <IconPlaceholder
+                                icon={CalendarIcon}
+                                title="Não é possível agendar neste dia"
+                                subtitle="Este estabelecimento não abre neste dia."
+                            />
+                        </div>
+                    ) : availableSlots.length === 0 ? (
+                        <div className="text-center py-8">
+                            <IconPlaceholder
+                                icon={CalendarIcon}
+                                title="Nenhum horário disponível"
+                                subtitle="Tente outra data ou outro profissional."
+                            />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {availableSlots.map((slot) => (
+                                <button
+                                    key={slot}
+                                    onClick={() => setSelectedTime(slot)}
+                                    className={`p-2.5 rounded-xl border text-sm font-bold transition-all text-center ${selectedTime === slot
+                                        ? "border-brand-dark bg-brand-dark text-white"
+                                        : "border-brand-border hover:border-gray-300 text-brand-dark"
+                                        }`}
+                                >
+                                    {slot}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* ── Selected Summary ── */}
-            {showPrice && (
-            <AnimatePresence>
-                {selectedTime && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                    >
-                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 mb-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <CheckCircleIcon size={16} className="text-brand-green" />
-                                <span className="text-sm font-bold text-brand-dark">Resumo do agendamento</span>
-                            </div>
-                            <div className="space-y-1.5 text-sm text-brand-inactive-text">
-                                <div className="flex justify-between">
-                                    <span>Profissional</span>
-                                    <span className="font-bold text-brand-dark">{selectedStaff?.name}</span>
+            {showPrice && schedulingEnabled && (
+                <AnimatePresence>
+                    {selectedTime && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 mb-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <CheckCircleIcon size={16} className="text-brand-green" />
+                                    <span className="text-sm font-bold text-brand-dark">Resumo do agendamento</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span>Data</span>
-                                    <span className="font-bold text-brand-dark">
-                                        {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Horário</span>
-                                    <span className="font-bold text-brand-dark">{selectedTime}</span>
-                                </div>
-                                {(!service.billing_unit || service.billing_unit === 'per_service') && (
+                                <div className="space-y-1.5 text-sm text-brand-inactive-text">
                                     <div className="flex justify-between">
-                                        <span>Duração</span>
-                                        <span className="font-bold text-brand-dark">{formatDuration(durationMinutes)}</span>
+                                        <span>Profissional</span>
+                                        <span className="font-bold text-brand-dark">{selectedStaff?.name}</span>
                                     </div>
-                                )}
-                                <div className="flex justify-between pt-2 border-t border-emerald-200 mt-2">
-                                    <span className="font-bold text-brand-dark">Valor</span>
-                                    <span className="font-bold text-brand-dark text-base">{pricePrefix}{formatCurrency(price)}{billingSuffix}</span>
+                                    <div className="flex justify-between">
+                                        <span>Data</span>
+                                        <span className="font-bold text-brand-dark">
+                                            {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Horário</span>
+                                        <span className="font-bold text-brand-dark">{selectedTime}</span>
+                                    </div>
+                                    {(!service.billing_unit || service.billing_unit === 'per_service') && (
+                                        <div className="flex justify-between">
+                                            <span>Duração</span>
+                                            <span className="font-bold text-brand-dark">{formatDuration(durationMinutes)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between pt-2 border-t border-emerald-200 mt-2">
+                                        <span className="font-bold text-brand-dark">Valor</span>
+                                        <span className="font-bold text-brand-dark text-base">{pricePrefix}{formatCurrency(price)}{billingSuffix}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             )}
 
             {/* ── CTA Buttons ── */}
@@ -1126,150 +1156,96 @@ export function ServiceDetailsPageClient({
                     })()}
                 </div>
             ) : (
-            <div className="hidden lg:block space-y-2 mb-4">
-                <Button
-                    disabled={(schedulingEnabled && !selectedTime) || isBooking}
-                    onClick={handleBookNowCheckout}
-                    className="w-full h-[46px]"
-                >
-                    {isBooking ? (
-                        <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Redirecionando...
-                        </span>
-                    ) : schedulingEnabled && !selectedTime ? (
-                        "Selecione um horário"
+                <div className="hidden lg:block space-y-2 mb-4">
+                    {schedulingEnabled ? (
+                        <>
+                            <Button
+                                disabled={(schedulingEnabled && !selectedTime) || isBooking}
+                                onClick={handleBookNowCheckout}
+                                className="w-full h-[46px]"
+                            >
+                                {isBooking ? (
+                                    <span className="flex items-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Redirecionando...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        <CalendarIcon size={18} />
+                                        Reservar agora
+                                    </span>
+                                )}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                disabled={!selectedTime || isBooking}
+                                onClick={handleAddBookingToCart}
+                                className="w-full h-[46px]"
+                            >
+                                Adicionar à sacola
+                            </Button>
+                        </>
                     ) : (
-                        <span className="flex items-center gap-2">
-                            <CalendarIcon size={18} />
-                            Reservar agora
-                        </span>
+                        <>
+                            <Button
+                                disabled={isBooking}
+                                onClick={handleAddBookingToCart}
+                                className="w-full h-[46px]"
+                            >
+                                {isBooking ? (
+                                    <span className="flex items-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Adicionando...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        Adicionar à sacola
+                                    </span>
+                                )}
+                            </Button>
+                            {(() => {
+                                const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                                const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                                const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber mais informações.`)
+                                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                                return (
+                                    <a
+                                        href={whatsappUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full h-[46px] flex items-center justify-center gap-2 border border-brand-green text-brand-green hover:bg-green-50 font-bold rounded-lg transition-colors text-sm"
+                                    >
+                                        <WhatsappIcon size={18} className="fill-brand-green" />
+                                        Saber mais sobre
+                                    </a>
+                                )
+                            })()}
+                        </>
                     )}
-                </Button>
-                {schedulingEnabled && (
-                    <Button
-                        variant="outline"
-                        disabled={!selectedTime || isBooking}
-                        onClick={handleAddBookingToCart}
-                        className="w-full h-[46px]"
-                    >
-                        Adicionar à sacola
-                    </Button>
-                )}
-            </div>
+                </div>
             )}
 
-            {/* Shipping */}
+            {/* Realization Location */}
             {!isProductOwner && (
-                <FormSection title="Entrega" className="mt-6 mb-6">
-                    <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden">
-                        {/* CEP Input or User Address */}
-                        {userId ? (
-                            loadingAddresses ? (
-                                <div className="p-4 bg-brand-gray/10 text-center text-xs text-brand-inactive-text animate-pulse">
-                                    Carregando endereços...
-                                </div>
-                            ) : userAddresses.length > 0 && selectedAddress ? (
-                                <div className="flex items-center justify-between w-full p-4 bg-brand-gray/10">
-                                    <div className="flex items-stretch gap-3">
-                                        <img
-                                            src="https://img.dudit.com.br/static/Map.png"
-                                            alt="Endereço de entrega"
-                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                        />
-                                        <div className="flex flex-col justify-center">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                            <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
-                                                {selectedAddress.street}, {selectedAddress.number}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
-                                        Trocar
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="p-4 bg-brand-gray/10 flex flex-col items-center justify-center text-center gap-2">
-                                    <p className="text-xs text-brand-inactive-text">Nenhum endereço cadastrado</p>
-                                    <Button variant="outline" size="sm" className="h-8 border-brand-green text-brand-green hover:bg-green-50" onClick={() => setShowAddressForm(true)}>
-                                        Cadastrar endereço
-                                    </Button>
-                                </div>
-                            )
-                        ) : (
-                            <div className="p-4 bg-brand-gray/10">
-                                <CepInput
-                                    value={cep}
-                                    onChange={setCep}
-                                    className="bg-white"
-                                    label="Calcular entrega"
-                                />
+                <FormSection title="Local de realização do serviço" className="mt-6 mb-6">
+                    <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden p-5 gap-3.5 shadow-sm">
+                        {(!service.fulfillment_modes || service.fulfillment_modes.length === 0) && (
+                            <div className="flex items-center gap-2 text-sm text-brand-inactive-text">
+                                <span>Não especificado</span>
                             </div>
                         )}
-
-                        <Separator className="opacity-60" />
-
-                        {/* Delivery Option if configured */}
-                        {deliveryConfig?.settings?.isDeliveryEnabled ? (
-                            <>
-                                <div className="flex justify-between items-start py-4 px-4">
-                                    <div>
-                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pela loja</p>
-                                        {deliveryLoading ? (
-                                            <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
-                                        ) : deliveryError ? (
-                                            <p className="text-xs text-red-500">{deliveryError}</p>
-                                        ) : calculatedAddress ? (
-                                            <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
-                                        ) : (
-                                            <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
-                                        )}
-                                    </div>
-                                    <div className="text-right">
-                                        {deliveryLoading ? (
-                                            <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
-                                        ) : deliveryFee !== null ? (
-                                            <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
-                                                {deliveryFee > 0 ? formatCurrency(deliveryFee) : "Grátis"}
-                                            </p>
-                                        ) : (
-                                            <p className="text-sm font-semibold text-brand-inactive-text">-</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <Separator className="opacity-60" />
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex justify-between items-start py-4 px-4">
-                                    <div>
-                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
-                                        <p className="text-xs text-brand-inactive-text">Fale com o profissional no WhatsApp após o pedido</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
-                                    </div>
-                                </div>
-
-                                <Separator className="opacity-60" />
-                            </>
+                        {service.fulfillment_modes?.includes("on_site") && (
+                            <div className="flex items-center gap-3 text-sm text-brand-dark font-medium">
+                                <CheckCircleIcon size={18} className="text-brand-green fill-brand-green/10" />
+                                <span>No estabelecimento/local do vendedor</span>
+                            </div>
                         )}
-
-                        {/* Retirar no local - Always show if store exists */}
-                        <div className="flex justify-between items-start py-4 px-4">
-                            <div>
-                                <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                                {preparationEstimate && (Number(service.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                    <p className="text-xs text-brand-inactive-text">
-                                        Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                )}
+                        {service.fulfillment_modes?.includes("customer_location") && (
+                            <div className="flex items-center gap-3 text-sm text-brand-dark font-medium">
+                                <CheckCircleIcon size={18} className="text-brand-green fill-brand-green/10" />
+                                <span>No endereço do cliente</span>
                             </div>
-                            <div className="text-right">
-                                <p className="text-sm font-bold text-brand-green">Grátis</p>
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </FormSection>
             )}
@@ -1906,7 +1882,7 @@ export function ServiceDetailsPageClient({
                                         <div className="text-center shrink-0">
                                             <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
                                             <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                                            <p className="text-xs text-brand-inactive-text">média de {reviews.length} avaliações</p>
+                                            <p className="text-xs text-brand-inactive-text">Média de {reviews.length} avaliações</p>
                                         </div>
                                         <div className="flex-1 space-y-2">
                                             {[5, 4, 3, 2, 1].map((star) => {
@@ -1995,26 +1971,55 @@ export function ServiceDetailsPageClient({
                                         {formatCurrency(pricing.pixDiscountPercent > 0 ? pricing.current * (1 - pricing.pixDiscountPercent / 100) : pricing.current)}
                                     </span>
                                     <span className="text-xs text-brand-inactive-text truncate">
-                                        {pricing.pixDiscountPercent > 0 ? "no Pix" : formatDuration(durationMinutes)}
+                                        {pricing.pixDiscountPercent > 0 ? "no Pix" : schedulingEnabled ? formatDuration(durationMinutes) : ""}
                                     </span>
                                 </div>
-                                {schedulingEnabled && (
-                                    <Button
-                                        variant="outline"
-                                        className="rounded-full px-3"
-                                        disabled={!selectedTime || isBooking}
-                                        onClick={handleAddBookingToCart}
-                                    >
-                                        Sacola
-                                    </Button>
+                                {schedulingEnabled ? (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            className="rounded-full px-3"
+                                            disabled={!selectedTime || isBooking}
+                                            onClick={handleAddBookingToCart}
+                                        >
+                                            Sacola
+                                        </Button>
+                                        <Button
+                                            className="flex-1 rounded-full min-w-[120px]"
+                                            disabled={(schedulingEnabled && !selectedTime) || isBooking}
+                                            onClick={handleBookNowCheckout}
+                                        >
+                                            {isBooking ? "..." : "Reservar"}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {(() => {
+                                            const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                                            const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                                            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" no Dudit e gostaria de saber mais informações.`)
+                                            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                                            return (
+                                                <a
+                                                    href={whatsappUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-[44px] h-[44px] flex items-center justify-center border border-brand-green text-brand-green hover:bg-green-50 rounded-full shrink-0"
+                                                    title="Saber mais"
+                                                >
+                                                    <WhatsappIcon size={20} className="fill-brand-green" />
+                                                </a>
+                                            )
+                                        })()}
+                                        <Button
+                                            className="flex-1 rounded-full min-w-[120px]"
+                                            disabled={isBooking}
+                                            onClick={handleAddBookingToCart}
+                                        >
+                                            {isBooking ? "..." : "Adicionar à sacola"}
+                                        </Button>
+                                    </>
                                 )}
-                                <Button
-                                    className="flex-1 rounded-full min-w-[120px]"
-                                    disabled={(schedulingEnabled && !selectedTime) || isBooking}
-                                    onClick={handleBookNowCheckout}
-                                >
-                                    {isBooking ? "..." : schedulingEnabled && !selectedTime ? "Horário" : "Reservar"}
-                                </Button>
                             </>
                         )}
                     </div>

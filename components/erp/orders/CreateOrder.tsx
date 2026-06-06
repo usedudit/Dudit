@@ -515,6 +515,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         sku: item.product_variants?.sku || item.sku || item.product?.sku || item.products?.sku || "",
                         stock: Number(item.product_variants?.stock_available ?? item.product_variants?.stock_quantity ?? item.products?.stock_available ?? item.products?.stock_quantity ?? 0),
                         allowSellWithoutStock: Boolean(item.products?.allow_sell_without_stock),
+                        unit: item.products?.unit || item.product?.unit || null,
                         isEditing: false,
                         isManual: !item.product_id
                     })))
@@ -734,6 +735,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 sku: product.sku,
                 stock: Number(product.stock || 0),
                 allowSellWithoutStock: Boolean(product.allow_sell_without_stock),
+                unit: product.unit || null,
                 isEditing: false,
                 isManual: false
             }
@@ -768,6 +770,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     sku: variant.sku || selectedProductForVariant.sku,
                     stock: Number(variant.stock || 0),
                     allowSellWithoutStock: Boolean(selectedProductForVariant.allow_sell_without_stock),
+                    unit: selectedProductForVariant.unit || null,
                     isEditing: false,
                     isManual: false
                 }

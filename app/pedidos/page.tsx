@@ -26,7 +26,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     return_requests!order_id(id, request_type, status),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
-      products(id, name, images, video_thumbnail),
+      products(id, name, images, video_thumbnail, unit),
       services(id, name, images),
       recurring_plans(id, name))
   `

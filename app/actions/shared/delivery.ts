@@ -78,6 +78,10 @@ export async function upsertPartnerDeliveryConfigAction(input: {
     freeDeliveryThreshold: input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold)),
   }
 
+  if (!normalized.isDeliveryEnabled && !normalized.isPickupEnabled) {
+    return { success: false as const, error: "Você deve manter ativo pelo menos um método de entrega (Entrega ou Retirada)." }
+  }
+
   const { error } = await supabase.from("delivery_settings").upsert({
     partner_id: input.partnerId,
     base_fee: normalized.baseFee,

@@ -25,6 +25,22 @@ const getStatusConfig = (status: string) => {
     }
 };
 
+const formatProductQuantity = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} un.`;
+    }
+    return `${qty} ${unit}`;
+};
+
+const formatProductUnitPrice = (price: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return formatCurrency(price);
+    }
+    return `${formatCurrency(price)}/${unit}`;
+};
+
 export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {
     const searchParams = useSearchParams();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
@@ -191,7 +207,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                         const storeImage = order.partners?.store_image_url
                                             ? getR2ImageUrl(order.partners.store_image_url)
                                             : "https://img.dudit.com.br/static/Placeholder.png";
-                                        
+
                                         const orderItems = order.order_items || [];
                                         const reviewableItems = orderItems.filter((item: any) => item.product_id || item.service_id);
                                         const unreviewedItems = reviewableItems.filter((item: any) => !reviewedItemsSet.has(`${order.id}:${item.product_id || item.service_id}`));
@@ -292,9 +308,9 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                                 )}
 
                                                                                 <div className="flex items-center gap-2 text-xs mt-1">
-                                                                                    <span className="text-brand-inactive-text">{item.quantity} un.</span>
+                                                                                    <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                     <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{formatCurrency(item.product_price)}</span>
+                                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(item.product_price, item.products?.unit)}</span>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -329,7 +345,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                         </div>
 
                                                         {/* Right Side: Actions */}
-                                                        <div className="flex flex-row items-center flex-wrap justify-end">
+                                                        <div className="flex flex-row items-center flex-wrap justify-end gap-3">
                                                             {isOrderFullyReviewed && (
                                                                 <span className="text-xs sm:text-sm font-medium text-brand-green flex items-center gap-1.5">
                                                                     <CheckCircleIcon size={16} /> Pedido avaliado

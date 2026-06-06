@@ -102,10 +102,10 @@ export const SplitPaymentCard: React.FC<SplitPaymentCardProps> = ({
         <div className="text-right shrink-0 max-w-[50%]">
             {recalculatedAmount ? (
                 <>
-                    <div className="text-[9px] uppercase font-semibold text-brand-inactive-text">Base</div>
+                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Base</div>
                     <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>
-                    <div className="text-[9px] uppercase font-semibold text-brand-inactive-text mt-0.5">A cobrar</div>
-                    <span className="font-bold text-sm text-brand-green dark:text-green-400 block">{recalculatedAmount}</span>
+                    <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">A cobrar</div>
+                    <span className="font-bold text-sm text-brand-green block">{recalculatedAmount}</span>
                 </>
             ) : (
                 <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">{amount}</span>

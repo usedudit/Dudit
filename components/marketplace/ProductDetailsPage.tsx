@@ -28,6 +28,14 @@ import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
+const getQuantityLabel = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} unidade${qty !== 1 ? "s" : ""}`;
+    }
+    return `${qty} ${unit}`;
+};
+
 interface ProductDetailsPageClientProps {
     product: any
     variants: any[]
@@ -874,7 +882,7 @@ export function ProductDetailsPageClient({
                     <FormDropdown
                         options={isOutOfStock ? [] : [
                             ...Array.from({ length: Math.min(5, MAX_STOCK) }, (_, i) => ({
-                                value: String(i + 1), label: `${i + 1} unidade${i > 0 ? "s" : ""}`,
+                                value: String(i + 1), label: getQuantityLabel(i + 1, product.unit),
                             })),
                             ...(MAX_STOCK > 5 ? [{ value: "other", label: "Outra quantidade" }] : [])
                         ]}
@@ -961,7 +969,7 @@ export function ProductDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.current)} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 block text-left px-0 py-0">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 block text-left px-0 py-0">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -979,7 +987,7 @@ export function ProductDetailsPageClient({
                                     </p>
                                     <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 px-0 py-0 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -1000,7 +1008,7 @@ export function ProductDetailsPageClient({
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.original)} em outros meios
                                 </p>
-                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-1 px-0 py-0 block text-left">
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     Ver opções de pagamento
                                 </Button>
                             </div>
@@ -1013,7 +1021,7 @@ export function ProductDetailsPageClient({
                             <p className="text-3xl leading-none font-bold text-brand-dark">
                                 {formatMoney(pricing.current)}
                             </p>
-                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium mt-3 px-0 py-0 block text-left">
+                            <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                 Ver opções de pagamento
                             </Button>
                         </div>
@@ -1456,7 +1464,7 @@ export function ProductDetailsPageClient({
                                 className="text-center text-lg font-bold"
                             />
                             <p className="text-[11px] text-brand-inactive-text mt-2 text-center">
-                                Limite disponível: <span className="font-bold">{MAX_STOCK} unidades</span>
+                                Limite disponível: <span className="font-bold">{getQuantityLabel(MAX_STOCK, product.unit)}</span>
                             </p>
                         </div>
                         <Button
@@ -1875,7 +1883,7 @@ export function ProductDetailsPageClient({
                                         <div className="text-center shrink-0">
                                             <p className="text-5xl font-black text-brand-dark leading-none mb-2">{avgRating.toFixed(1)}</p>
                                             <div className="flex justify-center mb-1.5"><StarRow rating={avgRating} size={14} /></div>
-                                            <p className="text-xs text-brand-inactive-text">média de {reviews.length} avaliações</p>
+                                            <p className="text-xs text-brand-inactive-text">Média de {reviews.length} avaliações</p>
                                         </div>
                                         <div className="flex-1 space-y-2">
                                             {[5, 4, 3, 2, 1].map((star) => {

@@ -13,7 +13,7 @@ export default async function AdminReturnsPage({ searchParams }: { searchParams?
             <div className="p-4 md:p-6 space-y-4">
                 <div className="rounded-xl border border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                     <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                        Fila administrativa com cliente, seller, origem, valores, evidencias, linha do tempo e acoes financeiras geradas.
+                        Fila administrativa com cliente, seller, origem, valores, evidencias, linha do tempo e ações financeiras geradas.
                     </p>
                     <p className="mt-2 text-xs text-brand-inactive-text dark:text-dark-body">
                         Dica: use query params como <span className="font-mono">?status=APPROVED</span>, <span className="font-mono">?type=exchange</span> ou <span className="font-mono">?source=marketplace</span>.

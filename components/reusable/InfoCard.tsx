@@ -11,46 +11,46 @@ interface InfoCardProps {
 
 const colorMap: Record<InfoCardColor, { bg: string; text: string; bar: string; border: string }> = {
   orange: {
-    bg: "bg-brand-orange/10",
-    text: "text-brand-orange",
-    bar: "bg-brand-orange",
-    border: "border-brand-border"
+    bg: "bg-[#fff7ed] dark:bg-orange-900/20",
+    text: "text-orange-700 dark:text-orange-300/80",
+    bar: "bg-orange-500",
+    border: "border-orange-100 dark:border-orange-900/30"
   },
   green: {
-    bg: "bg-brand-green/10",
-    text: "text-brand-green",
-    bar: "bg-brand-green",
-    border: "border-brand-border"
+    bg: "bg-[#ecfdf5] dark:bg-emerald-900/20",
+    text: "text-emerald-900 dark:text-emerald-100",
+    bar: "bg-emerald-500",
+    border: "border-emerald-100 dark:border-emerald-900/30"
   },
   gray: {
     bg: "bg-brand-gray dark:bg-brand-border/50",
     text: "text-brand-dark dark:text-dark-heading",
     bar: "bg-brand-border dark:bg-dark-border/50",
-    border: "border-brand-border dark:border-dark-border"
+    border: "border-gray-200 dark:border-gray-700"
   },
   red: {
-    bg: "bg-brand-red/10 dark:bg-brand-red-light",
-    text: "text-brand-red",
-    bar: "bg-brand-red",
-    border: "border-brand-border"
+    bg: "bg-red-50 dark:bg-red-900/10",
+    text: "text-red-700 dark:text-red-300/80",
+    bar: "bg-red-400",
+    border: "border-red-100 dark:border-red-900/30"
   },
   yellow: {
-    bg: "bg-brand-yellow/10",
-    text: "text-brand-yellow",
-    bar: "bg-brand-yellow",
-    border: "border-brand-border"
+    bg: "bg-yellow-50 dark:bg-yellow-900/10",
+    text: "text-yellow-900 dark:text-yellow-300/80",
+    bar: "bg-yellow-500",
+    border: "border-yellow-100 dark:border-yellow-900/30"
   },
   blue: {
-    bg: "bg-blue-500/10",
-    text: "text-blue-600",
-    bar: "bg-blue-600",
-    border: "border-brand-border"
+    bg: "bg-blue-50 dark:bg-blue-900/20",
+    text: "text-blue-700 dark:text-blue-300/80",
+    bar: "bg-blue-500",
+    border: "border-blue-100 dark:border-blue-900/30"
   },
   purple: {
-    bg: "bg-purple-500/10",
-    text: "text-purple-600",
-    bar: "bg-purple-600",
-    border: "border-brand-border"
+    bg: "bg-purple-50 dark:bg-purple-900/10",
+    text: "text-purple-700 dark:text-purple-300/80",
+    bar: "bg-purple-500",
+    border: "border-purple-100 dark:border-purple-900/30"
   },
 }
 

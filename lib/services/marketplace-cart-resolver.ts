@@ -44,6 +44,9 @@ export type ResolvedCartLine = {
   fulfillmentMode: LineFulfillmentMode | null
   lineRequiresDelivery: boolean
   capabilities: CatalogCapabilities
+  imageUrl: string | null
+  baseName: string
+  variantName: string | null
 }
 
 export type ResolveCartResult =
@@ -86,9 +89,9 @@ export async function resolveCheckoutCartLines(
     .select(`
       id, user_id, partner_id, item_type, product_id, variant_id, service_id,
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
-      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes),
+      products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
-      services(id, name, price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes),
+      services(id, name, price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images),
       recurring_plans(
         id, name, status, show_in_marketplace,
         recurring_plan_items(
@@ -219,6 +222,9 @@ export async function resolveCheckoutCartLines(
         fulfillmentMode,
         lineRequiresDelivery: fulfillmentMode === "delivery",
         capabilities: caps,
+        imageUrl: product.images?.[0] || null,
+        baseName: product.name,
+        variantName: (variantId && row.product_variants) ? row.product_variants.variant_name : null,
       })
       continue
     }
@@ -257,13 +263,14 @@ export async function resolveCheckoutCartLines(
       }
 
       const subtotal = unitPrice * qty
+      const lineName = meta.instantPurchase ? service.name : `${service.name} — ${formatDateToBR(meta.date)} ${meta.time}`
       const fulfillmentLine: CheckoutFulfillmentLine = {
         cartItemId: row.id,
         itemType: "service_booking",
         serviceId: row.service_id,
         quantity: qty,
         unitPrice,
-        lineName: `${service.name} — ${formatDateToBR(meta.date)} ${meta.time}`,
+        lineName,
         fulfillmentMode,
         bookingMetadata: meta,
         payDepositOnly,
@@ -277,7 +284,7 @@ export async function resolveCheckoutCartLines(
         partnerId,
         quantity: qty,
         unitPrice,
-        lineName: fulfillmentLine.lineName,
+        lineName,
         serviceId: row.service_id,
         bookingMetadata: meta,
         payDepositOnly,
@@ -291,7 +298,7 @@ export async function resolveCheckoutCartLines(
         orderItemRow: {
           product_id: null,
           variant_id: null,
-          product_name: fulfillmentLine.lineName,
+          product_name: lineName,
           product_price: unitPrice,
           quantity: qty,
           subtotal,
@@ -305,6 +312,9 @@ export async function resolveCheckoutCartLines(
         fulfillmentMode,
         lineRequiresDelivery: fulfillmentMode === "customer_location",
         capabilities: caps,
+        imageUrl: service.images?.[0] || null,
+        baseName: service.name,
+        variantName: null,
       })
       continue
     }
@@ -397,6 +407,9 @@ export async function resolveCheckoutCartLines(
         fulfillmentMode,
         lineRequiresDelivery: fulfillmentMode === "delivery",
         capabilities: caps,
+        imageUrl: null,
+        baseName: planRow.name || "Assinatura",
+        variantName: null,
       })
     }
   }

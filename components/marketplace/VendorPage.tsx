@@ -277,6 +277,17 @@ const CardBrands = ({ brands }: { brands: string[] }) => {
     )
 }
 
+function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
+    return (
+        <div className="flex gap-0.5">
+            {[...Array(5)].map((_, i) => (
+                <StarIcon key={i} size={size} strokeWidth={0}
+                    className={i < Math.round(rating) ? "text-brand-green fill-brand-green" : "text-gray-300 fill-gray-300"} />
+            ))}
+        </div>
+    )
+}
+
 const InfoTab = ({ partner, stats }: any) => {
     const hoursList = formatOpeningHoursList(partner.openingHours)
     const paymentMethodsArr = (partner.paymentMethods || []).filter(isPaymentActive)
@@ -378,13 +389,13 @@ const ReviewsTab = ({ partner, stats, ratingDistribution, reviews }: any) => {
         <div className="pb-10 animate-fade-in">
             {hasReviews ? (
                 <>
-                    <div className="bg-brand-gray rounded-[16px] p-5 mb-10 flex items-center justify-between max-w-[800px]">
-                        <div className="flex flex-col items-center">
-                            <span className="text-[48px] font-semibold text-brand-dark leading-none">{formatNumber(partner.rating, 1, 1)}</span>
-                            <RatingInline rating={partner.rating} reviewsCount={stats.reviewsCount} />
-                            <span className="text-[13px] text-brand-inactive-text font-medium mt-2">media de {stats.reviewsCount} avaliações</span>
+                    <div className="border border-brand-border rounded-xl p-5 mb-8 flex gap-8 items-center">
+                        <div className="text-center shrink-0">
+                            <p className="text-5xl font-black text-brand-dark leading-none mb-2">{partner.rating.toFixed(1)}</p>
+                            <div className="flex justify-center mb-1.5"><StarRow rating={stats.reviewsCount} size={14} /></div>
+                            <p className="text-xs text-brand-inactive-text">Média de {stats.reviewsCount} avaliações</p>
                         </div>
-                        <div className="flex-1 ml-10 space-y-1.5">
+                        <div className="flex-1 space-y-2">
                             {ratingDistribution.map((row: any) => (
                                 <div key={row.star} className="flex items-center gap-3">
                                     <span className="text-[12px] text-brand-inactive-text w-2">{row.star}</span>

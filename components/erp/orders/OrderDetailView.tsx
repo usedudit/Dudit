@@ -38,6 +38,74 @@ import { parseAddressString } from "./CreateOrder"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import BottomSheet from "@/components/BottomSheet"
 
+const formatProductQuantity = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} un.`;
+    }
+    return `${qty} ${unit}`;
+};
+
+const formatProductUnitPrice = (price: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return formatCurrency(price);
+    }
+    return `${formatCurrency(price)}/${unit}`;
+};
+
+const getServiceScheduleInfo = (item: any, order: any) => {
+    const appointments = order?.appointments || [];
+    const matchingAppt = appointments.find((appt: any) => 
+        appt.service_name?.toLowerCase() === item.product_name?.toLowerCase()
+    );
+    if (matchingAppt && matchingAppt.start_date && matchingAppt.start_time) {
+        return {
+            date: matchingAppt.start_date,
+            time: matchingAppt.start_time
+        };
+    }
+
+    const lines = order?.checkout_fulfillment?.lines || [];
+    const matchingLine = lines.find((line: any) => 
+        line.itemType === "service_booking" && 
+        line.bookingMetadata?.serviceName?.toLowerCase() === item.product_name?.toLowerCase()
+    );
+    if (matchingLine?.bookingMetadata?.date && matchingLine?.bookingMetadata?.time) {
+        return {
+            date: matchingLine.bookingMetadata.date,
+            time: matchingLine.bookingMetadata.time
+        };
+    }
+
+    return null;
+};
+
+const formatServiceSchedule = (dateStr: string, timeStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const year = parts[0];
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = parts[2];
+    
+    const months = [
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ];
+    const monthName = months[monthIndex] || parts[1];
+    
+    let timeFormatted = "";
+    if (timeStr) {
+        const timeParts = timeStr.split(":");
+        if (timeParts.length >= 2) {
+            timeFormatted = ` às ${timeParts[0]}:${timeParts[1]}`;
+        }
+    }
+    
+    return `${day} de ${monthName} de ${year}${timeFormatted}`;
+};
+
 interface OrderDetailViewProps {
     orderId: string
     partnerId: string
@@ -477,27 +545,45 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
                                                         <div className="space-y-4">
-                                                            {(order.order_items || []).map((item: any) => (
-                                                                <div key={item.id} className="flex items-start gap-4">
-                                                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                        <img
-                                                                            src={getR2ImageUrl(item.image, "thumbnail")}
-                                                                            className="w-full h-full object-cover rounded-xl"
-                                                                            alt={item.product_name}
-                                                                            onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex justify-between items-start mb-1">
-                                                                            <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                                            <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
+                                                            {(order.order_items || []).map((item: any) => {
+                                                                const isService = !item.product_id && !item.variant_id;
+                                                                const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
+                                                                return (
+                                                                    <div key={item.id} className="flex items-start gap-4">
+                                                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                            <img
+                                                                                src={getR2ImageUrl(item.image, "thumbnail")}
+                                                                                className="w-full h-full object-cover rounded-xl"
+                                                                                alt={item.product_name}
+                                                                                onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
                                                                         </div>
-                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
-                                                                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                            <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex justify-between items-start mb-1">
+                                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
+                                                                            </div>
+                                                                            {isService ? (
+                                                                                scheduleInfo ? (
+                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                        Agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                        Sem agendamento vinculado
+                                                                                    </div>
+                                                                                )
+                                                                            ) : (
+                                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                            )}
+                                                                            <div className="flex items-center gap-2 text-xs mt-1">
+                                                                                <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                                <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(item.product_price, item.products?.unit)}</span>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
 
@@ -661,16 +747,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 showChevron={true}
                                                                 onClick={() => setIsStepsSheetOpen(true)}
                                                                 left={
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                                                        order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
-                                                                            ? "bg-brand-red/10 text-brand-red"
-                                                                            : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                                                    }`}>
-                                                                        <div className={`w-2.5 h-2.5 rounded-full ${
-                                                                            order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
-                                                                                ? "bg-brand-red"
-                                                                                : "bg-brand-dark dark:bg-dark-heading"
-                                                                        }`} />
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                        ? "bg-brand-red/10 text-brand-red"
+                                                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                                                        }`}>
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                            ? "bg-brand-red"
+                                                                            : "bg-brand-dark dark:bg-dark-heading"
+                                                                            }`} />
                                                                     </div>
                                                                 }
                                                             />

@@ -230,7 +230,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
                         <Checkbox
                             checked={showPrice}
-                            label="Exibir o preço na loja"
+                            label="Exibir o preço na vitrine online"
                             onChange={(checked) => {
                                 handleFieldChange({ target: { name: "show_price_in_store", value: checked } })
                                 if (!checked) {

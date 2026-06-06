@@ -95,7 +95,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Informações básicas</h3>
-                
+
                 <div className="mb-10">
                     <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
                 </div>
@@ -246,7 +246,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         <div className="flex items-center gap-2 cursor-pointer w-fit mt-2 mb-6">
                             <Checkbox
                                 checked={showPrice}
-                                label="Exibir o preço na loja"
+                                label="Exibir o preço na vitrine online"
                                 onChange={(checked) => {
                                     handleFieldChange({ target: { name: "show_price_in_store", value: checked } })
                                     if (!checked) {
@@ -259,8 +259,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             />
                         </div>
                     )}
-
-
                 </div>
 
                 {/* TEMPO */}
@@ -269,25 +267,25 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Duração e Agendamento</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
-                            <Input 
-                                label="Duração do Serviço (minutos)" 
-                                name="duration_minutes" 
-                                type="number" 
-                                value={serviceData.duration_minutes || ""} 
-                                onChange={handleFieldChange} 
+                            <Input
+                                label="Duração do Serviço (minutos)"
+                                name="duration_minutes"
+                                type="number"
+                                value={serviceData.duration_minutes || ""}
+                                onChange={handleFieldChange}
                                 disabled={!isEditing}
                                 required
                                 error={fieldErrors?.has("duration_minutes")}
                                 errorMessage={fieldErrors?.has("duration_minutes") ? "Duração é obrigatória" : undefined}
                             />
                             {!isQuickMode && (
-                                <Input 
-                                    label="Tempo de Buffer (minutos)" 
-                                    name="buffer_minutes" 
-                                    type="number" 
-                                    value={serviceData.buffer_minutes || ""} 
-                                    onChange={handleFieldChange} 
-                                    disabled={!isEditing} 
+                                <Input
+                                    label="Tempo de Buffer (minutos)"
+                                    name="buffer_minutes"
+                                    type="number"
+                                    value={serviceData.buffer_minutes || ""}
+                                    onChange={handleFieldChange}
+                                    disabled={!isEditing}
                                     placeholder="Tempo de intervalo ou limpeza"
                                 />
                             )}

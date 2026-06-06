@@ -33,6 +33,7 @@ export async function createOrderAction(data: {
   couponCode?: string | null
   wantsChange?: boolean
   payWithAmount?: number
+  payDepositOnly?: boolean
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null
 }) {
   const user = await requireUser()
@@ -94,7 +95,7 @@ export async function createOrderAction(data: {
     data.csrf_token,
     data.wantsChange,
     data.payWithAmount,
-    undefined,
+    data.payDepositOnly,
     data.checkoutPricingSnapshot,
   )
 }

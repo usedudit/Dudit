@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon, CheckCircleIcon } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, Checkbox } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -12,6 +12,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
+import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
@@ -264,6 +265,9 @@ export function CheckoutPageClient() {
 
     const requirements: CheckoutRequirements | undefined = checkoutContext?.requirements
     const [payDepositOnly, setPayDepositOnly] = useState(false)
+    const [showDepositChoiceModal, setShowDepositChoiceModal] = useState(false)
+    const bypassDepositModalRef = useRef(false)
+    const bypassSubmitRef = useRef(false)
 
     const handleFulfillmentModeChange = async (cartItemId: string, mode: "on_site" | "customer_location") => {
         try {
@@ -740,6 +744,57 @@ export function CheckoutPageClient() {
     const selectedStorefrontMethod = visibleStorefrontMethods.find((m) => m.id === formData.paymentMethod) || null
     const isCashPayment = paymentOption === "traditional" && (selectedStorefrontMethod ? selectedStorefrontMethod.type === "cash" : formData.paymentMethod === "cash")
 
+    const renderFreeDeliveryProgressCard = () => {
+        if (!deliverySettings || formData.deliveryType !== "delivery") return null
+
+        const threshold = deliverySettings.freeDeliveryThreshold != null ? Number(deliverySettings.freeDeliveryThreshold) : 0
+        if (threshold <= 0) return null
+
+        const current = orderSubtotal
+        const diff = Math.max(0, threshold - current)
+        const isFree = diff <= 0
+        const percentage = Math.min(100, (current / threshold) * 100)
+
+        const storeUrl = checkoutContext?.partner ? getPartnerUrl(checkoutContext.partner) : "/"
+
+        return (
+            <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-brand-slate/10 dark:bg-dark-border/10 space-y-3 shadow-sm mb-6">
+                <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full">
+                        Frete Grátis
+                    </span>
+                    {isFree ? (
+                        <span className="text-xs font-semibold text-brand-green flex items-center gap-1">
+                            <CheckCircleIcon size={14} className="fill-brand-green text-white shrink-0" /> Atingido
+                        </span>
+                    ) : (
+                        <Link href={storeUrl} className="text-xs font-bold text-brand-green hover:underline">
+                            Ver mais itens
+                        </Link>
+                    )}
+                </div>
+
+                <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading leading-tight">
+                        {isFree ? (
+                            "Parabéns! Você ganhou entrega grátis nesta compra."
+                        ) : (
+                            <>
+                                Falta <span className="font-bold text-brand-green">{formatCurrency(diff)}</span> para entrega grátis nesse vendedor
+                            </>
+                        )}
+                    </p>
+                    <div className="w-full h-2 bg-gray-200 dark:bg-dark-border/40 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-brand-green rounded-full transition-all duration-300"
+                            style={{ width: `${percentage}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     const renderChangeSection = () => {
         if (!isCashPayment || isPickup) return null
 
@@ -797,6 +852,8 @@ export function CheckoutPageClient() {
     )
     const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
 
+    const orderSubtotal = checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount
+
     useEffect(() => {
         let active = true
         if (!partnerId || !formData.deliveryAddress || !productDeliveryQuoteActive) {
@@ -812,6 +869,7 @@ export function CheckoutPageClient() {
                 partnerId,
                 destinationAddress: formData.deliveryAddress,
                 freeDeliveryCoupon: hasFreeDeliveryCoupon,
+                orderSubtotal,
                 destinationCoords: selectedAddress?.latitude && selectedAddress?.longitude
                     ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
                     : undefined,
@@ -843,7 +901,7 @@ export function CheckoutPageClient() {
             active = false
             window.clearTimeout(timer)
         }
-    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, productDeliveryQuoteActive])
+    }, [partnerId, formData.deliveryAddress, hasFreeDeliveryCoupon, productDeliveryQuoteActive, orderSubtotal])
 
     useEffect(() => {
         let active = true
@@ -1011,41 +1069,103 @@ export function CheckoutPageClient() {
                 {checkoutContext?.lines && checkoutContext.lines.length > 0 ? (
                     <>
                         {checkoutContext.lines.some((l) => l.lineKind === "product") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide">Produtos</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide mb-2">Produtos</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "product")
                             .map((line) => (
-                                <div key={line.lineId} className="flex justify-between text-sm py-1">
-                                    <span className="truncate pr-2">{line.displayName}</span>
-                                    <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                <div
+                                    key={line.lineId}
+                                    className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                >
+                                    <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                        <img
+                                            src={line.imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                            alt={line.baseName || line.displayName}
+                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
+                                            {line.baseName || line.displayName}
+                                        </h4>
+                                        {line.variantName && (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                {line.variantName}
+                                            </div>
+                                        )}
+                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            Qtd: {line.quantity}
+                                        </div>
+                                    </div>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
+                                        {formatCurrency(line.lineTotal)}
+                                    </div>
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "service_booking") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2">Serviços</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2 mb-2">Serviços</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "service_booking")
                             .map((line) => (
-                                <div key={line.lineId} className="py-1">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="truncate pr-2">{line.displayName}</span>
-                                        <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                <div
+                                    key={line.lineId}
+                                    className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                >
+                                    <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                        <img
+                                            src={line.imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                            alt={line.baseName || line.displayName}
+                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]"
+                                        />
                                     </div>
-                                    {line.bookingSummary && (
-                                        <p className="text-xs text-brand-inactive-text">{line.bookingSummary}</p>
-                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
+                                            {line.baseName || line.displayName}
+                                        </h4>
+                                        {line.bookingSummary && (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                {line.bookingSummary}
+                                            </div>
+                                        )}
+                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            Qtd: {line.quantity}
+                                        </div>
+                                    </div>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
+                                        {formatCurrency(line.lineTotal)}
+                                    </div>
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2">Assinaturas</p>
+                            <p className="text-xs font-bold uppercase text-brand-inactive-text tracking-wide pt-2 mb-2">Assinaturas</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "subscription")
                             .map((line) => (
-                                <div key={line.lineId} className="flex justify-between text-sm py-1">
-                                    <span className="truncate pr-2">{line.displayName}</span>
-                                    <span className="shrink-0">{formatCurrency(line.lineTotal)}</span>
+                                <div
+                                    key={line.lineId}
+                                    className="group flex flex-row items-center gap-4 py-3 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0"
+                                >
+                                    <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
+                                        <img
+                                            src={line.imageUrl || "https://img.dudit.com.br/static/Placeholder.png"}
+                                            alt={line.baseName || line.displayName}
+                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
+                                            {line.baseName || line.displayName}
+                                        </h4>
+                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                            Qtd: {line.quantity}
+                                        </div>
+                                    </div>
+                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
+                                        {formatCurrency(line.lineTotal)}
+                                    </div>
                                 </div>
                             ))}
                     </>
@@ -1155,7 +1275,7 @@ export function CheckoutPageClient() {
                         </span>
                     </div>
                 )}
-                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (
+                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (deliveryBreakdown.distanceFee > 0 || deliveryBreakdown.timeAdjustmentTotal > 0) && (
                     <div className="space-y-1 text-xs text-brand-inactive-text">
                         {deliveryBreakdown.baseFee > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(deliveryBreakdown.baseFee)}</span></div>}
                         {deliveryBreakdown.distanceFee > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(deliveryBreakdown.distanceFee)}</span></div>}
@@ -1349,6 +1469,13 @@ export function CheckoutPageClient() {
         setPaymentError(null)
         setIsLoading(true)
 
+        if (checkoutContext?.deposit.available && !bypassDepositModalRef.current) {
+            setShowDepositChoiceModal(true)
+            setIsLoading(false)
+            return
+        }
+        bypassDepositModalRef.current = false
+
         if (isCashPayment && !isPickup) {
             if (wantsChange === null) {
                 setPaymentError("Por favor, informe se precisa de troco.")
@@ -1493,8 +1620,8 @@ export function CheckoutPageClient() {
                     sessionStorage.removeItem("checkout_session")
 
                     setPixPaymentData({
-                        orderId: result.orderId,
-                        orderNumber: result.orderNumber,
+                        orderId: (result as any).orderId,
+                        orderNumber: (result as any).orderNumber,
                         amount: checkoutTotalToCharge,
                         orderDetails: {
                             items: products.map(p => ({
@@ -1596,6 +1723,65 @@ export function CheckoutPageClient() {
                 notifyError("Erro", msg)
             }
             setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (bypassSubmitRef.current) {
+            bypassSubmitRef.current = false
+            void handleSubmit()
+        }
+    }, [payDepositOnly, paymentOption, formData.paymentMethod])
+
+    const handleSelectIntegral = () => {
+        bypassDepositModalRef.current = true
+        setShowDepositChoiceModal(false)
+        if (payDepositOnly) {
+            bypassSubmitRef.current = true
+            setPayDepositOnly(false)
+        } else {
+            void handleSubmit()
+        }
+    }
+
+    const handleSelectDeposit = () => {
+        bypassDepositModalRef.current = true
+        setShowDepositChoiceModal(false)
+
+        let targetPaymentOption = paymentOption
+        let targetPaymentMethod = formData.paymentMethod
+
+        if (paymentOption === "mercadopago") {
+            if (!checkoutContext?.deposit.mpEnabled) {
+                targetPaymentOption = "traditional"
+                const pixMethod = visibleStorefrontMethods.find((m) => m.type === "pix")
+                if (pixMethod) {
+                    targetPaymentMethod = pixMethod.id
+                }
+            }
+        } else {
+            if (!checkoutContext?.deposit.manualEnabled) {
+                targetPaymentOption = "mercadopago"
+                targetPaymentMethod = "mercadopago"
+            } else {
+                const pixMethod = visibleStorefrontMethods.find((m) => m.type === "pix")
+                if (pixMethod) {
+                    targetPaymentMethod = pixMethod.id
+                }
+            }
+        }
+
+        const optionChanged = paymentOption !== targetPaymentOption
+        const methodChanged = formData.paymentMethod !== targetPaymentMethod
+        const depositChanged = !payDepositOnly
+
+        if (optionChanged || methodChanged || depositChanged) {
+            bypassSubmitRef.current = true
+            if (optionChanged) setPaymentOption(targetPaymentOption)
+            if (methodChanged) setFormData(prev => ({ ...prev, paymentMethod: targetPaymentMethod }))
+            if (depositChanged) setPayDepositOnly(true)
+        } else {
+            void handleSubmit()
         }
     }
 
@@ -1979,6 +2165,7 @@ export function CheckoutPageClient() {
 
                         {/* Right Column (resumo + order bump) */}
                         <div className="col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
+                            {renderFreeDeliveryProgressCard()}
                             <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
                                 <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                                     Resumo do Pedido
@@ -2056,6 +2243,7 @@ export function CheckoutPageClient() {
 
                         {mobileStep === 2 && (
                             <div className="space-y-6 pb-28">
+                                {renderFreeDeliveryProgressCard()}
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
                                     {partnerInfo.mpConnected ? (
@@ -2638,6 +2826,97 @@ export function CheckoutPageClient() {
                     buyerId={userId!}
                     mpAcceptedPaymentMethods={mpAcceptedPaymentMethods}
                 />
+            )}
+
+            {showDepositChoiceModal && checkoutContext?.deposit && (
+                <DefaultModal
+                    isOpen={showDepositChoiceModal}
+                    onClose={() => setShowDepositChoiceModal(false)}
+                    title="Escolha como deseja pagar"
+                    maxWidth="md"
+                >
+                    <div className="space-y-6 py-2">
+                        <p className="text-sm text-brand-inactive-text">
+                            Este estabelecimento permite pagar um sinal/entrada para confirmar o seu agendamento, restando o valor restante para ser pago presencialmente.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Option Sinal */}
+                            <div
+                                onClick={handleSelectDeposit}
+                                className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-green bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all shadow-sm"
+                            >
+                                <div>
+                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 dark:bg-brand-green/20 rounded-full mb-3">
+                                        Recomendado
+                                    </span>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                                        Pagar Sinal / Entrada
+                                    </h3>
+                                    <p className="text-xs text-brand-inactive-text mb-4">
+                                        Pague apenas uma porcentagem agora para garantir sua reserva.
+                                    </p>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                        <span className="text-xl font-black text-brand-green">
+                                            {formatCurrency(
+                                                Math.max(0,
+                                                    (checkoutContext.productsSubtotal || 0) +
+                                                    (checkoutContext.subscriptionsSubtotal || 0) +
+                                                    (checkoutContext.deposit.previewAmount || 0) +
+                                                    (showDeliveryFeeRow && !isPickup ? deliveryFee : 0) -
+                                                    couponDiscount
+                                                )
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(
+                                                Math.max(0, (checkoutContext.servicesSubtotal || 0) - (checkoutContext.deposit.previewAmount || 0))
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Option Integral */}
+                            <div
+                                onClick={handleSelectIntegral}
+                                className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10 transition-all shadow-sm"
+                            >
+                                <div>
+                                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-inactive-text bg-brand-slate/80 dark:bg-dark-border/40 rounded-full mb-3">
+                                        Integral
+                                    </span>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
+                                        Pagamento Integral
+                                    </h3>
+                                    <p className="text-xs text-brand-inactive-text mb-4">
+                                        Pague o valor total do pedido agora e evite cobranças adicionais depois.
+                                    </p>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-brand-border/40 dark:border-dark-border/40">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className="text-xs text-brand-inactive-text">Pagar agora:</span>
+                                        <span className="text-xl font-black text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(
+                                                Math.max(0, totalAmount + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0) - couponDiscount)
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xs text-brand-inactive-text">Pagar no atendimento:</span>
+                                        <span className="text-sm font-semibold text-brand-inactive-text">R$ 0,00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </DefaultModal>
             )}
 
             <DefaultModal

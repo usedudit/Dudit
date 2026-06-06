@@ -19,6 +19,8 @@ export type MarketplaceCheckoutDepositConfig = {
   percent: number
   previewAmount: number
   manualOnly: boolean
+  manualEnabled: boolean
+  mpEnabled: boolean
 }
 
 export type MarketplaceCheckoutContextResult =
@@ -31,8 +33,11 @@ export type MarketplaceCheckoutContextResult =
       subscriptionsSubtotal: number
       deposit: MarketplaceCheckoutDepositConfig
       partner: {
+        id: string
+        slug: string | null
         address: Record<string, unknown> | null
         storeName: string | null
+        store_name: string | null
         mpConnected: boolean
         phone: string | null
         pixKey: string | null
@@ -84,7 +89,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "store_name, service_deposit_enabled, service_deposit_percentage, mp_user_id, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -102,10 +107,16 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)
   const depositEnabled = Boolean(partnerRow?.service_deposit_enabled)
+  const serviceDepositManualEnabled = Boolean(partnerRow?.service_deposit_manual_enabled)
+  const serviceDepositMpEnabled = Boolean(partnerRow?.service_deposit_mp_enabled)
   const mpConnected = Boolean(input.mpConnected ?? partnerRow?.mp_user_id)
 
   const depositAvailable =
-    requirements.showDepositOption && depositAllowed && depositEnabled && depositPreviewBase > 0
+    requirements.hasServiceLines &&
+    depositAllowed &&
+    depositEnabled &&
+    depositPreviewBase > 0 &&
+    (serviceDepositManualEnabled || (serviceDepositMpEnabled && mpConnected))
 
   const previewAmount =
     depositAvailable ? Math.round(depositPreviewBase * (depositPercent / 100) * 100) / 100 : 0
@@ -124,11 +135,16 @@ export async function getMarketplaceCheckoutContextAction(input: {
       available: depositAvailable,
       percent: depositPercent,
       previewAmount,
-      manualOnly: depositAvailable && !mpConnected,
+      manualOnly: depositAvailable && (!mpConnected || !serviceDepositMpEnabled),
+      manualEnabled: serviceDepositManualEnabled,
+      mpEnabled: serviceDepositMpEnabled,
     },
     partner: {
+      id: resolved.partnerId,
+      slug: partnerRow?.slug || null,
       address: (partnerAddress as Record<string, unknown>) || null,
       storeName: partnerRow?.store_name || null,
+      store_name: partnerRow?.store_name || null,
       mpConnected,
       phone: partnerRow?.phone || null,
       pixKey: pixMethodResult?.data?.pix_key || null,

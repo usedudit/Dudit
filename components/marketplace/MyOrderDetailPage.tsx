@@ -8,7 +8,7 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
-import { cancelBuyerOrderAction, getOrderHistoryForBuyerAction } from '@/app/actions/marketplace/orders';
+import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
@@ -48,6 +48,22 @@ const getFulfillmentModeLabel = (mode?: string | null) => {
         case "customer_location": return "No endereço do cliente";
         default: return "Nao informado";
     }
+};
+
+const formatProductQuantity = (qty: number, unit?: string | null, hidePrefix = false) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return hidePrefix ? `${qty} un.` : `x${qty}`;
+    }
+    return `${qty} ${unit}`;
+};
+
+const formatProductUnitPrice = (price: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return formatCurrency(price);
+    }
+    return `${formatCurrency(price)}/${unit}`;
 };
 
 const getItemKindLabel = (item: any) => {
@@ -339,9 +355,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
     const [userAddresses, setUserAddresses] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<"details" | "history">("details");
-    const [historyEntries, setHistoryEntries] = useState<any[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [historyLoaded, setHistoryLoaded] = useState(false);
 
     useEffect(() => {
         if (!order?.buyer_id) return;
@@ -354,35 +367,35 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             .catch(err => console.error("Error fetching user addresses:", err));
     }, [order?.buyer_id]);
 
-    useEffect(() => {
-        async function loadHistory() {
-            if (activeTab !== "history" || historyLoaded) return;
-            try {
-                setHistoryLoading(true);
-                const res = await getOrderHistoryForBuyerAction(order.id);
-                if (res.success && res.data) {
-                    setHistoryEntries(res.data);
-                    setHistoryLoaded(true);
-                } else {
-                    toast({
-                        title: "Erro ao carregar histórico",
-                        description: res.error || "Tente novamente.",
-                        variant: "destructive"
-                    });
-                }
-            } catch (err: any) {
-                console.error("Error loading order history:", err);
-                toast({
-                    title: "Erro ao carregar histórico",
-                    description: "Erro interno ao buscar histórico.",
-                    variant: "destructive"
-                });
-            } finally {
-                setHistoryLoading(false);
-            }
+    const activeSteps = getClientTimelineSteps(order).filter(s => s.active);
+    const historyEntries = activeSteps.map((step, idx) => {
+        const dateToUse = (idx === 0) ? order.created_at : (order.updated_at || order.created_at);
+        let changeLines: string[] = [];
+        if (step.subLabel) {
+            changeLines = Array.isArray(step.subLabel) ? step.subLabel : [step.subLabel];
+        } else {
+            if (step.label === "Pedido Realizado") changeLines = ["Seu pedido foi registrado em nosso sistema."];
+            else if (step.label === "Agendamento Criado") changeLines = ["Seu agendamento foi registrado em nosso sistema."];
+            else if (step.label === "Aguardando pagamento") changeLines = ["Aguardando a confirmação do pagamento pelo intermediador."];
+            else if (step.label === "Pago") changeLines = ["Pagamento confirmado com sucesso."];
+            else if (step.label === "Preparando") changeLines = ["O vendedor está preparando os itens do seu pedido."];
+            else if (step.label === "Enviado") changeLines = ["Seu pedido saiu para entrega."];
+            else if (step.label === "Pronto para retirada") changeLines = ["Seu pedido está pronto para ser retirado no local."];
+            else if (step.label === "Entregue") changeLines = ["O pedido foi entregue ao destinatário."];
+            else if (step.label === "Retirado") changeLines = ["O pedido foi retirado na loja."];
+            else if (step.label === "Cancelado") changeLines = ["O pedido foi cancelado."];
+            else if (step.label === "Não entregue" || step.label === "Entrega não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
+            else changeLines = ["Etapa concluída."];
         }
-        loadHistory();
-    }, [activeTab, historyLoaded, order.id, toast]);
+
+        return {
+            id: `step-${idx}-${step.label}`,
+            actor_name: step.label,
+            change_lines: changeLines,
+            created_at: dateToUse,
+            entry_type: step.label.toLowerCase()
+        };
+    });
 
     if (!order) return null;
 
@@ -650,11 +663,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
                                 </div>
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                    {formatCurrency(item.product_price)}
+                                    {formatProductUnitPrice(item.product_price, item.products?.unit)}
                                 </div>
                             </div>
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                x{item.quantity}
+                                {formatProductQuantity(item.quantity, item.products?.unit)}
                             </div>
                         </>
                     );
@@ -796,11 +809,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
                                                             </div>
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                                {formatCurrency(item.product_price)}
+                                                                {formatProductUnitPrice(item.product_price, item.products?.unit)}
                                                             </div>
                                                         </div>
                                                         <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                                            x{item.quantity}
+                                                            {formatProductQuantity(item.quantity, item.products?.unit)}
                                                         </div>
                                                     </>
                                                 );
@@ -1057,19 +1070,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
                             <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8 space-y-8">
-                                {historyLoading ? (
-                                    <div className="flex flex-col items-center justify-center py-12 gap-3 animate-pulse">
-                                        <Spinner size={24} className="text-brand-green" />
-                                        <p className="text-sm text-brand-inactive-text">Carregando histórico...</p>
-                                    </div>
-                                ) : (
-                                    <HistoryTimeline
-                                        entries={historyEntries}
-                                        title="Status do Acompanhamento"
-                                        subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
-                                        emptyMessage="Nenhum histórico encontrado para este pedido."
-                                    />
-                                )}
+                                <HistoryTimeline
+                                    entries={historyEntries}
+                                    title="Status do Acompanhamento"
+                                    subtitle="Acompanhe todas as movimentações e alterações de status detalhadas realizadas neste pedido."
+                                    emptyMessage="Nenhum histórico encontrado para este pedido."
+                                />
                             </div>
                         </TabsContent>
                     </Tabs>
@@ -1183,7 +1189,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
-                                                        <p className="text-xs text-brand-inactive-text">Comprado: {item.quantity} un.</p>
+                                                        <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                     </div>
                                                     <input
                                                         type="number"

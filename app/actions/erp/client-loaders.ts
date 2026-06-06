@@ -70,7 +70,7 @@ export async function fetchPartnerProductsBucket() {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, sku, gtin, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+    .select("id, name, sku, gtin, price, stock_available, allow_sell_without_stock, images, unit, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("name")
@@ -91,6 +91,7 @@ export async function fetchPartnerProductsBucket() {
     allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
     image: p.images && p.images.length > 0 ? p.images[0] : null,
     has_variants: p.product_variants && p.product_variants.length > 0,
+    unit: p.unit || null,
     variants: (p.product_variants || []).map((variant: any) => ({
       id: variant.id,
       name: variant.variant_name,

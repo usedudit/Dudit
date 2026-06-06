@@ -35,7 +35,7 @@ const COLUMNS = [
     { id: "date", label: "Data", align: "left" as const, width: "160px" },
     { id: "refund_type", label: "Resolucao", align: "left" as const, width: "180px" },
     { id: "quantity", label: "Qtd", align: "left" as const, width: "100px" },
-    { id: "actions", label: "Acoes", align: "center" as const, width: "80px" },
+    { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
 
 function mapLegacyCondition(condition: unknown) {
@@ -47,13 +47,13 @@ function mapLegacyCondition(condition: unknown) {
 }
 
 function mapLegacyResolution(resolution: unknown) {
-  const raw = String(resolution || "").toLowerCase()
-  if (raw === "troca") return "exchange"
-  if (raw === "vale_compra") return "store_credit"
-  if (raw === "sem_resolucao") return "none"
-  if (raw === "recusada") return "rejected"
-  if (raw === "store_credit" || raw === "exchange" || raw === "refund" || raw === "none" || raw === "rejected") return raw
-  return "refund"
+    const raw = String(resolution || "").toLowerCase()
+    if (raw === "troca") return "exchange"
+    if (raw === "vale_compra") return "store_credit"
+    if (raw === "sem_resolucao") return "none"
+    if (raw === "recusada") return "rejected"
+    if (raw === "store_credit" || raw === "exchange" || raw === "refund" || raw === "none" || raw === "rejected") return raw
+    return "refund"
 }
 
 function mapLegacyReason(reason: unknown) {
@@ -150,13 +150,13 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                     requestId: entityState.entityId,
                     action: "updated",
                     nextStatus: data.status,
-          refundAmount: Number(data.refundValue || 0),
-          refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-          refundPaymentMethod: data.resolutionType === "refund" ? data.refundType || null : null,
-          returnToInventory: Boolean(data.returnToInventory),
-          storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
-          exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
-          exchangeBalanceResolution: data.exchangeBalanceResolution || null,
+                    refundAmount: Number(data.refundValue || 0),
+                    refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
+                    refundPaymentMethod: data.resolutionType === "refund" ? data.refundType || null : null,
+                    returnToInventory: Boolean(data.returnToInventory),
+                    storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
+                    exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],
+                    exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                 })

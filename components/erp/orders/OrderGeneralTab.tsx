@@ -30,6 +30,22 @@ function formatLocalISODate(date: Date) {
     return `${y}-${m}-${d}`
 }
 
+const formatProductQuantity = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} un.`;
+    }
+    return `${qty} ${unit}`;
+};
+
+const formatProductUnitPrice = (price: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return formatCurrency(price);
+    }
+    return `${formatCurrency(price)}/${unit}`;
+};
+
 interface OrderGeneralTabProps {
     // Items state
     items: any[]
@@ -220,7 +236,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             </div>
                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
                                             <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                <span>{item.quantity} un. • {formatCurrency(item.unitPrice)} / un.</span>
+                                                <span>{formatProductQuantity(item.quantity, item.unit)} • {formatProductUnitPrice(item.unitPrice, item.unit)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -957,7 +973,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         </div>
                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
                                         <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                            <span>{item.quantity} un. • {formatCurrency(item.unitPrice)} / un.</span>
+                                            <span>{formatProductQuantity(item.quantity, item.unit)} • {formatProductUnitPrice(item.unitPrice, item.unit)}</span>
                                         </div>
                                     </div>
                                 </div>

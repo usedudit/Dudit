@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton } from '@/components/reusable';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
@@ -1524,24 +1524,20 @@ export const AppointmentSheet = ({
 
                                 {/* Outside Hours Alert Banner */}
                                 {isOutsideHours && (
-                                    <div className="p-3.5 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl flex items-start gap-2.5 text-xs text-orange-800 dark:text-orange-300">
-                                        <AlertTriangle size={16} className="text-orange-500 shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="font-bold">Atenção: Horário Especial</p>
-                                            <p className="opacity-90">Este agendamento está fora do horário de funcionamento do estabelecimento.</p>
-                                        </div>
-                                    </div>
+                                    <InfoCard
+                                        color="orange"
+                                        title="Atenção: Horário Especial"
+                                        message="Este agendamento está fora do horário de funcionamento do estabelecimento."
+                                    />
                                 )}
 
                                 {/* Collision Warning Banner */}
                                 {hasCollision && (
-                                    <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl flex items-start gap-2.5 text-xs text-red-800 dark:text-red-300">
-                                        <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="font-bold">Conflito de Horário</p>
-                                            <p className="opacity-90">Este profissional já possui outro agendamento ativo neste mesmo horário.</p>
-                                        </div>
-                                    </div>
+                                    <InfoCard
+                                        color="red"
+                                        title="Conflito de Horário"
+                                        message="Este profissional já possui outro agendamento ativo neste mesmo horário."
+                                    />
                                 )}
 
                                 {mode === 'view' && appointment && (
@@ -1559,7 +1555,7 @@ export const AppointmentSheet = ({
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Atendimento</p>
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Local de atendimento</p>
                                             <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
                                                 {appointment.fulfillmentMode?.replace(/_/g, ' ') || '—'}
                                             </p>
@@ -1646,12 +1642,12 @@ export const AppointmentSheet = ({
                                 {/* Total Row */}
                                 <div className="flex justify-between items-end border-t border-brand-border dark:border-dark-border pt-4 px-1">
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Duração Total</span>
-                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
+                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Duração Total</span>
+                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatDuration(calculatedDuration)}</span>
                                     </div>
                                     <div className="flex flex-col text-right">
-                                        <span className="text-[10px] font-bold text-brand-inactive-text uppercase tracking-wider">Valor Total</span>
-                                        <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
+                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Valor Total</span>
+                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(calculatedPrice)}</span>
                                     </div>
                                 </div>
 
@@ -1922,7 +1918,7 @@ export const AppointmentSheet = ({
                 />
             </div>
 
-            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNewServiceSheetOpen(false)} disabled={isCreatingService}>
                         Voltar
@@ -2069,12 +2065,12 @@ export const AppointmentSheet = ({
                 )}
             </div>
 
-            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="h-12 flex-1" onClick={() => setIsEditServiceOpen(false)}>
                         Voltar
                     </Button>
-                    <Button className="h-12 flex-1 bg-brand-primary text-white" onClick={() => setIsEditServiceOpen(false)}>
+                    <Button className="h-12 flex-1" onClick={() => setIsEditServiceOpen(false)}>
                         Salvar
                     </Button>
                 </div>
@@ -2115,13 +2111,13 @@ export const AppointmentSheet = ({
                 />
             </div>
 
-            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNewClientOpen(false)} disabled={isCreatingCustomer}>
                         Voltar
                     </Button>
                     <Button
-                        className="h-12 flex-1 bg-brand-primary text-white"
+                        className="h-12 flex-1"
                         isLoading={isCreatingCustomer}
                         onClick={handleQuickCreateCustomer}
                     >
@@ -2237,12 +2233,18 @@ export const AppointmentSheet = ({
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                 />
-                <div className="flex justify-end pt-4">
-                    <Button variant="default" className="px-6 h-[42px]" onClick={() => setIsNotesOverlayOpen(false)}>
-                        Salvar Nota
+            </div>
+
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                <div className="flex items-center gap-3">
+                    <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNotesOverlayOpen(false)}>
+                        Cancelar
+                    </Button>
+                    <Button className="h-12 flex-1" onClick={() => setIsNotesOverlayOpen(false)}>
+                        Salvar
                     </Button>
                 </div>
-            </div>
+            </footer>
         </div>
     );
 

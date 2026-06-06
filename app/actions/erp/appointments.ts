@@ -469,26 +469,47 @@ export async function getAvailableTimeSlotsAction(
       return { start: startMin, end: endMin + bufferMinutes }
     })
 
-    // Generate all possible slots within business hours
-    const bh = DEFAULT_BUSINESS_HOURS
-    const dayStartMin = bh.startHour * 60 + bh.startMinute
-    const dayEndMin = bh.endHour * 60 + bh.endMinute
-    const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
+    // Fetch partner opening hours
+    const { data: partnerData, error: partnerErr } = await supabase
+      .from("partners")
+      .select("opening_hours")
+      .eq("id", partnerId)
+      .single()
+
+    if (partnerErr) throw partnerErr
+
+    const rawOpeningHours = partnerData?.opening_hours
+
+    // Determine day of the week
+    const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    const [year, month, day] = date.split("-").map(Number)
+    const dateObj = new Date(year, month - 1, day)
+    const dayOfWeek = DAYS_OF_WEEK[dateObj.getDay()]
+
+    const { normalizeOpeningHours, parseTimeToMinutes } = await import("@/lib/utils/opening-hours")
+    const normalized = normalizeOpeningHours(rawOpeningHours)
+    const daySchedule = normalized[dayOfWeek]
 
     const slots: string[] = []
 
-    for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
-      const slotEnd = slotStart + totalDurationNeeded
+    if (daySchedule && daySchedule.enabled) {
+      const dayStartMin = parseTimeToMinutes(daySchedule.from)
+      const dayEndMin = parseTimeToMinutes(daySchedule.to)
+      const totalDurationNeeded = serviceDurationMinutes + bufferMinutes
 
-      // Check if this slot conflicts with any existing appointment
-      const hasConflict = occupiedRanges.some(
-        (range) => slotStart < range.end && slotEnd > range.start
-      )
+      for (let slotStart = dayStartMin; slotStart + serviceDurationMinutes <= dayEndMin; slotStart += SLOT_INCREMENT_MINUTES) {
+        const slotEnd = slotStart + totalDurationNeeded
 
-      if (!hasConflict) {
-        const h = Math.floor(slotStart / 60)
-        const m = slotStart % 60
-        slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+        // Check if this slot conflicts with any existing appointment
+        const hasConflict = occupiedRanges.some(
+          (range) => slotStart < range.end && slotEnd > range.start
+        )
+
+        if (!hasConflict) {
+          const h = Math.floor(slotStart / 60)
+          const m = slotStart % 60
+          slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+        }
       }
     }
 
