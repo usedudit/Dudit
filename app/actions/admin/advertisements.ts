@@ -1,7 +1,8 @@
 "use server"
 
-import { revalidateTag } from "next/cache"
+import { /* revalidateTag (use safeRevalidateTag helper) */ } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -39,7 +40,8 @@ function mapAdminRow(row: Advertisement): AdminAdvertisementRow {
 }
 
 function revalidateAdsCache() {
-    revalidateTag(TAGS.advertisements)
+    // Use project helper to always pass the required profile argument
+    safeRevalidateTag(TAGS.advertisements)
 }
 
 export async function getAdminAdvertisements(): Promise<AdminAdvertisementRow[]> {
@@ -54,7 +56,7 @@ export async function getAdminAdvertisements(): Promise<AdminAdvertisementRow[]>
         .limit(200)
 
     if (error) throw new Error(error.message)
-    return (data || []).map((row) => mapAdminRow(row as Advertisement))
+    return (data || []).map((row: Advertisement) => mapAdminRow(row))
 }
 
 export async function getAdminAdvertisement(id: string): Promise<AdminAdvertisementRow | null> {

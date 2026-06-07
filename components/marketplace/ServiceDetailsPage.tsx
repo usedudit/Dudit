@@ -49,8 +49,6 @@ import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
-import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
-import type { SponsoredAd } from "@/lib/ads/types"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
