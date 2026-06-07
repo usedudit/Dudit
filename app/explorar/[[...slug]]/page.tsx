@@ -8,6 +8,8 @@ import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
+import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
@@ -121,6 +123,20 @@ export default async function ExplorarPage({
             : null,
     )
 
+    const state = cidade.split("-").pop()?.toUpperCase() || userProfile?.state || null
+    const adLocation = {
+        lat: userProfile?.latitude ?? null,
+        lng: userProfile?.longitude ?? null,
+        citySlug: cidade || null,
+        city: userProfile?.city ?? null,
+        state,
+    }
+
+    const [exploreAds, searchAds] = await Promise.all([
+        getSponsoredAdsForSlot("explore", adLocation),
+        query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
+    ])
+
     return (
         <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col">
             <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
@@ -135,6 +151,8 @@ export default async function ExplorarPage({
                     userProfile={userProfile}
                     cartCount={cartCount}
                     hideHeaderAndFooter={true}
+                    exploreAds={exploreAds}
+                    searchAds={searchAds}
                 />
             </Suspense>
 

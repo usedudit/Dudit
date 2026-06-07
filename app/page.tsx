@@ -8,6 +8,8 @@ import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
+import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
+import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 
 export const metadata: Metadata = {
@@ -44,6 +46,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
     let products: any[] = []
     let vitrines: any[] = []
     let plans: any[] = []
+    let homeAds: SponsoredAd[] = []
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
@@ -52,6 +55,14 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         products = cityData.products
         vitrines = cityData.vitrines
         plans = cityData.plans || []
+
+        homeAds = await getSponsoredAdsForSlot("home", {
+            lat: userProfile?.latitude ?? null,
+            lng: userProfile?.longitude ?? null,
+            citySlug,
+            city: cityName,
+            state,
+        })
     }
 
     const coords = userProfile?.latitude && userProfile?.longitude
@@ -75,6 +86,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
             selectedCitySlug={citySlug}
             selectedCityName={cityName}
             hideHeaderAndFooter={true}
+            homeAds={homeAds}
         />
     )
 }

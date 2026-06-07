@@ -12,6 +12,7 @@ import { getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
+import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 
@@ -104,7 +105,11 @@ export default async function ProductDetailsPage({
 
   const userProfile = sessionData?.profile ? {
     full_name: sessionData.profile.full_name,
-    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null
+    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null,
+    latitude: sessionData.profile.latitude,
+    longitude: sessionData.profile.longitude,
+    city: sessionData.profile.city,
+    state: sessionData.profile.state,
   } : null
   const cartCount = sessionData?.cartCount || 0
 
@@ -128,10 +133,18 @@ export default async function ProductDetailsPage({
 
 
   // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
-  const [variants, reviews] = await Promise.all([
+  const [variants, reviews, detailAds] = await Promise.all([
     getProductVariants(id),
-    getProductReviews(id)
+    getProductReviews(id),
+    getSponsoredAdsForSlot("detail", {
+      lat: userProfile?.latitude ?? null,
+      lng: userProfile?.longitude ?? null,
+      citySlug: currentCidadeUf,
+      city: userProfile?.city ?? null,
+      state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
+    }),
   ])
+  const detailAd = detailAds[0] ?? null
 
   // Lógica de Preço Mínimo para Variante
   const minPrice = variants && variants.length > 0
@@ -188,6 +201,7 @@ export default async function ProductDetailsPage({
         currentUserId={user?.id || null}
         userProfile={userProfile}
         cartCount={cartCount}
+        sponsoredAd={detailAd}
       />
 
       <MarketplaceFooter />

@@ -60,6 +60,12 @@ export enum AdminActionType {
 
     // Financial
     SUBSCRIPTION_CANCEL = "subscription.cancel",
+
+    // Advertising
+    AD_CREATE = "advertising.create",
+    AD_UPDATE = "advertising.update",
+    AD_DELETE = "advertising.delete",
+    AD_STATUS_CHANGE = "advertising.status_change",
 }
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────
@@ -73,6 +79,7 @@ export type AuditTargetType =
     | "system"
     | "review"
     | "return_request"
+    | "advertisement"
 
 export interface AdminAuditLogEntry {
     adminUserId: string

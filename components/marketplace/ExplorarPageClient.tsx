@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { ItemCard, VitrineCard } from "./shared-components"
@@ -19,6 +19,9 @@ import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/mar
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
+import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
+import { SponsoredAdsSearchInline } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
@@ -31,6 +34,8 @@ interface ExplorarPageClientProps {
     categoria?: string
     userProfile?: any
     cartCount?: number
+    exploreAds?: SponsoredAd[]
+    searchAds?: SponsoredAd[]
 }
 
 type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
@@ -246,7 +251,9 @@ export function ExplorarPageClient({
     categoria = '',
     userProfile,
     cartCount,
-    hideHeaderAndFooter
+    hideHeaderAndFooter,
+    exploreAds = [],
+    searchAds = [],
 }: ExplorarPageClientProps & { hideHeaderAndFooter?: boolean }) {
     const router = useRouter()
     const pathname = usePathname()
@@ -1082,6 +1089,16 @@ export function ExplorarPageClient({
                                         />
                                     )}
 
+                                    {selectedCategories.length === 0 && !query && exploreAds.length > 0 && (
+                                        <SponsoredAdsCarousel
+                                            ads={exploreAds}
+                                            slot="explore"
+                                            title="Patrocinados perto de você"
+                                            size="compact"
+                                            className="mb-6"
+                                        />
+                                    )}
+
                                     {/* B. FEED MODE: SHOW CAROUSELS BY CATEGORY FIRST */}
                                     {selectedCategories.length === 0 && !query && currentType === 'tudo' && categoriesWithProducts.length > 0 && (
                                         <div className="space-y-4">
@@ -1173,14 +1190,29 @@ export function ExplorarPageClient({
                                                 </div>
                                             ) : (
                                                 <div className={`grid ${currentType === 'vitrines' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'} gap-3 md:gap-4 lg:gap-6`}>
-                                                    {remainingResults.map((item) => {
-                                                        if (item.itemType === 'loja') {
-                                                            return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
-                                                        }
+                                                    {remainingResults.map((item, index) => {
                                                         const userCoords = userProfile?.latitude && userProfile?.longitude
                                                             ? { lat: userProfile.latitude, lng: userProfile.longitude }
                                                             : null
-                                                        return <ItemCard key={item.id} product={item as any} userCoords={userCoords} className="w-full" />
+
+                                                        const resultNode = item.itemType === 'loja' ? (
+                                                            <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} className="w-full" />
+                                                        ) : (
+                                                            <ItemCard key={item.id} product={item as any} userCoords={userCoords} className="w-full" />
+                                                        )
+
+                                                        const shouldInjectSearchAds = !!query && searchAds.length > 0 && index === 5
+
+                                                        if (!shouldInjectSearchAds) {
+                                                            return resultNode
+                                                        }
+
+                                                        return (
+                                                            <Fragment key={`result-with-ads-${item.id}`}>
+                                                                {resultNode}
+                                                                <SponsoredAdsSearchInline ads={searchAds} />
+                                                            </Fragment>
+                                                        )
                                                     })}
 
                                                     {/* INFINITE SCROLL OBSERVER */}

@@ -4,6 +4,8 @@ import { useState, useMemo } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
 import { HeroBanner, ProductCarousel, CategoryList, InfoSection } from "./shared-components"
+import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
+import type { SponsoredAd } from "@/lib/ads/types"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 
 import { useRouter } from "next/navigation"
@@ -32,6 +34,7 @@ interface MarketplaceHomeProps {
     hideHeaderAndFooter?: boolean
     selectedCitySlug?: string | null
     selectedCityName?: string | null
+    homeAds?: SponsoredAd[]
 }
 
 const TRENDS = [
@@ -53,7 +56,8 @@ export default function MarketplaceHome({
     cartCount,
     hideHeaderAndFooter,
     selectedCitySlug,
-    selectedCityName
+    selectedCityName,
+    homeAds = [],
 }: MarketplaceHomeProps) {
     const router = useRouter()
     const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
@@ -680,6 +684,10 @@ export default function MarketplaceHome({
                 ))}
 
                 <CategoryList vitrines={sortedVitrines} />
+
+                {homeAds.length > 0 && (
+                    <SponsoredAdsCarousel ads={homeAds} slot="home" title="Patrocinados na sua região" />
+                )}
 
                 <InfoSection />
 

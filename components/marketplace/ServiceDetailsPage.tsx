@@ -47,6 +47,10 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import type { SponsoredAd } from "@/lib/ads/types"
+import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import type { SponsoredAd } from "@/lib/ads/types"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +61,7 @@ interface ServiceDetailsPageClientProps {
     currentUserId?: string | null
     userProfile?: any
     cartCount?: number
+    sponsoredAd?: SponsoredAd | null
 }
 
 type BookingStep = "info" | "schedule" | "confirm"
@@ -137,6 +142,7 @@ export function ServiceDetailsPageClient({
     currentUserId: initialUserId,
     userProfile,
     cartCount,
+    sponsoredAd = null,
 }: ServiceDetailsPageClientProps) {
     const router = useRouter()
     const { user, supabase } = useSupabase()
@@ -1943,6 +1949,8 @@ export function ServiceDetailsPageClient({
                             {BookingPanel}
                         </div>
                     </div>
+
+                    <SponsoredAdDetailSlot ad={sponsoredAd} className="px-4 lg:px-8" />
 
                     {/* Mobile bottom bar */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50 flex gap-2 lg:hidden shadow-lg">

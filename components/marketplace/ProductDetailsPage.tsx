@@ -27,6 +27,8 @@ import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
+import type { SponsoredAd } from "@/lib/ads/types"
 
 const getQuantityLabel = (qty: number, unit?: string | null) => {
     const cleanUnit = String(unit || "").trim().toLowerCase();
@@ -44,6 +46,7 @@ interface ProductDetailsPageClientProps {
     userProfile?: any
     cartCount?: number
     hideHeaderAndFooter?: boolean
+    sponsoredAd?: SponsoredAd | null
 }
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
@@ -132,6 +135,7 @@ export function ProductDetailsPageClient({
     userProfile,
     cartCount,
     hideHeaderAndFooter = false,
+    sponsoredAd = null,
 }: ProductDetailsPageClientProps) {
     const router = useRouter()
     const showPrice = product.show_price_in_store !== false
@@ -1944,6 +1948,8 @@ export function ProductDetailsPageClient({
                             {BuyPanel}
                         </div>
                     </div>
+
+                    <SponsoredAdDetailSlot ad={sponsoredAd} className="px-4 lg:px-8" />
 
                     {/* Mobile bottom bar */}
                     {!isProductOwner && (

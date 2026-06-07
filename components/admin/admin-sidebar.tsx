@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon } from "@/lib/icons"
-import { Home, ShieldAlert, DollarSign, Users, FileText, Building2, Flag, ShoppingCart, Undo2 } from "lucide-react"
+import { Home, ShieldAlert, DollarSign, Users, FileText, Building2, Flag, ShoppingCart, Undo2, Megaphone } from "lucide-react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -57,6 +57,11 @@ const navItems: NavItem[] = [
         icon: Building2,
         label: "Parceiros",
         href: "/ddt-admin/partners",
+    },
+    {
+        icon: Megaphone,
+        label: "Publicidade",
+        href: "/ddt-admin/advertising",
     },
     {
         icon: Flag,

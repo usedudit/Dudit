@@ -36,4 +36,7 @@ export const TAGS = {
 
   // Team / Invitations
   partnerInvitations: (partnerId: string) => `partner-${partnerId}-invitations`,
+
+  // Platform advertising
+  advertisements: "advertisements",
 }
