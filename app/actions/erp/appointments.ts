@@ -243,7 +243,7 @@ async function createAppointmentSaleAndSyncGoals(params: {
   return { saleId, paymentTransactionId }
 }
 
-async function syncAppointmentReceivable(params: {
+export async function syncAppointmentReceivable(params: {
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
   partnerId: string
   userId: string
@@ -693,7 +693,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
           onAppointmentCreated(row).catch(console.error)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
 
     return { success: true, created: data || [] }
   } catch (error: any) {
