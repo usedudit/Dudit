@@ -1,7 +1,6 @@
 "use client"
 
-import { Button, Checkbox, Input } from "@/components/reusable"
-import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
+import { Button, Checkbox, FormDropdown, Input } from "@/components/reusable"
 import { Check, MapPin, X } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
 
@@ -83,25 +82,14 @@ export function ExplorarFilterSidebar({
                     </button>
                 </section>
 
-                {/* Type Section - Using Dropdown */}
+                {/* Type Section - Using FormDropdown */}
                 <section>
-                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h3>
-                    <Dropdown trigger={
-                        <button className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors text-left">
-                            <span>{typeOptions.find(o => o.value === currentType)?.label || "Selecionar"}</span>
-                            <span className="text-gray-400">▼</span>
-                        </button>
-                    }>
-                        {typeOptions.map((option) => (
-                            <DropdownItem
-                                key={option.value}
-                                onClick={() => onTypeChange(option.value)}
-                                className={currentType === option.value ? "bg-[#ecfdf5] text-brand-green" : ""}
-                            >
-                                {option.label}
-                            </DropdownItem>
-                        ))}
-                    </Dropdown>
+                    <FormDropdown
+                        label="Tipo"
+                        value={currentType}
+                        setValue={onTypeChange}
+                        options={typeOptions.map(o => ({ value: o.value, label: o.label }))}
+                    />
                 </section>
 
                 {/* Categories Section - Using Checkbox */}
@@ -156,25 +144,14 @@ export function ExplorarFilterSidebar({
                     </div>
                 </section>
 
-                {/* Sort Section - Using Dropdown */}
+                {/* Sort Section - Using FormDropdown */}
                 <section>
-                    <h3 className="mb-3 text-sm font-bold text-brand-dark">Ordenar</h3>
-                    <Dropdown trigger={
-                        <button className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors text-left">
-                            <span>{sortOptions.find(o => o.value === sortBy)?.label || "Selecionar"}</span>
-                            <span className="text-gray-400">▼</span>
-                        </button>
-                    }>
-                        {sortOptions.map((option) => (
-                            <DropdownItem
-                                key={option.value}
-                                onClick={() => onSortChange(option.value)}
-                                className={sortBy === option.value ? "bg-[#ecfdf5] text-brand-green" : ""}
-                            >
-                                {option.label}
-                            </DropdownItem>
-                        ))}
-                    </Dropdown>
+                    <FormDropdown
+                        label="Ordenar"
+                        value={sortBy}
+                        setValue={onSortChange}
+                        options={sortOptions.map(o => ({ value: o.value, label: o.label }))}
+                    />
                 </section>
 
                 {/* Promo Section - Using Checkbox */}

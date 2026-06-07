@@ -1365,7 +1365,7 @@ export function ProductDetailsPageClient({
                         <XIcon size={18} />
                     </button>
                     {/* Header with Dual Squares */}
-                    <div className="h-[180px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
                             src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
                             alt="Pagamento"
@@ -1402,7 +1402,7 @@ export function ProductDetailsPageClient({
                         <XIcon size={18} />
                     </button>
                     {/* Header with Dual Squares */}
-                    <div className="h-[180px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
                             src="https://img.dudit.com.br/static/illustrations/Responsabilidade.png"
                             alt="Responsabilidade"

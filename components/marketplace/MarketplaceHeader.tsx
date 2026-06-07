@@ -371,9 +371,52 @@ const Header: React.FC<HeaderProps> = ({
         setIsSearchInputFocused(false)
         setDirection("forward")
         startTransition(() => {
-            router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
+            // Get city from localStorage/cookie or profile
+            let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
+            if (!savedCity && typeof document !== "undefined") {
+                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+                if (match) savedCity = match[1]
+            }
+
+            // If we have a city, redirect to that city with the query; otherwise redirect to /explorar with query
+            if (savedCity) {
+                router.push(`/explorar/${savedCity}?q=${encodeURIComponent(trimmed)}`)
+            } else {
+                router.push(`/explorar?q=${encodeURIComponent(trimmed)}`)
+            }
         })
-    }, [searchValue, router])
+    }, [searchValue, router, setDirection])
+
+    // Get navigation links with city included
+    const navigationLinks = useMemo(() => {
+        let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
+        if (!savedCity && typeof document !== "undefined") {
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match) savedCity = match[1]
+        }
+
+        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar"
+        return [
+            { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
+            { label: "Produtos", href: `${basePath}?type=produtos` },
+            { label: "Serviços", href: `/services` },
+        ]
+    }, [])
+
+    const desktopNavigationLinks = useMemo(() => {
+        let savedCity = typeof window !== "undefined" ? localStorage.getItem("dudit_city") : null
+        if (!savedCity && typeof document !== "undefined") {
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match) savedCity = match[1]
+        }
+
+        const basePath = savedCity ? `/explorar/${savedCity}` : "/explorar"
+        return [
+            { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
+            { label: "Produtos", href: `${basePath}?type=produtos` },
+            { label: "Serviços", href: `${basePath}?type=servicos` },
+        ]
+    }, [])
 
     const handleSignOut = useCallback(async () => {
         await supabase.auth.signOut({ scope: 'local' })
@@ -637,11 +680,7 @@ const Header: React.FC<HeaderProps> = ({
 
             <BottomSheet isOpen={isMobileCategoryMenuOpen} onClose={() => setIsMobileCategoryMenuOpen(false)}>
                 <div className="flex flex-col py-2">
-                    {[
-                        { label: "Ofertas do Dia", href: "/explorar?q=oferta" },
-                        { label: "Produtos", href: "/explorar?type=produtos" },
-                        { label: "Serviços", href: "/services" },
-                    ].map((link) => (
+                    {navigationLinks.map((link) => (
                         <Link
                             key={link.label}
                             href={link.href}
@@ -852,11 +891,7 @@ const Header: React.FC<HeaderProps> = ({
 
                 <div className="w-full h-[40px] bg-brand-dark flex items-center max-w-[1400px] mx-auto text-white text-[13px] border-t border-white/5">
                     <div className="flex items-center gap-1 h-full overflow-x-auto no-scrollbar">
-                        {[
-                            { label: "Ofertas do Dia", href: "/explorar?q=oferta" },
-                            { label: "Produtos", href: "/explorar?type=produtos" },
-                            { label: "Serviços", href: "/explorar?type=servicos" },
-                        ].map((link) => (
+                        {desktopNavigationLinks.map((link) => (
                             <Link
                                 key={link.label}
                                 href={link.href}

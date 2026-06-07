@@ -12,6 +12,7 @@ import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
+import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "casa-e-utilidades": "Casa & Utilidades",
@@ -56,7 +57,25 @@ export default async function ExplorarPage({
     const resolvedSearchParams = await searchParams
 
     const slug = resolvedParams.slug || []
-    const cidade = slug[0] || ""
+    const firstSlug = slug[0] || ""
+
+    // Se não tem slug, mostra apenas loader
+    if (!firstSlug) {
+        return (
+            <>
+                <MarketplaceHeader />
+                <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                    <ThreeDotsLoader />
+                </div>
+                <MarketplaceFooter />
+            </>
+        )
+    }
+
+    // Detecta se é um estado (formato: "estado-sp") ou uma cidade
+    const isStateRoute = firstSlug.startsWith("estado-")
+    const stateSlug = isStateRoute ? firstSlug : null
+    const cidade = !isStateRoute ? firstSlug : ""
 
     const user = await getCurrentUser()
     const sessionData = user
@@ -76,33 +95,6 @@ export default async function ExplorarPage({
         }
         : null
 
-    if (!cidade) {
-        const cookieStore = await cookies()
-        let savedCity = cookieStore.get("dudit_city")?.value
-
-        if (!savedCity && userProfile?.city && userProfile?.state) {
-            const normCity = userProfile.city
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "")
-            savedCity = `${normCity}-${userProfile.state.toLowerCase()}`
-        }
-
-        if (savedCity) {
-            const queryParams = new URLSearchParams()
-            const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
-            const type = parseMarketplaceType(resolvedSearchParams.type)
-            if (query) queryParams.set("q", query)
-            if (type !== "tudo") queryParams.set("type", type)
-            const queryStr = queryParams.toString()
-            const queryPart = queryStr ? `?${queryStr}` : ""
-            redirect(`/explorar/${savedCity}${queryPart}`)
-        } else {
-            redirect("/")
-        }
-    }
     const categorySlug = slug[1] || ""
     const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
 
@@ -111,7 +103,9 @@ export default async function ExplorarPage({
 
     const serverFetchType = type
 
-    const products = await getCachedExploreProducts(query, serverFetchType, cidade)
+    // Para estados, passa apenas o slug do estado; a função searchMarketplaceByCity filtrará por estado
+    const searchSlug = stateSlug ? stateSlug : cidade
+    const products = await getCachedExploreProducts(query, serverFetchType, searchSlug)
 
     const cartCount = sessionData?.cartCount || 0
 
@@ -122,12 +116,15 @@ export default async function ExplorarPage({
             : null,
     )
 
-    const state = cidade.split("-").pop()?.toUpperCase() || userProfile?.state || null
+    const state = stateSlug
+        ? stateSlug.replace(/^estado-/, "").toUpperCase()
+        : (cidade.split("-").pop()?.toUpperCase() || userProfile?.state || null)
+
     const adLocation = {
         lat: userProfile?.latitude ?? null,
         lng: userProfile?.longitude ?? null,
-        citySlug: cidade || null,
-        city: userProfile?.city ?? null,
+        citySlug: !stateSlug ? cidade : null,
+        city: !stateSlug ? userProfile?.city : null,
         state,
     }
 
@@ -145,13 +142,14 @@ export default async function ExplorarPage({
                     initialResults={productsWithDistance}
                     query={query}
                     type={type}
-                    cidade={cidade}
+                    cidade={searchSlug}
                     categoria={categoria}
                     userProfile={userProfile}
                     cartCount={cartCount}
                     hideHeaderAndFooter={true}
                     exploreAds={exploreAds}
                     searchAds={searchAds}
+                    isStateRoute={isStateRoute}
                 />
             </Suspense>
 

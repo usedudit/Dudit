@@ -1,17 +1,35 @@
 "use client"
 
+import { Button } from "@/components/reusable"
+import { ChevronLeft } from "lucide-react"
+
 interface ExplorarHeaderSectionProps {
     title: string
     resultsCount: number
+    showBackButton?: boolean
+    onBack?: () => void
 }
 
 export function ExplorarHeaderSection({
     title,
     resultsCount,
+    showBackButton = false,
+    onBack,
 }: ExplorarHeaderSectionProps) {
     return (
         <div className="mb-6">
             <div className="flex items-start gap-3">
+                {showBackButton && (
+                    <div className="hidden md:flex pt-1">
+                        <Button
+                            variant="filled"
+                            onClick={onBack}
+                            className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
+                        >
+                            <ChevronLeft className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                        </Button>
+                    </div>
+                )}
                 <div className="flex-1">
                     <h1 className="text-2xl lg:text-3xl font-bold text-brand-dark">
                         {title}
