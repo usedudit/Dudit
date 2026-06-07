@@ -311,8 +311,10 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
 export const getCachedExploreProducts = async (query: string, type: MarketplaceSearchType, cidade?: string) => {
   return await searchMarketplaceDirect(query, type, {
     vitrines: type === 'vitrines' ? 40 : 4,
-    produtos: 20,
-    servicos: 20,
+    produtos: 40,
+    servicos: 40,
+    planos: 40,
+    geral: 40,
     cidade
   })
 }

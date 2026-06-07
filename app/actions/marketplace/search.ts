@@ -86,7 +86,7 @@ function normalizePlan(item: any) {
 export const searchMarketplaceDirect = cache(async (
     query: string,
     type: MarketplaceSearchType,
-    limits: { vitrines?: number; produtos?: number; servicos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
 ) => {
     const { results } = await _searchMarketplaceCore(query, type, limits)
     const user = await getCurrentUser()

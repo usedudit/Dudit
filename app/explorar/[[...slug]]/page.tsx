@@ -109,8 +109,7 @@ export default async function ExplorarPage({
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
 
-    const isLandingPage = type === 'tudo' && !categoria && !query
-    const serverFetchType = isLandingPage ? 'vitrines' : type
+    const serverFetchType = type
 
     const products = await getCachedExploreProducts(query, serverFetchType, cidade)
 
