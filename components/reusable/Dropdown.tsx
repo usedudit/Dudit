@@ -219,11 +219,13 @@ interface DropdownItemProps {
     children: React.ReactNode
     onClick?: () => void
     className?: string
+    disabled?: boolean
 }
 
-export const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, className = "" }) => {
+export const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, className = "", disabled }) => {
     const { close } = useDropdownContext()
     const handleClick = (e: React.MouseEvent) => {
+        if (disabled) return
         if (onClick) onClick()
         close()
     }
@@ -231,7 +233,8 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, c
         <button
             type="button"
             onClick={handleClick}
-            className={`flex items-center gap-3 w-full text-left px-3 py-2 text-md lg:text-sm text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors duration-150 ${className}`}
+            disabled={disabled}
+            className={`flex items-center gap-3 w-full text-left px-3 py-2 text-md lg:text-sm text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors duration-150 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
             role="menuitem"
         >
             {children}

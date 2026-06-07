@@ -3045,3 +3045,162 @@ export async function getERPOrdersPageAction(
         return { success: false, error: e?.message || "Erro ao carregar pedidos" }
     }
 }
+
+export async function confirmAppointmentOrderPaymentAction(payload: {
+    orderId: string
+    partnerId: string
+    paymentStatus: "paid" | "partially_paid" | "unpaid"
+    paidAmount: number
+    paymentMethod: string
+    paymentBreakdown?: Array<{
+        method: string
+        amount: number
+        paymentMethodId?: string | null
+        installmentNumber?: number
+    }>
+    paymentProvider?: string | null
+    mpPaymentId?: string | null
+    financeAccountId?: string | null
+    notes?: string
+}) {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+        await requirePartnerAccessWithPermission(payload.partnerId, "orders", "edit")
+
+        const supabase = await getSupabaseServerClient()
+
+        const { data: order, error: orderErr } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("id", payload.orderId)
+            .eq("partner_id", payload.partnerId)
+            .single()
+
+        if (orderErr || !order) {
+            throw new Error("Pedido não encontrado")
+        }
+
+        const paymentState = resolvePaymentState({
+            requestedStatus: payload.paymentStatus,
+            totalAmount: order.total_amount,
+            paidAmount: payload.paidAmount,
+            fallbackPaidAmount: Number(order.paid_amount || 0),
+        })
+
+        const nextSituation = paymentState.situation
+        const nextPaidAmount = paymentState.paidAmount
+
+        const updatePayload: any = {
+            situation: nextSituation,
+            paid_amount: nextPaidAmount,
+            payment_method: payload.paymentMethod,
+            payment_breakdown: payload.paymentBreakdown || null,
+            payment_provider: payload.paymentProvider || null,
+            mp_payment_id: payload.mpPaymentId || null,
+            finance_account_id: payload.financeAccountId || null,
+        }
+
+        if (payload.notes !== undefined) {
+            updatePayload.notes = payload.notes
+        }
+
+        const { error: updateError } = await supabase
+            .from("orders")
+            .update(updatePayload)
+            .eq("id", payload.orderId)
+            .eq("partner_id", payload.partnerId)
+
+        if (updateError) throw updateError
+
+        const changeLines = [
+            `confirmou pagamento via checkout: status ${getPaymentStatusLabel(order.situation)} -> ${getPaymentStatusLabel(nextSituation)}`,
+            `valor pago: ${formatCurrency(order.paid_amount || 0)} -> ${formatCurrency(nextPaidAmount)}`
+        ]
+        await logAuditEvent({
+            partnerId: payload.partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: payload.orderId,
+            actionType: "updated",
+            changeLines,
+            metadata: { oldSituation: order.situation, newSituation: nextSituation, paidAmount: nextPaidAmount }
+        })
+
+        if (nextSituation === "paid") {
+            await createFinancialTransactionsForPaidOrder(supabase, {
+                orderNumber: order.order_number,
+                partnerId: payload.partnerId,
+                totalAmount: order.total_amount,
+                paymentMethod: payload.paymentMethod,
+                paymentProvider: payload.paymentProvider,
+                paymentBreakdown: payload.paymentBreakdown,
+                customerId: order.buyer_id,
+                customerName: order.customer_name,
+                paymentDate: new Date().toISOString(),
+                financeAccountId: payload.financeAccountId,
+            })
+
+            await fulfillMarketplaceOrderIfNeeded(supabase, payload.orderId)
+
+            await createSellerCommissionForPaidOrder({
+                supabase,
+                partnerId: payload.partnerId,
+                orderId: payload.orderId,
+                sellerUserId: order.created_by || user.id,
+                saleAmount: order.total_amount,
+                accountId: payload.financeAccountId,
+                createdByUserId: user.id,
+            })
+        }
+
+        const { data: linkedAppointment } = await supabase
+            .from("appointments")
+            .select("id, status")
+            .eq("marketplace_order_id", payload.orderId)
+            .eq("partner_id", payload.partnerId)
+            .maybeSingle()
+
+        if (linkedAppointment) {
+            const nextStatus = nextSituation === "paid" ? "Pago" : "Pago Parcialmente"
+            await supabase
+                .from("appointments")
+                .update({
+                    payment_status: nextSituation === "paid" ? "paid" : "partially_paid",
+                    status: nextStatus,
+                    paid_amount: nextPaidAmount,
+                })
+                .eq("id", linkedAppointment.id)
+                .eq("partner_id", payload.partnerId)
+
+            const { syncAppointmentReceivable } = await import("@/app/actions/erp/appointments")
+            await syncAppointmentReceivable({
+                supabase,
+                partnerId: payload.partnerId,
+                userId: user.id,
+                appointment: {
+                    id: linkedAppointment.id,
+                    status: nextStatus,
+                    price: order.total_amount,
+                    paid_amount: nextPaidAmount,
+                    marketplace_order_id: payload.orderId,
+                    start_date: new Date().toISOString().split('T')[0],
+                },
+            })
+        }
+
+        await revalidateOrders(payload.partnerId)
+
+        if (order.situation !== nextSituation) {
+            import("@/lib/services/whatsapp-automation.service")
+                .then(({ onOrderStatusChanged }) => {
+                    onOrderStatusChanged({ ...order, partner_id: payload.partnerId }, nextSituation).catch(console.error)
+                })
+                .catch(() => {})
+        }
+
+        return { success: true }
+    } catch (e: any) {
+        return { success: false, error: e?.message || "Erro ao processar pagamento" }
+    }
+}

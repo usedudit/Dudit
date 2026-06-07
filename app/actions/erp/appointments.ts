@@ -47,6 +47,7 @@ export type AppointmentInput = {
   source?: "appointment" | "unavailable"
   recurrenceRule?: string | null
   recurrenceGroupId?: string | null
+  fulfillmentMode?: string | null
 }
 
 function safeRevalidateTag(tag: string) {
@@ -88,6 +89,7 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     source: input.source || "appointment",
     recurrence_rule: input.recurrenceRule || null,
     recurrence_group_id: input.recurrenceGroupId || null,
+    fulfillment_mode: input.fulfillmentMode || null,
   }
 }
 
@@ -260,16 +262,32 @@ async function syncAppointmentReceivable(params: {
   const shouldBePending = !isPaidStatus(status) && remaining > 0.009
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
 
-  const saleRefNote = `appointment:${params.appointment.id}:sale`
-  const { data: existingSale } = await params.supabase
-    .from("sales")
-    .select("sale_number")
-    .eq("partner_id", params.partnerId)
-    .eq("notes", saleRefNote)
-    .limit(1)
-    .maybeSingle()
+  let saleNumber = `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
 
-  const saleNumber = existingSale?.sale_number || `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
+  if (params.appointment.marketplace_order_id) {
+    const { data: existingOrder } = await params.supabase
+      .from("orders")
+      .select("order_number")
+      .eq("id", params.appointment.marketplace_order_id)
+      .eq("partner_id", params.partnerId)
+      .limit(1)
+      .maybeSingle()
+    if (existingOrder?.order_number) {
+      saleNumber = existingOrder.order_number
+    }
+  } else {
+    const saleRefNote = `appointment:${params.appointment.id}:sale`
+    const { data: existingSale } = await params.supabase
+      .from("sales")
+      .select("sale_number")
+      .eq("partner_id", params.partnerId)
+      .eq("notes", saleRefNote)
+      .limit(1)
+      .maybeSingle()
+    if (existingSale?.sale_number) {
+      saleNumber = existingSale.sale_number
+    }
+  }
 
   const existingId = params.currentReceivableId || (await params.supabase
     .from("transactions")
@@ -367,7 +385,7 @@ const APPOINTMENT_LIST_COLUMNS = `
   id, partner_id, customer_id, customer_name, service_name,
   start_date, start_time, end_date, end_time, duration_minutes,
   staff_partner_user_id, staff_name, status, price, pricing_unit, notes, source,
-  sales_channel, payment_status, fulfillment_mode, needs_reschedule
+  sales_channel, payment_status, fulfillment_mode, needs_reschedule, sale_id, marketplace_order_id
 `
 
 /**
@@ -563,6 +581,59 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     for (const row of createdRows) {
       const price = Number(row.price || 0)
       if (price > 0.009 && row.source !== "unavailable") {
+        // 1. Create a pending order in public.orders
+        const { data: order, error: orderErr } = await supabase
+          .from("orders")
+          .insert({
+            partner_id: partnerId,
+            buyer_id: row.customer_id || null,
+            customer_name: row.customer_name,
+            total_amount: price,
+            discount_amount: 0,
+            final_amount: price,
+            paid_amount: 0,
+            situation: "pending",
+            delivery_status: "delivered", // Fulfilled right away
+            delivery_type: "pickup",
+            payment_method: "pendente",
+            order_source: "Manual",
+            notes: row.notes || null,
+            created_by: user.id,
+          })
+          .select("id, order_number")
+          .single()
+
+        if (orderErr) {
+          console.error("[createAppointmentsAction] failed to create order:", orderErr)
+        }
+
+        if (order?.id) {
+          // 2. Insert into order_items
+          await supabase.from("order_items").insert({
+            order_id: order.id,
+            product_name: row.service_name || "Serviço",
+            product_price: price,
+            quantity: 1,
+            subtotal: price,
+            line_type: "service_booking",
+            fulfillment_mode: row.fulfillment_mode || "on_site",
+          })
+
+          // 3. Update the appointment with marketplace_order_id and payment_status
+          await supabase
+            .from("appointments")
+            .update({
+              marketplace_order_id: order.id,
+              payment_status: "unpaid",
+            })
+            .eq("id", row.id)
+            .eq("partner_id", partnerId)
+
+          // Update row in-memory so returned created row contains it
+          row.marketplace_order_id = order.id
+          row.payment_status = "unpaid"
+        }
+
         const receivableId = await syncAppointmentReceivable({
           supabase,
           partnerId,
@@ -674,6 +745,29 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       .select("*")
       .single()
     if (error) throw error
+
+    if (updated.marketplace_order_id) {
+      const orderPrice = Number(updated.price || 0)
+      await supabase
+        .from("orders")
+        .update({
+          total_amount: orderPrice,
+          final_amount: orderPrice,
+          notes: updated.notes || null,
+        })
+        .eq("id", updated.marketplace_order_id)
+        .eq("partner_id", partnerId)
+
+      await supabase
+        .from("order_items")
+        .update({
+          product_name: updated.service_name || "Serviço",
+          product_price: orderPrice,
+          subtotal: orderPrice,
+          fulfillment_mode: updated.fulfillment_mode || "on_site",
+        })
+        .eq("order_id", updated.marketplace_order_id)
+    }
 
     const paidAmountFromPayload = Math.max(0, Number((payload as any)?.paidAmount ?? updated.paid_amount ?? 0))
     const normalizedStatus = String(updated.status || "")

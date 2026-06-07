@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
     PlusIcon,
     ExportFileIcon,
+    Settings2Icon,
 } from '@/lib/icons';
 import { useErpExport } from '@/hooks/use-erp-export';
 import { Button, Checkbox, IconPlaceholder, Pagination, Dropdown, DropdownItem } from '@/components/reusable';
@@ -80,7 +81,7 @@ const AppointmentsPage = ({
 }: {
     partnerId: string;
     initialTeam?: Array<{ id: string; name: string; role: string }>;
-    initialCustomers?: Array<{ id: string; name: string; email?: string }>;
+    initialCustomers?: Array<{ id: string; name: string; email?: string; avatar_url?: string | null }>;
     initialServices?: Array<{ id: string; name: string; price: number; duration: string; bufferMinutes: number; category: string; billingUnit: string }>;
     initialUnavailableTypes?: any[];
     openingHours?: any;
@@ -88,9 +89,9 @@ const AppointmentsPage = ({
     const APPOINTMENT_COLUMNS = useMemo<Array<{
         id: string;
         label: string;
-        align: "left" | "center" | "right";
-        width: string;
-        minWidth: string;
+        align: 'left' | 'center' | 'right';
+        width?: string;
+        minWidth?: string;
     }>>(() => ([
         { id: "customer", label: "Cliente", align: "left", width: "280px", minWidth: "280px" },
         { id: "datetime", label: "Data e hora", align: "left", width: "180px", minWidth: "180px" },
@@ -111,7 +112,7 @@ const AppointmentsPage = ({
         initialTeam.map(m => ({ id: m.id, name: m.name, role: m.role }))
     );
     const [realClients, setRealClients] = useState<any[]>(() =>
-        initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email }))
+        initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url }))
     );
     const [realServices, setRealServices] = useState<any[]>(() =>
         initialServices.map(s => ({ id: s.id, name: s.name, price: s.price, duration: s.duration, category: s.category, bufferMinutes: s.bufferMinutes, billingUnit: s.billingUnit }))
@@ -165,7 +166,8 @@ const AppointmentsPage = ({
         partnerId: row.partner_id,
         source: (row.source as any) || (row.status?.toLowerCase() === 'indisponível' ? 'unavailable' : 'appointment'),
         recurrence: (row.recurrence as any) || 'none',
-        saleId: row.sale_id || null,
+        saleId: row.sale_id || row.marketplace_order_id || null,
+        marketplaceOrderId: row.marketplace_order_id || null,
         paidAmount: Number(row.paid_amount || 0),
         salesChannel: row.sales_channel || "booking",
         paymentStatus: row.payment_status || "unpaid",
@@ -769,40 +771,34 @@ const AppointmentsPage = ({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button variant="outline" onClick={handleExport} disabled={isExporting} leftIcon={<ExportFileIcon size={18} />}>
-                                        {isExporting ? "Exportando..." : "Exportar"}
-                                    </Button>
+                                    <Dropdown
+                                        trigger={
+                                            <Button variant="outline">
+                                                <Settings2Icon className="w-[18px] h-[18px]" /> Ações
+                                            </Button>
+                                        }
+                                        align="right"
+                                        showChevron={false}
+                                        fullWidth={false}
+                                    >
+                                        <DropdownItem onClick={() => handleOpenUnavailable()}>
+                                            <CalendarOff size={16} /> Horário indisponível
+                                        </DropdownItem>
+                                        <DropdownItem onClick={() => {
+                                            setCurrentDate(new Date());
+                                            setViewMode('calendar');
+                                            setCalendarView('day');
+                                            setAppointmentFilters({ teamIds: [] });
+                                        }}>
+                                            <RefreshCw size={16} /> Redefinir visualização
+                                        </DropdownItem>
+                                        <DropdownItem onClick={handleExport} >
+                                            <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
+                                        </DropdownItem>
+                                    </Dropdown>
                                     <Button onClick={() => handleOpenCreate()} leftIcon={<PlusIcon size={18} />}>
                                         Novo agendamento
                                     </Button>
-                                    <Dropdown
-                                        width="w-56"
-                                        align="right"
-                                        showChevron={false}
-                                        trigger={
-                                            <Button variant="outline" className="h-[42px] px-3">
-                                                <Settings size={18} className="text-brand-dark dark:text-dark-heading" />
-                                            </Button>
-                                        }
-                                    >
-                                        <DropdownItem
-                                            className="gap-2 text-brand-dark dark:text-dark-heading"
-                                            onClick={() => handleOpenUnavailable()}
-                                        >
-                                            <CalendarOff size={16} /> Horário indisponível
-                                        </DropdownItem>
-                                        <DropdownItem
-                                            className="gap-2 text-brand-dark dark:text-dark-heading"
-                                            onClick={() => {
-                                                setCurrentDate(new Date());
-                                                setViewMode('calendar');
-                                                setCalendarView('day');
-                                                setAppointmentFilters({ teamIds: [] });
-                                            }}
-                                        >
-                                            <RefreshCw size={16} /> Redefinir visualização
-                                        </DropdownItem>
-                                    </Dropdown>
                                 </div>
                             </div>
 
@@ -1224,7 +1220,7 @@ const AppointmentsPage = ({
                     </AnimatePresence>
                     <SavingStatusModal isOpen={isSaving} text="Salvando agendamento..." />
                 </FadeIn>
-            </AnimatePresence>
+            </AnimatePresence >
         </>
     );
 };
