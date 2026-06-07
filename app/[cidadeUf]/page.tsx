@@ -2,6 +2,9 @@ import { Metadata } from 'next'
 import { resolveCityAndStateFromSlug } from '@/app/actions/marketplace/products'
 import { redirect, permanentRedirect } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
+import { getCurrentUser } from '@/lib/auth/authorization'
+import { getUserSessionData } from '@/lib/data/user'
+import { cookies } from 'next/headers'
 
 export const revalidate = 86400 // Cache 24h
 
@@ -36,7 +39,47 @@ export default async function CityPage({ params }: Props) {
 
     if (!isValidCitySlug(cidadeUf)) {
         const cleanSearch = cidadeUf.replace(/-[a-z]{2}$/i, '')
-        redirect(`/explorar/${cidadeUf}?q=${cleanSearch}`)
+
+        // Tenta obter localização do usuário
+        const user = await getCurrentUser()
+        const sessionData = user
+            ? await getUserSessionData(user.id)
+            : null
+
+        const userProfile = sessionData?.profile
+            ? {
+                city: sessionData.profile.city || null,
+                state: sessionData.profile.state || null,
+            }
+            : null
+
+        let redirectUrl = ''
+
+        if (userProfile?.city && userProfile?.state) {
+            // Usuário logado: redireciona para cidade-estado
+            const normalizedCity = userProfile.city
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, "-")
+            const stateCode = userProfile.state.toLowerCase()
+            redirectUrl = `/explorar/${normalizedCity}-${stateCode}?q=${cleanSearch}`
+        } else {
+            // Usuário não logado: tenta pegar estado dos cookies
+            const cookieStore = await cookies()
+            const savedState = cookieStore.get("dudit_state")?.value
+            if (savedState) {
+                const stateCode = savedState.toLowerCase()
+                redirectUrl = `/explorar/estado-${stateCode}?q=${cleanSearch}`
+            }
+        }
+
+        // Se conseguiu determinar localização, redireciona; senão, usa o slug original
+        if (redirectUrl) {
+            redirect(redirectUrl)
+        } else {
+            redirect(`/explorar/${cidadeUf}?q=${cleanSearch}`)
+        }
     }
 
     if (cidadeUf !== cidadeUf.toLowerCase()) {

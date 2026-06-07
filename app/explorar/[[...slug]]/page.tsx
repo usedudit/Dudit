@@ -59,24 +59,6 @@ export default async function ExplorarPage({
     const slug = resolvedParams.slug || []
     const firstSlug = slug[0] || ""
 
-    // Se não tem slug, mostra apenas loader
-    if (!firstSlug) {
-        return (
-            <>
-                <MarketplaceHeader />
-                <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
-                    <ThreeDotsLoader />
-                </div>
-                <MarketplaceFooter />
-            </>
-        )
-    }
-
-    // Detecta se é um estado (formato: "estado-sp") ou uma cidade
-    const isStateRoute = firstSlug.startsWith("estado-")
-    const stateSlug = isStateRoute ? firstSlug : null
-    const cidade = !isStateRoute ? firstSlug : ""
-
     const user = await getCurrentUser()
     const sessionData = user
         ? await getUserSessionData(user.id)
@@ -94,6 +76,44 @@ export default async function ExplorarPage({
             state: sessionData.profile.state || null,
         }
         : null
+
+    // Se não tem slug, redireciona para a localização do usuário
+    if (!firstSlug) {
+        if (userProfile?.city && userProfile?.state) {
+            // Usuário logado: redireciona para cidade-estado
+            const normalizedCity = userProfile.city
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, "-")
+            const stateCode = userProfile.state.toLowerCase()
+            redirect(`/explorar/${normalizedCity}-${stateCode}`)
+        } else {
+            // Usuário não logado: tenta pegar estado dos cookies
+            const cookieStore = await cookies()
+            const savedState = cookieStore.get("dudit_state")?.value
+            if (savedState) {
+                const stateCode = savedState.toLowerCase()
+                redirect(`/explorar/estado-${stateCode}`)
+            }
+        }
+
+        // Se não conseguir determinar localização, mostra loader
+        return (
+            <>
+                <MarketplaceHeader />
+                <div className="min-h-screen bg-white pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                    <ThreeDotsLoader />
+                </div>
+                <MarketplaceFooter />
+            </>
+        )
+    }
+
+    // Detecta se é um estado (formato: "estado-sp") ou uma cidade
+    const isStateRoute = firstSlug.startsWith("estado-")
+    const stateSlug = isStateRoute ? firstSlug : null
+    const cidade = !isStateRoute ? firstSlug : ""
 
     const categorySlug = slug[1] || ""
     const categoria = categorySlug ? (CATEGORY_SLUG_MAP[categorySlug] || categorySlug) : ""
