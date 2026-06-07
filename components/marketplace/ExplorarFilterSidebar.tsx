@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
 import { Button, Checkbox, Input } from "@/components/reusable"
+import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { Check, MapPin, X } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
 
@@ -52,7 +52,7 @@ export function ExplorarFilterSidebar({
 }: ExplorarFilterSidebarProps) {
     return (
         <aside className="hidden lg:block lg:w-[280px] lg:shrink-0 border-r border-gray-100">
-            <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-auto">
+            <div className="sticky top-[128px] space-y-6 py-5 px-5 max-h-[calc(100vh-140px)] overflow-y-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 pb-0">
                     <h2 className="text-base font-bold text-brand-dark">Filtros</h2>
@@ -83,64 +83,53 @@ export function ExplorarFilterSidebar({
                     </button>
                 </section>
 
-                {/* Type Section */}
+                {/* Type Section - Using Dropdown */}
                 <section>
                     <h3 className="mb-3 text-sm font-bold text-brand-dark">Tipo</h3>
-                    <div className="space-y-2">
+                    <Dropdown trigger={
+                        <button className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors text-left">
+                            <span>{typeOptions.find(o => o.value === currentType)?.label || "Selecionar"}</span>
+                            <span className="text-gray-400">▼</span>
+                        </button>
+                    }>
                         {typeOptions.map((option) => (
-                            <button
+                            <DropdownItem
                                 key={option.value}
                                 onClick={() => onTypeChange(option.value)}
-                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentType === option.value
-                                        ? "bg-[#ecfdf5] text-brand-green"
-                                        : "text-brand-dark hover:bg-gray-50"
-                                    }`}
+                                className={currentType === option.value ? "bg-[#ecfdf5] text-brand-green" : ""}
                             >
-                                <span>{option.label}</span>
-                                {currentType === option.value && (
-                                    <Check className="h-4 w-4" />
-                                )}
-                            </button>
+                                {option.label}
+                            </DropdownItem>
                         ))}
-                    </div>
+                    </Dropdown>
                 </section>
 
-                {/* Categories Section */}
+                {/* Categories Section - Using Checkbox */}
                 <section>
                     <h3 className="mb-3 text-sm font-bold text-brand-dark">Categorias</h3>
-                    <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[200px] overflow-y-hidden">
                         {activeCategoriesList.map((cat) => {
                             const isSelected = selectedCategories.includes(cat.name)
                             return (
-                                <button
+                                <label
                                     key={cat.name}
-                                    onClick={() => onToggleCategory(cat.name)}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${isSelected
-                                            ? "bg-[#ecfdf5] text-brand-green"
-                                            : "text-brand-dark hover:bg-gray-50"
-                                        }`}
+                                    className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors"
                                 >
-                                    <span
-                                        className={`flex h-4 w-4 items-center justify-center rounded border ${isSelected
-                                                ? "border-brand-green bg-brand-green"
-                                                : "border-gray-200 bg-white"
-                                            }`}
-                                    >
-                                        {isSelected && (
-                                            <Check className="h-3.5 w-3.5 text-white" />
-                                        )}
-                                    </span>
+                                    <Checkbox
+                                        checked={isSelected}
+                                        onChange={() => onToggleCategory(cat.name)}
+                                    />
                                     {cat.icon_url && (
                                         <img
                                             src={cat.icon_url}
                                             alt=""
-                                            className="h-6 w-6 object-contain"
+                                            className="h-5 w-5 object-contain"
                                         />
                                     )}
-                                    <span className="min-w-0 flex-1 truncate">
+                                    <span className="text-sm font-medium text-brand-dark truncate">
                                         {cat.name}
                                     </span>
-                                </button>
+                                </label>
                             )
                         })}
                     </div>
@@ -154,59 +143,49 @@ export function ExplorarFilterSidebar({
                             value={minPrice}
                             onChange={(e) => onMinPriceChange(e.target.value)}
                             inputMode="decimal"
-                            placeholder="Min."
+                            placeholder="Mín."
                             className="h-10 text-sm"
                         />
                         <Input
                             value={maxPrice}
                             onChange={(e) => onMaxPriceChange(e.target.value)}
                             inputMode="decimal"
-                            placeholder="Max."
+                            placeholder="Máx."
                             className="h-10 text-sm"
                         />
                     </div>
                 </section>
 
-                {/* Sort Section */}
+                {/* Sort Section - Using Dropdown */}
                 <section>
                     <h3 className="mb-3 text-sm font-bold text-brand-dark">Ordenar</h3>
-                    <select
-                        value={sortBy}
-                        onChange={(e) => onSortChange(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-brand-dark outline-none focus:border-brand-green"
-                    >
+                    <Dropdown trigger={
+                        <button className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-brand-dark hover:border-brand-green transition-colors text-left">
+                            <span>{sortOptions.find(o => o.value === sortBy)?.label || "Selecionar"}</span>
+                            <span className="text-gray-400">▼</span>
+                        </button>
+                    }>
                         {sortOptions.map((option) => (
-                            <option
+                            <DropdownItem
                                 key={option.value}
-                                value={option.value}
+                                onClick={() => onSortChange(option.value)}
+                                className={sortBy === option.value ? "bg-[#ecfdf5] text-brand-green" : ""}
                             >
                                 {option.label}
-                            </option>
+                            </DropdownItem>
                         ))}
-                    </select>
+                    </Dropdown>
                 </section>
 
-                {/* Promo Section */}
+                {/* Promo Section - Using Checkbox */}
                 <section>
-                    <button
-                        onClick={onPromoToggle}
-                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${promoOn
-                                ? "bg-[#ecfdf5] text-brand-green"
-                                : "text-brand-dark hover:bg-gray-50"
-                            }`}
-                    >
-                        <span
-                            className={`flex h-4 w-4 items-center justify-center rounded border ${promoOn
-                                    ? "border-brand-green bg-brand-green"
-                                    : "border-gray-200 bg-white"
-                                }`}
-                        >
-                            {promoOn && (
-                                <Check className="h-3.5 w-3.5 text-white" />
-                            )}
-                        </span>
-                        Em promoção
-                    </button>
+                    <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <Checkbox
+                            checked={promoOn}
+                            onChange={onPromoToggle}
+                        />
+                        <span className="text-sm font-medium text-brand-dark">Em promoção</span>
+                    </label>
                 </section>
             </div>
         </aside>

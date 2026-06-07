@@ -1,6 +1,6 @@
 "use client"
 
-import { Grid3X3, List } from "lucide-react"
+import { GridIcon, ListIcon } from "@/lib/icons"
 
 type ViewMode = "grid" | "list"
 
@@ -16,34 +16,33 @@ export function ExplorarViewControls({
     resultsCount,
 }: ExplorarViewControlsProps) {
     return (
-        <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <p className="text-sm font-semibold text-brand-inactive-text">
-                    {resultsCount} resultado{resultsCount !== 1 ? "s" : ""}
-                </p>
+        <div className="flex items-center justify-between mb-6">
+            {/* Results count */}
+            <div className="text-sm text-brand-inactive-text">
+                {resultsCount > 0 && <span>{resultsCount} resultado{resultsCount !== 1 ? 's' : ''}</span>}
             </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+
+            {/* View toggle - ERP Style */}
+            <div className="flex items-center bg-white border border-brand-border rounded-full p-1 h-[42px] shrink-0">
                 <button
-                    type="button"
-                    onClick={() => onViewModeChange("grid")}
-                    aria-label="Ver em grid"
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${viewMode === "grid"
-                            ? "border-brand-green bg-[#ecfdf5] text-brand-green"
-                            : "border-gray-200 text-brand-dark hover:bg-gray-50"
+                    onClick={() => onViewModeChange("list")}
+                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                            ? "bg-gray-100 text-brand-dark"
+                            : "text-gray-400 hover:text-gray-600"
                         }`}
+                    title="Vista em lista"
                 >
-                    <Grid3X3 className="h-4 w-4" />
+                    <ListIcon className="w-[18px] h-[18px]" />
                 </button>
                 <button
-                    type="button"
-                    onClick={() => onViewModeChange("list")}
-                    aria-label="Ver em lista"
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${viewMode === "list"
-                            ? "border-brand-green bg-[#ecfdf5] text-brand-green"
-                            : "border-gray-200 text-brand-dark hover:bg-gray-50"
+                    onClick={() => onViewModeChange("grid")}
+                    className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                            ? "bg-gray-100 text-brand-dark"
+                            : "text-gray-400 hover:text-gray-600"
                         }`}
+                    title="Vista em grade"
                 >
-                    <List className="h-4 w-4" />
+                    <GridIcon className="w-[18px] h-[18px]" />
                 </button>
             </div>
         </div>

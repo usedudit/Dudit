@@ -15,8 +15,6 @@ import {
     ChevronRight,
     MapPin,
     Check,
-    Grid3X3,
-    List,
     SlidersHorizontal,
 } from "lucide-react"
 import Link from "next/link"
@@ -33,7 +31,7 @@ import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { getMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
-import { ExplorarPageTabs } from "./ExplorarPageTabs"
+import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
 import { ExplorarFilterSidebar } from "./ExplorarFilterSidebar"
@@ -915,30 +913,17 @@ export function ExplorarPageClient({
                     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 `}</style>
 
-                {/* TAB NAVIGATION (Mobile/Tablet/Desktop) */}
+                {/* MOBILE CONTROLS (Sticky bar with Filters & Sort buttons) */}
                 {!isLandingPage && rawItems.length > 0 && (
-                    <ExplorarPageTabs
-                        activeTab={activeTab}
-                        onTabChange={(tab) => {
-                            if (tab === "filtros") {
-                                setIsFiltersBottomSheetOpen(true)
-                            } else if (tab === "ordenar") {
-                                setIsSortBottomSheetOpen(true)
-                            }
-                            setActiveTab(tab as any)
-                        }}
+                    <ExplorarMobileControls
                         activeFiltersCount={activeFiltersCount}
-                        sortLabel={
-                            sortBy === "relevancia"
-                                ? "Relevância"
-                                : sortBy === "preco_menor"
-                                    ? "Menor Preço"
-                                    : sortBy === "preco_maior"
-                                        ? "Maior Preço"
-                                        : "Mais Recentes"
-                        }
+                        onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
+                        onOpenSort={() => setIsSortBottomSheetOpen(true)}
                     />
                 )}
+
+                {/* Add padding to account for sticky mobile controls */}
+                {!isLandingPage && rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
@@ -979,9 +964,17 @@ export function ExplorarPageClient({
                         />
 
                         <div className="min-w-0 flex-1">
-                            {/* Sponsored Ad Banner */}
+                            {/* Title Section - ABOVE BANNER */}
+                            {!isLandingPage && (
+                                <ExplorarHeaderSection
+                                    title={pageTitle}
+                                    resultsCount={filteredResults.length}
+                                />
+                            )}
+
+                            {/* Sponsored Ad Banner - Desktop smaller (lg:max-w-[900px]), responsive height */}
                             {exploreAds.length > 0 && (
-                                <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5]">
+                                <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5] lg:max-w-[900px]">
                                     <div className="w-full h-full flex items-center justify-center cursor-pointer">
                                         {exploreAds[0]?.image_url ? (
                                             <img
@@ -1001,14 +994,6 @@ export function ExplorarPageClient({
                                         )}
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Title Section */}
-                            {!isLandingPage && (
-                                <ExplorarHeaderSection
-                                    title={pageTitle}
-                                    resultsCount={filteredResults.length}
-                                />
                             )}
 
                             <AnimatePresence mode="wait">
@@ -1229,29 +1214,12 @@ export function ExplorarPageClient({
                         onClearFilters={clearFilters}
                     />
                     <div className="min-w-0 flex-1">
-                        {/* Sponsored Ad Banner - Top of Grid */}
-                        {exploreAds.length > 0 && (
-                            <div className="mb-6 rounded-lg overflow-hidden bg-gradient-to-r from-gray-100 to-gray-50 aspect-[16/5]">
-                                <div className="w-full h-full flex items-center justify-center cursor-pointer">
-                                    {exploreAds[0]?.image_url ? (
-                                        <img
-                                            src={exploreAds[0].image_url}
-                                            alt="Patrocinado"
-                                            className="w-full h-full object-cover"
-                                            onClick={() => {
-                                                if (exploreAds[0]?.destination_url) {
-                                                    window.open(exploreAds[0].destination_url, "_blank")
-                                                }
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="text-center text-brand-inactive-text">
-                                            <p className="text-sm font-bold">Anúncio Patrocinado</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        {/* Grid/List View Controls */}
+                        <ExplorarViewControls
+                            viewMode={viewMode}
+                            onViewModeChange={setViewMode}
+                            resultsCount={filteredResults.length}
+                        />
 
                         <AnimatePresence mode="wait">
                             <motion.div
@@ -1386,32 +1354,6 @@ export function ExplorarPageClient({
                                 ) : (
                                     <>
                                         <div className="space-y-5">
-                                            <div className="flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-brand-inactive-text">
-                                                        {filteredResults.length} {filteredResults.length === 1 ? "resultado" : "resultados"}
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-2 self-start sm:self-auto">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setViewMode("grid")}
-                                                        aria-label="Ver em grid"
-                                                        className={`flex h-9 w-9 items-center justify-center rounded-full border ${viewMode === "grid" ? "border-brand-green bg-[#ecfdf5] text-brand-green" : "border-gray-200 text-brand-dark hover:bg-gray-50"}`}
-                                                    >
-                                                        <Grid3X3 className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setViewMode("list")}
-                                                        aria-label="Ver em lista"
-                                                        className={`flex h-9 w-9 items-center justify-center rounded-full border ${viewMode === "list" ? "border-brand-green bg-[#ecfdf5] text-brand-green" : "border-gray-200 text-brand-dark hover:bg-gray-50"}`}
-                                                    >
-                                                        <List className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-
                                             {filteredResults.length === 0 && !hasNextPage ? (
                                                 <div className="py-12 flex flex-col items-center">
                                                     <IconPlaceholder
