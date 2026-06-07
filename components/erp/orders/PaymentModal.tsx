@@ -277,6 +277,8 @@ export type PaymentModalProps = {
     existingPaidAmount?: number
     existingPaymentBreakdown?: any[]
     lockPaymentCompletion?: boolean
+    /** Oculta "Pendente de entrega" e usa layout de coluna única (ex.: checkout de agendamento). */
+    hidePendingDelivery?: boolean
     /** Texto abaixo do nome do cliente (desktop e mobile). */
     headerSubtitle?: string
     isMarketplaceOrder?: boolean
@@ -301,6 +303,7 @@ const PaymentModal = ({
     existingPaidAmount = 0,
     existingPaymentBreakdown = [],
     lockPaymentCompletion = false,
+    hidePendingDelivery = false,
     headerSubtitle = PAYMENT_MODAL_HEADER_SUBTITLE,
     isMarketplaceOrder = false,
     role = 'staff',
@@ -1629,7 +1632,7 @@ const PaymentModal = ({
                                             <div className="border-t border-brand-border dark:border-dark-border my-6"></div>
 
                                             {!lockPaymentCompletion && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                <div className={`grid ${hidePendingDelivery ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-4 mb-4`}>
                                                     <div
                                                         className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingPayment ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
                                                         onClick={() => setIsPendingPayment(!isPendingPayment)}
@@ -1643,18 +1646,20 @@ const PaymentModal = ({
                                                         </div>
                                                     </div>
 
-                                                    <div
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
-                                                        onClick={() => setIsPendingDelivery(!isPendingDelivery)}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                                                            <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                    {!hidePendingDelivery && (
+                                                        <div
+                                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${isPendingDelivery ? 'border-brand-green bg-green-50/20 dark:bg-green-900/10' : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20'}`}
+                                                            onClick={() => setIsPendingDelivery(!isPendingDelivery)}
+                                                        >
+                                                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                                <TruckIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+                                                            </div>
+                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
+                                                            <div className="ml-auto pointer-events-none">
+                                                                <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
+                                                            </div>
                                                         </div>
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pendente de entrega</span>
-                                                        <div className="ml-auto pointer-events-none">
-                                                            <Checkbox checked={isPendingDelivery} onChange={() => { }} name="pendingDel" />
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </motion.div>

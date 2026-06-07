@@ -4,6 +4,7 @@ import { EditIcon, TrashIcon } from '@/lib/icons';
 import { getEndTime } from './utils';
 import { InfoCard } from '@/components/reusable';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { getFulfillmentModeLabel } from '@/lib/orders/status';
 
 interface ServiceItemCardProps {
     service: any;
@@ -12,7 +13,8 @@ interface ServiceItemCardProps {
     onClick?: () => void;
     showActions?: boolean;
     unavailable?: boolean;
-    timeRange?: string; // New Prop
+    timeRange?: string;
+    fulfillmentMode?: string | null;
 }
 
 export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
@@ -22,7 +24,8 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
     onClick,
     showActions = true,
     unavailable = false,
-    timeRange
+    timeRange,
+    fulfillmentMode,
 }) => {
     // If explicit timeRange is passed, use it. Otherwise calc based on service.startTime or fallback
     const timeDisplay = timeRange
@@ -59,8 +62,10 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
                 <div className="flex justify-between items-center mb-2">
                     <div className="text-sm text-brand-inactive-text">
                         {service.duration}min
+                        {fulfillmentMode && (
+                            <span className="ml-2">· {getFulfillmentModeLabel(fulfillmentMode)}</span>
+                        )}
                     </div>
-                    {/* Display Individual Service Price, not accumulated total */}
                     <div className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(service.price)}</div>
                 </div>
 

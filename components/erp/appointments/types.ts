@@ -27,6 +27,7 @@ export interface Appointment {
     source?: 'unavailable' | 'appointment';
     recurrence?: 'none' | 'daily' | 'weekly';
     saleId?: string | null;
+    marketplaceOrderId?: string | null;
 }
 
 // Helper interface for layout calculation

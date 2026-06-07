@@ -62,3 +62,35 @@ export function getPaymentStatusLabel(status?: string | null) {
 export function getDeliveryStatusLabel(status?: string | null) {
   return getDeliveryStatusMeta(status).label
 }
+
+const SALES_CHANNEL_LABELS: Record<string, string> = {
+  booking: "Agendamento online",
+  agendamento: "Agendamento",
+  manual: "Manual",
+  online_storefront: "Loja online",
+  "loja online": "Loja online",
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  presencial: "Presencial",
+}
+
+export function getSalesChannelLabel(channel?: string | null) {
+  if (!channel) return "Não informado"
+  const key = channel.trim().toLowerCase()
+  return SALES_CHANNEL_LABELS[key] || channel
+}
+
+export function getFulfillmentModeLabel(mode?: string | null) {
+  switch (mode) {
+    case "delivery":
+      return "Entrega"
+    case "pickup":
+      return "Retirada"
+    case "on_site":
+      return "Na loja"
+    case "customer_location":
+      return "No endereço do cliente"
+    default:
+      return mode ? mode.replace(/_/g, " ") : "Não informado"
+  }
+}

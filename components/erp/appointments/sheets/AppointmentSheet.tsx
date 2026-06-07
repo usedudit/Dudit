@@ -20,7 +20,8 @@ import PaymentModal from '@/components/erp/orders/PaymentModal';
 import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
 import { createServiceAction } from '@/app/actions/erp/servicos';
-import { createERPOrderAction } from '@/app/actions/erp/orders';
+import { confirmAppointmentOrderPaymentAction, createERPOrderAction, getOrderDetailsAction } from '@/app/actions/erp/orders';
+import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
 import { getFinanceAccountsAction } from '@/app/actions/erp/finance-accounts';
 import { pickBankThenCashDefaultFinanceAccountId } from '@/lib/finance-utils';
 import { updateAppointmentAction } from '@/app/actions/erp/appointments';
@@ -146,7 +147,7 @@ export const AppointmentSheet = ({
     const csrfToken = useCSRFToken();
 
     const handleViewSale = () => {
-        const saleId = completedOrderId || appointment?.saleId || (appointment as any)?.sale_id;
+        const saleId = linkedOrderId || appointment?.marketplaceOrderId || appointment?.saleId || (appointment as any)?.sale_id;
         if (saleId) {
             router.push(`/erp/orders/${saleId}`);
             onClose();
@@ -858,7 +859,29 @@ export const AppointmentSheet = ({
     }
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
+    const [linkedOrder, setLinkedOrder] = useState<any>(null);
     const [financeAccountId, setFinanceAccountId] = useState<string>('');
+
+    const linkedOrderId = completedOrderId
+        || appointment?.marketplaceOrderId
+        || appointment?.saleId
+        || null;
+
+    useEffect(() => {
+        if (!partnerId || !linkedOrderId) {
+            setLinkedOrder(null);
+            return;
+        }
+
+        let cancelled = false;
+        getOrderDetailsAction(linkedOrderId, partnerId).then((res) => {
+            if (!cancelled && res.success && res.data) {
+                setLinkedOrder(res.data);
+            }
+        });
+
+        return () => { cancelled = true; };
+    }, [partnerId, linkedOrderId]);
 
     // Fetch default finance account for order creation
     useEffect(() => {
@@ -872,47 +895,90 @@ export const AppointmentSheet = ({
         });
     }, [partnerId]);
 
-    // Handle payment confirmation: create ERP order + update appointment
     const handleConfirmPayment = async (paymentData: any) => {
         if (!financeAccountId) {
             toast.warning("Conta financeira", "Nenhuma conta de recebimento configurada. Configure em Financeiro > Contas.");
             return { error: "Conta financeira não configurada" };
         }
 
-        const items = selectedServices.map((s, idx) => ({
-            productId: null as string | null,
-            customName: s.name,
-            quantity: 1,
-            unitPrice: s.price,
-            sortOrder: idx,
-        }));
-
-        const payload = {
-            partnerId: partnerId || '',
-            customerId: selectedClient?.id,
-            customerName: selectedClient?.name || 'Consumidor final',
-            salesChannel: 'Agendamento',
-            deliveryMethod: 'pickup' as const,
-            financeAccountId,
-            paymentStatus: paymentData.paymentStatus as 'paid' | 'partially_paid' | 'unpaid',
-            paymentMethod: paymentData.paymentMethod || 'pendente',
-            paymentBreakdown: paymentData.paymentBreakdown,
-            deliveryStatus: 'delivered' as const,
-            paidAmount: paymentData.paidAmount,
-            items,
-            subtotal: calculatedPrice,
-            discountValue: 0,
-            discountType: 'fixed' as const,
-            shippingCost: 0,
-            additionalCosts: 0,
-            totalAmount: calculatedPrice,
-            notes: notes || undefined,
-            csrf_token: csrfToken || undefined,
-            paymentProvider: paymentData.paymentProvider || undefined,
-            mpPaymentId: paymentData.mpPaymentId || undefined,
-        };
+        const paymentStatus = paymentData.paymentStatus as 'paid' | 'partially_paid' | 'unpaid';
+        const existingOrderId = linkedOrderId;
 
         try {
+            if (existingOrderId) {
+                const result = await confirmAppointmentOrderPaymentAction({
+                    orderId: existingOrderId,
+                    partnerId: partnerId || '',
+                    paymentStatus,
+                    paidAmount: paymentData.paidAmount,
+                    paymentMethod: paymentData.paymentMethod || 'pendente',
+                    paymentBreakdown: paymentData.paymentBreakdown,
+                    paymentProvider: paymentData.paymentProvider || null,
+                    mpPaymentId: paymentData.mpPaymentId || null,
+                    financeAccountId,
+                    notes: notes || undefined,
+                });
+
+                if (!result.success) {
+                    return { error: result.error || 'Erro ao confirmar pagamento' };
+                }
+
+                const orderNumber = linkedOrder?.order_number || existingOrderId;
+                setCompletedOrderId(existingOrderId);
+
+                const newStatus = paymentStatus === 'paid' ? 'Pago' : paymentStatus === 'partially_paid' ? 'Pago Parcialmente' : 'Concluído';
+                setStatus(newStatus);
+
+                if (appointment?.id) {
+                    try {
+                        const updateRes = await updateAppointmentAction(appointment.id, {
+                            status: newStatus,
+                            paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
+                            paidAmount: paymentData.paidAmount,
+                        } as any);
+                        if (updateRes.success && updateRes.item && onAppointmentUpdated) {
+                            onAppointmentUpdated(updateRes.item);
+                        }
+                    } catch { }
+                }
+
+                router.refresh();
+                return { success: true, orderNumber };
+            }
+
+            const items = selectedServices.map((s, idx) => ({
+                productId: null as string | null,
+                customName: s.name,
+                quantity: 1,
+                unitPrice: s.price,
+                sortOrder: idx,
+            }));
+
+            const payload = {
+                partnerId: partnerId || '',
+                customerId: selectedClient?.id,
+                customerName: selectedClient?.name || 'Consumidor final',
+                salesChannel: 'Agendamento',
+                deliveryMethod: 'pickup' as const,
+                financeAccountId,
+                paymentStatus,
+                paymentMethod: paymentData.paymentMethod || 'pendente',
+                paymentBreakdown: paymentData.paymentBreakdown,
+                deliveryStatus: 'delivered' as const,
+                paidAmount: paymentData.paidAmount,
+                items,
+                subtotal: calculatedPrice,
+                discountValue: 0,
+                discountType: 'fixed' as const,
+                shippingCost: 0,
+                additionalCosts: 0,
+                totalAmount: calculatedPrice,
+                notes: notes || undefined,
+                csrf_token: csrfToken || undefined,
+                paymentProvider: paymentData.paymentProvider || undefined,
+                mpPaymentId: paymentData.mpPaymentId || undefined,
+            };
+
             const result = await createERPOrderAction(payload);
             if (!('success' in result) || !result.success) {
                 return { error: ('error' in result ? result.error : 'Erro ao criar venda') || 'Erro ao criar venda' };
@@ -923,7 +989,6 @@ export const AppointmentSheet = ({
 
             if (orderId) setCompletedOrderId(orderId);
 
-            // Update appointment status to "Concluído"
             const newStatus = 'Concluído';
             setStatus(newStatus);
 
@@ -931,9 +996,9 @@ export const AppointmentSheet = ({
                 try {
                     const updateRes = await updateAppointmentAction(appointment.id, {
                         status: newStatus,
-                        paymentStatus: paymentData.paymentStatus === 'paid' ? 'Paid' : 'Partially Paid',
+                        paymentStatus: paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partially_paid' ? 'partially_paid' : 'unpaid',
                         saleId: orderId,
-                        paidAmount: paymentData.paidAmount
+                        paidAmount: paymentData.paidAmount,
                     } as any);
                     if (updateRes.success && updateRes.item && onAppointmentUpdated) {
                         onAppointmentUpdated(updateRes.item);
@@ -943,7 +1008,7 @@ export const AppointmentSheet = ({
 
             router.refresh();
             return { success: true, orderNumber };
-        } catch (error) {
+        } catch {
             return { error: 'Erro ao processar venda do agendamento' };
         }
     };
@@ -1457,8 +1522,18 @@ export const AppointmentSheet = ({
                     {currentView === 'summary' && (() => {
                         const isCompletedStatus = (status || '').toLowerCase() === 'concluído' || (status || '').toLowerCase() === 'concluido';
                         const isLocked = isPaid || isCompletedStatus;
-                        const currentPaidAmount = completedOrderId ? calculatedPrice : (appointment?.paidAmount || 0);
+                        const currentPaidAmount = completedOrderId
+                            ? calculatedPrice
+                            : Number(linkedOrder?.paid_amount ?? appointment?.paidAmount ?? 0);
                         const remainingToPay = Math.max(0, calculatedPrice - currentPaidAmount);
+                        const displaySalesChannel = getSalesChannelLabel(
+                            appointment?.salesChannel || linkedOrder?.sales_channel || linkedOrder?.order_source
+                        );
+                        const displayPaymentStatus = getPaymentStatusLabel(
+                            appointment?.paymentStatus || linkedOrder?.situation
+                        );
+                        const displayFulfillmentMode = getFulfillmentModeLabel(appointment?.fulfillmentMode);
+                        const displayOrderNumber = linkedOrder?.order_number || null;
 
                         const finalDateStr = needsRangePicker ? startDateRange : formatDateStr(selectedCalDate);
                         const timeStr = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || '09:00');
@@ -1544,21 +1619,35 @@ export const AppointmentSheet = ({
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
                                             <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Canal</p>
-                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
-                                                {appointment.salesChannel || 'booking'}
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                {displaySalesChannel}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
                                             <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Pagamento</p>
-                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
-                                                {appointment.paymentStatus || 'unpaid'}
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                {displayPaymentStatus}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Local de atendimento</p>
-                                            <p className="font-semibold text-brand-dark dark:text-dark-heading capitalize">
-                                                {appointment.fulfillmentMode?.replace(/_/g, ' ') || '—'}
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Local</p>
+                                            <p className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                {displayFulfillmentMode}
                                             </p>
+                                        </div>
+                                        <div className="rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <p className="font-bold text-brand-inactive-text uppercase tracking-wide mb-1">Venda</p>
+                                            {displayOrderNumber ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleViewSale}
+                                                    className="font-semibold text-brand-green hover:underline text-left"
+                                                >
+                                                    #{displayOrderNumber}
+                                                </button>
+                                            ) : (
+                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">—</p>
+                                            )}
                                         </div>
                                         {appointment.needsReschedule && (
                                             <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 col-span-2">
@@ -1619,12 +1708,11 @@ export const AppointmentSheet = ({
                                         {selectedServices.map((service, idx) => (
                                             <ServiceItemCard
                                                 key={idx}
-                                                // Pass individual service start time for display
                                                 service={{ ...service, startTime: getServiceTimeRange(idx).split(' - ')[0] }}
                                                 onEdit={!isLocked ? () => handleServiceEdit(idx) : undefined}
                                                 onRemove={!isLocked ? () => handleRemoveServiceRequest(idx) : undefined}
-                                                // Pass formatted time range
                                                 timeRange={getServiceTimeRange(idx)}
+                                                fulfillmentMode={appointment?.fulfillmentMode}
                                             />
                                         ))}
                                     </div>
@@ -1651,25 +1739,29 @@ export const AppointmentSheet = ({
                                     </div>
                                 </div>
 
-                                {/* Payment Status InfoCard */}
-                                <div className="mt-4">
-                                    {remainingToPay <= 0.009 ? (
-                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                                            <span>Totalmente pago</span>
-                                            <span>Valor total atingido!</span>
-                                        </div>
-                                    ) : currentPaidAmount > 0 ? (
-                                        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
-                                            <span>Pago parcialmente</span>
-                                            <span>Falta Pagar: {formatCurrency(remainingToPay)}</span>
-                                        </div>
-                                    ) : (
-                                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-center justify-between text-xs font-bold text-red-800 dark:text-red-300">
-                                            <span>Não pago</span>
-                                            <span>Falta Pagar: {formatCurrency(remainingToPay)}</span>
-                                        </div>
-                                    )}
-                                </div>
+                                {mode === 'view' && (
+                                    <div className="mt-4">
+                                        {remainingToPay <= 0.009 ? (
+                                            <InfoCard
+                                                color="green"
+                                                title="Totalmente pago"
+                                                message="Valor total atingido!"
+                                            />
+                                        ) : currentPaidAmount > 0 ? (
+                                            <InfoCard
+                                                color="orange"
+                                                title="Pago parcialmente"
+                                                message={`Falta pagar: ${formatCurrency(remainingToPay)}`}
+                                            />
+                                        ) : (
+                                            <InfoCard
+                                                color="red"
+                                                title="Não pago"
+                                                message={`Falta pagar: ${formatCurrency(remainingToPay)}`}
+                                            />
+                                        )}
+                                    </div>
+                                )}
                             </motion.div>
                         );
                     })()}
@@ -2588,8 +2680,11 @@ export const AppointmentSheet = ({
                             name: s.name,
                         }))}
                         amountDue={calculatedPrice}
+                        existingPaidAmount={Number(linkedOrder?.paid_amount ?? appointment?.paidAmount ?? 0)}
+                        existingPaymentBreakdown={linkedOrder?.payment_breakdown || []}
                         customer={{ id: selectedClient?.id, name: selectedClient?.name }}
                         headerSubtitle="Agendamento de Serviço"
+                        hidePendingDelivery
                     />
                 )}
             </AnimatePresence>
