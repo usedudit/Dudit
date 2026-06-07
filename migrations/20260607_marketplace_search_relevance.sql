@@ -62,29 +62,38 @@ AS $$
 BEGIN
   UPDATE public.products p
   SET
-    mp_store_name = ptr.store_name,
-    mp_search_category_text = CASE
-      WHEN cat.parent_id IS NOT NULL THEN parent_cat.name
-      ELSE cat.name
-    END,
-    mp_search_subcategory_text = CASE
-      WHEN cat.parent_id IS NOT NULL THEN cat.name
-      ELSE NULL
-    END,
-    fts = public.build_marketplace_tsvector(
-      p.name,
-      CASE WHEN cat.parent_id IS NOT NULL THEN parent_cat.name ELSE cat.name END,
-      CASE WHEN cat.parent_id IS NOT NULL THEN cat.name ELSE NULL END,
-      array_to_string(coalesce(p.tags, '{}'::text[]), ' '),
-      p.description,
+    mp_store_name = data.store_name,
+    mp_search_category_text = data.category_text,
+    mp_search_subcategory_text = data.subcategory_text,
+    fts = data.fts
+  FROM (
+    SELECT
+      p2.id,
       ptr.store_name,
-      p.sku
-    )
-  FROM public.partners ptr
-  LEFT JOIN public.marketplace_product_categories cat ON cat.id = p.marketplace_category_id
-  LEFT JOIN public.marketplace_product_categories parent_cat ON parent_cat.id = cat.parent_id
-  WHERE p.partner_id = ptr.id
-    AND (p_product_id IS NULL OR p.id = p_product_id);
+      CASE
+        WHEN cat.parent_id IS NOT NULL THEN parent_cat.name
+        ELSE cat.name
+      END as category_text,
+      CASE
+        WHEN cat.parent_id IS NOT NULL THEN cat.name
+        ELSE NULL
+      END as subcategory_text,
+      public.build_marketplace_tsvector(
+        p2.name,
+        CASE WHEN cat.parent_id IS NOT NULL THEN parent_cat.name ELSE cat.name END,
+        CASE WHEN cat.parent_id IS NOT NULL THEN cat.name ELSE NULL END,
+        array_to_string(coalesce(p2.tags, '{}'::text[]), ' '),
+        p2.description,
+        ptr.store_name,
+        p2.sku
+      ) as fts
+    FROM public.products p2
+    INNER JOIN public.partners ptr ON p2.partner_id = ptr.id
+    LEFT JOIN public.marketplace_product_categories cat ON cat.id = p2.marketplace_category_id
+    LEFT JOIN public.marketplace_product_categories parent_cat ON parent_cat.id = cat.parent_id
+    WHERE (p_product_id IS NULL OR p2.id = p_product_id)
+  ) data
+  WHERE p.id = data.id;
 END;
 $$;
 
@@ -175,36 +184,45 @@ AS $$
 BEGIN
   UPDATE public.services s
   SET
-    mp_store_name = ptr.store_name,
-    mp_search_category_text = coalesce(
-      CASE WHEN mcat.parent_id IS NOT NULL THEN mparent.name ELSE mcat.name END,
-      sc.name
-    ),
-    mp_search_subcategory_text = CASE
-      WHEN mcat.parent_id IS NOT NULL THEN mcat.name
-      ELSE NULL
-    END,
-    fts = public.build_marketplace_tsvector(
-      s.name,
+    mp_store_name = data.store_name,
+    mp_search_category_text = data.category_text,
+    mp_search_subcategory_text = data.subcategory_text,
+    fts = data.fts
+  FROM (
+    SELECT
+      s2.id,
+      ptr.store_name,
       coalesce(
         CASE WHEN mcat.parent_id IS NOT NULL THEN mparent.name ELSE mcat.name END,
         sc.name
-      ),
-      CASE WHEN mcat.parent_id IS NOT NULL THEN mcat.name ELSE NULL END,
-      coalesce((
-        SELECT string_agg(elem, ' ')
-        FROM jsonb_array_elements_text(coalesce(s.tags, '[]'::jsonb)) AS elem
-      ), ''),
-      s.description,
-      ptr.store_name,
-      NULL
-    )
-  FROM public.partners ptr
-  LEFT JOIN public.marketplace_service_categories mcat ON mcat.id = s.marketplace_category_id
-  LEFT JOIN public.marketplace_service_categories mparent ON mparent.id = mcat.parent_id
-  LEFT JOIN public.service_categories sc ON sc.id = s.category_id
-  WHERE s.partner_id = ptr.id
-    AND (p_service_id IS NULL OR s.id = p_service_id);
+      ) as category_text,
+      CASE
+        WHEN mcat.parent_id IS NOT NULL THEN mcat.name
+        ELSE NULL
+      END as subcategory_text,
+      public.build_marketplace_tsvector(
+        s2.name,
+        coalesce(
+          CASE WHEN mcat.parent_id IS NOT NULL THEN mparent.name ELSE mcat.name END,
+          sc.name
+        ),
+        CASE WHEN mcat.parent_id IS NOT NULL THEN mcat.name ELSE NULL END,
+        coalesce((
+          SELECT string_agg(elem, ' ')
+          FROM jsonb_array_elements_text(coalesce(s2.tags, '[]'::jsonb)) AS elem
+        ), ''),
+        s2.description,
+        ptr.store_name,
+        NULL
+      ) as fts
+    FROM public.services s2
+    INNER JOIN public.partners ptr ON s2.partner_id = ptr.id
+    LEFT JOIN public.marketplace_service_categories mcat ON mcat.id = s2.marketplace_category_id
+    LEFT JOIN public.marketplace_service_categories mparent ON mparent.id = mcat.parent_id
+    LEFT JOIN public.service_categories sc ON sc.id = s2.category_id
+    WHERE (p_service_id IS NULL OR s2.id = p_service_id)
+  ) data
+  WHERE s.id = data.id;
 END;
 $$;
 

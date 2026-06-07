@@ -42,7 +42,7 @@ function normalizePlan(item: any) {
         for (const planItem of item.recurring_plan_items) {
             const qty = Number(planItem.quantity || 1)
             let itemPrice = Number(planItem.unit_price || 0)
-            
+
             if (itemPrice <= 0) {
                 if (planItem.item_type === 'product' && planItem.products) {
                     itemPrice = Number(planItem.products.price || 0)
@@ -645,13 +645,14 @@ async function hydrateMarketplaceSearchHits(
             continue
         }
 
-        const serviceCategoryName = item.service_categories?.name || item.category || null
+        const serviceCategoryName = (item.service_categories?.name || item.category || null) as string | null
+        const sanitizedCategoryName = serviceCategoryName && typeof serviceCategoryName === 'string' ? serviceCategoryName : null
         results.push({
             ...item,
-            category: serviceCategoryName,
+            category: sanitizedCategoryName,
             itemType: "servico",
             partners: partner,
-            subcategoryName: serviceCategoryName,
+            subcategoryName: sanitizedCategoryName,
             _searchRank: hit.rank,
         })
     }
@@ -913,8 +914,10 @@ async function searchMarketplaceByCity(
             city: rawPartner.addresses?.[0]?.city || null,
             state: rawPartner.addresses?.[0]?.state || null
         } : null
-        const serviceCategoryName = item.service_categories?.name || item.category || null
-        return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
+        // Ensure category is always a string or null, never an object
+        const serviceCategoryName = (item.service_categories?.name || item.category || null) as string | null
+        const sanitizedCategoryName = serviceCategoryName && typeof serviceCategoryName === 'string' ? serviceCategoryName : null
+        return { ...item, category: sanitizedCategoryName, itemType: 'servico', partners: partner, subcategoryName: sanitizedCategoryName }
     })
 
     const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))
