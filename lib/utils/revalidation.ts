@@ -8,7 +8,7 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
 // Helper interno para evitar repetição do "max"
-export function safeRevalidateTag(tag: string) {
+export async function safeRevalidateTag(tag: string) {
     // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
     revalidateTag(tag, "max")
 }
@@ -19,23 +19,23 @@ export function safeRevalidateTag(tag: string) {
 export async function revalidateProducts(partnerId: string, productId?: string) {
     // Limpa a lista de produtos desse parceiro
     if (partnerId) {
-        safeRevalidateTag(TAGS.products(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
-        safeRevalidateTag(partnerId) // Tag genérica do parceiro
-        safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
+        await safeRevalidateTag(TAGS.products(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
+        await safeRevalidateTag(partnerId) // Tag genérica do parceiro
+        await safeRevalidateTag(`partner-${partnerId}`) // Just in case, explicit call as requested by user
     }
 
     // Limpa o cache do produto específico (detalhes)
     if (productId) {
-        safeRevalidateTag(TAGS.product(productId))
+        await safeRevalidateTag(TAGS.product(productId))
     }
 
     // Limpa a lista geral
-    safeRevalidateTag("products")
+    await safeRevalidateTag("products")
 }
 
 /**
@@ -43,21 +43,21 @@ export async function revalidateProducts(partnerId: string, productId?: string) 
  */
 export async function revalidateOrders(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.orders(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.revenueOrigin(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
-        safeRevalidateTag(partnerId)
-        safeRevalidateTag(`partner-${partnerId}-orders`)
+        await safeRevalidateTag(TAGS.orders(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.revenueOrigin(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
+        await safeRevalidateTag(partnerId)
+        await safeRevalidateTag(`partner-${partnerId}-orders`)
     }
-    safeRevalidateTag("orders")
+    await safeRevalidateTag("orders")
 
     // Clear router cache for relevant pages
     revalidatePath("/erp/orders")
@@ -68,10 +68,10 @@ export async function revalidateOrders(partnerId: string) {
 
 export async function revalidateCoupons(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.coupons(partnerId))
-        safeRevalidateTag(partnerId)
+        await safeRevalidateTag(TAGS.coupons(partnerId))
+        await safeRevalidateTag(partnerId)
     }
-    safeRevalidateTag("coupons")
+    await safeRevalidateTag("coupons")
     revalidatePath("/erp/coupons")
 }
 
@@ -80,12 +80,12 @@ export async function revalidateCoupons(partnerId: string) {
  */
 export async function revalidateOrderHistory(orderId: string) {
     if (!orderId) return
-    safeRevalidateTag(TAGS.orderHistory(orderId))
+    await safeRevalidateTag(TAGS.orderHistory(orderId))
 }
 
 export async function revalidateTransactionHistory(transactionId: string) {
     if (!transactionId) return
-    safeRevalidateTag(TAGS.transactionHistory(transactionId))
+    await safeRevalidateTag(TAGS.transactionHistory(transactionId))
 }
 
 /**
@@ -93,19 +93,19 @@ export async function revalidateTransactionHistory(transactionId: string) {
  */
 export async function revalidateQuotes(partnerId: string, quoteId?: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.quotes(partnerId))
-        safeRevalidateTag(partnerId)
+        await safeRevalidateTag(TAGS.quotes(partnerId))
+        await safeRevalidateTag(partnerId)
     }
     if (quoteId) {
-        safeRevalidateTag(`quote-${quoteId}`)
+        await safeRevalidateTag(`quote-${quoteId}`)
     }
-    safeRevalidateTag("quotes")
+    await safeRevalidateTag("quotes")
     revalidatePath("/erp/quotes")
 }
 
 export async function revalidateQuoteHistory(quoteId: string) {
     if (!quoteId) return
-    safeRevalidateTag(TAGS.quoteHistory(quoteId))
+    await safeRevalidateTag(TAGS.quoteHistory(quoteId))
 }
 
 /**
@@ -114,11 +114,11 @@ export async function revalidateQuoteHistory(quoteId: string) {
  */
 export async function revalidateEntityTimeline(entityType: string, entityId: string) {
     if (!entityId) return
-    safeRevalidateTag(TAGS.entityTimeline(entityType, entityId))
+    await safeRevalidateTag(TAGS.entityTimeline(entityType, entityId))
     // Also invalidate legacy per-entity history caches
-    if (entityType === "transaction") safeRevalidateTag(TAGS.transactionHistory(entityId))
-    if (entityType === "order") safeRevalidateTag(TAGS.orderHistory(entityId))
-    if (entityType === "quote") safeRevalidateTag(TAGS.quoteHistory(entityId))
+    if (entityType === "transaction") await safeRevalidateTag(TAGS.transactionHistory(entityId))
+    if (entityType === "order") await safeRevalidateTag(TAGS.orderHistory(entityId))
+    if (entityType === "quote") await safeRevalidateTag(TAGS.quoteHistory(entityId))
 }
 
 /**
@@ -126,17 +126,17 @@ export async function revalidateEntityTimeline(entityType: string, entityId: str
  */
 export async function revalidateCustomers(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.customers(partnerId))
+        await safeRevalidateTag(TAGS.customers(partnerId))
     }
-    safeRevalidateTag("customers")
+    await safeRevalidateTag("customers")
 }
 
 /**
  * Revalida dados de MARKETPLACE e CATEGORIAS
  */
 export async function revalidateMarketplace() {
-    safeRevalidateTag(TAGS.marketplace)
-    safeRevalidateTag(TAGS.categories)
+    await safeRevalidateTag(TAGS.marketplace)
+    await safeRevalidateTag(TAGS.categories)
 }
 
 /**
@@ -144,9 +144,9 @@ export async function revalidateMarketplace() {
  */
 export async function revalidateSuppliers(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.suppliers(partnerId))
+        await safeRevalidateTag(TAGS.suppliers(partnerId))
     }
-    safeRevalidateTag("suppliers")
+    await safeRevalidateTag("suppliers")
 }
 
 /**
@@ -154,13 +154,13 @@ export async function revalidateSuppliers(partnerId: string) {
  */
 export async function revalidateStockMovements(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.stockMovements(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+        await safeRevalidateTag(TAGS.stockMovements(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.products(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.operations(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
     }
-    safeRevalidateTag("stock-movements")
+    await safeRevalidateTag("stock-movements")
 }
 
 /**
@@ -168,15 +168,15 @@ export async function revalidateStockMovements(partnerId: string) {
  */
 export async function revalidateTransactions(partnerId: string) {
     if (partnerId) {
-        safeRevalidateTag(TAGS.transactions(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
-        safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
+        await safeRevalidateTag(TAGS.transactions(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.alerts(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.revenue(partnerId))
+        await safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
     }
-    safeRevalidateTag("transactions")
+    await safeRevalidateTag("transactions")
     revalidatePath("/erp/resumo-financeiro")
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/transactions")
@@ -189,32 +189,32 @@ export async function revalidateTransactions(partnerId: string) {
  */
 export async function revalidateCart(userId?: string) {
     if (userId) {
-        safeRevalidateTag(TAGS.cart(userId))
+        await safeRevalidateTag(TAGS.cart(userId))
     }
-    safeRevalidateTag(TAGS.cart()) // tag global "cart"
+    await safeRevalidateTag(TAGS.cart()) // tag global "cart"
 }
 
 /**
  * Revalida dados de ENDEREÇOS
  */
 export async function revalidateAddresses(entityType: string, entityId: string) {
-    safeRevalidateTag(TAGS.addresses(entityType, entityId))
+    await safeRevalidateTag(TAGS.addresses(entityType, entityId))
 }
 
 /**
  * Revalida PERFIL do parceiro
  */
 export async function revalidatePartnerProfile(partnerId: string) {
-    safeRevalidateTag(TAGS.partnerProfile(partnerId))
-    safeRevalidateTag("partner-profile")
-    safeRevalidateTag(TAGS.partner(partnerId))
+    await safeRevalidateTag(TAGS.partnerProfile(partnerId))
+    await safeRevalidateTag("partner-profile")
+    await safeRevalidateTag(TAGS.partner(partnerId))
 }
 
 /**
  * Revalida STATUS do parceiro (usado no onboarding)
  */
 export async function revalidatePartnerStatus() {
-    safeRevalidateTag(TAGS.partnerStatus)
+    await safeRevalidateTag(TAGS.partnerStatus)
 }
 
 /**
@@ -225,7 +225,7 @@ export async function revalidatePartnerStatus() {
  * - Role do usuário muda
  */
 export async function revalidateUserAccess(userId: string) {
-    safeRevalidateTag(TAGS.userAccess(userId))
+    await safeRevalidateTag(TAGS.userAccess(userId))
 }
 
 /**
@@ -233,7 +233,7 @@ export async function revalidateUserAccess(userId: string) {
  * Deve ser chamada quando convites são criados, revogados ou aceitos.
  */
 export async function revalidatePartnerInvitations(partnerId: string) {
-    safeRevalidateTag(TAGS.partnerInvitations(partnerId))
+    await safeRevalidateTag(TAGS.partnerInvitations(partnerId))
 }
 
 /**
@@ -251,7 +251,7 @@ export async function revalidateExploreSearch(options?: { silent?: boolean }) {
     }
 
     // 2. Clear Next.js cache tags for lists
-    safeRevalidateTag('marketplace-search')
-    safeRevalidateTag('home-products')
-    safeRevalidateTag('explore-products')
+    await safeRevalidateTag('marketplace-search')
+    await safeRevalidateTag('home-products')
+    await safeRevalidateTag('explore-products')
 }

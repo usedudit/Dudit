@@ -1,6 +1,5 @@
 "use server"
 
-import { /* revalidateTag (use safeRevalidateTag helper) */ } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
@@ -39,9 +38,9 @@ function mapAdminRow(row: Advertisement): AdminAdvertisementRow {
     }
 }
 
-function revalidateAdsCache() {
+async function revalidateAdsCache() {
     // Use project helper to always pass the required profile argument
-    safeRevalidateTag(TAGS.advertisements)
+    await safeRevalidateTag(TAGS.advertisements)
 }
 
 export async function getAdminAdvertisements(): Promise<AdminAdvertisementRow[]> {
@@ -124,7 +123,7 @@ export async function createAdvertisement(input: AdvertisementFormValues) {
         metadata: { title: normalized.title, target_mode: normalized.target_mode },
     })
 
-    revalidateAdsCache()
+    await revalidateAdsCache()
     return { success: true as const, id: data.id }
 }
 
@@ -177,7 +176,7 @@ export async function updateAdvertisement(id: string, input: AdvertisementFormVa
         metadata: { title: normalized.title, status: normalized.status },
     })
 
-    revalidateAdsCache()
+    await revalidateAdsCache()
     return { success: true as const }
 }
 
@@ -209,7 +208,7 @@ export async function updateAdvertisementStatus(id: string, status: AdStatus) {
         metadata: { status },
     })
 
-    revalidateAdsCache()
+    await revalidateAdsCache()
     return { success: true as const }
 }
 
@@ -232,6 +231,6 @@ export async function deleteAdvertisement(id: string) {
         targetId: safeId,
     })
 
-    revalidateAdsCache()
+    await revalidateAdsCache()
     return { success: true as const }
 }
