@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { getUserSessionData } from "@/lib/data/user"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { resolveCityAndStateFromSlug } from "./products"
+import { buildMarketplaceTsQuery } from "@/lib/search/build-tsquery"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -100,7 +101,7 @@ export const searchMarketplaceDirect = cache(async (
     return enrichMarketplaceDistance(results || [], coords)
 })
 
-export type MarketplaceListCursor = { createdAt: string; id: string }
+export type MarketplaceListCursor = { createdAt?: string; id: string; rank?: number }
 
 /**
  * SERVER ACTION para uso do CLIENT (infinite scroll, busca manual).
@@ -121,6 +122,7 @@ export const searchMarketplace = async (
     const cursor = limits.cursor ?? null
     const cursorMs = cursor?.createdAt ? new Date(cursor.createdAt).getTime() : undefined
     const lastId = cursor?.id || undefined
+    const cursorRank = typeof cursor?.rank === "number" ? cursor.rank : undefined
 
     const { results } = await _searchMarketplaceCore(query, type, {
         vitrines: limits.vitrines,
@@ -130,6 +132,7 @@ export const searchMarketplace = async (
         geral: limits.geral,
         cursor: Number.isFinite(cursorMs as any) ? cursorMs : undefined,
         lastId,
+        cursorRank,
         cidade: limits.cidade,
     })
 
@@ -143,8 +146,13 @@ export const searchMarketplace = async (
     // Normalize pagination response to the app-wide standard.
     const items = resultsWithDistance || []
     const last = items[items.length - 1]
-    const nextCursor: MarketplaceListCursor | null =
-        last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
+    const nextCursor: MarketplaceListCursor | null = last?.id
+        ? {
+            id: String(last.id),
+            ...(last.created_at ? { createdAt: String(last.created_at) } : {}),
+            ...(typeof last._searchRank === "number" ? { rank: last._searchRank } : {}),
+        }
+        : null
 
     // This search backend doesn’t currently expose an exact hasMore flag.
     // We conservatively assume "hasMore" when we got a full page.
@@ -160,7 +168,7 @@ export const searchMarketplace = async (
                         ? (limits.planos ?? 20)
                         : (limits.servicos ?? 20)
 
-    const hasMore = !limits.cidade && items.length >= limitCount && !!nextCursor
+    const hasMore = items.length >= limitCount && !!nextCursor
     return { items, nextCursor, hasMore }
 }
 
@@ -175,11 +183,12 @@ const serializeSearchKey = (query: string, type: string, limits: any) => {
 async function _searchMarketplaceCore(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cidade?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; cidade?: string } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     if (limits.cidade) {
         return searchMarketplaceByCity(query, type, limits.cidade, limits)
     }
+
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
 
     // Inline version read
@@ -246,9 +255,9 @@ async function _searchMarketplaceCore(
 async function _searchMarketplaceInternal(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string } = {}
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
-    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, cursor, lastId } = limits
+    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, cursor, lastId, cursorRank } = limits
 
     // ANTI-SCRAPING / DEPTH RESTRICTION
     if (cursor && Date.now() - cursor > 1000 * 60 * 60 * 24 * 365 * 10) {
@@ -492,64 +501,25 @@ async function _searchMarketplaceInternal(
 
 
 
-// Lógica de FTS (Full-Text Search) antiga preservada
-async function searchMarketplacePostgresFTS(
-    query: string,
-    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; cursor?: number; lastId?: string } = {}
-) {
-    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20 } = limits
-    const supabase = getAdminClient()
-    let results: any[] = []
+// Lógica de FTS (Full-Text Search) — PostgreSQL ts_rank_cd via RPC
+type MarketplaceSearchHit = { item_type: string; id: string; rank: number; created_at: string }
 
-    const qRaw = query ? query.trim() : ""
-    const qClean = qRaw.replace(/-/g, ' ')
-    const makeFuzzy = (s: string) => `%${s.split('').join('%')}%`
-    const qFuzzy = makeFuzzy(qRaw.replace(/-/g, ''))
+async function hydrateMarketplaceSearchHits(
+    hits: MarketplaceSearchHit[],
+    supabase: ReturnType<typeof getAdminClient>
+): Promise<any[]> {
+    if (!hits.length) return []
 
-    const stateMatch = qRaw.match(/-([a-z]{2})$/i)
-    const detectedState = stateMatch ? stateMatch[1].toUpperCase() : null
+    const produtosIds = hits.filter(h => h.item_type === "produto").map(h => h.id)
+    const servicosIds = hits.filter(h => h.item_type === "servico").map(h => h.id)
+    const lojasIds = hits.filter(h => h.item_type === "loja").map(h => h.id)
+    const planosIds = hits.filter(h => h.item_type === "plano").map(h => h.id)
 
-    const cursorDate = limits.cursor ? new Date(limits.cursor).toISOString() : null
+    const promises = []
 
-    try {
-        if (type === 'tudo' || type === 'vitrines') {
-            let req = supabase.from("partners").select(`id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)`).eq("is_active", true)
-            let reqJoined = req
-            if (qRaw) {
-                let orFilter = `store_name.ilike.%${qRaw}%,store_description.ilike.%${qRaw}%,store_name.ilike.%${qClean}%`
-                if (detectedState) {
-                    orFilter += `,addresses.state.eq.${detectedState}`
-                } else {
-                    orFilter += `,addresses.city.ilike.${qFuzzy},addresses.state.ilike.%${qRaw}%`
-                }
-                reqJoined = reqJoined.or(orFilter)
-            } else if (detectedState) {
-                reqJoined = reqJoined.filter("addresses.state", "eq", detectedState)
-            }
-            if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
-            const { data: partData } = await reqJoined.order("created_at", { ascending: false }).limit(vitLimit)
-            if (partData) {
-                results.push(...partData.map((item: any) => ({
-                    id: item.id, name: item.store_name, description: item.store_description,
-                    images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-                    rating: item.rating, itemType: 'loja', category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
-                    partners: {
-                        id: item.id, store_name: item.store_name,
-                        store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                        banner_url: item.banner_url || null,
-                        logo_moderation_status: item.logo_moderation_status || "approved",
-                        banner_moderation_status: item.banner_moderation_status || "approved",
-                        latitude: item.latitude, longitude: item.longitude,
-                        city: item.addresses?.[0]?.city || null, state: item.addresses?.[0]?.state || null,
-                        reviewsCount: item.reviews?.[0]?.count || 0
-                    }
-                })))
-            }
-        }
-
-        if (type === 'tudo' || type === 'produtos') {
-            let req = supabase.from("products").select(`
+    if (produtosIds.length > 0) {
+        promises.push(
+            supabase.from("products").select(`
                 id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
                 category_id, category:product_categories!category_id(name), created_at,
                 marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
@@ -557,68 +527,35 @@ async function searchMarketplacePostgresFTS(
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 product_variants(variant_options, price_adjustment, is_active),
                 show_price_in_store
-            `).eq("is_active", true).eq("show_in_marketplace", true)
-            let reqJoined = req
-            if (qRaw) {
-                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%`
-                reqJoined = reqJoined.or(orFilter)
-            }
-            if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
-            const { data: prodData } = await reqJoined.order("created_at", { ascending: false }).limit(prodLimit)
-            if (prodData) {
-                results.push(...prodData.map((item: any) => {
-                    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-                    const partner = rawPartner ? {
-                        ...rawPartner,
-                        store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                        latitude: rawPartner.latitude, longitude: rawPartner.longitude,
-                        city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
-                    } : null
-                    const variantFallback = extractFirstVariantFallback((item as any).product_variants, Number(item.price))
-                    const { product_variants, ...rest } = item
-                    return {
-                        ...rest,
-                        category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
-                        subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
-                        itemType: 'produto',
-                        partners: partner,
-                        ...variantFallback
-                    }
-                }))
-            }
-        }
-
-        if (type === 'tudo' || type === 'servicos') {
-            let req = supabase.from("services").select(`
+            `)
+                .in("id", produtosIds)
+                .eq("is_active", true)
+                .eq("show_in_marketplace", true)
+        )
+    }
+    if (servicosIds.length > 0) {
+        promises.push(
+            supabase.from("services").select(`
                 id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
                 service_categories:service_categories!category_id(name),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 show_price_in_store
-            `).eq("is_active", true).eq("show_in_marketplace", true)
-            let reqJoined = req
-            if (qRaw) {
-                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%,category.ilike.%${qRaw}%`
-                reqJoined = reqJoined.or(orFilter)
-            }
-            if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
-            const { data: servData } = await reqJoined.order("created_at", { ascending: false }).limit(servLimit)
-            if (servData) {
-                results.push(...servData.map((item: any) => {
-                    const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-                    const partner = rawPartner ? {
-                        ...rawPartner,
-                        store_avatar: rawPartner.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                        latitude: rawPartner.latitude, longitude: rawPartner.longitude,
-                        city: rawPartner.addresses?.[0]?.city || null, state: rawPartner.addresses?.[0]?.state || null
-                    } : null
-                    const serviceCategoryName = item.service_categories?.name || item.category || null
-                    return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
-                }))
-            }
-        }
-
-        if (type === 'tudo' || type === 'planos') {
-            let req = supabase.from("recurring_plans").select(`
+            `)
+                .in("id", servicosIds)
+                .eq("is_active", true)
+                .eq("show_in_marketplace", true)
+        )
+    }
+    if (lojasIds.length > 0) {
+        promises.push(
+            supabase.from("partners").select(`
+                id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), addresses(city, state), reviews(count)
+            `).in("id", lojasIds)
+        )
+    }
+    if (planosIds.length > 0) {
+        promises.push(
+            supabase.from("recurring_plans").select(`
                 id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 recurring_plan_items(
@@ -626,19 +563,142 @@ async function searchMarketplacePostgresFTS(
                     products:product_id(id, name, price, images),
                     services:service_id(id, name, price, duration_minutes)
                 )
-            `).eq("status", "active").eq("show_in_marketplace", true)
-            let reqJoined = req
-            if (qRaw) {
-                let orFilter = `name.ilike.%${qRaw}%,description.ilike.%${qRaw}%,name.ilike.%${qClean}%`
-                reqJoined = reqJoined.or(orFilter)
-            }
-            if (cursorDate) reqJoined = reqJoined.lt("created_at", cursorDate)
-            const { data: planData } = await reqJoined.order("created_at", { ascending: false }).limit(planosLimit)
-            if (planData) {
-                results.push(...planData.map((item: any) => normalizePlan(item)))
+            `)
+                .in("id", planosIds)
+                .eq("status", "active")
+                .eq("show_in_marketplace", true)
+        )
+    }
+
+    const queryResults = await Promise.all(promises)
+    const recordMap = new Map<string, any>()
+
+    queryResults.forEach((res) => {
+        if (res.data) {
+            for (const row of res.data) {
+                recordMap.set(String(row.id), row)
             }
         }
+    })
 
+    const results: any[] = []
+
+    for (const hit of hits) {
+        const item = recordMap.get(hit.id)
+        if (!item) continue
+
+        if (hit.item_type === "loja") {
+            results.push({
+                id: item.id,
+                name: item.store_name,
+                description: item.store_description,
+                images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+                rating: item.rating,
+                itemType: "loja",
+                category: item.category?.parent?.name || item.category?.name || "Loja Parceira",
+                partners: {
+                    id: item.id,
+                    store_name: item.store_name,
+                    store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+                    banner_url: item.banner_url || null,
+                    logo_moderation_status: item.logo_moderation_status || "approved",
+                    banner_moderation_status: item.banner_moderation_status || "approved",
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                    city: item.addresses?.[0]?.city || null,
+                    state: item.addresses?.[0]?.state || null,
+                    reviewsCount: item.reviews?.[0]?.count || 0,
+                },
+                created_at: item.created_at,
+                _searchRank: hit.rank,
+            })
+            continue
+        }
+
+        if (hit.item_type === "plano") {
+            results.push({ ...normalizePlan(item), _searchRank: hit.rank })
+            continue
+        }
+
+        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const partner = rawPartner ? {
+            ...rawPartner,
+            store_avatar: rawPartner.store_image_url || rawPartner.store_avatar || "https://img.dudit.com.br/static/Placeholder.png",
+            latitude: rawPartner.latitude,
+            longitude: rawPartner.longitude,
+            city: rawPartner.addresses?.[0]?.city || null,
+            state: rawPartner.addresses?.[0]?.state || null,
+        } : null
+
+        if (hit.item_type === "produto") {
+            const variantFallback = extractFirstVariantFallback(item.product_variants, Number(item.price))
+            const { product_variants, ...rest } = item
+            results.push({
+                ...rest,
+                category: item.marketplace_category?.parent?.name || item.marketplace_category?.name || item.category?.name || null,
+                subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : (item.subcategory?.name || null),
+                itemType: "produto",
+                partners: partner,
+                ...variantFallback,
+                _searchRank: hit.rank,
+            })
+            continue
+        }
+
+        const serviceCategoryName = item.service_categories?.name || item.category || null
+        results.push({
+            ...item,
+            category: serviceCategoryName,
+            itemType: "servico",
+            partners: partner,
+            subcategoryName: serviceCategoryName,
+            _searchRank: hit.rank,
+        })
+    }
+
+    return results
+}
+
+async function searchMarketplacePostgresFTS(
+    query: string,
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number; partnerIds?: string[] } = {}
+) {
+    const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, lastId, cursorRank, partnerIds } = limits
+    const supabase = getAdminClient()
+
+    const tsQuery = buildMarketplaceTsQuery(query)
+    if (!tsQuery) {
+        return { results: [], filteredIds: [] }
+    }
+
+    const limitCount = type === 'tudo'
+        ? geral
+        : type === 'vitrines'
+            ? vitLimit
+            : type === 'produtos'
+                ? prodLimit
+                : type === 'planos'
+                    ? planosLimit
+                    : servLimit
+
+    try {
+        const { data: hits, error } = await supabase.rpc("search_marketplace", {
+            p_tsquery: tsQuery,
+            p_type: type,
+            p_limit: limitCount,
+            p_cursor_rank: cursorRank ?? null,
+            p_cursor_id: lastId ?? null,
+            p_partner_ids: partnerIds?.length ? partnerIds : null,
+        })
+
+        if (error) {
+            console.error("Search FTS RPC Error:", error)
+            return { results: [], filteredIds: [] }
+        }
+
+        const rankedHits = (hits || []) as MarketplaceSearchHit[]
+        const results = await hydrateMarketplaceSearchHits(rankedHits, supabase)
         const finalIds = results.map(r => `${r.itemType}:${r.id}`)
         return { results, filteredIds: finalIds }
     } catch (error) {
@@ -651,20 +711,62 @@ async function searchMarketplaceByCity(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos',
     cidadeSlug: string,
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number }
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; lastId?: string; cursorRank?: number }
 ) {
     const supabase = getAdminClient()
     const parts = cidadeSlug.split("-")
     const state = parts.pop()?.toUpperCase() || ""
     const targetCitySlug = parts.join("-")
 
-    // Resolve target city to official DB city/state to search directly in Postgres SQL index
     const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
     const dbCity = resolved?.city
     const dbState = resolved?.state || state
 
-    // Fetch active partners in this city (optimized SQL direct filter)
     let partnersQuery = supabase
+        .from("partners")
+        .select("id, addresses!inner(city, state)")
+        .eq("is_active", true)
+        .eq("addresses.state", dbState)
+
+    if (dbCity) {
+        partnersQuery = partnersQuery.eq("addresses.city", dbCity)
+    } else {
+        partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
+    }
+
+    const partnersRes = await partnersQuery
+    const partnerIds = (partnersRes.data || []).map((p: any) => p.id)
+
+    if (!partnerIds.length) {
+        return { results: [], filteredIds: [] }
+    }
+
+    if (query.trim()) {
+        return searchMarketplacePostgresFTS(query, type, {
+            ...limits,
+            partnerIds,
+            lastId: limits.lastId,
+            cursorRank: limits.cursorRank,
+        })
+    }
+
+    // Browse mode within city: fetch marketplace items for local partners (no text query)
+    const limitCount = type === 'tudo'
+        ? (limits.geral ?? 40)
+        : type === 'vitrines'
+            ? (limits.vitrines ?? 40)
+            : type === 'produtos'
+                ? (limits.produtos ?? 20)
+                : type === 'planos'
+                    ? (limits.planos ?? 20)
+                    : (limits.servicos ?? 20)
+
+    let rawProducts: any[] = []
+    let rawServices: any[] = []
+    let rawPlans: any[] = []
+    let filteredPartners: any[] = []
+
+    const partnerDetailsRes = await supabase
         .from("partners")
         .select(`
             id, store_name, store_description, store_image_url, banner_url,
@@ -676,24 +778,12 @@ async function searchMarketplaceByCity(
             reviews(count)
         `)
         .eq("is_active", true)
-        .eq("addresses.state", dbState)
+        .in("id", partnerIds)
+        .order("created_at", { ascending: false })
+        .limit(type === 'vitrines' || type === 'tudo' ? limitCount : 0)
 
-    if (dbCity) {
-        partnersQuery = partnersQuery.eq("addresses.city", dbCity)
-    } else {
-        partnersQuery = partnersQuery.ilike("addresses.city", targetCitySlug.replace(/-/g, ' '))
-    }
+    filteredPartners = partnerDetailsRes.data || []
 
-    const partnersRes = await partnersQuery
-    const filteredPartners = partnersRes.data || []
-
-    const partnerIds = filteredPartners.map((p: any) => p.id)
-
-    let rawProducts: any[] = []
-    let rawServices: any[] = []
-    let rawPlans: any[] = []
-
-    // Fetch products, services and plans for these partners
     if (partnerIds.length > 0) {
         const promises = []
         if (type === 'tudo' || type === 'produtos') {
@@ -705,16 +795,15 @@ async function searchMarketplaceByCity(
                         category_id, category:product_categories!category_id(name), created_at,
                         marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
                         subcategory_id, subcategory:product_categories!subcategory_id(name),
-                        partners!inner(
-                            id, store_name, store_image_url, latitude, longitude,
-                            addresses!inner(city, state)
-                        ),
+                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                         product_variants(variant_options, price_adjustment, is_active),
                         show_price_in_store
                     `)
                     .eq("is_active", true)
                     .eq("show_in_marketplace", true)
                     .in("partner_id", partnerIds)
+                    .order("created_at", { ascending: false })
+                    .limit(type === 'produtos' || type === 'tudo' ? limitCount : 0)
             )
         }
         if (type === 'tudo' || type === 'servicos') {
@@ -724,15 +813,14 @@ async function searchMarketplaceByCity(
                     .select(`
                         id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
                         service_categories:service_categories!category_id(name),
-                        partners!inner(
-                            id, store_name, store_image_url, latitude, longitude,
-                            addresses!inner(city, state)
-                        ),
+                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                         show_price_in_store
                     `)
                     .eq("is_active", true)
                     .eq("show_in_marketplace", true)
                     .in("partner_id", partnerIds)
+                    .order("created_at", { ascending: false })
+                    .limit(type === 'servicos' || type === 'tudo' ? limitCount : 0)
             )
         }
         if (type === 'tudo' || type === 'planos') {
@@ -741,10 +829,7 @@ async function searchMarketplaceByCity(
                     .from("recurring_plans")
                     .select(`
                         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
-                        partners!inner(
-                            id, store_name, store_image_url, latitude, longitude,
-                            addresses!inner(city, state)
-                        ),
+                        partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                         recurring_plan_items(
                             id, item_type, product_id, variant_id, service_id, quantity, unit_price,
                             products:product_id(id, name, price, images),
@@ -754,6 +839,8 @@ async function searchMarketplaceByCity(
                     .eq("status", "active")
                     .eq("show_in_marketplace", true)
                     .in("partner_id", partnerIds)
+                    .order("created_at", { ascending: false })
+                    .limit(type === 'planos' || type === 'tudo' ? limitCount : 0)
             )
         }
 
@@ -770,32 +857,29 @@ async function searchMarketplaceByCity(
         }
     }
 
-    // Normalize
-    const normalizedPartners = filteredPartners.map((item: any) => {
-        return {
+    const normalizedPartners = filteredPartners.map((item: any) => ({
+        id: item.id,
+        name: item.store_name,
+        description: item.store_description,
+        images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
+        rating: item.rating,
+        itemType: 'loja',
+        category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
+        partners: {
             id: item.id,
-            name: item.store_name,
-            description: item.store_description,
-            images: [item.banner_url || item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"],
-            rating: item.rating,
-            itemType: 'loja',
-            category: item.category?.parent?.name || item.category?.name || 'Loja Parceira',
-            partners: {
-                id: item.id,
-                store_name: item.store_name,
-                store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
-                banner_url: item.banner_url || null,
-                logo_moderation_status: item.logo_moderation_status || "approved",
-                banner_moderation_status: item.banner_moderation_status || "approved",
-                latitude: item.latitude,
-                longitude: item.longitude,
-                city: item.addresses?.[0]?.city || null,
-                state: item.addresses?.[0]?.state || null,
-                reviewsCount: item.reviews?.[0]?.count || 0
-            },
-            created_at: item.created_at
-        }
-    })
+            store_name: item.store_name,
+            store_avatar: item.store_image_url || "https://img.dudit.com.br/static/Placeholder.png",
+            banner_url: item.banner_url || null,
+            logo_moderation_status: item.logo_moderation_status || "approved",
+            banner_moderation_status: item.banner_moderation_status || "approved",
+            latitude: item.latitude,
+            longitude: item.longitude,
+            city: item.addresses?.[0]?.city || null,
+            state: item.addresses?.[0]?.state || null,
+            reviewsCount: item.reviews?.[0]?.count || 0
+        },
+        created_at: item.created_at
+    }))
 
     const normalizedProducts = rawProducts.map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -835,7 +919,6 @@ async function searchMarketplaceByCity(
 
     const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))
 
-    // Combine
     let results: any[] = []
     if (type === 'tudo') {
         results = [...normalizedPartners, ...normalizedProducts, ...normalizedServices, ...normalizedPlans]
@@ -849,18 +932,6 @@ async function searchMarketplaceByCity(
         results = normalizedPlans
     }
 
-    // Apply text search filter if query is specified
-    if (query) {
-        const cleanQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        results = results.filter((r: any) => {
-            const nameMatch = (r.name || r.store_name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
-            const descMatch = (r.description || r.store_description || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
-            const catMatch = (r.category || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(cleanQuery)
-            return nameMatch || descMatch || catMatch
-        })
-    }
-
-    // Sort by created_at desc (standard score)
     results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     const finalIds = results.map(r => `${r.itemType}:${r.id}`)

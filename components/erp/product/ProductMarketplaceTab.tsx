@@ -372,9 +372,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     />
                 </div>
 
-                {/* Card de Tags */}
+                {/* Card de Tags / Palavras-chave de busca */}
                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                    <h3 className="text-lg font-bold mb-4 text-brand-dark dark:text-dark-heading">Tags</h3>
+                    <h3 className="text-lg font-bold mb-2 text-brand-dark dark:text-dark-heading">Palavras-chave de busca</h3>
+                    <p className="text-sm text-brand-inactive-text mb-4">
+                        Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
+                    </p>
                     <TagsInput
                         tags={tags}
                         onChange={(t) => manualChange("tags", t)}
