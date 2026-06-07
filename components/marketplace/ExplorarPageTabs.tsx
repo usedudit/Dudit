@@ -89,7 +89,7 @@ export function ExplorarPageTabs({
                                         <SlidersHorizontal className="w-4 h-4" />
                                         <span>Filtros</span>
                                         {activeFiltersCount > 0 && (
-                                            <Badge variant="secondary" className="ml-1">
+                                            <Badge variant="blue" className="ml-1">
                                                 {activeFiltersCount}
                                             </Badge>
                                         )}
