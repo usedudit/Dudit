@@ -11,7 +11,7 @@ import { PaymentMethodEditPage } from "./PaymentMethodEditPage"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useNotification } from "@/hooks/use-notification"
 import { deletePaymentMethodAction, getPaymentMethodsAction, updatePaymentMethodAction } from "@/app/actions/erp/payment-methods"
-import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, TrashIcon } from "@/lib/icons"
+import { BlockedIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, TrashIcon } from "@/lib/icons"
 import PaymentMethodPageControls from "./PaymentMethodPageControls"
 import PaymentMethodListRow, { getPaymentTypeLabel, PaymentMethodListItem, getPaymentIcon, getBrandsLabel } from "./PaymentMethodListRow"
 import PaymentMethodGridCard from "./PaymentMethodGridCard"
@@ -636,6 +636,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                                                     setEditingPayment(null)
                                                     setCurrentView("edit")
                                                 }}
+                                                leftIcon={<PlusIcon size={18} />}
                                             >
                                                 Novo método
                                             </Button>

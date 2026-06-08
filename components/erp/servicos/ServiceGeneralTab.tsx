@@ -227,6 +227,13 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 error={fieldErrors?.has("price")}
                                 errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
                             />
+                            <MoneyInput
+                                label="Preço Promocional"
+                                name="promotional_price"
+                                value={serviceData.promotional_price || ""}
+                                onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
+                                disabled={!isEditing || !showPrice}
+                            />
                         </div>
                     )}
 

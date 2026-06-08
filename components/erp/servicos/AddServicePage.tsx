@@ -39,7 +39,7 @@ const REQUIRED_FIELDS = [
 
 const getEmptyService = () => ({
     id: "", name: "", category: "", category_id: "", sku: "", description: "", subcategory: "", subcategory_id: "",
-    price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
+    price: null as unknown as number, promotional_price: null as unknown as number, cost_price: null as unknown as number, price_type: "fixed", billing_unit: "per_service",
     duration_minutes: null as unknown as number, buffer_minutes: null as unknown as number, service_type: "in_person",
     images: [], primary_image_index: 0, video_type: null, video_url: "", video_thumbnail: null, video_duration: null, video_provider_id: null,
     is_active: true, show_in_marketplace: true, highlight_service: false, show_price_in_store: true,
@@ -368,6 +368,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 subcategory_id: serviceData.subcategory_id,
                 price: Number(serviceData.price),
                 cost_price: Number(serviceData.cost_price) || 0,
+                promotional_price: serviceData.promotional_price ? Number(serviceData.promotional_price) : null,
                 price_type: serviceData.price_type,
                 billing_unit: serviceData.billing_unit,
                 duration_minutes: Number(serviceData.duration_minutes) || 60,

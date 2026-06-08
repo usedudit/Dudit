@@ -63,6 +63,10 @@ export enum AdminActionType {
     PRODUCT_SOFT_DELETE = "product.soft_delete",
     SERVICE_SOFT_DELETE = "service.soft_delete",
 
+    // Deletions
+    RECURRING_PLAN_DELETE = "recurring_plan.delete",
+    REVIEW_DELETE = "review.delete",
+
     // Financial
     SUBSCRIPTION_CANCEL = "subscription.cancel",
 
@@ -164,11 +168,14 @@ export interface FetchedProduct {
 
 export interface FetchedVariant {
     id: string
-    name: string
+    variant_name: string
+    variant_type: string | null
+    variant_value: string | null
     sku: string | null
-    price: number | null
+    price_adjustment: number
     stock_quantity: number
-    images: string[] | null
+    stock_available: number
+    variant_options: { image?: string } | null
     is_active: boolean
 }
 

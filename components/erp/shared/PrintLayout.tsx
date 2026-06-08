@@ -1,12 +1,19 @@
 "use client"
 
-import React from "react"
+import { useEffect } from "react"
 
 interface PrintLayoutProps {
     children: React.ReactNode
 }
 
 export default function PrintLayout({ children }: PrintLayoutProps) {
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            window.print()
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [])
+
     return (
         <div className="min-h-screen bg-white text-black print:bg-white print:text-black">
             <style
@@ -57,6 +64,11 @@ export default function PrintLayout({ children }: PrintLayoutProps) {
                             box-shadow: none !important;
                             border: none !important;
                             border-radius: 0 !important;
+                        }
+
+                        .pdf-print-page:last-child {
+                            page-break-after: avoid !important;
+                            break-after: avoid !important;
                         }
                     `,
                 }}

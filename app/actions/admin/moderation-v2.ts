@@ -151,7 +151,7 @@ export async function fetchModerationTarget(
                     .select(`
                         id, name, description, price, images, tags, video_url, video_type,
                         video_thumbnail, moderation_status, is_active, created_at,
-                        partner:partners!inner(id, store_name, risk_score)
+                        partner:partners(id, store_name, risk_score)
                     `)
                     .eq("id", id)
                     .is("deleted_at", null)
@@ -161,9 +161,9 @@ export async function fetchModerationTarget(
 
                 const { data: variants } = await admin
                     .from("product_variants")
-                    .select("id, name, sku, price, stock_quantity, images, is_active")
+                    .select("id, variant_name, variant_type, variant_value, sku, price_adjustment, stock_quantity, stock_available, variant_options, is_active")
                     .eq("product_id", id)
-                    .order("name")
+                    .order("variant_name")
 
                 return { success: true, data: { ...data, variants: variants || [] } as FetchedProduct }
             }
@@ -211,7 +211,7 @@ export async function fetchModerationTarget(
                         id, store_name, store_description, store_image_url, banner_url,
                         gallery, logo_moderation_status, banner_moderation_status,
                         risk_score, is_active, created_at,
-                        owner:user_profiles!partners_user_id_fkey(full_name, email, risk_score)
+                        owner:user_profiles!user_id(full_name, email, risk_score)
                     `)
                     .eq("id", id)
                     .single()
@@ -371,11 +371,14 @@ export async function removeImage(
 
             if (error) return { success: false, error: error.message }
 
-            // If this was a variant, also update variant images
+            // If this was a variant, also update variant image in variant_options
             if (targetType === "variant") {
-                const { data: vData } = await fetchAdmin.from("product_variants").select("images").eq("id", targetId).single()
-                const vImages = (vData?.images || []).filter((img: string) => img !== imageUrl)
-                await fetchAdmin.from("product_variants").update({ images: vImages }).eq("id", targetId)
+                const { data: vData } = await fetchAdmin.from("product_variants").select("variant_options").eq("id", targetId).single()
+                if (vData?.variant_options) {
+                    const opts = typeof vData.variant_options === "string" ? JSON.parse(vData.variant_options) : vData.variant_options
+                    if (opts?.image) delete opts.image
+                    await fetchAdmin.from("product_variants").update({ variant_options: opts }).eq("id", targetId)
+                }
             }
         } else if (effectiveType === "service") {
             const { data } = await fetchAdmin.from("services").select("images").eq("id", effectiveId).single()
@@ -465,16 +468,17 @@ export async function editVariant(
         const fetchAdmin = getAdminClient()
         const { data: variant } = await fetchAdmin
             .from("product_variants")
-            .select("product_id, name")
+            .select("product_id, variant_name")
             .eq("id", variantId)
             .single()
 
         if (!variant) return { success: false, error: "Variante não encontrada" }
 
-        const previousValue = variant.name
+        const previousValue = variant.variant_name
 
+        const dbField = field === "name" ? "variant_name" : field
         const updateData: any = {}
-        updateData[field] = value === "" ? null : value
+        updateData[dbField] = value === "" ? null : value
 
         const { error } = await fetchAdmin
             .from("product_variants")
@@ -650,5 +654,137 @@ export async function updatePartnerRiskScore(
         return { success: true }
     } catch (err: any) {
         return { success: false, error: err.message || "Erro ao atualizar risk score" }
+    }
+}
+
+// ─── Batch Save Changes ──────────────────────────────────────────────────────
+
+type FieldChange = { field: string; value: string }
+
+export async function saveModerationChanges(params: {
+    type: string
+    targetId: string
+    changes: FieldChange[]
+    removedImages: string[]
+    riskScoreIncrement: number
+    notes?: string
+    knownPartnerId?: string
+}): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    const partnerId = params.knownPartnerId ?? await getPartnerIdFromTarget(params.type, params.targetId)
+
+    try {
+        const fetchAdmin = getAdminClient()
+
+        // 1. Apply field changes
+        for (const { field, value } of params.changes) {
+            const dbField = field === "tags" ? "tags" : field
+            const updateData: any = {}
+            updateData[dbField] = value === "" ? null : value
+
+            const tableMap: Record<string, string> = {
+                product: "products",
+                service: "services",
+                recurring_plan: "recurring_plans",
+                partner: "partners",
+            }
+            const table = tableMap[params.type]
+            if (table) {
+                await fetchAdmin.from(table as any).update(updateData).eq("id", params.targetId)
+            }
+        }
+
+        // 2. Apply image removals
+        for (const imageUrl of params.removedImages) {
+            const tableMap: Record<string, string> = {
+                product: "products",
+                service: "services",
+            }
+            const table = tableMap[params.type]
+            if (table) {
+                const { data: current } = await fetchAdmin.from(table as any).select("images").eq("id", params.targetId).single()
+                const images = (current?.images || []).filter((img: string) => img !== imageUrl)
+                await fetchAdmin.from(table as any).update({ images }).eq("id", params.targetId)
+                await _deleteFromR2(imageUrl)
+            }
+        }
+
+        // 3. Audit log
+        await logModerationAction({
+            adminUserId: admin.userId,
+            partnerId,
+            actionType: AdminActionType.MODERATION_EDIT_FIELD,
+            targetType: params.type,
+            targetId: params.targetId,
+            fieldName: params.changes.map(c => c.field).join(","),
+            previousValue: "",
+            newValue: params.changes.map(c => `${c.field}=${c.value}`).join(","),
+            riskScoreIncrement: params.riskScoreIncrement,
+            notes: params.notes,
+        })
+
+        return { success: true }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao salvar alterações" }
+    }
+}
+
+// ─── Delete Moderation Target ────────────────────────────────────────────────
+
+export async function deleteModerationTarget(
+    type: string,
+    id: string,
+    riskScoreIncrement: number,
+    notes?: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    try {
+        const fetchAdmin = getAdminClient()
+        const partnerId = await getPartnerIdFromTarget(type, id)
+
+        let actionType: AdminActionType
+
+        switch (type) {
+            case "product": {
+                actionType = AdminActionType.PRODUCT_SOFT_DELETE
+                await fetchAdmin.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", id)
+                break
+            }
+            case "service": {
+                actionType = AdminActionType.SERVICE_SOFT_DELETE
+                await fetchAdmin.from("services").update({ deleted_at: new Date().toISOString() }).eq("id", id)
+                break
+            }
+            case "recurring_plan": {
+                actionType = AdminActionType.RECURRING_PLAN_DELETE
+                await fetchAdmin.from("recurring_plans").update({ status: "cancelled" }).eq("id", id)
+                break
+            }
+            case "review": {
+                actionType = AdminActionType.REVIEW_DELETE
+                await fetchAdmin.from("reviews").delete().eq("id", id)
+                break
+            }
+            default:
+                return { success: false, error: "Tipo inválido para remoção" }
+        }
+
+        await logModerationAction({
+            adminUserId: admin.userId,
+            partnerId,
+            actionType,
+            targetType: type,
+            targetId: id,
+            riskScoreIncrement,
+            notes,
+        })
+
+        return { success: true }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao remover" }
     }
 }

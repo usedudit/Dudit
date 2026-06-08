@@ -139,7 +139,7 @@ const PaymentMethodListRow = React.memo(
                                 {getPaymentTypeLabel(method)}
                             </Badge>
                             {method.is_online_default && (
-                                <Badge variant="blue" icon={null} className="text-[10px] px-1.5 h-5">
+                                <Badge variant="blue" icon={null}>
                                     Padrão
                                 </Badge>
                             )}
@@ -162,7 +162,7 @@ const PaymentMethodListRow = React.memo(
 
                 case "status":
                     return (
-                        <Badge variant={method.is_active ? "green" : "red"} icon={null}>
+                        <Badge variant={method.is_active ? "green" : "red"}>
                             {method.is_active ? "Ativo" : "Inativo"}
                         </Badge>
                     )

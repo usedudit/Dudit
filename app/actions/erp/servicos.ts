@@ -175,6 +175,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             unit: data.unit || 'Sessão',
             cost_price: data.costPrice || data.cost_price || 0,
             price: data.price || 0,
+            promotional_price: data.promotional_price ?? data.promotionalPrice ?? null,
             price_type: data.price_type || data.priceType || 'fixed',
             billing_unit: data.billing_unit || data.billingUnit || 'per_service',
             duration_minutes: data.duration_minutes || data.durationMinutes || 60,
@@ -269,6 +270,8 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.costPrice !== undefined) payload.cost_price = data.costPrice
         if (data.cost_price !== undefined) payload.cost_price = data.cost_price
         if (data.price !== undefined) payload.price = data.price
+        if (data.promotional_price !== undefined) payload.promotional_price = data.promotional_price
+        if (data.promotionalPrice !== undefined) payload.promotional_price = data.promotionalPrice
         if (data.price_type !== undefined) payload.price_type = data.price_type
         if (data.priceType !== undefined) payload.price_type = data.priceType
         if (data.billing_unit !== undefined) payload.billing_unit = data.billing_unit
