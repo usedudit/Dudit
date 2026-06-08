@@ -164,6 +164,16 @@ export function ServiceDetailsPageClient({
     const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
     const lightboxJustOpened = useRef(false)
 
+    useEffect(() => {
+        if (service?.id) {
+            fetch("/api/marketplace/view", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entityType: "servico", entityId: service.id }),
+            }).catch(() => {})
+        }
+    }, [service?.id])
+
     // Redesign states
     const [cep, setCep] = useState("")
     const [shippingState, setShippingState] = useState<"initial" | "calculated">("initial")

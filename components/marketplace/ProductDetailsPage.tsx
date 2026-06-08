@@ -225,6 +225,16 @@ export function ProductDetailsPageClient({
         }
     }, [partner?.id])
 
+    useEffect(() => {
+        if (product?.id) {
+            fetch("/api/marketplace/view", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entityType: "produto", entityId: product.id }),
+            }).catch(() => {})
+        }
+    }, [product?.id])
+
     const activePromo = useMemo(() => {
         return activePromotions.find((promo) => {
             if (promo.applyScope === "entire_cart") return true

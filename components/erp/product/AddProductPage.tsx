@@ -35,6 +35,7 @@ import { ProductGeneralTab } from "./ProductGeneralTab"
 import { ProductVariationsTab } from "./ProductVariationsTab"
 import { ProductSuppliersTab } from "./ProductSuppliersTab"
 import { ProductMarketplaceTab } from "./ProductMarketplaceTab"
+import { ProductMetricsTab } from "./ProductMetricsTab"
 
 const NUMERIC_FIELDS = new Set([
     "price", "costPrice", "stock", "minStock", "maxStock", "promotional_price",
@@ -106,6 +107,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
     const variantsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+    const metricsPlanBlocked = !hasMinimumPlan(planSlug, "escalar")
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = businessInfo.mode === "quick"
@@ -693,7 +695,11 @@ const AddProductPage: FC<AddProductPageProps> = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <Tabs value={activeTab} onValueChange={(v) => { if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("crescer"); return } setActiveTab(v) }}
+                <Tabs value={activeTab} onValueChange={(v) => {
+                    if (v === "variations" && variantsPlanBlocked) { openPlanUpgrade("crescer"); return }
+                    if (v === "metrics" && metricsPlanBlocked) { openPlanUpgrade("escalar"); return }
+                    setActiveTab(v)
+                }}
                     className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
@@ -787,6 +793,16 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
+                                        {productData.show_in_marketplace && (
+                                            <TabsTrigger value="metrics" disabled={isLoadingDetails}>
+                                                <span className="inline-flex items-center gap-2">
+                                                    Métricas
+                                                    {metricsPlanBlocked ? (
+                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                    ) : null}
+                                                </span>
+                                            </TabsTrigger>
+                                        )}
                                     </TabsList>
                                 </div>
                             </div>
@@ -859,6 +875,25 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 }}
                                                 onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
                                             />
+                                        )}
+                                    </FadeIn>
+                                )}
+                                {activeTab === "metrics" && productData.show_in_marketplace && (
+                                    <FadeIn key="metrics" className="block">
+                                        {metricsPlanBlocked ? (
+                                            <div className="flex flex-col items-center justify-center pt-24 pb-32">
+                                                <p className="text-[15px] text-brand-inactive-text dark:text-dark-body font-medium">
+                                                    Faça upgrade para o plano <strong>Escalar</strong> para acessar métricas detalhadas.
+                                                </p>
+                                                <button
+                                                    onClick={() => openPlanUpgrade("escalar")}
+                                                    className="mt-4 px-6 py-2 bg-brand-primary text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                                                >
+                                                    Ver planos
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <ProductMetricsTab productData={productData} />
                                         )}
                                     </FadeIn>
                                 )}

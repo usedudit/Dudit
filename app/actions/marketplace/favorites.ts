@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidateTag } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 
@@ -59,12 +60,18 @@ export async function toggleFavoriteAction(
             .eq("item_type", itemType)
             .maybeSingle()
 
+        const itemTag = itemType === "produto" ? `product-${itemId}` : itemType === "servico" ? `service-${itemId}` : `partner-${itemId}`
+
         if (existing) {
             // Remove favorite
             await admin
                 .from("favorites")
                 .delete()
                 .eq("id", existing.id)
+
+            revalidateTag(itemTag, "max")
+            revalidateTag("marketplace-search", "max")
+            revalidateTag("home-products", "max")
 
             return { success: true, isFavorited: false }
         } else {
@@ -85,6 +92,10 @@ export async function toggleFavoriteAction(
                 console.error("[Favorites] Insert error:", insertError.message)
                 return { success: false, isFavorited: false, error: "Erro ao adicionar favorito" }
             }
+
+            revalidateTag(itemTag, "max")
+            revalidateTag("marketplace-search", "max")
+            revalidateTag("home-products", "max")
 
             return { success: true, isFavorited: true }
         }

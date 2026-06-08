@@ -477,14 +477,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         />
                     </SidebarCard>
                 )}
-
-                {mode !== "add" && (
-                    <SidebarCard>
-                        <div className="flex items-center gap-2 mb-2"><ShoppingBagIcon size={18} className="rotate-90 stroke-[2.5]" /><h3 className="text-[15px] font-bold">Total sales</h3></div>
-                        <div className="flex items-baseline gap-3 mb-8 pl-1"><span className="text-[32px] font-bold">{formatCurrency(840.00)}</span></div>
-                        <div className="h-48 w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><defs><linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#059669" stopOpacity={0.15} /><stop offset="95%" stopColor="#059669" stopOpacity={0} /></linearGradient></defs><XAxis dataKey="name" axisLine={false} tickLine={false} interval={3} /><Tooltip /><Area type="monotone" dataKey="value" stroke="#059669" strokeWidth={2.5} fillOpacity={1} fill="url(#colorValue)" /></AreaChart></ResponsiveContainer></div>
-                    </SidebarCard>
-                )}
             </div>
         </div>
     )
