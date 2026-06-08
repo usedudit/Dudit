@@ -527,7 +527,7 @@ export async function getBuyerReviewsAction() {
       *,
       products(id, name, images, video_thumbnail),
       services(id, name, images),
-      partners(id, store_name, store_image_url, slug, addresses(id, city, state))
+      partners(id, store_name, store_image_url, addresses(id, city, state))
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

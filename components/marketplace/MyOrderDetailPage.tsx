@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal } from '@/components/reusable';
+import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
@@ -43,9 +44,9 @@ const formatPartnerAddress = (addresses: any) => {
 const getFulfillmentModeLabel = (mode?: string | null) => {
     switch (mode) {
         case "delivery": return "Entrega";
-        case "pickup": return "Retirada";
-        case "on_site": return "Na loja";
-        case "customer_location": return "No endereço do cliente";
+        case "pickup": return "Retirada no estabelecimento";
+        case "on_site": return "No estabelecimento";
+        case "customer_location": return "A domicílio";
         default: return "Nao informado";
     }
 };
@@ -176,7 +177,7 @@ const getClientTimelineSteps = (order: any) => {
         // 3. Em Execução (with sub-labels)
         const servicesCount = orderItems.filter((item: any) => item.service_id || item.line_type === "service_booking").length;
         const productsCount = orderItems.filter((item: any) => !item.service_id && !item.recurring_plan_id && item.line_type !== "service_booking" && item.line_type !== "subscription").length;
-        
+
         const serviceText = servicesCount === 1 ? "1 serviço sendo realizado" : `${servicesCount} serviços sendo realizados`;
         const productText = productsCount === 1 ? "1 produto sendo preparado" : `${productsCount} produtos sendo preparados`;
 
@@ -344,7 +345,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnResolution, setReturnResolution] = useState<"exchange" | "refund" | "store_credit">("refund");
     const [returnMessage, setReturnMessage] = useState("");
     const [returnItems, setReturnItems] = useState<Record<string, number>>({});
-    const [returnEvidence, setReturnEvidence] = useState<any[]>([]);
+    const [returnServiceItems, setReturnServiceItems] = useState<Record<string, boolean>>({});
+    const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
@@ -380,7 +382,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (step.label === "Pago") changeLines = ["Pagamento confirmado com sucesso."];
             else if (step.label === "Preparando") changeLines = ["O vendedor está preparando os itens do seu pedido."];
             else if (step.label === "Enviado") changeLines = ["Seu pedido saiu para entrega."];
-            else if (step.label === "Pronto para retirada") changeLines = ["Seu pedido está pronto para ser retirado no local."];
+            else if (step.label === "Pronto para retirada") changeLines = ["Produtos do pedido estão prontos para serem retirados no local."];
             else if (step.label === "Entregue") changeLines = ["O pedido foi entregue ao destinatário."];
             else if (step.label === "Retirado") changeLines = ["O pedido foi retirado na loja."];
             else if (step.label === "Cancelado") changeLines = ["O pedido foi cancelado."];
@@ -418,6 +420,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasMixedItems = hasAnyService && hasProducts;
     const canCancelOrder = canRequestOrderCancellation(order);
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
+    const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
+    const showReturnButton = canRequestResolution || (hasAnyService && isPaidOrPartiallyPaid && !canCancelOrder);
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
     const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
@@ -586,42 +590,61 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     };
 
-    const handleEvidenceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleEvidenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (!files) return;
         const remaining = Math.max(0, 5 - returnEvidence.length);
-        for (const file of Array.from(files).slice(0, remaining)) {
-            const uploaded = await evidenceUploader.uploadFile(file);
-            setReturnEvidence(prev => [...prev, {
-                file_url: uploaded.publicUrl,
-                file_key: uploaded.key,
-                file_name: file.name,
-                file_type: uploaded.contentType || file.type,
-                file_size: file.size,
-            }]);
-        }
+        const newFiles = Array.from(files).slice(0, remaining);
+        setReturnEvidence(prev => [...prev, ...newFiles]);
         event.target.value = "";
     };
 
+    const handleRemoveEvidence = (index: number) => {
+        setReturnEvidence(prev => prev.filter((_, i) => i !== index));
+    };
+
     const submitReturnRequest = async () => {
-        const items = Object.entries(returnItems)
+        const productItems = Object.entries(returnItems)
             .filter(([, quantity]) => Number(quantity) > 0)
             .map(([orderItemId, quantity]) => ({ order_item_id: orderItemId, quantity: Number(quantity), reason: returnReason }));
 
-        if (items.length === 0) {
-            toast({ title: "Selecione ao menos um produto", variant: "destructive" });
+        const serviceItems = Object.entries(returnServiceItems)
+            .filter(([, checked]) => checked)
+            .map(([orderItemId]) => ({ order_item_id: orderItemId, quantity: 1, reason: returnReason }));
+
+        const allItems = [...productItems, ...serviceItems];
+
+        if (allItems.length === 0) {
+            toast({ title: "Selecione ao menos um item", variant: "destructive" });
             return;
         }
 
         try {
             setIsSubmittingReturn(true);
+
+            const uploadedEvidence: any[] = [];
+            for (const file of returnEvidence) {
+                if (file instanceof File) {
+                    const uploaded = await evidenceUploader.uploadFile(file);
+                    uploadedEvidence.push({
+                        file_url: uploaded.publicUrl,
+                        file_key: uploaded.key,
+                        file_name: file.name,
+                        file_type: uploaded.contentType || file.type,
+                        file_size: file.size,
+                    });
+                } else if (typeof file === 'string') {
+                    uploadedEvidence.push({ file_url: file });
+                }
+            }
+
             const result = await createMarketplaceReturnRequestAction({
                 orderId: order.id,
                 resolution: returnResolution,
                 reason: returnReason,
                 message: returnMessage,
-                items,
-                evidence: returnEvidence,
+                items: allItems,
+                evidence: uploadedEvidence,
                 idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
             });
             if (!result.success) throw new Error(result.error);
@@ -646,6 +669,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         video_thumbnail: item.products?.video_thumbnail || null,
                         fallback_variant_image: item.product_variants?.variant_options?.image || null,
                     });
+                    const isService = !!item.service_id || item.line_type === "service_booking";
+                    const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                    const bookingDate = fulfillmentLine?.bookingMetadata?.date || null;
+                    const bookingTime = fulfillmentLine?.bookingMetadata?.time || null;
                     const content = (
                         <>
                             <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
@@ -655,26 +682,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate group-hover:text-brand-green transition-colors">
                                     {item.products?.name || item.product_name}
                                 </h3>
-                                {item.product_variants?.variant_name && (
-                                    <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                {isService ? (
+                                    <>
+                                        <div className="text-xs text-brand-inactive-text mt-0.5 flex items-center gap-1.5">
+                                            {fulfillmentMode && getFulfillmentModeLabel(fulfillmentMode)}
+                                            {isService && order.situation === "cancelled" && (
+                                                <Badge variant="red">Cancelado</Badge>
+                                            )}
+                                        </div>
+                                        {bookingDate && bookingTime && (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                {formatFullDate(bookingDate)} as {bookingTime}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {item.product_variants?.variant_name && (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                        )}
+                                    </>
                                 )}
-                                <div className="text-xs text-brand-inactive-text mt-0.5">
-                                    {itemKind}
-                                    {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
-                                </div>
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
                                     {formatProductUnitPrice(item.product_price, item.products?.unit)}
                                 </div>
                             </div>
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                {formatProductQuantity(item.quantity, item.products?.unit)}
+                                {!isService ? formatProductQuantity(item.quantity, item.products?.unit) : ""}
                             </div>
                         </>
                     );
 
-                    const isService = !!item.service_id || item.line_type === "service_booking";
-                    const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
-                    
                     let itemUrl = "";
                     if (isService) {
                         itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
@@ -792,6 +830,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     video_thumbnail: item.products?.video_thumbnail || null,
                                                     fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                                 });
+                                                const isService = !!item.service_id || item.line_type === "service_booking";
+                                                const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
+                                                const bookingDate = fulfillmentLine?.bookingMetadata?.date || null;
+                                                const bookingTime = fulfillmentLine?.bookingMetadata?.time || null;
                                                 const content = (
                                                     <>
                                                         <div className="w-14 h-14 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center shrink-0">
@@ -801,25 +843,37 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
                                                                 {item.products?.name || item.product_name}
                                                             </h3>
-                                                            {item.product_variants?.variant_name && (
-                                                                <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                            {isService ? (
+                                                                <>
+                                                                    <div className="text-xs text-brand-inactive-text mt-0.5 flex items-center gap-1.5">
+                                                                        {fulfillmentMode && getFulfillmentModeLabel(fulfillmentMode)}
+                                                                        {isService && order.situation === "cancelled" && (
+                                                                            <Badge variant="red">Cancelado</Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    {bookingDate && bookingTime && (
+                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                            {formatFullDate(bookingDate)} as {bookingTime}
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {item.product_variants?.variant_name && (
+                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                                    )}
+                                                                </>
                                                             )}
-                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                                {itemKind}
-                                                                {fulfillmentMode ? ` · ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
-                                                            </div>
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
                                                                 {formatProductUnitPrice(item.product_price, item.products?.unit)}
                                                             </div>
                                                         </div>
                                                         <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
-                                                            {formatProductQuantity(item.quantity, item.products?.unit)}
+                                                            {!isService ? formatProductQuantity(item.quantity, item.products?.unit) : ""}
                                                         </div>
                                                     </>
                                                 );
-                                                const isService = !!item.service_id || item.line_type === "service_booking";
-                                                const isPlan = !!item.recurring_plan_id || item.line_type === "subscription";
-                                                
+
                                                 let itemUrl = "";
                                                 if (isService) {
                                                     itemUrl = getServiceUrl({ ...item.services, id: item.service_id }, order.partners);
@@ -855,7 +909,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 2: Endereço de entrega / retirada */}
                                     {hasProducts && (
-                                        <FormSection title={isDelivery ? "Endereço de Entrega" : "Local de Retirada"}>
+                                        <FormSection title={isDelivery ? "Endereço de Entrega" : "Retirada no estabelecimento"}>
                                             {isDelivery ? (
                                                 <div
                                                     onClick={() => setIsShippingModalOpen(true)}
@@ -880,11 +934,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 >
                                                     <img
                                                         src="https://img.dudit.com.br/static/Map.png"
-                                                        alt="Local de Retirada"
+                                                        alt="Retirada no estabelecimento"
                                                         className="w-12 h-12 object-cover rounded-xl shrink-0"
                                                     />
                                                     <div className="flex flex-col justify-center">
-                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
+                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Retirada no estabelecimento</p>
                                                         <p className="text-sm text-brand-inactive-text">{formatPartnerAddress(order.partners?.addresses)}</p>
                                                     </div>
                                                 </div>
@@ -893,38 +947,44 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     )}
 
                                     {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
-                                    <FormSection title="Atendimento e Assinaturas">
-                                        <div className="space-y-4">
-                                            {(order.order_items || [])
-                                                .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
-                                                .map((item: any) => {
-                                                    const fulfillmentLine = findFulfillmentLine(order, item);
-                                                    const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
-                                                    const isCustomerAddress = mode === "customer_location" || mode === "delivery";
-                                                    const address = isCustomerAddress
-                                                        ? (order.delivery_address || "Endereco nao informado")
-                                                        : formatPartnerAddress(order.partners?.addresses);
+                                        <FormSection title="Atendimento e Assinaturas">
+                                            <div className="space-y-4">
+                                                {(order.order_items || [])
+                                                    .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
+                                                    .map((item: any) => {
+                                                        const fulfillmentLine = findFulfillmentLine(order, item);
+                                                        const mode = item.fulfillment_mode || fulfillmentLine?.fulfillmentMode;
+                                                        const isCustomerAddress = mode === "customer_location" || mode === "delivery";
+                                                        const address = isCustomerAddress
+                                                            ? (order.delivery_address || "Endereco nao informado")
+                                                            : formatPartnerAddress(order.partners?.addresses);
 
-                                                    return (
-                                                        <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
-                                                            <img
-                                                                src="https://img.dudit.com.br/static/Map.png"
-                                                                alt={getFulfillmentModeLabel(mode)}
-                                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                                            />
-                                                            <div className="flex flex-col justify-center min-w-0">
-                                                                <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                    {getItemKindLabel(item)} · {getFulfillmentModeLabel(mode)}
-                                                                </p>
-                                                                <p className="text-xs lg:text-sm text-brand-inactive-text">
-                                                                    {isCustomerAddress && addressTypeLabel ? `${addressTypeLabel}: ` : ""}{address}
-                                                                </p>
+                                                        const isServiceCancelled = order.situation === "cancelled";
+                                                        const isSub = !!item.recurring_plan_id || item.line_type === "subscription";
+                                                        const serviceLabel = isSub ? "Assinatura" : `Serviço ${getFulfillmentModeLabel(mode)?.toLowerCase()}`;
+                                                        return (
+                                                            <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
+                                                                <img
+                                                                    src="https://img.dudit.com.br/static/Map.png"
+                                                                    alt={serviceLabel}
+                                                                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                                                />
+                                                                <div className="flex flex-col justify-center min-w-0">
+                                                                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate flex items-center gap-2">
+                                                                        {serviceLabel}
+                                                                        {isServiceCancelled && (
+                                                                            <Badge variant="red">Cancelado</Badge>
+                                                                        )}
+                                                                    </p>
+                                                                    <p className="text-xs lg:text-sm text-brand-inactive-text">
+                                                                        {isCustomerAddress && addressTypeLabel ? `${addressTypeLabel}: ` : ""}{address}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </FormSection>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </FormSection>
                                     )}
 
                                     {/* Section 3: Pagamento */}
@@ -992,17 +1052,24 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </Button>
                                         )}
 
-                                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                        {!canCancelOrder && !showReturnButton && order.situation !== "cancelled" && (
                                             <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                                 Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
                                             </div>
                                         )}
 
-                                        {canRequestResolution && (
+                                        {showReturnButton && (
                                             <>
-                                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                                </p>
+                                                {canRequestResolution && (
+                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                        Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                                    </p>
+                                                )}
+                                                {!canRequestResolution && hasAnyService && (
+                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                        Seus servicos estao disponiveis para cancelamento, troca ou devolucao.
+                                                    </p>
+                                                )}
                                                 <Button
                                                     variant="outline"
                                                     className="w-full h-12 font-bold"
@@ -1043,17 +1110,24 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </Button>
                                         )}
 
-                                        {!canCancelOrder && !canRequestResolution && order.situation !== "cancelled" && (
+                                        {!canCancelOrder && !showReturnButton && order.situation !== "cancelled" && (
                                             <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
                                                 Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
                                             </div>
                                         )}
 
-                                        {canRequestResolution && (
+                                        {showReturnButton && (
                                             <>
-                                                <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                    Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                                </p>
+                                                {canRequestResolution && (
+                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                        Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                                    </p>
+                                                )}
+                                                {!canRequestResolution && hasAnyService && (
+                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                        Seus servicos estao disponiveis para cancelamento, troca ou devolucao.
+                                                    </p>
+                                                )}
                                                 <Button
                                                     variant="outline"
                                                     className="w-full h-12 font-bold"
@@ -1098,170 +1172,190 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     />
                 )}
 
-                <AnimatePresence>
-                    {isCancelModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-white dark:bg-dark-surface w-full max-w-lg rounded-2xl overflow-hidden"
-                            >
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Cancelar pedido</h3>
-                                    <button onClick={() => setIsCancelModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                                        <XIcon size={24} />
-                                    </button>
-                                </div>
-                                <div className="p-6 space-y-5">
-                                    {order.situation !== "paid" ? (
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            Tem certeza de que deseja cancelar este pedido? O cancelamento será feito imediatamente e os itens retornarão ao estoque.
-                                        </p>
-                                    ) : (
-                                        <>
-                                            <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                Motivo do cancelamento
-                                                <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                                    <option value="purchased_by_mistake">Comprei por engano</option>
-                                                    <option value="better_price">Encontrei preco melhor</option>
-                                                    <option value="delivery_delay">Atraso na entrega</option>
-                                                    <option value="changed_mind">Mudei de ideia</option>
-                                                    <option value="payment_issue">Problema no pagamento</option>
-                                                    <option value="other">Outro</option>
-                                                </select>
-                                            </label>
-                                            <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                Detalhes
-                                                <textarea value={cancelDetails} onChange={(e) => setCancelDetails(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
-                                            </label>
-                                        </>
-                                    )}
-                                </div>
-                                <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
-                                    <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
-                                    <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
-                                        {isCanceling ? (
-                                            "Cancelando..."
-                                        ) : order.situation !== "paid" ? (
-                                            "Confirmar cancelamento"
-                                        ) : (
-                                            "Solicitar cancelamento"
-                                        )}
-                                    </Button>
-                                </div>
-                            </motion.div>
+                <DefaultModal
+                    isOpen={isCancelModalOpen}
+                    onClose={() => setIsCancelModalOpen(false)}
+                    title="Cancelar pedido"
+                    maxWidth="lg"
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
+                            <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
+                                {isCanceling ? "Cancelando..." : order.situation !== "paid" ? "Confirmar cancelamento" : "Solicitar cancelamento"}
+                            </Button>
+                        </div>
+                    }
+                >
+                    {order.situation !== "paid" ? (
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Tem certeza de que deseja cancelar este pedido? O cancelamento será feito imediatamente e os itens retornarão ao estoque.
+                        </p>
+                    ) : (
+                        <div className="space-y-5">
+                            <FormDropdown
+                                label="Motivo do cancelamento"
+                                value={cancelReason}
+                                setValue={setCancelReason}
+                                options={[
+                                    { value: "purchased_by_mistake", label: "Comprei por engano" },
+                                    { value: "better_price", label: "Encontrei preco melhor" },
+                                    { value: "delivery_delay", label: "Atraso na entrega" },
+                                    { value: "changed_mind", label: "Mudei de ideia" },
+                                    { value: "payment_issue", label: "Problema no pagamento" },
+                                    { value: "other", label: "Outro" },
+                                ]}
+                            />
+                            <Input
+                                label="Detalhes"
+                                value={cancelDetails}
+                                onChange={(e) => setCancelDetails(e.target.value)}
+                                maxLength={1000}
+                                multiline
+                                rows={4}
+                                showCharacterCount
+                            />
                         </div>
                     )}
-                </AnimatePresence>
+                </DefaultModal>
 
-                <AnimatePresence>
-                    {isReturnModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-white dark:bg-dark-surface w-full max-w-2xl rounded-2xl overflow-hidden"
-                            >
-                                <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border">
-                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Solicitar troca ou devolucao</h3>
-                                    <button onClick={() => setIsReturnModalOpen(false)} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading">
-                                        <XIcon size={24} />
-                                    </button>
-                                </div>
-                                <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar space-y-6">
-                                    <div className="space-y-3">
-                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
-                                        {order.order_items?.map((item: any) => {
-                                            const itemImage = getPrimaryProductDisplayImage({
-                                                images: item.products?.images || null,
-                                                video_thumbnail: item.products?.video_thumbnail || null,
-                                                fallback_variant_image: item.product_variants?.variant_options?.image || null,
-                                            });
-                                            return (
-                                                <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={Number(returnItems[item.id] || 0) > 0}
-                                                        onChange={(event) => setReturnItems(prev => ({ ...prev, [item.id]: event.target.checked ? 1 : 0 }))}
-                                                    />
-                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
-                                                        <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
-                                                    </div>
-                                                    <input
-                                                        type="number"
-                                                        min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
-                                                        max={item.quantity}
-                                                        value={returnItems[item.id] || 0}
-                                                        onChange={(event) => setReturnItems(prev => ({
-                                                            ...prev,
-                                                            [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(event.target.value || 0))),
-                                                        }))}
-                                                        className="w-20 h-10 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-2 text-sm"
-                                                    />
+                <DefaultModal
+                    isOpen={isReturnModalOpen}
+                    onClose={() => setIsReturnModalOpen(false)}
+                    title="Solicitar troca ou devolucao"
+                    maxWidth="2xl"
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
+                            <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
+                                {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-6">
+                        {/* Produtos */}
+                        {order.order_items?.filter((item: any) => !item.service_id && item.line_type !== "service_booking").length > 0 && (
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Produtos</h4>
+                                {order.order_items
+                                    ?.filter((item: any) => !item.service_id && item.line_type !== "service_booking")
+                                    .map((item: any) => {
+                                        const itemImage = getPrimaryProductDisplayImage({
+                                            images: item.products?.images || null,
+                                            video_thumbnail: item.products?.video_thumbnail || null,
+                                            fallback_variant_image: item.product_variants?.variant_options?.image || null,
+                                        });
+                                        return (
+                                            <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                <Checkbox
+                                                    checked={Number(returnItems[item.id] || 0) > 0}
+                                                    onChange={(checked) => setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }))}
+                                                />
+                                                <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
+                                                    <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
                                                 </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            Motivo
-                                            <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                                <option value="wrong_item">Recebi item errado</option>
-                                                <option value="defective">Item com defeito</option>
-                                                <option value="damaged">Item danificado</option>
-                                                <option value="different_from_description">Diferente da descricao</option>
-                                                <option value="missing_parts">Faltam partes</option>
-                                                <option value="arrived_late">Chegou atrasado</option>
-                                                <option value="changed_mind">Mudei de ideia</option>
-                                                <option value="other">Outro</option>
-                                            </select>
-                                        </label>
-                                        <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                            Resolucao
-                                            <select value={returnResolution} onChange={(e) => setReturnResolution(e.target.value as any)} className="h-11 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 font-medium">
-                                                <option value="exchange">Troca</option>
-                                                <option value="refund">Reembolso</option>
-                                                <option value="store_credit">Vale-compra</option>
-                                            </select>
-                                        </label>
-                                    </div>
-
-                                    <label className="flex flex-col gap-2 text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                        Mensagem opcional
-                                        <textarea value={returnMessage} onChange={(e) => setReturnMessage(e.target.value)} maxLength={1000} rows={4} className="rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface p-3 font-medium resize-none" />
-                                    </label>
-
-                                    <div className="space-y-3">
-                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
-                                        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-brand-border dark:border-dark-border p-4 text-center text-sm font-semibold text-brand-inactive-text">
-                                            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleEvidenceUpload} />
-                                            {evidenceUploader.isLoading ? "Enviando..." : "Adicionar fotos ou PDF"}
-                                            <span className="mt-1 text-xs font-medium">{returnEvidence.length}/5 arquivos</span>
-                                        </label>
-                                        {returnEvidence.length > 0 && (
-                                            <div className="grid grid-cols-2 gap-2 text-xs text-brand-inactive-text">
-                                                {returnEvidence.map((file, index) => (
-                                                    <div key={`${file.file_url}-${index}`} className="truncate rounded-lg border border-brand-border p-2">{file.file_name || file.file_url}</div>
-                                                ))}
+                                                <Input
+                                                    type="number"
+                                                    min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
+                                                    max={item.quantity}
+                                                    value={returnItems[item.id] || 0}
+                                                    onChange={(e) => setReturnItems(prev => ({
+                                                        ...prev,
+                                                        [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(e.target.value || 0))),
+                                                    }))}
+                                                    className="!w-20"
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-3 border-t border-brand-border dark:border-dark-border p-4">
-                                    <Button variant="outline" onClick={() => setIsReturnModalOpen(false)} disabled={isSubmittingReturn}>Cancelar</Button>
-                                    <Button onClick={submitReturnRequest} disabled={isSubmittingReturn}>
-                                        {isSubmittingReturn ? "Enviando..." : "Enviar solicitacao"}
-                                    </Button>
-                                </div>
-                            </motion.div>
+                                        )
+                                    })}
+                            </div>
+                        )}
+
+                        {/* Servicos */}
+                        {order.order_items?.filter((item: any) => item.service_id || item.line_type === "service_booking").length > 0 && (
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Servicos</h4>
+                                {order.order_items
+                                    ?.filter((item: any) => item.service_id || item.line_type === "service_booking")
+                                    .map((item: any) => {
+                                        const isCancelled = order.situation === "cancelled";
+                                        return (
+                                            <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                <Checkbox
+                                                    checked={!!returnServiceItems[item.id]}
+                                                    onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
+                                                    disabled={isCancelled}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
+                                                        {isCancelled && (
+                                                            <Badge variant="red">Cancelado</Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-brand-inactive-text">Servico</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormDropdown
+                                label="Motivo"
+                                value={returnReason}
+                                setValue={setReturnReason}
+                                options={[
+                                    { value: "wrong_item", label: "Recebi item errado" },
+                                    { value: "defective", label: "Item com defeito" },
+                                    { value: "damaged", label: "Item danificado" },
+                                    { value: "different_from_description", label: "Diferente da descricao" },
+                                    { value: "missing_parts", label: "Faltam partes" },
+                                    { value: "arrived_late", label: "Chegou atrasado" },
+                                    { value: "changed_mind", label: "Mudei de ideia" },
+                                    { value: "other", label: "Outro" },
+                                ]}
+                            />
+                            <FormDropdown
+                                label="Resolucao"
+                                value={returnResolution}
+                                setValue={(val) => setReturnResolution(val as any)}
+                                options={[
+                                    { value: "exchange", label: "Troca" },
+                                    { value: "refund", label: "Reembolso" },
+                                    { value: "store_credit", label: "Vale-compra" },
+                                ]}
+                            />
                         </div>
-                    )}
-                </AnimatePresence>
+
+                        <Input
+                            label="Mensagem opcional"
+                            value={returnMessage}
+                            onChange={(e) => setReturnMessage(e.target.value)}
+                            maxLength={1000}
+                            multiline
+                            rows={4}
+                            showCharacterCount
+                        />
+
+                        <div className="space-y-3">
+                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidencias</h4>
+                            <div className="max-w-full overflow-x-auto">
+                                <ProductImagesSection
+                                    images={returnEvidence}
+                                    onImageUpload={handleEvidenceUpload}
+                                    onRemoveImage={handleRemoveEvidence}
+                                    onSetPrimaryImage={() => { }}
+                                    isEditing={true}
+                                />
+                            </div>
+                            <p className="text-xs text-brand-inactive-text font-medium">{returnEvidence.length}/5 arquivos</p>
+                        </div>
+                    </div>
+                </DefaultModal>
             </div>
         </motion.div>
     );
