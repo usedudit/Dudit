@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache"
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { searchMarketplaceDirect } from "@/app/actions/marketplace/search"
+import { applySellerDiversity, sortByTrendingScore } from "@/lib/marketplace/ranking"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 
@@ -427,6 +428,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       .from("products")
       .select(`
         id, name, description, price, promotional_price, stock_available, stock_quantity, images, rating,
+        marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
         category_id, category:product_categories!category_id(name), created_at,
         partners!inner(
           id, store_name, store_image_url, latitude, longitude,
@@ -452,6 +454,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       .from("recurring_plans")
       .select(`
         id, name, description, status, show_in_marketplace, partner_id, frequency_type, frequency_interval, created_at,
+        marketplace_score, signups_last_30_days, favorites_count, views_count,
         partners!inner(
           id, store_name, store_image_url, latitude, longitude,
           addresses!inner(city, state)
@@ -574,6 +577,17 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
     }
   })
 
-  return { products: normalizedProducts, vitrines: normalizedVitrines, plans: normalizedPlans }
+  const trendingProducts = applySellerDiversity(sortByTrendingScore(normalizedProducts)).slice(0, 20)
+  const trendingPlans = applySellerDiversity(
+    sortByTrendingScore(
+      normalizedPlans.map((p) => ({ ...p, signups_last_30_days: (p as any).signups_last_30_days })),
+    ),
+  ).slice(0, 10)
+
+  return {
+    products: trendingProducts,
+    vitrines: normalizedVitrines.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)),
+    plans: trendingPlans,
+  }
 }
 

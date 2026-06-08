@@ -625,7 +625,7 @@ export default function MarketplaceHome({
 
                 {recentProducts.length > 0 && (
                     <ProductCarousel
-                        title="Seus queridinhos estão aqui"
+                        title="Produtos em alta na sua cidade"
                         products={recentProducts}
                         seeMoreLink="/explorar"
                         userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
@@ -634,7 +634,7 @@ export default function MarketplaceHome({
 
                 {displayPlans.length > 0 && (
                     <ProductCarousel
-                        title="Assinaturas e planos na sua cidade"
+                        title="Planos em alta na sua cidade"
                         products={displayPlans}
                         seeMoreLink="/explorar?type=planos"
                         userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}

@@ -714,9 +714,6 @@ async function handler(request: NextRequest) {
           customer_name: customerName,
         })
 
-        // Increment partner's total sales count
-        await adminClient.rpc('increment_partner_sales', { partner_uuid: partnerId })
-
         const { fulfillMarketplaceOrder } = await import("@/lib/services/marketplace-checkout-fulfillment")
         await fulfillMarketplaceOrder(adminClient, newOrder.id)
       } catch (txErr: any) {

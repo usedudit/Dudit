@@ -204,13 +204,17 @@ async function _getPartnerReviews(partnerId: string) {
 async function _getPartnerStats(partnerId: string) {
   const supabase = getAdminClient()
   const [partner, reviews] = await Promise.all([
-    supabase.from("partners").select("vendas_totais").eq("id", partnerId).single(),
+    supabase.from("partners").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("id", partnerId).single(),
     supabase.from("reviews").select("*", { count: "exact", head: true }).eq("partner_id", partnerId)
   ])
 
   return {
     salesCount: partner.data?.vendas_totais || 0,
-    reviewsCount: reviews.count || 0
+    reviewsCount: reviews.count || 0,
+    marketplaceReputation: partner.data?.marketplace_reputation || 0,
+    productSales: partner.data?.vendas_produtos || 0,
+    serviceSales: partner.data?.vendas_servicos || 0,
+    subscriptionSales: partner.data?.vendas_assinaturas || 0,
   }
 }
 
@@ -377,13 +381,17 @@ export const getCachedPartnerStats = async (partnerId: string) => {
     async () => {
       const supabase = getAdminClient()
       const [partner, reviews] = await Promise.all([
-        supabase.from("partners").select("vendas_totais").eq("id", partnerId).single(),
+        supabase.from("partners").select("vendas_totais, marketplace_reputation, vendas_produtos, vendas_servicos, vendas_assinaturas").eq("id", partnerId).single(),
         supabase.from("reviews").select("*", { count: "exact", head: true }).eq("partner_id", partnerId)
       ])
 
       return {
         salesCount: partner.data?.vendas_totais || 0,
-        reviewsCount: reviews.count || 0
+        reviewsCount: reviews.count || 0,
+        marketplaceReputation: partner.data?.marketplace_reputation || 0,
+        productSales: partner.data?.vendas_produtos || 0,
+        serviceSales: partner.data?.vendas_servicos || 0,
+        subscriptionSales: partner.data?.vendas_assinaturas || 0,
       }
     },
     [`partner-stats-${partnerId}`],

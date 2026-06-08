@@ -146,6 +146,12 @@ export async function createRecurringSubscriptionAction(input: {
 
     if (error) throw error
 
+    import("@/lib/services/marketplace-metrics.service")
+      .then(({ recordSubscriptionSignupMetrics }) =>
+        recordSubscriptionSignupMetrics(supabase, data.id as string),
+      )
+      .catch(console.error)
+
     await logAuditEvent({
       partnerId: input.partnerId,
       actorUserId: null,

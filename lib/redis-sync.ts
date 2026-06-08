@@ -13,9 +13,20 @@ interface SyncItemOptions {
   id: string
   type: ItemType
   data: any // Objeto completo formatado para o marketplace
-  score?: number // Se não informado, usa Date.now()
+  score?: number // Se não informado, usa marketplace_score + desempate por created_at
   removeFromRedis?: boolean
   silent?: boolean
+}
+
+/** Redis ZSET score: higher marketplace_score ranks first; created_at breaks ties. */
+export function computeExploreRedisScore(
+  data: { marketplace_score?: number; marketplace_reputation?: number; created_at?: string },
+  explicitScore?: number,
+): number {
+  if (explicitScore !== undefined) return explicitScore
+  const rankScore = Number(data.marketplace_score ?? data.marketplace_reputation ?? 0)
+  const timePart = new Date(data.created_at || Date.now()).getTime() / 1e15
+  return rankScore * 1e6 + timePart
 }
 
 // Extrai imagem e preço da primeira variante ativa como fallback
@@ -48,7 +59,6 @@ export async function syncToExploreRedis({
   const globalIndexKey = `explore:index:all`
   const dataKey = getExploreRedisDataKey(type, id)
   const memberId = `${type}:${id}`
-  const finalScore = score ?? new Date(data.created_at || Date.now()).getTime()
 
   try {
     if (removeFromRedis) {
@@ -77,6 +87,7 @@ export async function syncToExploreRedis({
           .from("products")
           .select(`
             id, name, description, price, promotional_price, images, video_thumbnail, rating,
+            marketplace_score, sales_last_30_days, favorites_count, views_last_30_days,
             category_id, category:product_categories!category_id(name), created_at, updated_at, is_active, show_in_marketplace,
             marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
@@ -129,7 +140,8 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("services")
           .select(`
-            id, name, price, promotional_price, images, rating, category, category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
+            id, name, price, promotional_price, images, rating, marketplace_score, bookings_last_30_days, favorites_count, views_count,
+            category, category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
             service_categories:service_categories!category_id(name),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             show_price_in_store
@@ -161,7 +173,7 @@ export async function syncToExploreRedis({
         const { data: dbData } = await admin
           .from("partners")
           .select(`
-            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, latitude, longitude, created_at, updated_at,
+            id, store_name, store_description, store_image_url, banner_url, logo_moderation_status, banner_moderation_status, rating, marketplace_reputation, latitude, longitude, created_at, updated_at,
             category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)),
             addresses(city, state),
             reviews(count)
@@ -199,6 +211,8 @@ export async function syncToExploreRedis({
       console.warn(`[RedisSync] Dados insuficientes para sincronizar ${memberId}. Ignorando.`)
       return
     }
+
+    const finalScore = computeExploreRedisScore(finalData, score)
 
     // 1. Atualiza o Cache do Objeto (JSON)
     // 2. Atualiza o Índice Específico (zset)

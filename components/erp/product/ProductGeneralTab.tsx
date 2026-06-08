@@ -11,6 +11,7 @@ import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { RichTextEditor } from "@/components/reusable"
+import { MarketplaceMetricsReadOnly } from "@/components/erp/marketplace/MarketplaceMetricsReadOnly"
 
 const FormCombobox = ({
     label,
@@ -163,6 +164,10 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             />
                         </div>
                     </div>
+
+                    {productData.id && showInMarketplaceValue === "true" && (
+                        <MarketplaceMetricsReadOnly entityType="product" metrics={productData} />
+                    )}
                 </div>
 
                 {/* PREÇO */}

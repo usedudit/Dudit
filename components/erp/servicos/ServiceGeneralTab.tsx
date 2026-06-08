@@ -12,6 +12,7 @@ import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { RichTextEditor } from "@/components/reusable"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { MarketplaceMetricsReadOnly } from "@/components/erp/marketplace/MarketplaceMetricsReadOnly"
 import { useEffect, useState } from "react"
 
 const FormCombobox = ({
@@ -144,6 +145,12 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 width="w-full"
                             />
                         </div>
+
+                        {serviceData.id && serviceData.show_in_marketplace && (
+                            <div className="col-span-12">
+                                <MarketplaceMetricsReadOnly entityType="service" metrics={serviceData} />
+                            </div>
+                        )}
 
                         <FulfillmentModesEditor
                             label="Formas de atendimento (vitrine)"

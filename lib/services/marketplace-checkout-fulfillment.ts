@@ -14,6 +14,7 @@ import type {
 } from "@/lib/types/marketplace-cart"
 import { isStaffSlotAvailable } from "@/lib/commerce/scheduling-availability"
 import { syncAppointmentReceivable } from "@/lib/services/appointment-receivable"
+import { onMarketplaceOrderPaid } from "@/lib/services/marketplace-metrics.service"
 
 const STOREFRONT_CHANNEL = "online_storefront"
 
@@ -349,6 +350,9 @@ export async function fulfillMarketplaceOrder(
       }
     }
     if (appointmentIds.length >= expectedScheduledServices) {
+      if (situation === "paid" || situation === "approved") {
+        await onMarketplaceOrderPaid(supabase, orderId)
+      }
       return { success: true, result: (existingFulfillment.result || {}) as CheckoutFulfillmentResult, skipped: true }
     }
   }
@@ -358,6 +362,9 @@ export async function fulfillMarketplaceOrder(
   }
 
   if (!payload?.lines?.length) {
+    if (situation === "paid" || situation === "approved") {
+      await onMarketplaceOrderPaid(supabase, orderId)
+    }
     return { success: true, skipped: true }
   }
 
@@ -466,6 +473,10 @@ export async function fulfillMarketplaceOrder(
         error_message: null,
       })
       .eq("idempotency_key", idempotencyKey)
+
+    if (situation === "paid" || situation === "approved") {
+      await onMarketplaceOrderPaid(supabase, orderId)
+    }
 
     return { success: true, result }
   } catch (e: unknown) {

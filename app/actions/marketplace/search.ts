@@ -13,6 +13,7 @@ import { getUserSessionData } from "@/lib/data/user"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { resolveCityAndStateFromSlug } from "./products"
 import { buildMarketplaceTsQuery } from "@/lib/search/build-tsquery"
+import { applySellerDiversity } from "@/lib/marketplace/ranking"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -286,8 +287,8 @@ async function _searchMarketplaceInternal(
             // tentamos buscar no Postgres FTS para não deixar o marketplace vazio.
             // Apenas para a primeira página (sem cursor/lastId).
             if (!cursor && !lastId) {
-                console.log(`[REDIS] Index ${indexKey} is empty. Falling back to Postgres FTS for ${type}.`)
-                return await searchMarketplacePostgresFTS(query, type, limits)
+                console.log(`[REDIS] Index ${indexKey} is empty. Falling back to Postgres browse-by-score for ${type}.`)
+                return await browseMarketplaceByScore(type, limits)
             }
             return { results: [], filteredIds: [] }
         }
@@ -935,9 +936,60 @@ async function searchMarketplaceByCity(
         results = normalizedPlans
     }
 
-    results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    results.sort((a, b) => Number(b.marketplace_score || 0) - Number(a.marketplace_score || 0))
+    results = applySellerDiversity(results)
 
     const finalIds = results.map(r => `${r.itemType}:${r.id}`)
     return { results, filteredIds: finalIds }
+}
+
+type BrowseScoreHit = {
+    item_type: string
+    id: string
+    score: number
+    created_at: string
+    partner_id?: string
+}
+
+async function browseMarketplaceByScore(
+    type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos',
+    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; partnerIds?: string[] } = {},
+): Promise<{ results: any[]; filteredIds: string[] }> {
+    const supabase = getAdminClient()
+    const limitCount = type === 'tudo'
+        ? (limits.geral ?? 40)
+        : type === 'vitrines'
+            ? (limits.vitrines ?? 40)
+            : type === 'produtos'
+                ? (limits.produtos ?? 20)
+                : type === 'planos'
+                    ? (limits.planos ?? 20)
+                    : (limits.servicos ?? 20)
+
+    const rpcType = type === 'vitrines' ? 'tudo' : type
+    const { data: hits, error } = await supabase.rpc("browse_marketplace_by_score", {
+        p_type: rpcType,
+        p_limit: limitCount,
+        p_cursor_score: null,
+        p_cursor_id: null,
+        p_partner_ids: limits.partnerIds?.length ? limits.partnerIds : null,
+    })
+
+    if (error || !hits?.length) {
+        console.error("[browseMarketplaceByScore]", error?.message)
+        return { results: [], filteredIds: [] }
+    }
+
+    const rankedHits = (hits as BrowseScoreHit[]).map((h) => ({
+        item_type: h.item_type,
+        id: h.id,
+        rank: h.score,
+        created_at: h.created_at,
+    }))
+
+    const results = await hydrateMarketplaceSearchHits(rankedHits as MarketplaceSearchHit[], supabase)
+    const diversified = applySellerDiversity(results)
+    const finalIds = diversified.map((r) => `${r.itemType}:${r.id}`)
+    return { results: diversified, filteredIds: finalIds }
 }
 

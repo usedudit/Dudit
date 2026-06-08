@@ -849,6 +849,17 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     revalidatePath("/erp/servicos")
 
     const finalRow = syncedAppointment || updated
+
+    const wasNotSuccessful = !["Concluído", "Pago", "Pago Parcialmente", "Confirmado"].includes(String(current.status || ""))
+    const isNowSuccessful = ["Concluído", "Pago", "Pago Parcialmente", "Confirmado"].includes(String(normalizedStatus || ""))
+    if (wasNotSuccessful && isNowSuccessful) {
+      import("@/lib/services/marketplace-metrics.service")
+        .then(({ recordAppointmentBookingMetrics }) =>
+          recordAppointmentBookingMetrics(supabase, appointmentId),
+        )
+        .catch(console.error)
+    }
+
     import("@/lib/services/whatsapp-automation.service")
       .then(({ onAppointmentStatusChanged }) =>
         onAppointmentStatusChanged(finalRow, String(current.status), String(normalizedStatus)),
