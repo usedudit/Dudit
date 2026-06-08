@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Checkbox, FormDropdown, Input } from "@/components/reusable"
+import { Button, Checkbox, FormDropdown, Input, MoneyInput } from "@/components/reusable"
 import { Check, MapPin, X } from "lucide-react"
 import { Separator } from "@/components/reusable/Separator"
 
@@ -127,19 +127,17 @@ export function ExplorarFilterSidebar({
                 <section>
                     <h3 className="mb-3 text-sm font-bold text-brand-dark">Preço</h3>
                     <div className="grid grid-cols-2 gap-2">
-                        <Input
+                        <MoneyInput
                             value={minPrice}
-                            onChange={(e) => onMinPriceChange(e.target.value)}
-                            inputMode="decimal"
+                            onChange={(v) => onMinPriceChange(String(v))}
                             placeholder="Mín."
-                            className="h-10 text-sm"
+                            className="h-10"
                         />
-                        <Input
+                        <MoneyInput
                             value={maxPrice}
-                            onChange={(e) => onMaxPriceChange(e.target.value)}
-                            inputMode="decimal"
+                            onChange={(v) => onMaxPriceChange(String(v))}
                             placeholder="Máx."
-                            className="h-10 text-sm"
+                            className="h-10"
                         />
                     </div>
                 </section>

@@ -1527,7 +1527,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         source: "manual",
     })
 
-    increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
+    await increment_usage_counter(partnerId, "orders_month_count")
 
     if (couponIdToSave) {
         await supabase.from("coupon_usages").upsert(

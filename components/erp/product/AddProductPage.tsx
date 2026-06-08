@@ -438,7 +438,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
             })
 
             let signedUploads: { file: File; uploadUrl: string; key: string }[] = []
-            let needsManualModeration = false
 
             if (filesToUpload.length > 0) {
                 setUploadingImages(new Set(filesToUpload.map((f) => f.index)))
@@ -461,9 +460,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 signedResults.forEach(({ result, file, index }) => {
                     if (result.success && result.key) {
                         finalImages[index] = result.key
-                        if (result.blocked || (result.moderation?.status && result.moderation.status !== "APPROVED")) {
-                            needsManualModeration = true
-                        }
                     } else {
                         hasErrors = true
                         if (result.error) errorMessage = result.error
@@ -530,7 +526,6 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 isOnPromotion: !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
                 showInMarketplace: d.show_in_marketplace !== false,
-                requiresManualModeration: needsManualModeration,
                 images: cleanedFinalImages,
                 primaryImageIndex: 0,
                 ncm: d.ncm?.trim() || "00000000",

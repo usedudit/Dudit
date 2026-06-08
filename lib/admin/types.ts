@@ -37,6 +37,11 @@ export enum AdminActionType {
     MODERATION_APPROVE = "moderation.approve",
     MODERATION_REJECT = "moderation.reject",
     MODERATION_REPROCESS = "moderation.reprocess",
+    MODERATION_EDIT_FIELD = "moderation.edit_field",
+    MODERATION_REMOVE_IMAGE = "moderation.remove_image",
+    MODERATION_HIDE_REVIEW = "moderation.hide_review",
+    MODERATION_EDIT_REVIEW = "moderation.edit_review",
+    MODERATION_RISK_SCORE = "moderation.risk_score",
 
     // Reports / Denúncias
     REPORT_VALIDATE = "report.validate",
@@ -76,6 +81,7 @@ export type AuditTargetType =
     | "product"
     | "service"
     | "subscription"
+    | "recurring_plan"
     | "system"
     | "review"
     | "return_request"
@@ -137,6 +143,96 @@ export interface ModerationItem {
     moderation_status: string
     risk_score: number
     created_at: string
+}
+
+export interface FetchedProduct {
+    id: string
+    name: string
+    description: string | null
+    price: number
+    images: string[]
+    tags: string[] | null
+    video_url: string | null
+    video_type: string | null
+    video_thumbnail: string | null
+    moderation_status: string
+    is_active: boolean
+    created_at: string
+    partner: { id: string; store_name: string; risk_score: number } | null
+    variants: FetchedVariant[] | null
+}
+
+export interface FetchedVariant {
+    id: string
+    name: string
+    sku: string | null
+    price: number | null
+    stock_quantity: number
+    images: string[] | null
+    is_active: boolean
+}
+
+export interface FetchedService {
+    id: string
+    name: string
+    description: string | null
+    price: number
+    images: string[] | null
+    tags: string[] | null
+    video_url: string | null
+    video_type: string | null
+    video_thumbnail: string | null
+    moderation_status: string
+    is_active: boolean
+    created_at: string
+    partner: { id: string; store_name: string; risk_score: number } | null
+}
+
+export interface FetchedRecurringPlan {
+    id: string
+    name: string
+    description: string | null
+    status: string
+    frequency_type: string
+    show_in_marketplace: boolean
+    created_at: string
+    partner: { id: string; store_name: string; risk_score: number } | null
+    items: FetchedRecurringPlanItem[] | null
+}
+
+export interface FetchedRecurringPlanItem {
+    id: string
+    item_type: string
+    product_id: string | null
+    service_id: string | null
+    quantity: number
+    unit_price: number | null
+}
+
+export interface FetchedPartner {
+    id: string
+    store_name: string
+    store_description: string | null
+    store_image_url: string | null
+    banner_url: string | null
+    gallery: string[] | null
+    logo_moderation_status: string
+    banner_moderation_status: string
+    risk_score: number
+    is_active: boolean
+    created_at: string
+    owner: { full_name: string; email: string; risk_score: number } | null
+}
+
+export interface FetchedReview {
+    id: string
+    rating: number
+    comment: string | null
+    is_hidden: boolean
+    created_at: string
+    user: { full_name: string | null } | null
+    partner: { id: string; store_name: string; risk_score: number } | null
+    product: { id: string; name: string } | null
 }
 
 // ─── Enforcement Types ──────────────────────────────────────────────────────

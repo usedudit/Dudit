@@ -1,9 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
-import cn from "classnames"
 import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton } from "@/components/reusable"
-import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon } from "@/lib/icons"
+import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
 import type { TeamMember } from "@/app/actions/erp/team"
@@ -20,7 +19,6 @@ const ROLE_LABELS: Record<PartnerRole, string> = {
     OPERATOR: "Operador",
     DELIVERY: "Entregador",
 }
-
 const ROLE_DESCRIPTIONS: Record<PartnerRole, string> = {
     OWNER: "Controle absoluto do sistema. Pode excluir loja, transferir propriedade e alterar assinatura.",
     ADMIN: "Acesso operacional completo, exceto plano/assinatura e integrações.",
@@ -28,6 +26,15 @@ const ROLE_DESCRIPTIONS: Record<PartnerRole, string> = {
     OPERATOR: "Executa o dia a dia: pedidos, agenda e atendimento.",
     DELIVERY: "Atualiza entregas e acompanha rotas/pedidos atribuídos.",
 }
+
+const ROLE_ICONS: Record<PartnerRole, React.ReactNode> = {
+    OWNER: <CrownIcon />,
+    ADMIN: <ShieldIcon />,
+    MANAGER: <ManagerIcon />,
+    OPERATOR: <UserIcon />,
+    DELIVERY: <MotorbikeIcon />,
+}
+
 
 const ROLE_HIERARCHY: Record<PartnerRole, number> = {
     OWNER: 5,
@@ -253,16 +260,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                             ) : errorMembers ? (
                                 <InfoCard message={errorMembers} color="red" className="mb-6" />
                             ) : (
-                                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-                                    <TabsList>
-                                        <TabsTrigger value="members">
-                                            Equipe ({teamMembers.length})
-                                        </TabsTrigger>
-                                        <TabsTrigger value="invites">
-                                            Convites ({invitations.filter(i => !i.used_at && !i.revoked_at).length})
-                                        </TabsTrigger>
-                                    </TabsList>
-
+                                <div>
                                     <TabsContent value="members" className="mt-6">
                                         <FadeIn>
                                             {teamMembers.length === 0 ? (
@@ -514,7 +512,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                             )}
                                         </FadeIn>
                                     </TabsContent>
-                                </Tabs>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -557,6 +555,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                     <div className="space-y-2">
                                         {allowedInviteRoles.map((role) => (
                                             <ListItem
+                                                icon={ROLE_ICONS[role]}
                                                 title={ROLE_LABELS[role]}
                                                 description={ROLE_DESCRIPTIONS[role]}
                                                 onClick={() => setInviteRole(role)}
@@ -568,6 +567,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                         onChange={() => setInviteRole(role)}
                                                     />
                                                 }
+                                                className="px-4 py-3 gap-4"
                                             />
                                         ))}
                                     </div>

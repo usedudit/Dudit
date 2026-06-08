@@ -737,6 +737,9 @@ async function searchMarketplaceByCity(
     }
 
     const partnersRes = await partnersQuery
+    if (partnersRes.error) {
+        console.error("[searchMarketplaceByCity] Partner fetch error:", partnersRes.error)
+    }
     const partnerIds = (partnersRes.data || []).map((p: any) => p.id)
 
     if (!partnerIds.length) {
@@ -784,6 +787,9 @@ async function searchMarketplaceByCity(
         .order("created_at", { ascending: false })
         .limit(type === 'vitrines' || type === 'tudo' ? limitCount : 0)
 
+    if (partnerDetailsRes.error) {
+        console.error("[searchMarketplaceByCity] Partner details query error:", partnerDetailsRes.error)
+    }
     filteredPartners = partnerDetailsRes.data || []
 
     if (partnerIds.length > 0) {
@@ -849,13 +855,19 @@ async function searchMarketplaceByCity(
         const resList = await Promise.all(promises)
         let idx = 0
         if (type === 'tudo' || type === 'produtos') {
-            rawProducts = resList[idx++]?.data || []
+            const res = resList[idx++]
+            if (res?.error) console.error("[searchMarketplaceByCity] Products query error:", res.error)
+            rawProducts = res?.data || []
         }
         if (type === 'tudo' || type === 'servicos') {
-            rawServices = resList[idx++]?.data || []
+            const res = resList[idx++]
+            if (res?.error) console.error("[searchMarketplaceByCity] Services query error:", res.error)
+            rawServices = res?.data || []
         }
         if (type === 'tudo' || type === 'planos') {
-            rawPlans = resList[idx++]?.data || []
+            const res = resList[idx++]
+            if (res?.error) console.error("[searchMarketplaceByCity] Plans query error:", res.error)
+            rawPlans = res?.data || []
         }
     }
 

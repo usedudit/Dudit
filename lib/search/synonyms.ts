@@ -10,6 +10,13 @@ export const MARKETPLACE_SYNONYMS: Record<string, string[]> = {
 
   pet: ["racao", "brinquedo", "coleira", "acessorio", "pets"],
   pets: ["racao", "brinquedo", "coleira", "acessorio", "pet"],
+  ração: ["pet", "brinquedo", "coleira", "acessorio", "pets"],
+  brinquedo: ["pet", "racao", "coleira", "acessorio", "pets"],
+  coleira: ["pet", "racao", "brinquedo", "acessorio", "pets"],
+  acessorio: ["pet", "racao", "brinquedo", "coleira", "pets"],
+  adestramento: ["pet", "racao", "brinquedo", "coleira", "pets"],
+  adestrador: ["pet", "racao", "brinquedo", "coleira", "pets"],
+  adestrar: ["pet", "racao", "brinquedo", "coleira", "pets"],
 
   veiculo: ["carro", "moto", "pneu", "peca", "auto"],
   veiculos: ["carro", "moto", "pneu", "peca", "auto"],

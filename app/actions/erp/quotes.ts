@@ -432,7 +432,7 @@ export async function createQuoteAction(data: {
 
             await revalidateQuotes(data.partnerId, newQuoteId)
 
-            increment_usage_counter(data.partnerId, "quotes_month_count").catch(console.error)
+            await increment_usage_counter(data.partnerId, "quotes_month_count")
 
             await logAuditEvent({
                 partnerId: data.partnerId,
@@ -869,8 +869,8 @@ export async function deleteQuoteAction(quoteId: string) {
 
             await revalidateQuotes(ctx.partnerId, quoteId)
 
-            // Decrement usage counter (fire-and-forget)
-            decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error)
+            // Decrement usage counter
+            await decrement_usage_counter(ctx.partnerId, "quotes_month_count")
 
             return successResponse({ id: quoteId })
         } catch (err: any) {
@@ -925,7 +925,7 @@ export async function duplicateQuoteAction(quoteId: string) {
             await revalidateQuotes(ctx.partnerId, created.id)
             await revalidateQuotes(ctx.partnerId, quoteId)
 
-            increment_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error)
+            await increment_usage_counter(ctx.partnerId, "quotes_month_count")
 
             await logAuditEvent({
                 partnerId: ctx.partnerId,
@@ -1721,7 +1721,7 @@ export async function batchDeleteQuotesAction(quoteIds: string[]) {
 
             // Update usage counter (estimate)
             for (let i = 0; i < quoteIds.length; i++) {
-                decrement_usage_counter(ctx.partnerId, "quotes_month_count").catch(console.error).catch(() => { })
+                await decrement_usage_counter(ctx.partnerId, "quotes_month_count")
             }
 
             return successResponse({ count: quoteIds.length })

@@ -19,6 +19,8 @@ import {
     Settings01Icon,
     FilterHorizontalIcon,
     Sun03Icon,
+    Motorbike02Icon,
+    ManagerIcon as ManagerIcon01,
     TextFirstlineRightIcon as TextFirstlineRightIcon01,
     PackageIcon as PackageIcon01,
     PackageDeliveredIcon,
@@ -26,6 +28,7 @@ import {
     PackageRemoveIcon,
     DashboardSquare01Icon,
     RepeatIcon as RepeatIcon01,
+    CrownIcon as CrownIcon01,
     Chart03Icon,
     ViewIcon,
     ViewOffSlashIcon,
@@ -267,7 +270,8 @@ export const IdentityCardIcon = CreateIcon(IdentityCard)
 
 export const LockIcon = CreateIcon(LockPasswordIcon)
 export const LogoutIcon = CreateIcon(Logout02Icon)
-
+export const MotorbikeIcon = CreateIcon(Motorbike02Icon)
+export const CrownIcon = CreateIcon(CrownIcon01)
 
 // ============================
 // COMMERCE
@@ -395,3 +399,4 @@ export const CadastrosIcon = CreateIcon(ResourcesAddIcon)
 
 export const InstallmentIcon = CreateIcon(SplitIcon)
 export const RepeatIcon = CreateIcon(RepeatIcon01)
+export const ManagerIcon = CreateIcon(ManagerIcon01)

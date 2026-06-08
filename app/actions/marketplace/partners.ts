@@ -150,12 +150,23 @@ async function _getPartnerProducts(partnerId: string) {
 
 async function _getPartnerServices(partnerId: string) {
   const supabase = getAdminClient()
-  const { data } = await supabase
+  const user = await getCurrentUser()
+
+  const { data: partner } = await supabase.from("partners").select("user_id").eq("id", partnerId).single()
+  const isOwner = user && partner?.user_id === user.id
+
+  let query = supabase
     .from("services")
     .select("*")
     .eq("partner_id", partnerId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
+
+  if (!isOwner) {
+    query = query.eq("is_active", true).eq("show_in_marketplace", true)
+  } else {
+    query = query.eq("is_active", true)
+  }
+
+  const { data } = await query.order("created_at", { ascending: false })
   return data || []
 }
 

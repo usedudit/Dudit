@@ -182,7 +182,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             service_type: data.service_type || data.serviceType || 'in_person',
             show_in_marketplace: isQuick
                 ? (data.show_in_marketplace !== undefined ? data.show_in_marketplace : (data.showInMarketplace !== undefined ? data.showInMarketplace : true))
-                : (data.show_in_marketplace || data.showInMarketplace || false),
+                : (data.show_in_marketplace ?? data.showInMarketplace ?? true),
             highlight_service: data.highlight_service || data.highlightService || false,
             show_price_in_store: data.show_price_in_store !== false && data.showPriceInStore !== false,
             marketplace_category_id: data.marketplace_category_id || data.marketplaceCategoryId || null,

@@ -184,7 +184,7 @@ export async function deleteProductAction(productId: string) {
         // Fire-and-forget: R2 image cleanup (non-blocking)
         if (imagesToDelete.length > 0) {
             Promise.all(imagesToDelete.map(img => _deleteFromR2(img))).catch(console.error)
-            decrement_usage_counter(product.partner_id, "images_count", imagesToDelete.length).catch(console.error)
+            await decrement_usage_counter(product.partner_id, "images_count", imagesToDelete.length)
         }
         if (product.video_type === "upload") {
             Promise.all([
@@ -399,8 +399,7 @@ export async function createProductComprehensiveAction(data: {
             technical_specs: data.technicalSpecs || {},
             delivery_format: data.deliveryFormat || null,
             show_in_marketplace: data.showInMarketplace !== false,
-            // Moderação assíncrona ou status de bloqueio do enviador
-            moderation_status: data.requiresManualModeration ? 'pending_moderation' : 'approved',
+            moderation_status: 'approved',
             tags: data.tags || [],
             allow_sell_without_stock: data.allow_sell_without_stock || false,
             created_at: getBrasiliaTime(),
@@ -485,22 +484,12 @@ export async function createProductComprehensiveAction(data: {
         const { error: videoUpdateError } = await getAdminClient().from("products").update(videoUpdate).eq("id", insertedProduct.id)
         if (videoUpdateError) return errorResponse(videoUpdateError.message, videoUpdateError)
 
-        // Criar moderation job (cron processa)
-        const admin = getAdminClient()
-        Promise.resolve(
-            admin.from('moderation_jobs').insert({
-                product_id: insertedProduct.id,
-                type: 'product',
-                status: 'pending',
-            })
-        ).catch(console.error)
-
         // Synchronous revalidation and Redis sync to prevent stale data
         await invalidateProductCache(insertedProduct.id, finalPartnerId, 'create')
 
         // DB_TRIGGER handles products_count, so we ONLY handle images_count manually
         if (data.images && data.images.length > 0) {
-            increment_usage_counter(finalPartnerId, "images_count", data.images.length).catch(console.error)
+            await increment_usage_counter(finalPartnerId, "images_count", data.images.length)
         }
 
         return successResponse({ ...insertedProduct, ...fiscalData, ...logisticsData })
@@ -713,13 +702,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace
 
-        // Moderação de TEXTO: cria job para cron processar (não altera moderation_status)
-        const needsTextRemoderation =
-            (data.name !== undefined && data.name !== product.name) ||
-            (data.description !== undefined && data.description !== product.description)
-
-        // Moderação de IMAGEM: simples â€” bloqueou algo? pending. Não bloqueou? approved.
-        payload.moderation_status = data.requiresManualModeration ? 'pending_moderation' : 'approved'
+        payload.moderation_status = 'approved'
 
         const { data: updatedProduct, error: transactionError } = await supabase.rpc(
             "update_product_transaction",
@@ -741,17 +724,6 @@ export async function updateProductComprehensiveAction(productId: string, data: 
             })
         await adminUpdate.from('products').update(directProductPatch).eq('id', productId)
 
-        // Criar moderation job se necessário (cron processa) - reuses same admin client
-        if (needsTextRemoderation) {
-            Promise.resolve(
-                adminUpdate.from('moderation_jobs').insert({
-                    product_id: productId,
-                    type: 'product',
-                    status: 'pending',
-                })
-            ).catch(console.error)
-        }
-
         // Fire-and-forget: R2 image cleanup para imagens removidas
         if (product.images && Array.isArray(product.images)) {
             const oldImages = product.images.filter((img: any) => typeof img === 'string' && img.trim());
@@ -761,13 +733,13 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
             if (deletedImages.length > 0) {
                 Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
-                decrement_usage_counter(product.partner_id, "images_count", deletedImages.length).catch(console.error)
+                await decrement_usage_counter(product.partner_id, "images_count", deletedImages.length)
             }
             if (addedImages.length > 0) {
-                increment_usage_counter(product.partner_id, "images_count", addedImages.length).catch(console.error)
+                await increment_usage_counter(product.partner_id, "images_count", addedImages.length)
             }
         } else if (payload.images && payload.images.length > 0) {
-            increment_usage_counter(product.partner_id, "images_count", payload.images.length).catch(console.error)
+            await increment_usage_counter(product.partner_id, "images_count", payload.images.length)
         }
 
         if (
@@ -952,11 +924,11 @@ export async function createProductVariantsBatchAction(data: {
 
         if (imagesToCleanup.length > 0) {
             Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)
-            decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.length).catch(console.error)
+            await decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.length)
         }
 
         if (newImagesCount > 0) {
-            increment_usage_counter(product.partner_id, "images_count", newImagesCount).catch(console.error)
+            await increment_usage_counter(product.partner_id, "images_count", newImagesCount)
         }
 
         await invalidateProductCache(data.productId, product.partner_id, 'update')
@@ -1410,6 +1382,7 @@ export const getCachedProducts = async (partnerId: string) => {
                 .from("products")
                 .select("id, name, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
                 .eq("partner_id", partnerId)
+                .limit(100)
                 .order("created_at", { ascending: false })
             if (error) throw error
             return (data || []).map((p: any) => ({
@@ -1464,10 +1437,11 @@ export async function getProducts(partnerId: string) {
         const user = await requireUser()
         await requirePartnerAccessWithPermission(partnerId, "products", "view")
         const supabase = await getSupabaseServerClient()
-        const { data } = await supabase.from("products").select("*").eq("partner_id", partnerId).order("created_at", { ascending: false })
+        const { data } = await supabase.from("products").select("*").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(100)
         return data || []
-    } catch {
-        return null
+    } catch (error) {
+        console.error("[getProducts] Error fetching products:", error)
+        return []
     }
 }
 

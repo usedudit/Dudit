@@ -211,7 +211,7 @@ export async function createRecurringPlanAction(input: {
     }
 
     if (input.images && input.images.length > 0) {
-      increment_usage_counter(input.partnerId, "images_count", input.images.length).catch(console.error)
+      await increment_usage_counter(input.partnerId, "images_count", input.images.length)
     }
 
     await logAuditEvent({
@@ -333,13 +333,13 @@ export async function updateRecurringPlanAction(input: {
 
       if (deletedImages.length > 0) {
         Promise.all(deletedImages.map((img: string) => _deleteFromR2(img))).catch(console.error)
-        decrement_usage_counter(input.partnerId, "images_count", deletedImages.length).catch(console.error)
+        await decrement_usage_counter(input.partnerId, "images_count", deletedImages.length)
       }
       if (addedImages.length > 0) {
-        increment_usage_counter(input.partnerId, "images_count", addedImages.length).catch(console.error)
+        await increment_usage_counter(input.partnerId, "images_count", addedImages.length)
       }
     } else if (input.images && input.images.length > 0) {
-      increment_usage_counter(input.partnerId, "images_count", input.images.length).catch(console.error)
+      await increment_usage_counter(input.partnerId, "images_count", input.images.length)
     }
 
     await logAuditEvent({

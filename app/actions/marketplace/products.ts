@@ -40,7 +40,7 @@ async function _getMarketplaceProductBase(id: string) {
       partners(
         id, store_name, store_description, rating, user_id, phone,
         store_image_url, banner_url, max_installments, interest_rate_percent,
-        mp_user_id, mp_public_key, opening_hours,
+        opening_hours,
         logo_moderation_status, banner_moderation_status,
         vendas_totais, created_at,
         addresses(city, state),
@@ -343,31 +343,28 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
   if (!state) return null
 
   const supabase = getAdminClient()
-
-  // Find a matching address row in the DB to preserve correct accents and capitalization
   const { data: addresses } = await supabase
     .from("addresses")
     .select("city, state")
-    .eq("state", state)
 
   if (addresses && addresses.length > 0) {
-    const matched = addresses.find((addr: any) => {
-      if (!addr.city) return false
-      const normalized = addr.city
+    const targetSlug = citySlugWithoutState
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+    const match = addresses.find((a: any) => {
+      const addrSlug = (a.city || "")
         .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-      return normalized === citySlugWithoutState
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "-")
+      return addrSlug === targetSlug && a.state === state
     })
-
-    if (matched) {
-      return { city: matched.city, state: matched.state }
+    if (match) {
+      return { city: match.city, state: match.state }
     }
   }
 
-  // Fallback formatting if no address exists in the DB yet
   const fallbackCityName = citySlugWithoutState.split('-').join(' ').replace(/\b\w/g, l => l.toUpperCase())
   return { city: fallbackCityName, state }
 }

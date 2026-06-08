@@ -676,7 +676,7 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     )
 
     // Increment usage counter for each created appointment
-    increment_usage_counter(partnerId, "appointments_month_count", createdRows.length).catch(console.error)
+    await increment_usage_counter(partnerId, "appointments_month_count", createdRows.length)
 
     // Revalidation - once at the end, not per-row
     safeRevalidateTag(TAGS.entityTimeline("appointment-list", partnerId))

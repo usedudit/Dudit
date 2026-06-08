@@ -318,8 +318,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 else finalImages[idx] = img
             })
 
-            let needsManualModeration = false
-
             if (filesToUpload.length > 0) {
                 const signedResults = await Promise.all(
                     filesToUpload.map(async ({ file, index }) => {
@@ -338,9 +336,6 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 signedResults.forEach(({ result, index }) => {
                     if (result.success && result.key) {
                         finalImages[index] = result.key
-                        if (result.blocked || (result.moderation?.status && result.moderation.status !== "APPROVED")) {
-                            needsManualModeration = true
-                        }
                     } else {
                         hasErrors = true
                         if (result.error) errorMessage = result.error

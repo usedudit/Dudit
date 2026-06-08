@@ -179,28 +179,10 @@ async function handleUpload(request: NextRequest) {
     const imageHash = await calculateImageHash(buffer)
 
     // =============================
-    // Moderação (pula se foi aprovada antes)
+    // Moderação de imagem DESATIVADA (Sightengine free quota esgotada)
+    // Todo upload é aprovado automaticamente sem verificação de IA
     // =============================
-    let decision = { status: "APPROVED" }
-    const cachedResult = await getImageFromCache(imageHash)
-
-    if (cachedResult) {
-      decision.status = cachedResult.status
-    } else {
-      // Fazer moderação nova
-      const base64Image = buffer.toString("base64")
-      const moderationResult = await moderateImageWithBase64(base64Image)
-      decision = decideImageStatus(moderationResult)
-
-      // Guardar resultado em cache
-      await cacheImageModeration(
-        imageHash,
-        moderationResult.riskLevel,
-        moderationResult.confidence,
-        moderationResult.categories,
-        decision.status as "APPROVED" | "FLAGGED" | "BLOCKED",
-      )
-    }
+    const decision = { status: "APPROVED" }
 
     // =============================
     // Nome seguro (server-generated, ignoring client name)
