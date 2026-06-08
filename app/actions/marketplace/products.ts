@@ -586,7 +586,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
 
   return {
     products: trendingProducts,
-    vitrines: normalizedVitrines.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)),
+    vitrines: normalizedVitrines.sort((a: any, b: any) => Number(b.rating || 0) - Number(a.rating || 0)),
     plans: trendingPlans,
   }
 }

@@ -49,7 +49,7 @@ export async function recordAppointmentBookingMetrics(
         .select("partner_id")
         .eq("id", appointmentId)
         .maybeSingle()
-      if (appt?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${appt.partner_id}`)
+      if (appt?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${appt.partner_id}`, "max")
     }
     return data === true
   } catch (e) {
@@ -77,7 +77,7 @@ export async function recordSubscriptionSignupMetrics(
         .select("partner_id")
         .eq("id", subscriptionId)
         .maybeSingle()
-      if (sub?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${sub.partner_id}`)
+      if (sub?.partner_id) revalidateTag(`${PARTNER_STATS_TAG}-${sub.partner_id}`, "max")
     }
     return data === true
   } catch (e) {
@@ -123,7 +123,7 @@ async function invalidatePartnerStatsForOrder(
     .eq("id", orderId)
     .maybeSingle()
   if (order?.partner_id) {
-    revalidateTag(`${PARTNER_STATS_TAG}-${order.partner_id}`)
+    revalidateTag(`${PARTNER_STATS_TAG}-${order.partner_id}`, "max")
   }
 }
 
