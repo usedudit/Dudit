@@ -75,6 +75,8 @@ interface QuoteEditorProps {
     setQuoteTitle: (val: string) => void;
     quoteSubtitle: string;
     setQuoteSubtitle: (val: string) => void;
+    showDecoration: boolean;
+    setShowDecoration: (val: boolean) => void;
     isReadOnly?: boolean;
     onSearchFocus?: () => void;
     fieldErrors?: Set<string>;
@@ -623,15 +625,17 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 disabled={expiryLocked}
                             />
 
-                            <div className="flex flex-col gap-1.5">
-                                <FormDropdown
-                                    label="Status"
-                                    value={props.status}
-                                    setValue={props.setStatus}
-                                    options={(props.mode === 'create' || props.mode === 'duplicate' ? statusOptions.filter(o => o.value === 'draft') : statusOptions).map(o => ({ value: o.value, label: o.label }))}
-                                    disabled={statusLocked}
-                                />
-                            </div>
+                            {props.mode !== 'create' && props.mode !== 'duplicate' && (
+                                <div className="flex flex-col gap-1.5">
+                                    <FormDropdown
+                                        label="Status"
+                                        value={props.status}
+                                        setValue={props.setStatus}
+                                        options={statusOptions.map(o => ({ value: o.value, label: o.label }))}
+                                        disabled={statusLocked}
+                                    />
+                                </div>
+                            )}
 
                             <div className="flex flex-col gap-1.5">
                                 <FormDropdown
@@ -704,6 +708,35 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                         </h3>
 
                         <div className="space-y-6">
+                            <div>
+                                <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-3">Temas de Cor</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { p: "#113833", s: "#d4f995", label: "Padrão" },
+                                        { p: "#1e40af", s: "#bfdbfe", label: "Azul" },
+                                        { p: "#065f46", s: "#a7f3d0", label: "Verde" },
+                                        { p: "#6b21a8", s: "#e9d5ff", label: "Roxo" },
+                                        { p: "#991b1b", s: "#fca5a5", label: "Vermelho" },
+                                        { p: "#c2410c", s: "#fed7aa", label: "Laranja" },
+                                        { p: "#1e1e1e", s: "#e5e5e5", label: "Escuro" },
+                                        { p: "#0369a1", s: "#bae6fd", label: "Celeste" },
+                                    ].map((theme) => (
+                                        <button
+                                            key={theme.label}
+                                            type="button"
+                                            onClick={() => { props.setPrimaryColor(theme.p); props.setSecondaryColor(theme.s); }}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading transition-colors disabled:opacity-50"
+                                            disabled={layoutLocked}
+                                            title={theme.label}
+                                        >
+                                            <div className="w-5 h-5 rounded-full border border-white/50 shadow-sm" style={{ backgroundColor: theme.p }} />
+                                            <div className="w-5 h-5 rounded-full border border-white/50 shadow-sm -ml-2" style={{ backgroundColor: theme.s }} />
+                                            <span className="text-xs font-medium text-brand-dark dark:text-dark-body">{theme.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-2">Cor Primária</label>
@@ -754,6 +787,20 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 placeholder="Ex: Proposta Comercial"
                                 disabled={layoutLocked}
                             />
+
+                            <div className="flex items-center justify-between py-3 px-4 bg-brand-gray dark:bg-dark-border/30 rounded-xl">
+                                <div>
+                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">Detalhes decorativos</span>
+                                    <span className="text-xs text-brand-inactive-text">Mostrar círculos e enfeites no cabeçalho</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => props.setShowDecoration(!props.showDecoration)}
+                                    className={`relative w-11 h-6 rounded-full transition-colors ${props.showDecoration ? 'bg-brand-dark dark:bg-dark-heading' : 'bg-gray-300 dark:bg-dark-border'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${props.showDecoration ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </FadeIn>

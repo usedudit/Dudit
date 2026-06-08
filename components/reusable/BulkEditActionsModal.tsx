@@ -351,10 +351,10 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     <div className="space-y-2 pt-2">
                         <ListItem
                             title="Publicar Selecionados"
-                            description={`Os ${targetLabel} ficarão visíveis na loja`}
+                            description={`Os ${targetLabel} ficarão visíveis na vitrine`}
                             icon={EyeIcon}
                             onClick={() => setVisConfig('publish')}
-                            className="cursor-pointer px-4"
+                            className="px-4 py-1 gap-4"
                             right={
                                 <RadioButton
                                     checked={visConfig === 'publish'}
@@ -366,10 +366,10 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         />
                         <ListItem
                             title="Ocultar Selecionados"
-                            description={`Os ${targetLabel} ficarão ocultos na loja`}
+                            description={`Os ${targetLabel} ficarão ocultos na vitrine`}
                             icon={EyeIcon}
                             onClick={() => setVisConfig('hide')}
-                            className="cursor-pointer px-4"
+                            className="px-4 py-1 gap-4"
                             right={
                                 <RadioButton
                                     checked={visConfig === 'hide'}
@@ -397,7 +397,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 key={s.value}
                                 title={s.label}
                                 onClick={() => setStatusConfig(s.value!)}
-                                className="cursor-pointer px-4"
+                                className="px-4 py-1 gap-4"
                                 right={
                                     <RadioButton
                                         checked={statusConfig === s.value}
@@ -451,7 +451,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                     title={s.label}
                                     titleClassName="font-medium"
                                     onClick={() => !isCurrentViewBlocked && setOrderStatusConfig(s.value)}
-                                    className={`py-1 pl-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                                    className={`px-4 py-1 gap-4 ${isCurrentViewBlocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                                     right={
                                         <RadioButton
                                             checked={orderStatusConfig === s.value}
@@ -518,12 +518,14 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 </div>
 
                 {view !== 'menu' && (
-                    <div className="flex gap-3 w-full mt-6">
-                        <Button variant="outline" className="flex-1" onClick={onClose} disabled={isApplying}>Cancelar</Button>
-                        <Button variant={view === 'delete' ? 'destructive' : 'default'} className="flex-1" onClick={handleApply} disabled={isApplying || isCurrentViewBlocked}>
-                            {isApplying ? 'Aplicando...' : view === 'delete' ? 'Excluir Seleção' : `Aplicar em ${selectedCount}`}
-                        </Button>
-                    </div>
+                    <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" className="h-12 flex-1" onClick={onClose} disabled={isApplying}>Cancelar</Button>
+                            <Button variant={view === 'delete' ? 'destructive' : 'default'} className="h-12 flex-1" onClick={handleApply} disabled={isApplying || isCurrentViewBlocked}>
+                                {isApplying ? 'Aplicando...' : view === 'delete' ? 'Excluir Seleção' : `Aplicar em ${selectedCount}`}
+                            </Button>
+                        </div>
+                    </footer>
                 )}
 
                 {showImageCropper && selectedImageForCrop && (

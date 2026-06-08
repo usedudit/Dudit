@@ -371,8 +371,8 @@ async function _searchMarketplaceInternal(
             if (servicosIds.length > 0) {
                 promises.push(
                     supabase.from("services").select(`
-                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
-                        service_categories:service_categories!category_id(name),
+                        id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                        marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                         show_price_in_store
                     `)
@@ -456,8 +456,8 @@ async function _searchMarketplaceInternal(
                     }
                 }
 
-                const serviceCategoryName = item.service_categories?.name || item.category || null
-                return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: serviceCategoryName }
+                const serviceCategoryName = item.marketplace_category?.parent?.name || item.marketplace_category?.name || null
+                return { ...item, category: serviceCategoryName, itemType: 'servico', partners: partner, subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null }
             }
 
             for (const idx of missingIndices) {
@@ -537,8 +537,8 @@ async function hydrateMarketplaceSearchHits(
     if (servicosIds.length > 0) {
         promises.push(
             supabase.from("services").select(`
-                id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
-                service_categories:service_categories!category_id(name),
+                id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                 partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
                 show_price_in_store
             `)
@@ -646,14 +646,14 @@ async function hydrateMarketplaceSearchHits(
             continue
         }
 
-        const serviceCategoryName = (item.service_categories?.name || item.category || null) as string | null
-        const sanitizedCategoryName = serviceCategoryName && typeof serviceCategoryName === 'string' ? serviceCategoryName : null
+        const categoryName = (item.marketplace_category?.parent?.name || item.marketplace_category?.name || null) as string | null
+        const sanitizedCategoryName = categoryName && typeof categoryName === 'string' ? categoryName : null
         results.push({
             ...item,
             category: sanitizedCategoryName,
             itemType: "servico",
             partners: partner,
-            subcategoryName: sanitizedCategoryName,
+            subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null,
             _searchRank: hit.rank,
         })
     }
@@ -819,8 +819,8 @@ async function searchMarketplaceByCity(
                 supabase
                     .from("services")
                     .select(`
-                        id, name, description, price, promotional_price, images, rating, category, category_id, duration_minutes, billing_unit, price_type, created_at,
-                        service_categories:service_categories!category_id(name),
+                        id, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
+                        marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
                         partners!inner(id, store_name, store_image_url, latitude, longitude, addresses!inner(city, state)),
                         show_price_in_store
                     `)
@@ -927,10 +927,9 @@ async function searchMarketplaceByCity(
             city: rawPartner.addresses?.[0]?.city || null,
             state: rawPartner.addresses?.[0]?.state || null
         } : null
-        // Ensure category is always a string or null, never an object
-        const serviceCategoryName = (item.service_categories?.name || item.category || null) as string | null
-        const sanitizedCategoryName = serviceCategoryName && typeof serviceCategoryName === 'string' ? serviceCategoryName : null
-        return { ...item, category: sanitizedCategoryName, itemType: 'servico', partners: partner, subcategoryName: sanitizedCategoryName }
+        const categoryName = (item.marketplace_category?.parent?.name || item.marketplace_category?.name || null) as string | null
+        const sanitizedCategoryName = categoryName && typeof categoryName === 'string' ? categoryName : null
+        return { ...item, category: sanitizedCategoryName, itemType: 'servico', partners: partner, subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null }
     })
 
     const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))

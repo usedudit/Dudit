@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
@@ -10,7 +10,7 @@ import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Badge, Input, InfoCard, Tooltip, SelectionBanner } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -34,10 +34,9 @@ import {
     DeliveryPickupIcon,
     DeliveryFailedIcon,
     PartiallyPaidIcon,
-    ReturnIcon
 } from "@/lib/icons"
 
-import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
+import { formatDate, formatTime } from "@/lib/utils"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -56,8 +55,7 @@ import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
-import SaleReceiptPrintModal from "./receipt/SaleReceiptPrintModal"
-import { buildSaleReceiptFromOrder } from "@/lib/sales/sale-receipt"
+
 import { useErpExport } from "@/hooks/use-erp-export"
 
 // --- TYPES & INTERFACES ---
@@ -190,8 +188,7 @@ export default function OrdersPage({
     const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
-    const [receiptPrintOpen, setReceiptPrintOpen] = useState(false)
-    const [receiptPrintData, setReceiptPrintData] = useState<ReturnType<typeof buildSaleReceiptFromOrder> | null>(null)
+
 
     const isLoading = storeLoading || entityPage.isListLoading
 
@@ -658,42 +655,10 @@ export default function OrdersPage({
     }
 
     const handlePrintReceipt = useCallback(
-        async (order: Order) => {
-            setReceiptPrintOpen(true)
-            setReceiptPrintData(null)
-            try {
-                const res = await getOrderDetailsAction(order.originalId, partnerId)
-                if (res.success && res.data) {
-                    setReceiptPrintData(
-                        buildSaleReceiptFromOrder(
-                            res.data,
-                            {
-                                fantasyName: "",
-                                legalName: "",
-                                addressLine: "",
-                                taxIdLine: "",
-                            },
-                            { partnerAvatar: selectedStore?.image_url || undefined },
-                        ),
-                    )
-                } else {
-                    toast({
-                        title: "Erro",
-                        description: res.error || "Não foi possível carregar o pedido para impressão.",
-                        variant: "destructive",
-                    })
-                    setReceiptPrintOpen(false)
-                }
-            } catch {
-                toast({
-                    title: "Erro",
-                    description: "Não foi possível carregar o pedido para impressão.",
-                    variant: "destructive",
-                })
-                setReceiptPrintOpen(false)
-            }
+        (order: Order) => {
+            window.open(`/print/recibo/${order.originalId}`, "_blank")
         },
-        [partnerId, selectedStore?.image_url, toast],
+        [],
     )
 
     return (
@@ -898,35 +863,35 @@ export default function OrdersPage({
                                                 />
                                                 {effectiveViewMode === "grid" ? (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                                                         {paginated.map((o: Order) => (
-                                                             <OrderGridCard
-                                                                 key={o.originalId}
-                                                                 order={o}
-                                                                 selected={selection.ids.has(o.originalId)}
-                                                                 onSelect={() => handleSelectRow(o.originalId)}
-                                                                 onDetails={() => handleDetailsOrder(o)}
-                                                                 onPrint={() => handlePrintReceipt(o)}
-                                                                 onEdit={() => handleEditOrder(o)}
-                                                                 canEdit={o.canEdit}
-                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
-                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
-                                                                 extraActions={o.situation !== "cancelled" ? (
-                                                                     <>
-                                                                         <DropdownItem onClick={() => openPaymentStatusModal(o)}>
-                                                                             Alterar status de pagamento
-                                                                         </DropdownItem>
-                                                                         <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                             Alterar status de entrega
-                                                                         </DropdownItem>
-                                                                     </>
-                                                                 ) : null}
-                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
-                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
-                                                                 onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
-                                                             />
-                                                         ))}
-                                                     </div>
-                                                 ) : (
+                                                        {paginated.map((o: Order) => (
+                                                            <OrderGridCard
+                                                                key={o.originalId}
+                                                                order={o}
+                                                                selected={selection.ids.has(o.originalId)}
+                                                                onSelect={() => handleSelectRow(o.originalId)}
+                                                                onDetails={() => handleDetailsOrder(o)}
+                                                                onPrint={() => handlePrintReceipt(o)}
+                                                                onEdit={() => handleEditOrder(o)}
+                                                                canEdit={o.canEdit}
+                                                                cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
+                                                                onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
+                                                                extraActions={o.situation !== "cancelled" ? (
+                                                                    <>
+                                                                        <DropdownItem onClick={() => openPaymentStatusModal(o)}>
+                                                                            Alterar status de pagamento
+                                                                        </DropdownItem>
+                                                                        <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
+                                                                            Alterar status de entrega
+                                                                        </DropdownItem>
+                                                                    </>
+                                                                ) : null}
+                                                                onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
+                                                                onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
+                                                                onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
                                                     <div className="w-full overflow-hidden rounded-xl relative">
                                                         <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                                                         <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
@@ -1231,14 +1196,6 @@ export default function OrdersPage({
                 </div>
             </DefaultModal>
 
-            <SaleReceiptPrintModal
-                isOpen={receiptPrintOpen}
-                onClose={() => {
-                    setReceiptPrintOpen(false)
-                    setReceiptPrintData(null)
-                }}
-                receiptData={receiptPrintOpen ? receiptPrintData : null}
-            />
         </>
     )
 }

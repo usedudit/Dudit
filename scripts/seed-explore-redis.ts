@@ -124,7 +124,8 @@ async function seedRedis() {
     const { data: servicos } = await supabase
         .from("services")
         .select(`
-            id, name, description, price, images, rating, category, created_at,
+            id, name, description, price, images, rating, created_at,
+            marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state))
         `)
         .eq("is_active", true)

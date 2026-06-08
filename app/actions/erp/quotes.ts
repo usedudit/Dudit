@@ -1917,7 +1917,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             const supabase = await getSupabaseServerClient()
 
             // 1. Fetch quote by public_token
-            const { data: quote, error: quoteErr } = await supabase
+            let { data: quote, error: quoteErr } = await supabase
                 .from("quotes")
                 .select(`
                     *,
@@ -1931,6 +1931,42 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 `)
                 .eq("public_token", publicToken)
                 .maybeSingle()
+
+            // 1b. Fallback: try by quote id (UUID)
+            if (!quote && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(publicToken)) {
+                const { data: quoteById } = await supabase
+                    .from("quotes")
+                    .select(`
+                        *,
+                        customers (
+                            id, name, email, phone,
+                            addresses (*)
+                        ),
+                        partners (
+                            id, store_name, store_image_url, email, phone
+                        )
+                    `)
+                    .eq("id", publicToken)
+                    .maybeSingle()
+                if (quoteById) {
+                    quote = quoteById
+                    // Auto-generate public_token if missing
+                    if (!quote.public_token) {
+                        const admin = getAdminClient()
+                        await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
+                        const { data: refreshed } = await supabase.from("quotes").select("public_token").eq("id", quote.id).single()
+                        if (refreshed?.public_token) quote.public_token = refreshed.public_token
+                    }
+                }
+            }
+
+            // 1c. Auto-generate public_token if quote exists but has none
+            if (quote && !quote.public_token) {
+                const admin = getAdminClient()
+                await admin.from("quotes").update({ public_token: crypto.randomUUID() }).eq("id", quote.id)
+                const { data: refreshed } = await supabase.from("quotes").select("public_token").eq("id", quote.id).single()
+                if (refreshed?.public_token) quote.public_token = refreshed.public_token
+            }
 
             if (quoteErr || !quote) {
                 return errorResponse("Link inválido ou orçamento não encontrado")

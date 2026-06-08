@@ -240,12 +240,12 @@ export default function POSShippingSheet({
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
             Cancelar
           </Button>
           <Button
-            className="flex-1"
+            className="h-12 flex-1"
             disabled={!hasSelectedCustomer || !hasStreet}
             onClick={() => onApply({ shippingFee: shippingFeeValue, distanceKm, breakdown })}
           >
@@ -296,12 +296,12 @@ export default function POSShippingSheet({
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={handleCloseAddressSheet}>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" className="h-12 flex-1" onClick={handleCloseAddressSheet}>
             Cancelar
           </Button>
           <Button
-            className="flex-1"
+            className="h-12 flex-1"
             isLoading={isSavingAddress}
             onClick={async () => {
               if (!customerDetails?.id) return

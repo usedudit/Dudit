@@ -141,8 +141,8 @@ export async function syncToExploreRedis({
           .from("services")
           .select(`
             id, name, price, promotional_price, images, rating, marketplace_score, bookings_last_30_days, favorites_count, views_count,
-            category, category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
-            service_categories:service_categories!category_id(name),
+            category_id, duration_minutes, created_at, updated_at, is_active, show_in_marketplace,
+            marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
             partners(id, store_name, store_image_url, latitude, longitude, addresses(city, state)),
             show_price_in_store
           `)
@@ -166,8 +166,8 @@ export async function syncToExploreRedis({
           city: rawPartner.addresses?.[0]?.city || null,
           state: rawPartner.addresses?.[0]?.state || null
         } : null
-        const serviceCategoryName = dbData.service_categories?.name || dbData.category || null
-        finalData = { ...dbData, category: serviceCategoryName, partners: partner, subcategoryName: serviceCategoryName }
+        const catName = dbData.marketplace_category?.parent?.name || dbData.marketplace_category?.name || null
+        finalData = { ...dbData, category: catName, partners: partner, subcategoryName: dbData.marketplace_category?.parent ? dbData.marketplace_category.name : null }
       }
       else if (type === 'loja') {
         const { data: dbData } = await admin

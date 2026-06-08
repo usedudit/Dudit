@@ -393,12 +393,12 @@ const SelectCustomerSheet = ({
             </div>
 
             <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     <Button variant="outline" className="h-12 flex-1" onClick={handleSafeClose} disabled={isCloseLocked}>
                         Cancelar
                     </Button>
                     <Button
-                        className="h-12 flex-1 bg-brand-green hover:bg-brand-green/90 text-white"
+                        className="h-12 flex-1"
                         onClick={handleSaveSelection}
                         disabled={isCloseLocked || !canSave}
                     >
@@ -456,7 +456,7 @@ const SelectCustomerSheet = ({
             </div>
 
             <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     <Button variant="outline" className="h-12 flex-1" onClick={() => setIsNewCustomerSheetOpen(false)} disabled={isCloseLocked}>
                         Voltar
                     </Button>

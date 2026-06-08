@@ -213,7 +213,7 @@ export async function getUserFavoritesAction(params?: {
                 ? admin
                     .from("services")
                     .select(`
-                        id, name, price, images, rating, is_active, category, billing_unit, price_type,
+                        id, name, price, images, rating, is_active, billing_unit, price_type,
                         partners(id, store_name, store_image_url, addresses(city, state)),
                         show_price_in_store
                     `)

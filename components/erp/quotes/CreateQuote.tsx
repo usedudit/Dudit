@@ -30,6 +30,7 @@ import {
 } from '@/app/actions/erp/quotes';
 import { getQuoteEditCaps, QUOTE_DEFAULT_CUSTOMER_LABEL } from "@/lib/quotes/quote-edit-rules";
 import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme";
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders";
 import { useProductBucket } from "../hooks";
 import { useSidebar } from '@/lib/sidebar-context';
@@ -67,13 +68,32 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // Partner info for preview
     const partnerName = selectedStore?.name || 'Sua Loja';
     const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
-    const partnerAvatar = selectedStore?.image_url || '';
+    const [partnerImage, setPartnerImage] = useState(selectedStore?.image_url || '');
     const [isScrolled, setIsScrolled] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5);
     }, []);
     const [activeTab, setActiveTab] = useState('Dados Gerais');
+
+    useEffect(() => {
+        if (selectedStore?.image_url) {
+            setPartnerImage(selectedStore.image_url);
+        }
+    }, [selectedStore?.image_url]);
+
+    useEffect(() => {
+        if (!partnerImage && partnerId) {
+            const fetchPartnerImage = async () => {
+                const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
+                const { data } = await supabase.from("partners").select("store_image_url").eq("id", partnerId).maybeSingle();
+                if (data?.store_image_url) setPartnerImage(data.store_image_url);
+            };
+            fetchPartnerImage();
+        }
+    }, [partnerImage, partnerId]);
+
+    const partnerAvatar = partnerImage ? getR2ImageUrl(partnerImage) : '';
 
     // Fetch Partner Address
     useEffect(() => {
@@ -162,6 +182,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const [secondaryColor, setSecondaryColor] = useState(QUOTE_PREVIEW_SECONDARY_COLOR);
     const [quoteTitle, setQuoteTitle] = useState('ORÇAMENTO');
     const [quoteSubtitle, setQuoteSubtitle] = useState('');
+    const [showDecoration, setShowDecoration] = useState(true);
 
     // Financials State
     const [discount, setDiscount] = useState('');
@@ -936,7 +957,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
 
                             {/* LEFT SIDE - EDITOR */}
                             <div
-                                className={`w-full lg:w-1/2 flex flex-col flex-1 min-h-0 lg:flex-none lg:shrink-0 lg:h-full border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative ${isEditLoadingLocked ? "pointer-events-none" : ""}`}
+                                className={`w-full lg:w-1/2 flex flex-col flex-1 min-h-0 lg:flex-none lg:shrink-0 lg:h-full border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative ${activeTab === 'Visualização' ? 'hidden lg:flex' : 'flex'} ${isEditLoadingLocked ? "pointer-events-none" : ""}`}
                             >
                                 {/* Header now inside the left column */}
                                 <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ease-in-out">
@@ -990,6 +1011,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                     Observações
                                                     {getTabErrorCount("Observações") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
+                                                <TabsTrigger value="Layout" className="hidden md:inline-flex">Personalizar</TabsTrigger>
                                                 <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
                                             </TabsList>
                                         </div>
@@ -1060,6 +1082,8 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             setQuoteTitle={setQuoteTitle}
                                             quoteSubtitle={quoteSubtitle}
                                             setQuoteSubtitle={setQuoteSubtitle}
+                                            showDecoration={showDecoration}
+                                            setShowDecoration={setShowDecoration}
                                             isReadOnly={mode === 'view'}
                                             fieldErrors={fieldErrors}
                                             setFieldErrors={setFieldErrors}
@@ -1097,6 +1121,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             partnerName={partnerName}
                                             partnerAddress={partnerAddress}
                                             partnerAvatar={partnerAvatar}
+                                            showDecoration={showDecoration}
                                         />
                                     </FadeIn>
                                 </TabsContent>

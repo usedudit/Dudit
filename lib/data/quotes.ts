@@ -103,9 +103,20 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 console.error("[getQuoteWithItems] Items error:", itemsError)
             }
 
+            let userProfile = null
+            if (quote.user_id) {
+                const { data: profile } = await supabase
+                    .from("user_profiles")
+                    .select("full_name, email")
+                    .eq("user_id", quote.user_id)
+                    .maybeSingle()
+                if (profile) userProfile = profile
+            }
+
             return {
                 ...quote,
-                items: items || []
+                items: items || [],
+                user_profiles: userProfile
             }
         },
         [`quote-${quoteId}`],

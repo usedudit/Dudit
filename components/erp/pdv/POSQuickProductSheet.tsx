@@ -68,11 +68,11 @@ export default function POSQuickProductSheet({
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={isCreating}>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" className="h-12 flex-1" onClick={onClose} disabled={isCreating}>
             Cancelar
           </Button>
-          <Button className="flex-1" onClick={handleCreate} isLoading={isCreating}>
+          <Button className="h-12 flex-1" onClick={handleCreate} isLoading={isCreating}>
             Criar e adicionar
           </Button>
         </div>

@@ -11,7 +11,16 @@ export default function PrintLayout({ children }: PrintLayoutProps) {
         const timer = setTimeout(() => {
             window.print()
         }, 500)
-        return () => clearTimeout(timer)
+
+        const handleAfterPrint = () => {
+            window.close()
+        }
+        window.addEventListener("afterprint", handleAfterPrint)
+
+        return () => {
+            clearTimeout(timer)
+            window.removeEventListener("afterprint", handleAfterPrint)
+        }
     }, [])
 
     return (

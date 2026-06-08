@@ -446,7 +446,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
             Cancelar
           </Button>

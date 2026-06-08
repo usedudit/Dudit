@@ -27,6 +27,7 @@ interface QuotePreviewProps {
     partnerAddress?: string;
     partnerAvatar?: string;
     printMode?: boolean;
+    showDecoration?: boolean;
 }
 
 const QuotePreview = ({
@@ -48,7 +49,8 @@ const QuotePreview = ({
     partnerName = 'Parceiro',
     partnerAddress = 'Endereço não cadastrado',
     partnerAvatar,
-    printMode = false
+    printMode = false,
+    showDecoration = true
 }: QuotePreviewProps) => {
 
     const resolvedColors = useMemo(() => {
@@ -178,19 +180,20 @@ const QuotePreview = ({
                                 className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
                                 style={{ backgroundColor: resolvedColors.primary }}
                             >
-                                {/* Círculos decorativos */}
-                                <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
-                                    <div className="flex flex-col gap-3">
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                {showDecoration && (
+                                    <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
+                                        <div className="flex flex-col gap-3">
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                        </div>
+                                        <div className="flex flex-col gap-3 -mt-12">
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                            <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-3 -mt-12">
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                        <div className="w-14 h-24 rounded-full" style={{ backgroundColor: resolvedColors.secondary }}></div>
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* Nome do parceiro + título do orçamento */}
                                 <div className="relative z-10">

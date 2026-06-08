@@ -235,21 +235,23 @@ const SelectCouponSheet = ({
       </div>
 
       <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-        {appliedCouponId && (
-          <Button
-            variant="outline"
-            className="h-12 w-full mb-3 text-brand-red border-brand-red hover:bg-red-50"
-            onClick={() => {
-              onRemoveCoupon?.()
-              onClose()
-            }}
-          >
-            Remover cupom aplicado
+        <div className="flex items-center gap-4">
+          {appliedCouponId && (
+            <Button
+              variant="outlinered"
+              className="h-12 flex-1"
+              onClick={() => {
+                onRemoveCoupon?.()
+                onClose()
+              }}
+            >
+              Remover cupom aplicado
+            </Button>
+          )}
+          <Button variant="outline" className="h-12 flex-1" onClick={onClose}>
+            Cancelar
           </Button>
-        )}
-        <Button variant="outline" className="h-12 w-full" onClick={onClose}>
-          Cancelar
-        </Button>
+        </div>
       </footer>
     </div>
   )
