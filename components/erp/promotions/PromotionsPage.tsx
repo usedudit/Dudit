@@ -103,10 +103,11 @@ export default function PromotionsPage({
   } = entityPage
 
   const [promotions, setPromotions] = useState<any[]>(initialPromotions)
-  const [scopeData, setScopeData] = useState<{ products: any[]; services: any[]; categories: any[]; customers: any[] }>({
+  const [scopeData, setScopeData] = useState<{ products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[] }>({
     products: [],
     services: [],
     categories: [],
+    serviceCategories: [],
     customers: [],
   })
   const [isLoadingScope, setIsLoadingScope] = useState(false)
@@ -144,6 +145,7 @@ export default function PromotionsPage({
             products: res.products || [],
             services: res.services || [],
             categories: res.categories || [],
+            serviceCategories: (res as any).serviceCategories || [],
             customers: res.customers || [],
           })
         }

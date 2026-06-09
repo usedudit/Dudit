@@ -35,6 +35,7 @@ const PromotionSchema = z.object({
   maxDiscountAmount: z.number().min(0).nullable().optional(),
   minSpendAmount: z.number().min(0).nullable().optional(),
   giftProductId: z.string().uuid().nullable().optional(),
+  giftServiceId: z.string().uuid().nullable().optional(),
   buyQuantity: z.number().int().min(1).nullable().optional(),
   payQuantity: z.number().int().min(1).nullable().optional(),
   priority: z.number().int().default(0),
@@ -243,12 +244,15 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
       return { success: false, error: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga." }
     }
   } else if (data.promotionType === "gift") {
-    if (!data.giftProductId) {
-      return { success: false, error: "Para campanhas de brinde, selecione o produto que será o brinde." }
+    if (!data.giftProductId && !data.giftServiceId) {
+      return { success: false, error: "Para campanhas de brinde, selecione o produto ou serviço que será o brinde." }
     }
   } else if (data.promotionType === "discount") {
     if (!data.discountType || data.discountValue === undefined || data.discountValue === null) {
       return { success: false, error: "Para descontos, informe o tipo e o valor do desconto." }
+    }
+    if (data.discountType === "fixed" && (data.minSpendAmount === undefined || data.minSpendAmount === null)) {
+      return { success: false, error: "Para desconto de valor fixo (R$), informe o valor mínimo de compra." }
     }
   }
 
@@ -264,7 +268,8 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
       discount_value: data.promotionType === "discount" ? data.discountValue : null,
       max_discount_amount: data.maxDiscountAmount ?? null,
       min_spend_amount: data.minSpendAmount ?? null,
-      gift_product_id: data.promotionType === "gift" ? data.giftProductId : null,
+      gift_product_id: data.promotionType === "gift" && data.giftProductId ? data.giftProductId : null,
+      gift_service_id: data.promotionType === "gift" && data.giftServiceId ? data.giftServiceId : null,
       buy_quantity: data.promotionType === "buy_x_pay_y" ? data.buyQuantity : null,
       pay_quantity: data.promotionType === "buy_x_pay_y" ? data.payQuantity : null,
       priority: data.priority,
@@ -318,12 +323,15 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
       return { success: false, error: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga." }
     }
   } else if (data.promotionType === "gift") {
-    if (!data.giftProductId) {
-      return { success: false, error: "Para campanhas de brinde, selecione o produto que será o brinde." }
+    if (!data.giftProductId && !data.giftServiceId) {
+      return { success: false, error: "Para campanhas de brinde, selecione o produto ou serviço que será o brinde." }
     }
   } else if (data.promotionType === "discount") {
     if (!data.discountType || data.discountValue === undefined || data.discountValue === null) {
       return { success: false, error: "Para descontos, informe o tipo e o valor do desconto." }
+    }
+    if (data.discountType === "fixed" && (data.minSpendAmount === undefined || data.minSpendAmount === null)) {
+      return { success: false, error: "Para desconto de valor fixo (R$), informe o valor mínimo de compra." }
     }
   }
 
@@ -338,7 +346,8 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
       discount_value: data.promotionType === "discount" ? data.discountValue : null,
       max_discount_amount: data.maxDiscountAmount ?? null,
       min_spend_amount: data.minSpendAmount ?? null,
-      gift_product_id: data.promotionType === "gift" ? data.giftProductId : null,
+      gift_product_id: data.promotionType === "gift" && data.giftProductId ? data.giftProductId : null,
+      gift_service_id: data.promotionType === "gift" && data.giftServiceId ? data.giftServiceId : null,
       buy_quantity: data.promotionType === "buy_x_pay_y" ? data.buyQuantity : null,
       pay_quantity: data.promotionType === "buy_x_pay_y" ? data.payQuantity : null,
       priority: data.priority,
@@ -577,6 +586,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       maxDiscountAmount: promo.max_discount_amount ? Number(promo.max_discount_amount) : null,
       minSpendAmount: promo.min_spend_amount ? Number(promo.min_spend_amount) : null,
       giftProductId: promo.gift_product_id,
+      giftServiceId: promo.gift_service_id,
       buyQuantity: promo.buy_quantity,
       payQuantity: promo.pay_quantity,
       priority: promo.priority,
@@ -597,7 +607,7 @@ export async function getPromotionScopeDataAction(partnerId: string) {
   await requirePartnerAccessWithPermission(partnerId, "coupons", "view")
   const supabase = await getSupabaseServerClient()
 
-  const [{ data: products }, { data: services }, { data: categories }, { data: customers }] = await Promise.all([
+  const [{ data: products }, { data: services }, { data: categories }, { data: serviceCategories }, { data: customers }] = await Promise.all([
     supabase
       .from("products")
       .select("id, name, category:product_categories!category_id(name), category_id, price, sku, images, is_active")
@@ -612,6 +622,12 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       .limit(200),
     supabase
       .from("product_categories")
+      .select("id, name, is_active")
+      .eq("partner_id", partnerId)
+      .is("parent_id", null)
+      .order("name"),
+    supabase
+      .from("service_categories")
       .select("id, name, is_active")
       .eq("partner_id", partnerId)
       .is("parent_id", null)
@@ -647,6 +663,11 @@ export async function getPromotionScopeDataAction(partnerId: string) {
       isActive: Boolean(s.is_active),
     })),
     categories: (categories || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      isActive: Boolean(c.is_active),
+    })),
+    serviceCategories: (serviceCategories || []).map((c: any) => ({
       id: c.id,
       name: c.name,
       isActive: Boolean(c.is_active),
@@ -788,6 +809,7 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
       maxDiscountAmount: promo.max_discount_amount ? Number(promo.max_discount_amount) : null,
       minSpendAmount: promo.min_spend_amount ? Number(promo.min_spend_amount) : null,
       giftProductId: promo.gift_product_id,
+      giftServiceId: promo.gift_service_id,
       buyQuantity: promo.buy_quantity,
       payQuantity: promo.pay_quantity,
       priority: promo.priority,

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, TagIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -24,6 +24,7 @@ interface SelectPromotionCategoriesSheetProps {
   isOpen: boolean
   onClose: () => void
   categories: ScopeCategory[]
+  serviceCategories: ScopeCategory[]
   selectedIds: string[]
   onToggle: (id: string) => void
   isLoading?: boolean
@@ -41,20 +42,91 @@ function CategoryRowSkeleton() {
   )
 }
 
+function CategoryList({ items, selectedIds, onToggle }: { items: ScopeCategory[]; selectedIds: string[]; onToggle: (id: string) => void }) {
+  return (
+    <Div className="flex flex-col px-2 pb-2">
+      {items.map((category) => {
+        const disabled = category.isActive === false
+        const isSelected = selectedIds.includes(category.id)
+        return (
+          <Div
+            key={category.id}
+            role={disabled ? undefined : "button"}
+            tabIndex={disabled ? undefined : 0}
+            onClick={disabled ? undefined : () => onToggle(category.id)}
+            onKeyDown={
+              disabled
+                ? undefined
+                : (e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onToggle(category.id)
+                  }
+                }
+            }
+            className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
+              ? "cursor-not-allowed opacity-55"
+              : isSelected
+                ? "bg-brand-primary/5 dark:bg-brand-primary/10"
+                : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
+              }`}
+          >
+            <Div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
+              <TagIcon size={20} />
+            </Div>
+            <Div className="min-w-0 flex-1">
+              <Div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
+                  {category.name}
+                </Span>
+                <Badge variant={category.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
+                  {category.isActive === false ? "Inativo" : "Ativo"}
+                </Badge>
+                {isSelected && (
+                  <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
+                    Selecionado
+                  </Badge>
+                )}
+              </Div>
+              <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                {category.isActive === false ? "Categoria inativa" : "Categoria disponível para uso"}
+              </P>
+            </Div>
+            <Div className="flex shrink-0 items-center gap-2">
+              {!disabled && isSelected ? (
+                <Div className="flex h-8 w-8 items-center justify-center text-brand-green">
+                  <CheckCircleIcon size={18} />
+                </Div>
+              ) : !disabled ? (
+                <Div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
+                  <PlusIcon size={18} />
+                </Div>
+              ) : null}
+            </Div>
+          </Div>
+        )
+      })}
+    </Div>
+  )
+}
+
 export default function SelectPromotionCategoriesSheet({
   isOpen,
   onClose,
   categories,
+  serviceCategories,
   selectedIds,
   onToggle,
   isLoading = false,
 }: SelectPromotionCategoriesSheetProps) {
   const [search, setSearch] = useState("")
+  const [activeTab, setActiveTab] = useState("products")
   const isMobile = useMediaQuery("(max-width: 768px)")
 
   const filteredCategories = useMemo(() => {
     const term = search.trim().toLowerCase()
-    const sorted = [...categories].sort((a, b) => {
+    const list = activeTab === "products" ? categories : serviceCategories
+    const sorted = [...list].sort((a, b) => {
       const aInactive = a.isActive === false ? 1 : 0
       const bInactive = b.isActive === false ? 1 : 0
       if (aInactive !== bInactive) return aInactive - bInactive
@@ -63,7 +135,7 @@ export default function SelectPromotionCategoriesSheet({
 
     if (!term) return sorted
     return sorted.filter((item) => item.name.toLowerCase().includes(term))
-  }, [categories, search])
+  }, [categories, serviceCategories, search, activeTab])
 
   const content = (
     <Div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -73,6 +145,15 @@ export default function SelectPromotionCategoriesSheet({
           <XIcon className="h-5 w-5" />
         </Button>
       </Header>
+
+      <Div className="z-10 shrink-0 border-b border-brand-border bg-white px-6 pt-4 dark:border-dark-border dark:bg-dark-surface">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+            <TabsTrigger value="products">Categorias de Produtos ({categories.length})</TabsTrigger>
+            <TabsTrigger value="services">Categorias de Serviços ({serviceCategories.length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </Div>
 
       <Div className="z-10 shrink-0 border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
         <Input
@@ -95,69 +176,7 @@ export default function SelectPromotionCategoriesSheet({
             ))}
           </Div>
         ) : filteredCategories.length > 0 ? (
-          <Div className="flex flex-col px-2 pb-2">
-            {filteredCategories.map((category) => {
-              const disabled = category.isActive === false
-              const isSelected = selectedIds.includes(category.id)
-              return (
-                <Div
-                  key={category.id}
-                  role={disabled ? undefined : "button"}
-                  tabIndex={disabled ? undefined : 0}
-                  onClick={disabled ? undefined : () => onToggle(category.id)}
-                  onKeyDown={
-                    disabled
-                      ? undefined
-                      : (e: React.KeyboardEvent) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          onToggle(category.id)
-                        }
-                      }
-                  }
-                  className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border ${disabled
-                    ? "cursor-not-allowed opacity-55"
-                    : isSelected
-                      ? "bg-brand-primary/5 dark:bg-brand-primary/10"
-                      : "cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                    }`}
-                >
-                  <Div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand-border bg-brand-gray text-brand-inactive-text dark:border-dark-border dark:bg-dark-border">
-                    <TagIcon size={20} />
-                  </Div>
-                  <Div className="min-w-0 flex-1">
-                    <Div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <Span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                        {category.name}
-                      </Span>
-                      <Badge variant={category.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
-                        {category.isActive === false ? "Inativo" : "Ativo"}
-                      </Badge>
-                      {isSelected && (
-                        <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
-                          Selecionado
-                        </Badge>
-                      )}
-                    </Div>
-                    <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
-                      {category.isActive === false ? "Categoria inativa" : "Categoria disponível para uso"}
-                    </P>
-                  </Div>
-                  <Div className="flex shrink-0 items-center gap-2">
-                    {!disabled && isSelected ? (
-                      <Div className="flex h-8 w-8 items-center justify-center text-brand-green">
-                        <CheckCircleIcon size={18} />
-                      </Div>
-                    ) : !disabled ? (
-                      <Div className="flex h-8 w-8 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                        <PlusIcon size={18} />
-                      </Div>
-                    ) : null}
-                  </Div>
-                </Div>
-              )
-            })}
-          </Div>
+          <CategoryList items={filteredCategories} selectedIds={selectedIds} onToggle={onToggle} />
         ) : (
           <Div className="px-4 py-12">
             <IconPlaceholder

@@ -126,33 +126,13 @@ export function AdminModerationPanel() {
                             {/* Result Tabs */}
                             {result && (
                                 <div className="mt-4">
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger
-                                            value="general"
-                                            onClick={() => setActiveTab("general")}
-                                            className={activeTab === "general" ? "border-b-2 border-brand-dark dark:border-dark-heading" : ""}
-                                        >
-                                            Dados gerais
-                                        </TabsTrigger>
-                                        {hasVariants && (
-                                            <TabsTrigger
-                                                value="variations"
-                                                onClick={() => setActiveTab("variations")}
-                                                className={activeTab === "variations" ? "border-b-2 border-brand-dark dark:border-dark-heading" : ""}
-                                            >
-                                                Variações
-                                            </TabsTrigger>
-                                        )}
-                                        {isPartner && (
-                                            <TabsTrigger
-                                                value="gallery"
-                                                onClick={() => setActiveTab("gallery")}
-                                                className={activeTab === "gallery" ? "border-b-2 border-brand-dark dark:border-dark-heading" : ""}
-                                            >
-                                                Galeria
-                                            </TabsTrigger>
-                                        )}
-                                    </TabsList>
+                                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Dados gerais</TabsTrigger>
+                                            {hasVariants && <TabsTrigger value="variations">Variações</TabsTrigger>}
+                                            {isPartner && <TabsTrigger value="gallery">Galeria</TabsTrigger>}
+                                        </TabsList>
+                                    </Tabs>
                                 </div>
                             )}
                         </div>
@@ -758,7 +738,7 @@ function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; 
             right={
                 <SidebarCard title="Ações">
                     <SaveFooter riskScore={riskScore} onRiskScoreChange={setRiskScore} notes={notes} onNotesChange={setNotes}
-                        onSave={() => {}} isPending={saving} />
+                        onSave={() => { }} isPending={saving} />
                 </SidebarCard>
             }
         />

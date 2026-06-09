@@ -17,6 +17,7 @@ import {
 import SelectPromotionProductsSheet from "./SelectPromotionProductsSheet"
 import SelectPromotionCategoriesSheet from "./SelectPromotionCategoriesSheet"
 import SelectPromotionServicesSheet from "./SelectPromotionServicesSheet"
+import SelectPromotionGiftSheet from "./SelectPromotionGiftSheet"
 import { Switch } from "@/components/reusable/Switch"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon } from "@/lib/icons"
@@ -56,7 +57,7 @@ interface PromotionFormPageProps {
     partnerId: string
     mode: "add" | "edit" | "details" | "duplicate"
     campaign?: any
-    scopeData: { products: any[]; services: any[]; categories: any[]; customers: any[] }
+    scopeData: { products: any[]; services: any[]; categories: any[]; serviceCategories: any[]; customers: any[] }
     promotions: any[]
     onClose: () => void
 }
@@ -107,6 +108,7 @@ export default function PromotionFormPage({
     const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false)
     const [isCategoriesSheetOpen, setIsCategoriesSheetOpen] = useState(false)
     const [isServicesSheetOpen, setIsServicesSheetOpen] = useState(false)
+    const [isGiftSheetOpen, setIsGiftSheetOpen] = useState(false)
 
     // Pagination & Search states for selected items lists
     const [scopeSearch, setScopeSearch] = useState("")
@@ -291,7 +293,8 @@ export default function PromotionFormPage({
                                 discountValue: promo.promotion_type === "discount" ? parseNumberField(promo.discount_value) : null,
                                 maxDiscountAmount: parseNumberField(promo.max_discount_amount),
                                 minSpendAmount: parseNumberField(promo.min_spend_amount),
-                                giftProductId: promo.promotion_type === "gift" ? promo.gift_product_id : null,
+                                giftProductId: promo.promotion_type === "gift" && promo.gift_product_id ? promo.gift_product_id : null,
+                                giftServiceId: promo.promotion_type === "gift" && promo.gift_service_id ? promo.gift_service_id : null,
                                 buyQuantity: promo.promotion_type === "buy_x_pay_y" ? parseNumberField(promo.buy_quantity) : null,
                                 payQuantity: promo.promotion_type === "buy_x_pay_y" ? parseNumberField(promo.pay_quantity) : null,
                                 priority: Number(promo.priority || 0),
@@ -345,13 +348,17 @@ export default function PromotionFormPage({
                 return
             }
         } else if (editingRule.promotion_type === "gift") {
-            if (!editingRule.gift_product_id) {
-                toast({ title: "Erro", description: "Selecione o produto de brinde.", variant: "destructive" })
+            if (!editingRule.gift_product_id && !editingRule.gift_service_id) {
+                toast({ title: "Erro", description: "Selecione o brinde.", variant: "destructive" })
                 return
             }
         } else if (editingRule.promotion_type === "discount") {
             if (!editingRule.discount_type || !editingRule.discount_value) {
                 toast({ title: "Erro", description: "Informe o tipo e valor de desconto.", variant: "destructive" })
+                return
+            }
+            if (editingRule.discount_type === "fixed" && !editingRule.min_spend_amount) {
+                toast({ title: "Erro", description: "Para desconto de valor fixo (R$), informe o valor mínimo de compra.", variant: "destructive" })
                 return
             }
         }
@@ -387,7 +394,8 @@ export default function PromotionFormPage({
                 discountValue: ruleData.promotion_type === "discount" ? parseNumberField(ruleData.discount_value) : null,
                 maxDiscountAmount: parseNumberField(ruleData.max_discount_amount),
                 minSpendAmount: parseNumberField(ruleData.min_spend_amount),
-                giftProductId: ruleData.promotion_type === "gift" ? ruleData.gift_product_id : null,
+                giftProductId: ruleData.promotion_type === "gift" && ruleData.gift_product_id ? ruleData.gift_product_id : null,
+                giftServiceId: ruleData.promotion_type === "gift" && ruleData.gift_service_id ? ruleData.gift_service_id : null,
                 buyQuantity: ruleData.promotion_type === "buy_x_pay_y" ? parseNumberField(ruleData.buy_quantity) : null,
                 payQuantity: ruleData.promotion_type === "buy_x_pay_y" ? parseNumberField(ruleData.pay_quantity) : null,
                 priority: Number(ruleData.priority || 0),
@@ -471,7 +479,8 @@ export default function PromotionFormPage({
                         discountValue: parseNumberField(promo.discount_value),
                         maxDiscountAmount: parseNumberField(promo.max_discount_amount),
                         minSpendAmount: parseNumberField(promo.min_spend_amount),
-                        giftProductId: promo.gift_product_id,
+                        giftProductId: promo.gift_product_id || null,
+                        giftServiceId: promo.gift_service_id || null,
                         buyQuantity: parseNumberField(promo.buy_quantity),
                         payQuantity: parseNumberField(promo.buy_quantity) && parseNumberField(promo.pay_quantity),
                         priority: Number(promo.priority || 0),
@@ -668,7 +677,8 @@ export default function PromotionFormPage({
                             discountValue: parseNumberField(promo.discount_value),
                             maxDiscountAmount: parseNumberField(promo.max_discount_amount),
                             minSpendAmount: parseNumberField(promo.min_spend_amount),
-                            giftProductId: promo.gift_product_id,
+                            giftProductId: promo.gift_product_id || null,
+                            giftServiceId: promo.gift_service_id || null,
                             buyQuantity: parseNumberField(promo.buy_quantity),
                             payQuantity: parseNumberField(promo.pay_quantity),
                             priority: Number(promo.priority || 0),
@@ -1319,38 +1329,51 @@ export default function PromotionFormPage({
 
                                                             {/* Conditional configurations based on promotion type */}
                                                             {editingRule.promotion_type === "discount" && (
-                                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                                                    <FormDropdown
-                                                                        label="Tipo de Desconto"
-                                                                        value={editingRule.discount_type || "percentage"}
-                                                                        setValue={(val) => setEditingRule({ ...editingRule, discount_type: val })}
-                                                                        options={[
-                                                                            { value: "percentage", label: "Porcentagem (%)" },
-                                                                            { value: "fixed", label: "Valor Fixo (R$)" }
-                                                                        ]}
-                                                                    />
+                                                                <>
+                                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                                                        <FormDropdown
+                                                                            label="Tipo de Desconto"
+                                                                            value={editingRule.discount_type || "percentage"}
+                                                                            setValue={(val) => setEditingRule({ ...editingRule, discount_type: val })}
+                                                                            options={[
+                                                                                { value: "percentage", label: "Porcentagem (%)" },
+                                                                                { value: "fixed", label: "Valor Fixo (R$)" }
+                                                                            ]}
+                                                                        />
+                                                                        <Input
+                                                                            label="Valor do Desconto"
+                                                                            name="discount_value"
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0.01"
+                                                                            required
+                                                                            placeholder="10"
+                                                                            value={editingRule.discount_value ?? ""}
+                                                                            onChange={(e) => setEditingRule({ ...editingRule, discount_value: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                        />
+                                                                        <Input
+                                                                            label="Teto de Desconto (Opcional)"
+                                                                            name="max_discount_amount"
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            placeholder="Ex: 50.00"
+                                                                            value={editingRule.max_discount_amount ?? ""}
+                                                                            onChange={(e) => setEditingRule({ ...editingRule, max_discount_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                        />
+                                                                    </div>
                                                                     <Input
-                                                                        label="Valor do Desconto"
-                                                                        name="discount_value"
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0.01"
-                                                                        required
-                                                                        placeholder="10"
-                                                                        value={editingRule.discount_value ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, discount_value: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                    />
-                                                                    <Input
-                                                                        label="Teto de Desconto (Opcional)"
-                                                                        name="max_discount_amount"
+                                                                        label={editingRule.discount_type === "fixed" ? "Valor Mínimo de Compra (Obrigatório para Fixo)" : "Valor Mínimo de Compra (Opcional)"}
+                                                                        name="min_spend_amount"
                                                                         type="number"
                                                                         step="0.01"
                                                                         min="0"
-                                                                        placeholder="Ex: 50.00"
-                                                                        value={editingRule.max_discount_amount ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, max_discount_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                        required={editingRule.discount_type === "fixed"}
+                                                                        placeholder="0.00"
+                                                                        value={editingRule.min_spend_amount ?? ""}
+                                                                        onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
                                                                     />
-                                                                </div>
+                                                                </>
                                                             )}
 
                                                             {editingRule.promotion_type === "buy_x_pay_y" && (
@@ -1379,14 +1402,88 @@ export default function PromotionFormPage({
                                                             )}
 
                                                             {editingRule.promotion_type === "gift" && (
-                                                                <FormDropdown
-                                                                    label="Selecione o Brinde"
-                                                                    value={editingRule.gift_product_id || ""}
-                                                                    setValue={(val) => setEditingRule({ ...editingRule, gift_product_id: val })}
-                                                                    options={[
-                                                                        { value: "", label: "Escolha o produto que será entregue de brinde..." },
-                                                                        ...scopeData.products.map(p => ({ value: p.id, label: `${p.name} (${formatCurrency(p.price)})` }))
-                                                                    ]}
+                                                                <FormSection title="Brinde">
+                                                                    <div className="flex flex-col gap-4">
+                                                                        <div className="flex justify-end">
+                                                                            <Button variant="outline" type="button" onClick={() => setIsGiftSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                                                                                Selecionar Brinde
+                                                                            </Button>
+                                                                        </div>
+
+                                                                        {(() => {
+                                                                            const giftProdId = editingRule.gift_product_id
+                                                                            const giftServId = editingRule.gift_service_id
+                                                                            const selectedGiftProduct = giftProdId ? scopeData.products.find(p => p.id === giftProdId) : null
+                                                                            const selectedGiftService = giftServId ? scopeData.services.find(s => s.id === giftServId) : null
+                                                                            const selectedItem = selectedGiftProduct || selectedGiftService
+                                                                            const giftTypeText = selectedGiftProduct ? "Produto" : selectedGiftService ? "Serviço" : ""
+
+                                                                            if (!selectedItem) {
+                                                                                return (
+                                                                                    <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
+                                                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum brinde selecionado.</p>
+                                                                                    </div>
+                                                                                )
+                                                                            }
+
+                                                                            return (
+                                                                                <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-white dark:bg-dark-surface">
+                                                                                    <div className="flex items-center justify-between gap-3">
+                                                                                        <div className="flex items-center gap-3 min-w-0">
+                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
+                                                                                                <img
+                                                                                                    src={selectedItem.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                                                                    alt=""
+                                                                                                    className="w-full h-full object-cover"
+                                                                                                />
+                                                                                            </div>
+                                                                                            <div className="min-w-0">
+                                                                                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{selectedItem.name}</p>
+                                                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                                                                    {giftTypeText} • {formatCurrency(selectedItem.price || 0)}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <Button
+                                                                                            variant="outline"
+                                                                                            size="icon"
+                                                                                            onClick={() => setEditingRule({
+                                                                                                ...editingRule,
+                                                                                                gift_product_id: null,
+                                                                                                gift_service_id: null
+                                                                                            })}
+                                                                                            className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
+                                                                                        >
+                                                                                            <TrashIcon size={16} />
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )
+                                                                        })()}
+                                                                        <Input
+                                                                            label="Valor Mínimo de Compra (Opcional)"
+                                                                            name="min_spend_amount"
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            placeholder="0.00"
+                                                                            value={editingRule.min_spend_amount ?? ""}
+                                                                            onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                        />
+                                                                    </div>
+                                                                </FormSection>
+                                                            )}
+
+                                                            {editingRule.promotion_type === "free_shipping" && (
+                                                                <Input
+                                                                    label="Valor Mínimo de Compra (Opcional)"
+                                                                    name="min_spend_amount"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    placeholder="0.00"
+                                                                    value={editingRule.min_spend_amount ?? ""}
+                                                                    onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
                                                                 />
                                                             )}
 
@@ -1407,10 +1504,11 @@ export default function PromotionFormPage({
                                                             {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
                                                             {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
                                                         </FormSection>
+                                                    </div>
 
-                                                        {/* Right Column: Rule limits and status */}
-                                                        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                            <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
+                                                    {/* Right Column: Rule limits and status */}
+                                                    <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                                        <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
                                                                 Limitações e Status
                                                             </h3>
 
@@ -1482,7 +1580,6 @@ export default function PromotionFormPage({
                                                                 </Button>
                                                             </div>
                                                         </div>
-                                                    </div>
                                                 </form>
                                             ) : (
                                                 /* Redesigned Rules List View */
@@ -1901,6 +1998,7 @@ export default function PromotionFormPage({
                     isOpen={isCategoriesSheetOpen}
                     onClose={() => setIsCategoriesSheetOpen(false)}
                     categories={scopeData.categories}
+                    serviceCategories={scopeData.serviceCategories || []}
                     selectedIds={editingRuleCategoryIds}
                     onToggle={(id) => {
                         if (editingRuleCategoryIds.includes(id)) {
@@ -1922,6 +2020,21 @@ export default function PromotionFormPage({
                         } else {
                             setEditingRuleServiceIds([...editingRuleServiceIds, id])
                         }
+                    }}
+                />
+
+                <SelectPromotionGiftSheet
+                    isOpen={isGiftSheetOpen}
+                    onClose={() => setIsGiftSheetOpen(false)}
+                    products={scopeData.products}
+                    services={scopeData.services}
+                    selectedId={editingRule.gift_product_id || editingRule.gift_service_id || null}
+                    onSelect={(id, type) => {
+                        setEditingRule({
+                            ...editingRule,
+                            gift_product_id: type === "product" ? id : null,
+                            gift_service_id: type === "service" ? id : null
+                        })
                     }}
                 />
 

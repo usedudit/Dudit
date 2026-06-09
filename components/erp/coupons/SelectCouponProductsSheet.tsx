@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import { SearchIcon, PlusIcon, XIcon, CheckCircleIcon, BoxIcon } from "@/lib/icons"
-import { Badge, Button, Input, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Badge, Button, Input, IconPlaceholder } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"

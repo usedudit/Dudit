@@ -92,6 +92,8 @@ export type PricingResult = {
   appliedPromotionIds: string[]
   /** List of gift product IDs earned from promotions */
   appliedGiftProductIds: string[]
+  /** Whether any item was clamped to min R$0.01 to prevent free/negative pricing */
+  minPriceWarning: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +248,10 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         appliedGiftProductIds.push(promo.giftProductId)
         appliedPromotionIds.push(promo.id)
       }
+      if (promo.giftServiceId) {
+        appliedGiftProductIds.push(promo.giftServiceId)
+        appliedPromotionIds.push(promo.id)
+      }
     } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
       freeShippingApplied = true
       appliedPromotionIds.push(promo.id)
@@ -273,7 +279,16 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
       }
     } else if (promo.promotionType === PromotionType.DISCOUNT) {
       let discountAmt = 0
-      const currentEligibleSubtotal = eligibleUnits.reduce((sum, u) => sum + u.currentPrice, 0)
+
+      // For fixed discount, filter out units where discount value > unit price
+      let filteredEligible = eligibleUnits
+      if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
+        filteredEligible = eligibleUnits.filter((u) => promo.discountValue! <= u.currentPrice)
+      }
+
+      if (filteredEligible.length === 0) continue
+
+      const currentEligibleSubtotal = filteredEligible.reduce((sum, u) => sum + u.currentPrice, 0)
 
       if (currentEligibleSubtotal > 0) {
         if (promo.discountType === DiscountType.PERCENTAGE && promo.discountValue) {
@@ -292,8 +307,8 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         if (discountAmt > 0) {
           // Distribute discount proportionally across currentPrice of units
           let remainingDiscount = discountAmt
-          for (let i = 0; i < eligibleUnits.length; i++) {
-            const unit = eligibleUnits[i]
+          for (let i = 0; i < filteredEligible.length; i++) {
+            const unit = filteredEligible[i]
             if (unit.currentPrice > 0) {
               const share = round2((unit.currentPrice / currentEligibleSubtotal) * discountAmt)
               const actualDiscount = Math.min(share, unit.currentPrice, remainingDiscount)
@@ -304,7 +319,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
           // Clean up rounding remainder
           if (remainingDiscount > 0) {
-            for (const unit of eligibleUnits) {
+            for (const unit of filteredEligible) {
               if (unit.currentPrice >= remainingDiscount) {
                 unit.currentPrice = round2(unit.currentPrice - remainingDiscount)
                 remainingDiscount = 0
@@ -321,6 +336,19 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   }
 
   promotionDiscountAmount = round2(clampMin0(promotionDiscountAmount))
+
+  // Enforce minimum unit price of R$0.01 (never free, never negative)
+  let minPriceWarning = false
+  for (const unit of units) {
+    if (unit.currentPrice < 0.01) {
+      const adjustment = round2(0.01 - unit.currentPrice)
+      promotionDiscountAmount = round2(promotionDiscountAmount - adjustment)
+      unit.currentPrice = 0.01
+      minPriceWarning = true
+    }
+  }
+  promotionDiscountAmount = round2(clampMin0(promotionDiscountAmount))
+
   let currentTotal = round2(clampMin0(subtotal - promotionDiscountAmount))
 
   // ── Step 3: Manual Discount ───────────────────────────────────────────
@@ -406,5 +434,6 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     freeShippingApplied,
     appliedPromotionIds,
     appliedGiftProductIds,
+    minPriceWarning,
   }
 }

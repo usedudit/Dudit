@@ -29,6 +29,7 @@ export interface PricingPromotion {
     maxDiscountAmount?: number | null
     minSpendAmount?: number | null
     giftProductId?: string | null
+    giftServiceId?: string | null
     buyQuantity?: number | null
     payQuantity?: number | null
     priority: number
