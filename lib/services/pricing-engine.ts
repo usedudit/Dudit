@@ -133,7 +133,6 @@ function isItemInScope(
   applicableProductIds?: string[] | null,
   applicableCategoryIds?: string[] | null,
   applicableServiceIds?: string[] | null,
-  applicableSubscriptionIds?: string[] | null,
 ): boolean {
   if (applyScope === ApplyScope.ENTIRE_CART) {
     return true
@@ -146,9 +145,6 @@ function isItemInScope(
   }
   if (applyScope === ApplyScope.SPECIFIC_SERVICES) {
     return Boolean(item.serviceId && applicableServiceIds?.includes(item.serviceId))
-  }
-  if (applyScope === ApplyScope.SPECIFIC_SUBSCRIPTIONS) {
-    return Boolean(item.recurringPlanId && applicableSubscriptionIds?.includes(item.recurringPlanId))
   }
   return false
 }
@@ -229,7 +225,6 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         promo.applicableProductIds,
         promo.applicableCategoryIds,
         promo.applicableServiceIds,
-        promo.applicableSubscriptionIds,
       )
     )
 

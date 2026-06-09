@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, XIcon, CheckCircleIcon, TagIcon, ArrowUpDownIcon } from "@/lib/icons"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, IconPlaceholder, ActionsDropdown, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SelectionBanner, Pagination, Separator } from "@/components/reusable"
+import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, XIcon, CheckCircleIcon, TagIcon, ArrowUpDownIcon, UserIcon } from "@/lib/icons"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, IconPlaceholder, ActionsDropdown, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SelectionBanner, Pagination, Separator, MoneyInput, PercentageInput } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -18,6 +18,7 @@ import SelectPromotionProductsSheet from "./SelectPromotionProductsSheet"
 import SelectPromotionCategoriesSheet from "./SelectPromotionCategoriesSheet"
 import SelectPromotionServicesSheet from "./SelectPromotionServicesSheet"
 import SelectPromotionGiftSheet from "./SelectPromotionGiftSheet"
+import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
 import { Switch } from "@/components/reusable/Switch"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon } from "@/lib/icons"
@@ -109,6 +110,7 @@ export default function PromotionFormPage({
     const [isCategoriesSheetOpen, setIsCategoriesSheetOpen] = useState(false)
     const [isServicesSheetOpen, setIsServicesSheetOpen] = useState(false)
     const [isGiftSheetOpen, setIsGiftSheetOpen] = useState(false)
+    const [isCustomersSheetOpen, setIsCustomersSheetOpen] = useState(false)
 
     // Pagination & Search states for selected items lists
     const [scopeSearch, setScopeSearch] = useState("")
@@ -226,17 +228,6 @@ export default function PromotionFormPage({
         }
     }, [editingRule])
 
-    // Filtered customer listing
-    const filteredCustomers = useMemo(() => {
-        const term = custSearch.toLowerCase().trim()
-        if (!term) return scopeData.customers
-        return scopeData.customers.filter(
-            (c) =>
-                c.name.toLowerCase().includes(term) ||
-                (c.email && c.email.toLowerCase().includes(term))
-        )
-    }, [scopeData.customers, custSearch])
-
     // Save the overall Campaign + memory rules
     const handleSaveCampaign = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -247,6 +238,32 @@ export default function PromotionFormPage({
 
         setIsSaving(true)
         try {
+            // Auto-save current editing rule if it has data
+            if (editingRule) {
+                const ruleToSave = {
+                    ...editingRule,
+                    name: editingRule.name || getAutoPromotionName(
+                        campName,
+                        editingRule.promotion_type,
+                        editingRule.discount_type,
+                        editingRule.discount_value,
+                        editingRule.buy_quantity,
+                        editingRule.pay_quantity
+                    ),
+                    description: null,
+                    promotion_products: editingRuleProductIds,
+                    promotion_categories: editingRuleCategoryIds,
+                    promotion_services: editingRuleServiceIds,
+                    id: editingRule.id || `temp_${Math.random()}`,
+                }
+                if (localPromotions.some(p => p.id === ruleToSave.id)) {
+                    setLocalPromotions(localPromotions.map(p => p.id === ruleToSave.id ? ruleToSave : p))
+                } else {
+                    setLocalPromotions([...localPromotions, ruleToSave])
+                }
+                setEditingRule(null)
+            }
+
             const payload = {
                 partnerId,
                 name: campName,
@@ -816,7 +833,7 @@ export default function PromotionFormPage({
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
-                                                                src={prod.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                                src={prod.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -852,7 +869,7 @@ export default function PromotionFormPage({
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
-                                                        src={prod.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                        src={prod.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                         alt=""
                                                         className="w-full h-full object-cover"
                                                     />
@@ -1041,7 +1058,7 @@ export default function PromotionFormPage({
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
-                                                                src={serv.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                                src={serv.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -1077,7 +1094,7 @@ export default function PromotionFormPage({
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
-                                                        src={serv.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                        src={serv.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                         alt=""
                                                         className="w-full h-full object-cover"
                                                     />
@@ -1116,6 +1133,74 @@ export default function PromotionFormPage({
                     ) : (
                         <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum serviço selecionado ou correspondente à busca.</p>
+                        </div>
+                    )}
+                </div>
+            </FormSection>
+        )
+    }
+
+    const renderSelectedCustomersList = () => {
+        const selectedCustomers = scopeData.customers.filter((c: any) => campCustIds.includes(c.id))
+        const searched = custSearch.trim()
+            ? selectedCustomers.filter((c: any) =>
+                c.name.toLowerCase().includes(custSearch.toLowerCase()) ||
+                String(c.email || "").toLowerCase().includes(custSearch.toLowerCase())
+            )
+            : selectedCustomers
+
+        return (
+            <FormSection title="Clientes Elegíveis">
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
+                        <div className="w-full sm:w-72">
+                            <Input
+                                name="custSearch"
+                                placeholder="Buscar nos selecionados..."
+                                value={custSearch}
+                                onChange={(e) => setCustSearch(e.target.value)}
+                                className="mb-0"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                                label=""
+                            />
+                        </div>
+                        <Button variant="outline" type="button" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                            Selecionar Clientes
+                        </Button>
+                    </div>
+
+                    {searched.length > 0 ? (
+                        <div className="border border-brand-border dark:border-dark-border rounded-xl bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
+                            {searched.map((cust: any) => (
+                                <div key={cust.id} className="flex items-center justify-between gap-3 p-3.5">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                            <UserIcon size={16} className="text-brand-inactive-text" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{cust.name}</p>
+                                            {cust.email && <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">{cust.email}</p>}
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => setCampCustIds(campCustIds.filter((id: string) => id !== cust.id))}
+                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8 shrink-0"
+                                    >
+                                        <TrashIcon size={16} />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : campCustIds.length === 0 ? (
+                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum cliente selecionado.</p>
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum cliente corresponde à busca.</p>
                         </div>
                     )}
                 </div>
@@ -1230,45 +1315,7 @@ export default function PromotionFormPage({
                                                         ]}
                                                     />
 
-                                                    {campScope === "specific" && (
-                                                        <div className="border border-brand-border dark:border-dark-border p-4 rounded-xl space-y-3 bg-white dark:bg-dark-surface">
-                                                            <label className="text-xs font-bold uppercase text-brand-inactive-text">Selecionar Clientes elegíveis</label>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Filtrar clientes por nome ou email..."
-                                                                value={custSearch}
-                                                                onChange={(e) => setCustSearch(e.target.value)}
-                                                                disabled={isReadOnly}
-                                                                className="w-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg py-2.5 px-4 text-sm focus:ring-brand-green focus:border-brand-green dark:focus:ring-brand-green dark:focus:border-brand-green focus:outline-none text-brand-dark dark:text-dark-heading placeholder:text-brand-dark/70 dark:placeholder:text-dark-heading/70 transition-colors disabled:bg-brand-gray dark:disabled:bg-dark-border/30"
-                                                            />
-                                                            <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                                                {filteredCustomers.map((cust) => {
-                                                                    const isChecked = campCustIds.includes(cust.id)
-                                                                    return (
-                                                                        <label key={cust.id} className="flex items-center gap-3 text-sm p-1.5 hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 rounded cursor-pointer transition-colors">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={isChecked}
-                                                                                disabled={isReadOnly}
-                                                                                onChange={() => {
-                                                                                    if (isChecked) {
-                                                                                        setCampCustIds(campCustIds.filter((id) => id !== cust.id))
-                                                                                    } else {
-                                                                                        setCampCustIds([...campCustIds, cust.id])
-                                                                                    }
-                                                                                }}
-                                                                                className="text-brand-green focus:ring-brand-green border-brand-border dark:border-dark-border rounded"
-                                                                            />
-                                                                            <div>
-                                                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">{cust.name}</p>
-                                                                                {cust.email && <p className="text-xs text-brand-inactive-text dark:text-dark-body">{cust.email}</p>}
-                                                                            </div>
-                                                                        </label>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                    {campScope === "specific" && renderSelectedCustomersList()}
                                                 </FormSection>
                                             </div>
 
@@ -1340,39 +1387,33 @@ export default function PromotionFormPage({
                                                                                 { value: "fixed", label: "Valor Fixo (R$)" }
                                                                             ]}
                                                                         />
-                                                                        <Input
-                                                                            label="Valor do Desconto"
-                                                                            name="discount_value"
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0.01"
-                                                                            required
-                                                                            placeholder="10"
-                                                                            value={editingRule.discount_value ?? ""}
-                                                                            onChange={(e) => setEditingRule({ ...editingRule, discount_value: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                        />
-                                                                        <Input
+                                                                        {editingRule.discount_type === "percentage" ? (
+                                                                            <PercentageInput
+                                                                                label="Valor do Desconto"
+                                                                                name="discount_value"
+                                                                                required
+                                                                                placeholder="10"
+                                                                                value={editingRule.discount_value ?? ""}
+                                                                                onChange={(val) => setEditingRule({ ...editingRule, discount_value: val })}
+                                                                            />
+                                                                        ) : (
+                                                                            <MoneyInput
+                                                                                label="Valor do Desconto"
+                                                                                name="discount_value"
+                                                                                required
+                                                                                placeholder="10.00"
+                                                                                value={editingRule.discount_value ?? ""}
+                                                                                onChange={(val) => setEditingRule({ ...editingRule, discount_value: val })}
+                                                                            />
+                                                                        )}
+                                                                        <MoneyInput
                                                                             label="Teto de Desconto (Opcional)"
                                                                             name="max_discount_amount"
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0"
-                                                                            placeholder="Ex: 50.00"
+                                                                            placeholder="50.00"
                                                                             value={editingRule.max_discount_amount ?? ""}
-                                                                            onChange={(e) => setEditingRule({ ...editingRule, max_discount_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
+                                                                            onChange={(val) => setEditingRule({ ...editingRule, max_discount_amount: val })}
                                                                         />
                                                                     </div>
-                                                                    <Input
-                                                                        label={editingRule.discount_type === "fixed" ? "Valor Mínimo de Compra (Obrigatório para Fixo)" : "Valor Mínimo de Compra (Opcional)"}
-                                                                        name="min_spend_amount"
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
-                                                                        required={editingRule.discount_type === "fixed"}
-                                                                        placeholder="0.00"
-                                                                        value={editingRule.min_spend_amount ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                    />
                                                                 </>
                                                             )}
 
@@ -1432,7 +1473,7 @@ export default function PromotionFormPage({
                                                                                         <div className="flex items-center gap-3 min-w-0">
                                                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                                                                 <img
-                                                                                                    src={selectedItem.image || "https://img.dudit.com.br/static/placeholder.png"}
+                                                                                                    src={selectedItem.image || "https://img.dudit.com.br/static/Placeholder.png"}
                                                                                                     alt=""
                                                                                                     className="w-full h-full object-cover"
                                                                                                 />
@@ -1460,31 +1501,14 @@ export default function PromotionFormPage({
                                                                                 </div>
                                                                             )
                                                                         })()}
-                                                                        <Input
-                                                                            label="Valor Mínimo de Compra (Opcional)"
-                                                                            name="min_spend_amount"
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0"
-                                                                            placeholder="0.00"
-                                                                            value={editingRule.min_spend_amount ?? ""}
-                                                                            onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                        />
                                                                     </div>
                                                                 </FormSection>
                                                             )}
 
                                                             {editingRule.promotion_type === "free_shipping" && (
-                                                                <Input
-                                                                    label="Valor Mínimo de Compra (Opcional)"
-                                                                    name="min_spend_amount"
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    min="0"
-                                                                    placeholder="0.00"
-                                                                    value={editingRule.min_spend_amount ?? ""}
-                                                                    onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                />
+                                                                <div className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                    Configure o valor mínimo de compra na seção "Limitações" ao lado.
+                                                                </div>
                                                             )}
 
                                                             {/* Escopo de Aplicação */}
@@ -1509,77 +1533,74 @@ export default function PromotionFormPage({
                                                     {/* Right Column: Rule limits and status */}
                                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                                                         <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
-                                                                Limitações e Status
-                                                            </h3>
+                                                            Limitações e Status
+                                                        </h3>
 
-                                                            <SidebarCard hasTopStrip={true}>
-                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
-                                                                <div className="space-y-4">
-                                                                    <Input
-                                                                        label="Prioridade de Execução"
-                                                                        name="priority"
-                                                                        type="number"
-                                                                        placeholder="0"
-                                                                        value={editingRule.priority ?? 0}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })}
-                                                                    />
-                                                                    <Input
-                                                                        label="Mínimo de Compra (R$)"
-                                                                        name="min_spend_amount"
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
-                                                                        placeholder="0.00"
-                                                                        value={editingRule.min_spend_amount ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, min_spend_amount: e.target.value === "" ? "" : parseFloat(e.target.value) })}
-                                                                    />
-                                                                    <Input
-                                                                        label="Limite Global de Usos"
-                                                                        name="usage_limit"
-                                                                        type="number"
-                                                                        min="0"
-                                                                        placeholder="Sem limite"
-                                                                        value={editingRule.usage_limit ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                    />
-                                                                    <Input
-                                                                        label="Limite de Usos por Cliente"
-                                                                        name="usage_limit_per_customer"
-                                                                        type="number"
-                                                                        min="0"
-                                                                        placeholder="Sem limite"
-                                                                        value={editingRule.usage_limit_per_customer ?? ""}
-                                                                        onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
-                                                                    />
-                                                                </div>
-                                                            </SidebarCard>
-
-                                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
-                                                                <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
-                                                                <div className="space-y-4">
-                                                                    <Checkbox
-                                                                        checked={editingRule.allow_coupon_combination || false}
-                                                                        onChange={() => setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
-                                                                        label="Permitir uso combinado com cupons de desconto"
-                                                                    />
-                                                                    <Checkbox
-                                                                        checked={editingRule.is_active ?? true}
-                                                                        onChange={() => setEditingRule({ ...editingRule, is_active: !editingRule.is_active })}
-                                                                        label="Regra ativa e disponível"
-                                                                    />
-                                                                </div>
+                                                        <SidebarCard hasTopStrip={true}>
+                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
+                                                            <div className="space-y-4">
+                                                                <Input
+                                                                    label="Prioridade de Execução"
+                                                                    name="priority"
+                                                                    type="number"
+                                                                    placeholder="0"
+                                                                    value={editingRule.priority ?? 0}
+                                                                    onChange={(e) => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) || 0 })}
+                                                                />
+                                                                <MoneyInput
+                                                                    label="Mínimo de Compra (R$)"
+                                                                    name="min_spend_amount"
+                                                                    placeholder="0.00"
+                                                                    value={editingRule.min_spend_amount ?? ""}
+                                                                    onChange={(val) => setEditingRule({ ...editingRule, min_spend_amount: val })}
+                                                                />
+                                                                <Input
+                                                                    label="Limite Global de Usos"
+                                                                    name="usage_limit"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    placeholder="Sem limite"
+                                                                    value={editingRule.usage_limit ?? ""}
+                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                />
+                                                                <Input
+                                                                    label="Limite de Usos por Cliente"
+                                                                    name="usage_limit_per_customer"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    placeholder="Sem limite"
+                                                                    value={editingRule.usage_limit_per_customer ?? ""}
+                                                                    onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                                                                />
                                                             </div>
+                                                        </SidebarCard>
 
-                                                            {/* Desktop sub-form Actions */}
-                                                            <div className="hidden md:flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-4">
-                                                                <Button variant="outline" type="button" onClick={() => setEditingRule(null)}>
-                                                                    Voltar para lista
-                                                                </Button>
-                                                                <Button variant="filled" type="submit" disabled={isSaving}>
-                                                                    Salvar Regra
-                                                                </Button>
+                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
+                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
+                                                            <div className="space-y-4">
+                                                                <Checkbox
+                                                                    checked={editingRule.allow_coupon_combination || false}
+                                                                    onChange={() => setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
+                                                                    label="Permitir uso combinado com cupons de desconto"
+                                                                />
+                                                                <Checkbox
+                                                                    checked={editingRule.is_active ?? true}
+                                                                    onChange={() => setEditingRule({ ...editingRule, is_active: !editingRule.is_active })}
+                                                                    label="Regra ativa e disponível"
+                                                                />
                                                             </div>
                                                         </div>
+
+                                                        {/* Desktop sub-form Actions */}
+                                                        <div className="hidden md:flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-4">
+                                                            <Button variant="outline" type="button" onClick={() => setEditingRule(null)}>
+                                                                Voltar para lista
+                                                            </Button>
+                                                            <Button variant="filled" type="submit" disabled={isSaving}>
+                                                                Salvar Regra
+                                                            </Button>
+                                                        </div>
+                                                    </div>
                                                 </form>
                                             ) : (
                                                 /* Redesigned Rules List View */
@@ -2035,6 +2056,20 @@ export default function PromotionFormPage({
                             gift_product_id: type === "product" ? id : null,
                             gift_service_id: type === "service" ? id : null
                         })
+                    }}
+                />
+
+                <SelectCustomerSheet
+                    isOpen={isCustomersSheetOpen}
+                    onClose={() => setIsCustomersSheetOpen(false)}
+                    partnerId={partnerId}
+                    selectedCustomerIds={campCustIds}
+                    onSelect={(customer) => {
+                        if (campCustIds.includes(customer.id)) {
+                            setCampCustIds(campCustIds.filter((cId) => cId !== customer.id))
+                        } else {
+                            setCampCustIds([...campCustIds, customer.id])
+                        }
                     }}
                 />
 

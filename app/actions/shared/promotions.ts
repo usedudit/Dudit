@@ -294,7 +294,13 @@ export async function createPromotionAction(input: z.infer<typeof PromotionSchem
   }
 
   if (data.applyScope === "category" && data.categoryIds.length > 0) {
-    const records = data.categoryIds.map((cid) => ({ promotion_id: promoId, category_id: cid }))
+    const { data: productCats } = await supabase.from("product_categories").select("id").in("id", data.categoryIds)
+    const productCatSet = new Set((productCats || []).map((c: any) => c.id))
+    const records = data.categoryIds.map((cid) => ({
+      promotion_id: promoId,
+      category_id: cid,
+      category_type: productCatSet.has(cid) ? "product" : "service",
+    }))
     await supabase.from("promotion_categories").insert(records)
   }
 
@@ -376,7 +382,13 @@ export async function updatePromotionAction(promotionId: string, input: z.infer<
   }
 
   if (data.applyScope === "category" && data.categoryIds.length > 0) {
-    const records = data.categoryIds.map((cid) => ({ promotion_id: promotionId, category_id: cid }))
+    const { data: productCats } = await supabase.from("product_categories").select("id").in("id", data.categoryIds)
+    const productCatSet = new Set((productCats || []).map((c: any) => c.id))
+    const records = data.categoryIds.map((cid) => ({
+      promotion_id: promotionId,
+      category_id: cid,
+      category_type: productCatSet.has(cid) ? "product" : "service",
+    }))
     await supabase.from("promotion_categories").insert(records)
   }
 
@@ -539,8 +551,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       *,
       promotion_products(product_id),
       promotion_categories(category_id),
-      promotion_services(service_id),
-      promotion_subscriptions(recurring_plan_id)
+      promotion_services(service_id)
     `)
     .eq("partner_id", partnerId)
     .eq("is_active", true)
@@ -595,7 +606,6 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
       applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
       applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
       applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
-      applicableSubscriptionIds: (promo.promotion_subscriptions || []).map((s: any) => s.recurring_plan_id),
     })
   }
 
@@ -740,8 +750,7 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
       *,
       promotion_products(product_id),
       promotion_categories(category_id),
-      promotion_services(service_id),
-      promotion_subscriptions(recurring_plan_id)
+      promotion_services(service_id)
     `)
     .in("partner_id", partnerIds)
     .eq("is_active", true)
@@ -818,7 +827,6 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
       applicableProductIds: (promo.promotion_products || []).map((p: any) => p.product_id),
       applicableCategoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id),
       applicableServiceIds: (promo.promotion_services || []).map((s: any) => s.service_id),
-      applicableSubscriptionIds: (promo.promotion_subscriptions || []).map((s: any) => s.recurring_plan_id),
     })
   }
 

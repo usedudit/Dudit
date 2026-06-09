@@ -850,12 +850,6 @@ export async function checkoutCartAction(
   for (const giftId of giftProductIds) {
     const giftProd = giftProducts.find(p => p.id === giftId)
     if (!giftProd || !giftProd.is_active || (giftProd.stock_available ?? 0) <= 0) {
-      await adminClient.from("promotion_audit_logs").insert({
-        partner_id: partnerId,
-        customer_id: customerIdForPromo,
-        action: "gift_out_of_stock",
-        details: { gift_product_id: giftId },
-      })
       continue
     }
 
@@ -872,15 +866,6 @@ export async function checkoutCartAction(
     })
   }
 
-  // Create audit logs for applied promotions
-  if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
-    await adminClient.from("promotion_audit_logs").insert({
-      partner_id: partnerId,
-      customer_id: customerIdForPromo,
-      action: "applied",
-      details: { promotion_ids: pricingResult.appliedPromotionIds },
-    })
-  }
 
   // Snapshot structure for promotions_applied field in orders
   const promotionsAppliedSnapshot = (pricingResult.appliedPromotionIds || []).map(id => {

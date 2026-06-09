@@ -17,7 +17,7 @@ const Span = (props: any) => React.createElement("span", props)
 const P = (props: any) => React.createElement("p", props)
 const Img = (props: any) => React.createElement("img", props)
 
-const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/placeholder.png"
+const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
 
 export interface ScopeItem {
   id: string
