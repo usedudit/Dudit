@@ -399,8 +399,12 @@ export async function removeImage(
                 const { data: vData } = await fetchAdmin.from("product_variants").select("variant_options").eq("id", targetId).single()
                 if (vData?.variant_options) {
                     const opts = typeof vData.variant_options === "string" ? JSON.parse(vData.variant_options) : vData.variant_options
-                    if (opts?.image) delete opts.image
-                    await fetchAdmin.from("product_variants").update({ variant_options: opts }).eq("id", targetId)
+                    if (opts?.image) {
+                        delete opts.image
+                        await fetchAdmin.from("product_variants").update({
+                            variant_options: Object.keys(opts).length > 0 ? opts : null
+                        }).eq("id", targetId)
+                    }
                 }
             }
         } else if (effectiveType === "service") {
@@ -655,8 +659,10 @@ export async function deleteVariant(
 
         // Delete variant image from R2 if exists
         const opts = variant.variant_options
-        const img = opts && typeof opts === "object" && "image" in opts ? (opts as any).image : null
-        if (img) await _deleteFromR2(img)
+        if (opts) {
+            const parsed = typeof opts === "string" ? JSON.parse(opts) : opts
+            if (parsed?.image) await _deleteFromR2(parsed.image)
+        }
 
         // Delete variant
         await fetchAdmin.from("product_variants").delete().eq("id", variantId)

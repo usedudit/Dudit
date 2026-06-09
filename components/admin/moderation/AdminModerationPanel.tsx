@@ -727,18 +727,40 @@ function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; 
     return (
         <TwoColLayout
             left={
-                <FormSection title="Logo">
-                    {data.store_image_url ? (
-                        <div className="flex items-start gap-3">
-                            <ImagePreview url={data.store_image_url} onRemove={() => handleRemoveImage(data.store_image_url!, "store_image_url")} />
-                        </div>
-                    ) : <p className="text-sm text-brand-inactive-text">Nenhum logo</p>}
-                </FormSection>
+                <>
+                    <FormSection title="Logo">
+                        {data.store_image_url ? (
+                            <div className="flex items-start gap-3">
+                                <ImagePreview url={data.store_image_url} onRemove={() => handleRemoveImage(data.store_image_url!, "store_image_url")} />
+                            </div>
+                        ) : <p className="text-sm text-brand-inactive-text">Nenhum logo</p>}
+                    </FormSection>
+                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full" />
+                    <FormSection title="Banner">
+                        {data.banner_url ? (
+                            <div className="flex items-start gap-3">
+                                <ImagePreview url={data.banner_url} onRemove={() => handleRemoveImage(data.banner_url!, "banner_url")} />
+                            </div>
+                        ) : <p className="text-sm text-brand-inactive-text">Nenhum banner</p>}
+                    </FormSection>
+                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full" />
+                    <FormSection title="Galeria">
+                        {data.gallery && data.gallery.length > 0 ? (
+                            <div className="flex flex-wrap gap-3">
+                                {data.gallery.map((url: string, i: number) => (
+                                    <ImagePreview key={i} url={url} onRemove={() => handleRemoveImage(url, "gallery")} />
+                                ))}
+                            </div>
+                        ) : <p className="text-sm text-brand-inactive-text">Nenhuma imagem na galeria</p>}
+                    </FormSection>
+                </>
             }
             right={
                 <SidebarCard title="Ações">
-                    <SaveFooter riskScore={riskScore} onRiskScoreChange={setRiskScore} notes={notes} onNotesChange={setNotes}
-                        onSave={() => { }} isPending={saving} />
+                    <div className="space-y-5">
+                        <FormDropdown label="Risk Score" options={RISK_LEVELS} value={riskScore} setValue={setRiskScore} placeholder="Não alterar" width="w-full" />
+                        <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." />
+                    </div>
                 </SidebarCard>
             }
         />

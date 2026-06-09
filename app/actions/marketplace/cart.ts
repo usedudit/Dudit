@@ -684,6 +684,10 @@ export async function checkoutCartAction(
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
 
+  // Resolve customer_id for promotion tracking (must exist in customers table)
+  let customerIdForPromo: string | null = null
+  { const { data: existingCust } = await adminClient.from("customers").select("id").eq("id", user.id).eq("partner_id", partnerId).maybeSingle(); if (existingCust) customerIdForPromo = existingCust.id }
+
   const lineContexts = (
     await import("@/lib/commerce/marketplace-checkout-lines")
   ).buildCheckoutLineContextsFromResolved(resolvedLines)
@@ -848,7 +852,7 @@ export async function checkoutCartAction(
     if (!giftProd || !giftProd.is_active || (giftProd.stock_available ?? 0) <= 0) {
       await adminClient.from("promotion_audit_logs").insert({
         partner_id: partnerId,
-        customer_id: user.id,
+        customer_id: customerIdForPromo,
         action: "gift_out_of_stock",
         details: { gift_product_id: giftId },
       })
@@ -872,7 +876,7 @@ export async function checkoutCartAction(
   if (pricingResult.appliedPromotionIds && pricingResult.appliedPromotionIds.length > 0) {
     await adminClient.from("promotion_audit_logs").insert({
       partner_id: partnerId,
-      customer_id: user.id,
+      customer_id: customerIdForPromo,
       action: "applied",
       details: { promotion_ids: pricingResult.appliedPromotionIds },
     })
@@ -1173,7 +1177,7 @@ export async function checkoutCartAction(
     await supabase.from("coupon_usages").upsert(
       {
         coupon_id: couponIdToSave,
-        customer_id: user.id,
+        customer_id: customerIdForPromo,
         order_id: order.id,
       },
       { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
@@ -1184,7 +1188,7 @@ export async function checkoutCartAction(
     await adminClient.from("promotion_usages").insert(
       pricingResult.appliedPromotionIds.map(promoId => ({
         promotion_id: promoId,
-        customer_id: user.id,
+        customer_id: customerIdForPromo,
         order_id: order.id,
       }))
     )

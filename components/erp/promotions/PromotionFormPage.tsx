@@ -2028,7 +2028,7 @@ export default function PromotionFormPage({
                     onClose={() => setIsGiftSheetOpen(false)}
                     products={scopeData.products}
                     services={scopeData.services}
-                    selectedId={editingRule.gift_product_id || editingRule.gift_service_id || null}
+                    selectedId={editingRule?.gift_product_id || editingRule?.gift_service_id || null}
                     onSelect={(id, type) => {
                         setEditingRule({
                             ...editingRule,
