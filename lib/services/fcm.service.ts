@@ -96,11 +96,9 @@ export async function sendPushToUser(params: {
       try {
         await messaging.send({
           token: sub.fcm_token,
-          notification: {
+          data: {
             title: params.title,
             body: params.body,
-          },
-          data: {
             notificationId: params.notificationId,
             href: params.href,
             type: params.type,

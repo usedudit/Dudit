@@ -16,13 +16,13 @@ export function getNotificationHref(params: {
 
   if (entityType === "order" && entityId) {
     if (audience === "seller" || audience === "admin") {
-      return `/erp/orders/${entityId}`
+      return `/erp/orders?view=${encodeURIComponent(entityId)}`
     }
     const orderNumber = data?.order_number
     if (typeof orderNumber === "string" && orderNumber.length > 0) {
-      return `/pedidos?order_number=${encodeURIComponent(orderNumber)}`
+      return `/pedidos?tab=details&order_number=${encodeURIComponent(orderNumber)}`
     }
-    return `/pedidos?order_number=${encodeURIComponent(entityId)}`
+    return `/pedidos?tab=details&order_number=${encodeURIComponent(entityId)}`
   }
 
   if (entityType === "appointment" && entityId) {

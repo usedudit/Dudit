@@ -1,12 +1,9 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { isFirebaseClientConfigured } from "@/lib/notifications/firebase-config"
-import {
-  registerPushSubscriptionAction,
-  unregisterPushSubscriptionAction,
-} from "@/app/actions/notifications"
+import { registerPushSubscriptionAction } from "@/app/actions/notifications"
 
 async function getDeviceName(): Promise<string> {
   if (typeof navigator === "undefined") return "unknown"
@@ -18,10 +15,23 @@ async function getDeviceName(): Promise<string> {
   return "Web"
 }
 
+function getDeviceFingerprint(): string {
+  if (typeof window === "undefined") return "unknown"
+  const ua = navigator.userAgent
+  const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`
+  const lang = navigator.language
+  let fingerprint = `${ua}|${screen}|${lang}`
+  let hash = 0
+  for (let i = 0; i < fingerprint.length; i++) {
+    const chr = fingerprint.charCodeAt(i)
+    hash = ((hash << 5) - hash) + chr
+    hash |= 0
+  }
+  return hash.toString(36)
+}
+
 export function PushNotificationManager() {
   const { user } = useSupabase()
-  const tokenRef = useRef<string | null>(null)
-  const registeredRef = useRef(false)
 
   useEffect(() => {
     if (!user?.id || !isFirebaseClientConfigured()) return
@@ -29,6 +39,7 @@ export function PushNotificationManager() {
     if (!("Notification" in window)) return
 
     let cancelled = false
+    let registered = false
 
     async function setup() {
       try {
@@ -42,7 +53,7 @@ export function PushNotificationManager() {
         if (permission !== "granted" || cancelled) return
 
         const { initializeApp, getApps } = await import("firebase/app")
-        const { getMessaging, getToken, onMessage } = await import("firebase/messaging")
+        const { getMessaging, getToken } = await import("firebase/messaging")
         const { firebaseClientConfig } = await import("@/lib/notifications/firebase-config")
 
         const app = getApps().length ? getApps()[0]! : initializeApp(firebaseClientConfig)
@@ -56,37 +67,20 @@ export function PushNotificationManager() {
 
         if (!token || cancelled) return
 
-        tokenRef.current = token
-        if (!registeredRef.current) {
+        if (!registered) {
           await registerPushSubscriptionAction({
             fcmToken: token,
             deviceName: await getDeviceName(),
+            deviceFingerprint: getDeviceFingerprint(),
           })
-          registeredRef.current = true
+          registered = true
         }
-
-        onMessage(messaging, (payload: { notification?: { title?: string; body?: string } }) => {
-          if (document.visibilityState !== "visible") return
-          const title = payload.notification?.title || "Dudit"
-          const body = payload.notification?.body || ""
-          if (Notification.permission === "granted") {
-            new Notification(title, { body, icon: "/icons/icon-192x192.png" })
-          }
-        })
       } catch (err) {
         console.warn("[push] registration skipped", err)
       }
     }
 
     setup()
-
-    return () => {
-      cancelled = true
-      const token = tokenRef.current
-      if (token && registeredRef.current) {
-        unregisterPushSubscriptionAction(token).catch(() => {})
-      }
-    }
   }, [user?.id])
 
   return null

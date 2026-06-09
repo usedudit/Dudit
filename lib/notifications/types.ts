@@ -3,6 +3,8 @@ export const NOTIFICATION_TYPES = [
   "order_paid",
   "order_shipped",
   "order_delivered",
+  "order_cancelled",
+  "order_refunded",
   "appointment_created",
   "appointment_confirmed",
   "appointment_reminder",

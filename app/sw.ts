@@ -253,18 +253,27 @@ if (FCM_API_KEY && FCM_PROJECT_ID) {
     const messaging = firebase.messaging()
 
     messaging.onBackgroundMessage((payload: {
-      notification?: { title?: string; body?: string }
-      data?: { href?: string }
+      data?: {
+        title?: string
+        body?: string
+        href?: string
+        notificationId?: string
+        type?: string
+        entityType?: string
+        entityId?: string
+      }
     }) => {
-      const title = payload.notification?.title || "Dudit"
-      const body = payload.notification?.body || ""
+      const title = payload.data?.title || "Dudit"
+      const body = payload.data?.body || ""
       const href = payload.data?.href || "/"
+      const notificationId = payload.data?.notificationId
 
       self.registration.showNotification(title, {
         body,
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-192x192.png",
-        data: { href },
+        data: { href, notificationId },
+        tag: notificationId || undefined,
       })
     })
 

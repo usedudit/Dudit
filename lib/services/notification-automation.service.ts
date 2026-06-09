@@ -315,6 +315,8 @@ export async function onAppointmentStatusChanged(
 
 const CUSTOMER_SITUATION_TYPES: Record<string, NotificationType> = {
   paid: "order_paid",
+  cancelled: "order_cancelled",
+  refunded: "order_refunded",
 }
 
 const CUSTOMER_DELIVERY_TYPES: Record<string, NotificationType> = {
@@ -369,10 +371,10 @@ export async function onOrderStatusChanged(
         ctx: { ...ctx, orderNumber },
       })
     }
-    if (situation === "paid") {
+    if (situation === "paid" || situation === "cancelled" || situation === "refunded") {
       await notifyPartnerTeam({
         partnerId,
-        type: "order_paid",
+        type,
         entityType: "order",
         entityId: orderId,
         ctx,

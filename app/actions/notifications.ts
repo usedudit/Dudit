@@ -50,6 +50,7 @@ export async function markNotificationsReadAction(notificationIds: string[]) {
 export async function registerPushSubscriptionAction(params: {
   fcmToken: string
   deviceName?: string | null
+  deviceFingerprint?: string | null
 }) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" as const }
@@ -64,6 +65,7 @@ export async function registerPushSubscriptionAction(params: {
     userId: user.id,
     fcmToken: params.fcmToken,
     deviceName: params.deviceName,
+    deviceFingerprint: params.deviceFingerprint,
   })
 
   if (!result.success) return { error: result.error || "Falha ao registrar push" }

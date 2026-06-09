@@ -207,7 +207,7 @@ export async function middleware(request: NextRequest) {
         https://dudit.com.br
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
-        https://*.supabase.co ${process.env.NEXT_PUBLIC_SUPABASE_URL || ''} 
+        https://*.supabase.co wss://*.supabase.co ${process.env.NEXT_PUBLIC_SUPABASE_URL || ''} wss://${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https:\/\//, '') || ''} 
         https://dudit.com.br
         https://www.dudit.com.br
         https://api.mercadopago.com 

@@ -11,6 +11,7 @@ import type {
   NotificationType,
 } from "@/lib/notifications/types"
 import { sendPushToUser } from "./fcm.service"
+import { shouldDeliverPush } from "./notification-preferences.service"
 
 const PAGE_SIZE = 20
 
@@ -77,17 +78,20 @@ export async function createNotification(
     metadata: { type: input.type },
   })
 
-  sendPushToUser({
-    userId: input.userId,
-    notificationId: notification.id,
-    title: input.title,
-    body: input.message,
-    href,
-    type: input.type,
-    entityType: input.entityType ?? null,
-    entityId: input.entityId ?? null,
-  }).catch((err) => {
-    console.error("[notifications] push delivery failed", err instanceof Error ? err.message : err)
+  shouldDeliverPush(input.userId, input.type).then((shouldPush) => {
+    if (!shouldPush) return
+    sendPushToUser({
+      userId: input.userId,
+      notificationId: notification.id,
+      title: input.title,
+      body: input.message,
+      href,
+      type: input.type,
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+    }).catch((err) => {
+      console.error("[notifications] push delivery failed", err instanceof Error ? err.message : err)
+    })
   })
 
   return { notification, created: true }
@@ -239,13 +243,50 @@ export async function registerPushSubscription(params: {
   userId: string
   fcmToken: string
   deviceName?: string | null
+  deviceFingerprint?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   const admin = getAdminClient()
+
+  if (params.deviceFingerprint && params.deviceName) {
+    const fingerprintTag = `fp:${params.deviceFingerprint}:${params.deviceName}`
+    const { data: existing } = await admin
+      .from("push_subscriptions")
+      .select("id, fcm_token")
+      .eq("user_id", params.userId)
+      .eq("device_name", fingerprintTag)
+      .maybeSingle()
+
+    if (existing) {
+      if (existing.fcm_token !== params.fcmToken) {
+        const { error: updateError } = await admin
+          .from("push_subscriptions")
+          .update({
+            fcm_token: params.fcmToken,
+            last_seen_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+
+        if (updateError) return { success: false, error: updateError.message }
+        return { success: true }
+      }
+
+      await admin
+        .from("push_subscriptions")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", existing.id)
+      return { success: true }
+    }
+  }
+
+  const deviceTag = params.deviceFingerprint && params.deviceName
+    ? `fp:${params.deviceFingerprint}:${params.deviceName}`
+    : params.deviceName || null
+
   const { error } = await admin.from("push_subscriptions").upsert(
     {
       user_id: params.userId,
       fcm_token: params.fcmToken,
-      device_name: params.deviceName || null,
+      device_name: deviceTag,
       last_seen_at: new Date().toISOString(),
     },
     { onConflict: "user_id,fcm_token" },

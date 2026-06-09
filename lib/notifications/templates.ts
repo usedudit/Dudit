@@ -49,6 +49,19 @@ export function buildNotificationContent(
         title: "Pedido entregue",
         message: `Seu pedido ${orderRef} em ${store} foi entregue.`,
       }
+    case "order_cancelled":
+      return {
+        title: "Pedido cancelado",
+        message:
+          audience === "seller"
+            ? `O pedido ${orderRef} de ${customer} foi cancelado.`
+            : `Seu pedido ${orderRef} em ${store} foi cancelado.`,
+      }
+    case "order_refunded":
+      return {
+        title: "Reembolso realizado",
+        message: `O pagamento do pedido ${orderRef} em ${store} foi reembolsado.`,
+      }
     case "appointment_created":
       return {
         title: "Novo agendamento",
