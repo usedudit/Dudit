@@ -366,7 +366,7 @@ export async function onOrderStatusChanged(
         type,
         entityType: "order",
         entityId: orderId,
-        ctx: { ...ctx, order_number: orderNumber },
+        ctx: { ...ctx, orderNumber },
       })
     }
     if (situation === "paid") {
@@ -390,7 +390,7 @@ export async function onOrderStatusChanged(
         type,
         entityType: "order",
         entityId: orderId,
-        ctx: { ...ctx, order_number: orderNumber },
+        ctx: { ...ctx, orderNumber },
       })
     }
   }
@@ -485,22 +485,22 @@ export async function broadcastAdminAnnouncement(params: {
 
   if (params.target === "all") {
     const { data } = await admin.from("user_profiles").select("user_id")
-    userIds = (data || []).map((r) => r.user_id).filter(Boolean)
+    userIds = (data || []).map((r: { user_id: string }) => r.user_id).filter(Boolean)
   } else if (params.target === "sellers") {
     const [{ data: owners }, { data: members }] = await Promise.all([
       admin.from("partners").select("user_id"),
       admin.from("partner_users").select("user_id"),
     ])
     userIds = [
-      ...(owners || []).map((r) => r.user_id),
-      ...(members || []).map((r) => r.user_id),
+      ...(owners || []).map((r: { user_id: string }) => r.user_id),
+      ...(members || []).map((r: { user_id: string }) => r.user_id),
     ].filter(Boolean)
   } else {
     const { data } = await admin
       .from("orders")
       .select("buyer_id")
       .not("buyer_id", "is", null)
-    userIds = [...new Set((data || []).map((r) => r.buyer_id).filter(Boolean))]
+    userIds = [...new Set((data || []).map((r: { buyer_id: string }) => r.buyer_id).filter(Boolean))] as string[]
   }
 
   const unique = [...new Set(userIds)]

@@ -65,7 +65,7 @@ export function PushNotificationManager() {
           registeredRef.current = true
         }
 
-        onMessage(messaging, (payload) => {
+        onMessage(messaging, (payload: { notification?: { title?: string; body?: string } }) => {
           if (document.visibilityState !== "visible") return
           const title = payload.notification?.title || "Dudit"
           const body = payload.notification?.body || ""

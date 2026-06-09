@@ -82,7 +82,7 @@ export async function sendPushToUser(params: {
   const invalidTokenIds: string[] = []
 
   await Promise.all(
-    subscriptions.map(async (sub) => {
+    subscriptions.map(async (sub: { id: string; fcm_token: string }) => {
       try {
         await messaging.send({
           token: sub.fcm_token,

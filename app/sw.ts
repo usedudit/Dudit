@@ -237,9 +237,7 @@ const FCM_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || ""
 
 if (FCM_API_KEY && FCM_PROJECT_ID) {
   try {
-    // @ts-expect-error importScripts is available in service workers
     importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js")
-    // @ts-expect-error importScripts is available in service workers
     importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js")
 
     // @ts-expect-error firebase compat global from importScripts

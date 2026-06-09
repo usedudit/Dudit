@@ -93,15 +93,6 @@ const ReportListRow = React.memo(({
                 </div>
             </td>
 
-            {/* Tipo */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
-                    <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"}>
-                        {targetTypeLabels[report.target_type] || report.target_type}
-                    </Badge>
-                </div>
-            </td>
-
             {/* Data */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center">
@@ -111,6 +102,15 @@ const ReportListRow = React.memo(({
                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
                         {new Date(report.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                </div>
+            </td>
+
+            {/* Tipo */}
+            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                <div className="flex justify-center">
+                    <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"}>
+                        {targetTypeLabels[report.target_type] || report.target_type}
+                    </Badge>
                 </div>
             </td>
 

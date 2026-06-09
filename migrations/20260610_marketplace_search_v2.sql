@@ -8,6 +8,14 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 -- Text normalization (matches lib/search/normalize.ts)
 -- =============================================================================
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'unaccent') THEN
+    RAISE EXCEPTION 'unaccent extension is required but not installed';
+  END IF;
+END
+$$;
+
 CREATE OR REPLACE FUNCTION public.normalize_search_text(input TEXT)
 RETURNS TEXT
 LANGUAGE sql
@@ -15,7 +23,7 @@ IMMUTABLE
 PARALLEL SAFE
 AS $$
   SELECT trim(regexp_replace(
-    lower(unaccent(coalesce(input, ''))),
+    lower(public.unaccent(coalesce(input, ''))),
     '[^[:alnum:][:space:]]', ' ', 'g'
   ));
 $$;

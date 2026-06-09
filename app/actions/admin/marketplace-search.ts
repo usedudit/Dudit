@@ -59,7 +59,7 @@ export async function listMarketplaceSynonymGroupsAction(): Promise<SynonymGroup
     termsByGroup.set(term.group_id, list)
   }
 
-  return (groups || []).map((g) => ({
+  return (groups || []).map((g: SynonymGroupRow) => ({
     ...(g as SynonymGroupRow),
     terms: termsByGroup.get(g.id) || [],
   }))

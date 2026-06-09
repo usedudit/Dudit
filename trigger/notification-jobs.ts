@@ -19,7 +19,6 @@ export async function triggerNotificationScheduledJob(
     )
   }
 
-  // @ts-expect-error dynamic import — Trigger.dev SDK
   const { tasks } = await import("@trigger.dev/sdk/v3")
   await tasks.trigger("notification-scheduled-job", payload, {
     delay: new Date(payload.runAt),

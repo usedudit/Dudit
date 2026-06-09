@@ -3,6 +3,14 @@
 
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'unaccent') THEN
+    RAISE EXCEPTION 'unaccent extension is required but not installed';
+  END IF;
+END
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
@@ -31,14 +39,14 @@ STABLE
 PARALLEL SAFE
 AS $$
   SELECT
-    setweight(to_tsvector('portuguese', unaccent(coalesce(p_name, ''))), 'A') ||
-    setweight(to_tsvector('portuguese', unaccent(coalesce(p_category, ''))), 'A') ||
-    setweight(to_tsvector('portuguese', unaccent(coalesce(p_subcategory, ''))), 'B') ||
-    setweight(to_tsvector('portuguese', unaccent(coalesce(p_tags, ''))), 'B') ||
-    setweight(to_tsvector('portuguese', unaccent(strip_html_tags(p_description))), 'C') ||
-    setweight(to_tsvector('portuguese', unaccent(coalesce(p_store, ''))), 'D') ||
+    setweight(to_tsvector('portuguese', public.unaccent(coalesce(p_name, ''))), 'A') ||
+    setweight(to_tsvector('portuguese', public.unaccent(coalesce(p_category, ''))), 'A') ||
+    setweight(to_tsvector('portuguese', public.unaccent(coalesce(p_subcategory, ''))), 'B') ||
+    setweight(to_tsvector('portuguese', public.unaccent(coalesce(p_tags, ''))), 'B') ||
+    setweight(to_tsvector('portuguese', public.unaccent(strip_html_tags(p_description))), 'C') ||
+    setweight(to_tsvector('portuguese', public.unaccent(coalesce(p_store, ''))), 'D') ||
     CASE
-      WHEN coalesce(p_sku, '') <> '' THEN setweight(to_tsvector('portuguese', unaccent(p_sku)), 'B')
+      WHEN coalesce(p_sku, '') <> '' THEN setweight(to_tsvector('portuguese', public.unaccent(p_sku)), 'B')
       ELSE ''::tsvector
     END;
 $$;
