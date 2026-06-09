@@ -433,10 +433,13 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   }
 }
 
+export type DiscountSource = "manual" | "campaign" | "none"
+
 export interface ItemCampaignPricing {
   effectivePrice: number
   campaignDiscount: number
-  campaignPrice: number
+  bestPrice: number
+  discountSource: DiscountSource
 }
 
 export function computeItemCampaignPricing(
@@ -445,13 +448,13 @@ export function computeItemCampaignPricing(
   promotion: PricingPromotion | null,
   itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
 ): ItemCampaignPricing {
-  const effectivePrice =
+  const manualPrice =
     promotionalPrice != null && promotionalPrice > 0 && promotionalPrice < unitPrice
       ? promotionalPrice
       : unitPrice
 
   if (!promotion) {
-    return { effectivePrice, campaignDiscount: 0, campaignPrice: effectivePrice }
+    return { effectivePrice: manualPrice, campaignDiscount: 0, bestPrice: manualPrice, discountSource: manualPrice < unitPrice ? "manual" : "none" }
   }
 
   let inScope = false
@@ -466,15 +469,16 @@ export function computeItemCampaignPricing(
   }
 
   if (!inScope || promotion.promotionType !== PromotionType.DISCOUNT) {
-    return { effectivePrice, campaignDiscount: 0, campaignPrice: effectivePrice }
+    return { effectivePrice: manualPrice, campaignDiscount: 0, bestPrice: manualPrice, discountSource: manualPrice < unitPrice ? "manual" : "none" }
   }
 
+  // Campaign discount calc on BASE price
   let discountAmt = 0
   if (promotion.discountType === DiscountType.PERCENTAGE && promotion.discountValue) {
     const pct = Math.min(100, Math.max(0, promotion.discountValue))
-    discountAmt = effectivePrice * (pct / 100)
+    discountAmt = unitPrice * (pct / 100)
   } else if (promotion.discountType === DiscountType.FIXED && promotion.discountValue) {
-    if (promotion.discountValue <= effectivePrice) {
+    if (promotion.discountValue <= unitPrice) {
       discountAmt = promotion.discountValue
     }
   }
@@ -483,12 +487,20 @@ export function computeItemCampaignPricing(
     discountAmt = Math.min(discountAmt, promotion.maxDiscountAmount)
   }
 
-  let campaignPrice = round2(effectivePrice - discountAmt)
+  let campaignPrice = round2(unitPrice - discountAmt)
   if (campaignPrice < 0.01) campaignPrice = 0.01
 
+  // Pick the best price
+  const bestPrice = Math.min(unitPrice, manualPrice, campaignPrice)
+  const discountSource: DiscountSource =
+    bestPrice === manualPrice && manualPrice < unitPrice ? "manual"
+    : bestPrice === campaignPrice && campaignPrice < unitPrice ? "campaign"
+    : "none"
+
   return {
-    effectivePrice,
-    campaignDiscount: round2(discountAmt),
-    campaignPrice,
+    effectivePrice: bestPrice,
+    campaignDiscount: discountSource === "campaign" ? round2(unitPrice - campaignPrice) : 0,
+    bestPrice,
+    discountSource,
   }
 }

@@ -105,18 +105,30 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     }
 
     const getItemDisplayPrice = (item: any, promotions: any[]) => {
-        const effective = getItemPrice(item)
-        if (!promotions?.length) return effective
-        for (const promo of promotions) {
-            if (promo.promotionType === "discount" && promo.is_active !== false) {
-                const result = computeItemCampaignPricing(effective, null, promo, {
-                    productId: item.product_id,
-                    categoryId: item.products?.category_id || undefined,
-                })
-                if (result && result.campaignDiscount > 0) return result.campaignPrice
+        const type = item.item_type || "product"
+        if (type !== "product") return getItemPrice(item)
+
+        const basePrice = Number(item.products?.price || 0)
+        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
+        const hasPromo = promoPrice > 0 && promoPrice < basePrice
+        const unitPrice = (item.variant_id && item.product_variants)
+            ? Number(item.product_variants.price_adjustment) || basePrice
+            : basePrice
+        const individualPromo = item.variant_id ? null : (hasPromo ? promoPrice : null)
+
+        if (promotions?.length) {
+            for (const promo of promotions) {
+                if (promo.promotionType === "discount" && promo.is_active !== false) {
+                    const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, {
+                        productId: item.product_id,
+                        categoryId: item.products?.category_id || undefined,
+                    })
+                    if (result.discountSource === "campaign") return result.bestPrice
+                }
             }
         }
-        return effective
+        // Fallback: computeItemCampaignPricing sem promo já resolve manualPrice
+        return computeItemCampaignPricing(unitPrice, individualPromo, null).bestPrice
     }
 
     const getPartnerDisplayTotal = (partnerId: string, items: any[]) => {
@@ -764,8 +776,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                     </AnimatePresence>
                                                 </div>
                                             </div>
-                                                                    </div>
-                                                                    {index !== array.length - 1 && (
+                                        </div>
+                                        {index !== array.length - 1 && (
                                             <div className="w-full h-[1px] bg-brand-border dark:bg-dark-border my-12" />
                                         )}
                                     </Fragment>)

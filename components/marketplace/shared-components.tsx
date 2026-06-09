@@ -290,22 +290,25 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
         })
     }, [activePromotions, product.id, itemType, (product as any).category_id])
 
-    const hasDiscount = !!(product.originalPrice && product.originalPrice > product.price)
-    const discountPercent = hasDiscount ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0
-
     const campaignPricing = useMemo(() => {
-        if (!activePromo) return null
+        const basePrice = Number(product.originalPrice) || Number(product.price) || 0
+        const individualPromo = product.originalPrice ? Number(product.price) : null
         return computeItemCampaignPricing(
-            product.price,
-            null,
-            activePromo,
+            basePrice,
+            individualPromo,
+            activePromo || null,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
         )
-    }, [activePromo, product.price, product.id, itemType, (product as any).category_id])
+    }, [activePromo, product.price, product.originalPrice, product.id, itemType, (product as any).category_id])
 
-    const displayPrice = campaignPricing?.campaignPrice ?? product.price
-    const hasCampaignDiscount = campaignPricing != null && campaignPricing.campaignDiscount > 0
-    const referencePrice = product.originalPrice && product.originalPrice > displayPrice ? product.originalPrice : (displayPrice !== product.price ? product.price : undefined)
+    const displayPrice = campaignPricing.bestPrice
+    const discountSource = campaignPricing.discountSource
+    const hasCampaignDiscount = discountSource === "campaign"
+    const hasManualPromo = discountSource === "manual"
+    const hasAnyDiscount = hasCampaignDiscount || hasManualPromo
+    const basePrice = Number(product.originalPrice) || Number(product.price) || 0
+    const discountPercent = hasAnyDiscount ? Math.round((1 - displayPrice / basePrice) * 100) : 0
+    const referencePrice = hasAnyDiscount ? basePrice : undefined
 
     const itemUrl = itemType === "plano"
         ? getPlanUrl(product, product.partners)
@@ -341,15 +344,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
                         {showPrice && hasCampaignDiscount && (
                             <Badge variant="blue" icon={null} className="whitespace-nowrap">
-                                {activePromo?.discountType === "percentage" ? `-${activePromo.discountValue}%` : `-${formatCurrency(campaignPricing!.campaignDiscount)}`}
+                                {activePromo?.discountType === "percentage" ? `-${activePromo.discountValue}%` : `-${formatCurrency(campaignPricing.campaignDiscount)}`}
                             </Badge>
                         )}
-                        {showPrice && hasDiscount && !hasCampaignDiscount && (
+                        {showPrice && hasManualPromo && (
                             <Badge variant="orange" icon={null} className="whitespace-nowrap">
                                 -{discountPercent}%
                             </Badge>
                         )}
-                        {showPrice && activePromo && activePromo.promotionType !== "discount" && (
+                        {showPrice && activePromo && activePromo.promotionType !== "discount" && !hasCampaignDiscount && (
                             <span title={activePromo.name}>
                                 <Badge variant="blue" icon={<TagIcon size={10} />} className="whitespace-nowrap p-1.5 w-6 h-6 justify-center" />
                             </span>

@@ -20,7 +20,17 @@ function getFirebaseAdmin(): FirebaseAdminApp | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const admin = require("firebase-admin") as typeof import("firebase-admin")
-    const credential = admin.credential.cert(JSON.parse(serviceAccountJson))
+
+    const normalized = serviceAccountJson.trim()
+
+    const parsed = JSON.parse(
+      normalized.startsWith('"')
+        ? JSON.parse(normalized)
+        : normalized
+    )
+
+    const credential = admin.credential.cert(parsed)
+
     firebaseApp = admin.apps.length
       ? admin.app()
       : admin.initializeApp({ credential })

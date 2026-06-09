@@ -533,46 +533,50 @@ export function ProductDetailsPageClient({
         const promo = Number(product.promotional_price) || 0
         const hasPromo = promo > 0 && promo < base
         const effective = selectedVariant ? Number(selectedVariant.price_adjustment) || base : hasPromo ? promo : base
-        const total = effective * quantity
 
-        // Campaign discount on top of effective price
-        const campaignPricingResult = activePromo
-            ? computeItemCampaignPricing(effective, null, activePromo, {
-                productId: product.id,
-                categoryId: product.category_id || undefined,
-              })
-            : null
-        const campaignPrice = campaignPricingResult?.campaignPrice ?? effective
-        const hasCampaignDiscount = campaignPricingResult != null && campaignPricingResult.campaignDiscount > 0
+        // Compute best price: compares manual promo vs campaign discount
+        const pricingUnitPrice = selectedVariant ? Number(selectedVariant.price_adjustment) || base : base
+        const pricingPromo = selectedVariant ? null : (hasPromo ? promo : null)
+        const campaignPricingResult = computeItemCampaignPricing(
+            pricingUnitPrice, pricingPromo,
+            activePromo || null,
+            { productId: product.id, categoryId: product.category_id || undefined },
+        )
+
+        const bestPrice = campaignPricingResult.bestPrice
+        const discountSource = campaignPricingResult.discountSource
+        const hasCampaignDiscount = discountSource === "campaign"
+        const hasManualPromo = discountSource === "manual"
+        const total = bestPrice * quantity
 
         // Real Pix Discount from Partner's payment methods
         const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
         const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = campaignPrice * quantity * (1 - (pixDiscountPercent / 100))
+        const pixTotal = bestPrice * quantity * (1 - (pixDiscountPercent / 100))
 
         // Real Installments from Partner's credit card method
         const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
         const hasCC = !!ccMethod
         const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-        const installmentPrice = campaignPrice / maxInstallments
+        const installmentPrice = bestPrice / maxInstallments
 
-        const totalDiscountPercent = base > 0 ? Math.round(((base - campaignPrice) / base) * 100) : 0
+        const totalDiscountPercent = base > 0 ? Math.round(((base - bestPrice) / base) * 100) : 0
 
-        const campaignDiscountAmount = campaignPricingResult?.campaignDiscount ?? 0
-        const campaignDiscountLabel = activePromo?.discountType === "percentage"
-            ? `${activePromo.discountValue}%`
-            : `${formatCurrency(campaignDiscountAmount)}`
+        const campaignDiscountLabel = hasCampaignDiscount && activePromo
+            ? activePromo.discountType === "percentage"
+                ? `${activePromo.discountValue}%`
+                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
+            : `${totalDiscountPercent}%`
 
         return {
-            current: effective, campaignPrice, original: base,
-            hasPromo: !selectedVariant && hasPromo,
-            hasCampaignDiscount, total,
+            current: effective, bestPrice, original: base,
+            hasCampaignDiscount, hasManualPromo, total,
             pix: pixTotal,
             pixDiscountPercent,
             hasCC, maxInstallments, installment: installmentPrice,
             discountPercent: Math.round(((base - promo) / base) * 100),
             totalDiscountPercent,
-            campaignDiscountAmount, campaignDiscountLabel,
+            campaignDiscountLabel,
         }
     }, [product, selectedVariant, quantity, partner, activePromo])
 
@@ -984,9 +988,9 @@ export function ProductDetailsPageClient({
                     </div>
                 ) : (() => {
                     const hasCampaign = pricing.hasCampaignDiscount;
-                    const hasProductPromo = pricing.hasPromo && !hasCampaign;
+                    const hasProductPromo = pricing.hasManualPromo;
                     const hasPix = pricing.pixDiscountPercent > 0;
-                    const displayPrice = pricing.campaignPrice;
+                    const displayPrice = pricing.bestPrice;
                     const pixUnitPrice = displayPrice * (1 - pricing.pixDiscountPercent / 100);
                     // Caso: Campanha + Pix
                     if (hasCampaign && hasPix) {

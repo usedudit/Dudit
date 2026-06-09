@@ -550,42 +550,45 @@ export function ServiceDetailsPageClient({
         const promo = Number(service.promotional_price) || 0
         const hasPromo = promo > 0 && promo < base
         const effective = hasPromo ? promo : base
-        const total = effective
 
-        // Campaign discount on top of effective price
-        const campaignPricingResult = activePromo
-            ? computeItemCampaignPricing(effective, null, activePromo, {
-                productId: service.id,
-                categoryId: service.category_id || undefined,
-              })
-            : null
-        const campaignPrice = campaignPricingResult?.campaignPrice ?? effective
-        const hasCampaignDiscount = campaignPricingResult != null && campaignPricingResult.campaignDiscount > 0
+        // Compute best price: compares manual promo vs campaign discount
+        const campaignPricingResult = computeItemCampaignPricing(
+            base, hasPromo ? promo : null,
+            activePromo || null,
+            { productId: service.id, categoryId: service.category_id || undefined },
+        )
+
+        const bestPrice = campaignPricingResult.bestPrice
+        const discountSource = campaignPricingResult.discountSource
+        const hasCampaignDiscount = discountSource === "campaign"
+        const hasManualPromo = discountSource === "manual"
+        const total = bestPrice
 
         // Real Pix Discount from Partner's payment methods
         const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
         const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = campaignPrice * (1 - (pixDiscountPercent / 100))
+        const pixTotal = bestPrice * (1 - (pixDiscountPercent / 100))
 
         // Real Installments from Partner's credit card method
         const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
         const hasCC = !!ccMethod
         const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-        const installmentPrice = campaignPrice / maxInstallments
+        const installmentPrice = bestPrice / maxInstallments
 
-        const campaignDiscountAmount = campaignPricingResult?.campaignDiscount ?? 0
-        const campaignDiscountLabel = activePromo?.discountType === "percentage"
-            ? `${activePromo.discountValue}%`
-            : `${formatCurrency(campaignDiscountAmount)}`
+        const campaignDiscountLabel = hasCampaignDiscount && activePromo
+            ? activePromo.discountType === "percentage"
+                ? `${activePromo.discountValue}%`
+                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
+            : ""
 
         return {
-            current: effective, campaignPrice, original: base,
-            hasPromo, hasCampaignDiscount, total,
+            current: effective, bestPrice, original: base,
+            hasCampaignDiscount, hasManualPromo, total,
             pix: pixTotal,
             pixDiscountPercent,
             hasCC, maxInstallments, installment: installmentPrice,
             discountPercent: Math.round(((base - promo) / base) * 100),
-            campaignDiscountLabel, campaignDiscountAmount,
+            campaignDiscountLabel,
         }
     }, [service, partner, activePromo])
 
@@ -903,9 +906,9 @@ export function ServiceDetailsPageClient({
                     }
 
                     const hasCampaign = pricing.hasCampaignDiscount;
-                    const hasProductPromo = pricing.hasPromo && !hasCampaign;
+                    const hasProductPromo = pricing.hasManualPromo;
                     const hasPix = pricing.pixDiscountPercent > 0;
-                    const displayPrice = pricing.campaignPrice;
+                    const displayPrice = pricing.bestPrice;
                     const pixUnitPrice = displayPrice * (1 - pricing.pixDiscountPercent / 100);
 
                     // Caso: Campanha + Pix
