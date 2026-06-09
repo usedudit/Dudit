@@ -14,6 +14,8 @@ interface OrderGridCardProps {
     onCancel: () => void
     onDetails: () => void
     onPrint?: () => void
+    onPaymentStatus?: () => void
+    onDeliveryStatus?: () => void
     canEdit?: boolean
     cancelLabel?: string
     extraActions?: React.ReactNode
@@ -31,6 +33,8 @@ const OrderGridCard = React.memo(
         onCancel,
         onDetails,
         onPrint,
+        onPaymentStatus,
+        onDeliveryStatus,
         canEdit = true,
         cancelLabel = "Cancelar",
         extraActions,
@@ -168,6 +172,8 @@ const OrderGridCard = React.memo(
                                 onPrint={onPrint}
                                 onEdit={canEdit ? onEdit : undefined}
                                 onCancel={onCancel}
+                                onPaymentStatus={onPaymentStatus}
+                                onDeliveryStatus={onDeliveryStatus}
                                 cancelLabel={cancelLabel}
                             >
                                 {extraActions}

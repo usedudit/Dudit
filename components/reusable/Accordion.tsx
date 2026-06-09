@@ -15,7 +15,9 @@ import {
   PrinterIcon,
   MailIcon,
   ArchiveIcon,
-  BlockedIcon
+  BlockedIcon,
+  MoneyIcon,
+  MotorbikeIcon,
 } from "@/lib/icons"
 
 interface AccordionProps {
@@ -91,6 +93,8 @@ interface ActionsDropdownProps {
   onEmail?: () => void
   onArchive?: () => void
   onCancel?: () => void
+  onPaymentStatus?: () => void
+  onDeliveryStatus?: () => void
   cancelLabel?: string
   trigger?: React.ReactElement
   className?: string
@@ -108,6 +112,8 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
   onEmail,
   onArchive,
   onCancel,
+  onPaymentStatus,
+  onDeliveryStatus,
   cancelLabel = "Cancelar",
   trigger,
   className,
@@ -173,6 +179,16 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
     {onCancel && (
       <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red dark:text-brand-red" : ""}>
         <BlockedIcon className="w-4 h-4" /> {cancelLabel}
+      </DropdownItem>
+    )}
+    {onPaymentStatus && (
+      <DropdownItem onClick={onPaymentStatus}>
+        <MoneyIcon className="w-4 h-4" /> Alterar status de pagamento
+      </DropdownItem>
+    )}
+    {onDeliveryStatus && (
+      <DropdownItem onClick={onDeliveryStatus}>
+        <MotorbikeIcon className="w-4 h-4" /> Alterar status de entrega
       </DropdownItem>
     )}
     {children}

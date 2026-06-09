@@ -22,7 +22,7 @@ import {
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { usePermissions } from "@/lib/permission-context"
-import { DropdownItem } from "@/components/reusable/Dropdown"
+
 import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/orders"
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
@@ -438,19 +438,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 onPrint={() => window.open(`/print/recibo/${order.id || order.order_number}`, "_blank")}
                                                 onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                                                 onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
+                                                onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
+                                                onDeliveryStatus={order.situation !== "cancelled" ? () => onUpdateDeliveryStatus(order) : undefined}
                                                 cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
-                                            >
-                                                {order.situation !== "cancelled" && (
-                                                    <>
-                                                        <DropdownItem onClick={() => onUpdatePaymentStatus(order)}>
-                                                            Alterar status de pagamento
-                                                        </DropdownItem>
-                                                        <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
-                                                            Alterar status de entrega
-                                                        </DropdownItem>
-                                                    </>
-                                                )}
-                                            </ActionsDropdown>
+                                            />
                                         </div>
                                     </div>
 
@@ -919,23 +910,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     onPrint={() => window.open(`/print/recibo/${order.id || order.order_number}`, "_blank")}
                     onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
+                    onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
+                    onDeliveryStatus={order.situation !== "cancelled" ? () => onUpdateDeliveryStatus(order) : undefined}
                     cancelLabel={order.situation === "cancelled" ? "Observação" : "Cancelar"}
                     trigger={<Button variant="outline" className="flex-1">
                         <ThreeDotsIcon className="w-4 h-4 mr-2" />
                         Opcoes
                     </Button>}
-                >
-                    {order.situation !== "cancelled" && (
-                        <>
-                            <DropdownItem onClick={() => onUpdatePaymentStatus(order)}>
-                                Alterar status de pagamento
-                            </DropdownItem>
-                            <DropdownItem onClick={() => onUpdateDeliveryStatus(order)}>
-                                Alterar status de entrega
-                            </DropdownItem>
-                        </>
-                    )}
-                </ActionsDropdown>
+                />
             </div>
 
             <BottomSheet

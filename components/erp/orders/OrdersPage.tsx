@@ -49,7 +49,7 @@ import {
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { DropdownItem } from "@/components/reusable/Dropdown"
+
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
@@ -875,16 +875,8 @@ export default function OrdersPage({
                                                                 canEdit={o.canEdit}
                                                                 cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                 onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
-                                                                extraActions={o.situation !== "cancelled" ? (
-                                                                    <>
-                                                                        <DropdownItem onClick={() => openPaymentStatusModal(o)}>
-                                                                            Alterar status de pagamento
-                                                                        </DropdownItem>
-                                                                        <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                            Alterar status de entrega
-                                                                        </DropdownItem>
-                                                                    </>
-                                                                ) : null}
+                                                                onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
+                                                                onDeliveryStatus={o.situation !== "cancelled" ? () => openDeliveryStatusModal(o) : undefined}
                                                                 onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                 onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
                                                                 onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
@@ -960,16 +952,8 @@ export default function OrdersPage({
                                                                             cancelLabel={o.situation === "cancelled" ? "Observação" : "Cancelar"}
                                                                             onCancel={() => o.situation === "cancelled" ? openNotesSheet(o) : openCancelModal(o.originalId)}
                                                                             onDetails={handleDetailsOrder}
-                                                                            extraActions={o.situation !== "cancelled" ? (
-                                                                                <>
-                                                                                    <DropdownItem onClick={() => openPaymentStatusModal(o)}>
-                                                                                        Alterar status de pagamento
-                                                                                    </DropdownItem>
-                                                                                    <DropdownItem onClick={() => openDeliveryStatusModal(o)}>
-                                                                                        Alterar status de entrega
-                                                                                    </DropdownItem>
-                                                                                </>
-                                                                            ) : null}
+                                                                            onPaymentStatus={o.situation !== "cancelled" ? () => openPaymentStatusModal(o) : undefined}
+                                                                            onDeliveryStatus={o.situation !== "cancelled" ? () => openDeliveryStatusModal(o) : undefined}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
                                                                             onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}

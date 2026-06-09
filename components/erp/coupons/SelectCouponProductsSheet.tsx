@@ -134,7 +134,7 @@ export default function SelectCouponProductsSheet({
                   <Img
                     src={imageUrl}
                     alt={product.name}
-                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${product.image ? "object-cover" : "object-contain p-1.5"}`}
+                    className={`h-12 w-12 shrink-0 rounded-full border border-brand-border dark:border-dark-border ${product.image ? "object-cover" : "object-contain"}`}
                   />
                   <Div className="min-w-0 flex-1">
                     <Div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -144,11 +144,6 @@ export default function SelectCouponProductsSheet({
                       <Badge variant={product.isActive === false ? "gray" : "green"} className="whitespace-nowrap scale-90 shrink-0">
                         {product.isActive === false ? "Inativo" : "Ativo"}
                       </Badge>
-                      {isSelected && (
-                        <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">
-                          Selecionado
-                        </Badge>
-                      )}
                     </Div>
                     <P className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                       {product.sku ? `SKU: ${product.sku}` : "Sem SKU"}

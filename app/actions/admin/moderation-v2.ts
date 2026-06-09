@@ -210,8 +210,7 @@ export async function fetchModerationTarget(
                     .select(`
                         id, store_name, store_description, store_image_url, banner_url,
                         gallery, logo_moderation_status, banner_moderation_status,
-                        risk_score, is_active, created_at,
-                        owner:user_profiles!user_id(full_name, email, risk_score)
+                        risk_score, is_active, created_at, user_id
                     `)
                     .eq("id", id)
                     .single()
@@ -226,15 +225,26 @@ export async function fetchModerationTarget(
                     }
                 }
 
-                return { success: true, data: { ...data, gallery: galleryArr } as FetchedPartner }
+                // Fetch owner separately (avoid FK join issues)
+                let owner = null
+                if (data.user_id) {
+                    const { data: profile } = await admin
+                        .from("user_profiles")
+                        .select("full_name, email, risk_score")
+                        .eq("id", data.user_id)
+                        .single()
+                    if (profile) owner = profile
+                }
+
+                const { user_id, ...partnerData } = data
+                return { success: true, data: { ...partnerData, gallery: galleryArr, owner } as FetchedPartner }
             }
 
             case "review": {
                 const { data, error } = await admin
                     .from("reviews")
                     .select(`
-                        id, rating, comment, is_hidden, created_at,
-                        user:user_profiles(full_name),
+                        id, rating, comment, is_hidden, created_at, user_id,
                         partner:partners(id, store_name, risk_score),
                         product:products(id, name)
                     `)
@@ -242,7 +252,20 @@ export async function fetchModerationTarget(
                     .single()
 
                 if (error || !data) return { success: false, error: "Review não encontrado" }
-                return { success: true, data: data as FetchedReview }
+
+                // Fetch user separately (avoid FK join issues)
+                let user = null
+                if (data.user_id) {
+                    const { data: profile } = await admin
+                        .from("user_profiles")
+                        .select("full_name")
+                        .eq("id", data.user_id)
+                        .single()
+                    if (profile) user = profile
+                }
+
+                const { user_id, ...reviewData } = data
+                return { success: true, data: { ...reviewData, user } as FetchedReview }
             }
 
             default:
@@ -606,6 +629,56 @@ export async function editReview(
         return { success: true }
     } catch (err: any) {
         return { success: false, error: err.message || "Erro ao editar review" }
+    }
+}
+
+// ─── Delete Variant ──────────────────────────────────────────────────────────
+
+export async function deleteVariant(
+    variantId: string,
+    riskScoreIncrement: number,
+    notes?: string,
+    knownPartnerId?: string
+): Promise<{ success: boolean; error?: string }> {
+    const admin = await requireAdmin("moderator")
+    await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    try {
+        const fetchAdmin = getAdminClient()
+        const { data: variant } = await fetchAdmin
+            .from("product_variants")
+            .select("product_id, variant_options")
+            .eq("id", variantId)
+            .single()
+
+        if (!variant) return { success: false, error: "Variante não encontrada" }
+
+        // Delete variant image from R2 if exists
+        const opts = variant.variant_options
+        const img = opts && typeof opts === "object" && "image" in opts ? (opts as any).image : null
+        if (img) await _deleteFromR2(img)
+
+        // Delete variant
+        await fetchAdmin.from("product_variants").delete().eq("id", variantId)
+
+        const partnerId = knownPartnerId ?? await getPartnerIdFromTarget("product", variant.product_id)
+
+        await logModerationAction({
+            adminUserId: admin.userId,
+            partnerId,
+            actionType: AdminActionType.MODERATION_EDIT_FIELD,
+            targetType: "product",
+            targetId: variant.product_id,
+            fieldName: "variant_deleted",
+            previousValue: variantId,
+            newValue: "",
+            riskScoreIncrement,
+            notes,
+        })
+
+        return { success: true }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao remover variante" }
     }
 }
 

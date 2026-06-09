@@ -231,7 +231,7 @@ export function ProductDetailsPageClient({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ entityType: "produto", entityId: product.id }),
-            }).catch(() => {})
+            }).catch(() => { })
         }
     }, [product?.id])
 
@@ -973,12 +973,15 @@ export function ProductDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                <Badge variant="orange" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.discountPercent}% OFF
+                                </Badge>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
                                         {formatMoney(pixUnitPrice)}
                                     </p>
-                                    <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
-                                    <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
+                                    <span className="text-sm font-semibold text-brand-green">no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {formatMoney(pricing.current)} em outros meios
@@ -995,11 +998,14 @@ export function ProductDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                <Badge variant="orange" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.discountPercent}% OFF
+                                </Badge>
                                 <div className="flex items-center gap-2">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {formatMoney(pricing.current)}
                                     </p>
-                                    <span className="bg-red-100 text-brand-red text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     Ver opções de pagamento
@@ -1045,159 +1051,163 @@ export function ProductDetailsPageClient({
 
             {VariantsSection}
 
-            {isProductOwner ? (
-                <InfoCard
-                    message={isTeamMember
-                        ? "Você não pode comprar produtos de um negócio do qual faz parte da equipe."
-                        : "Você não pode comprar seus próprios produtos."}
-                    color="orange"
-                    className="mb-8"
-                />
-            ) : !showPrice ? (
-                <div className="hidden lg:block">
-                    {(() => {
-                        const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
-                        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                        const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
-                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
-                        return (
-                            <a
-                                href={whatsappUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full mb-8 h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
-                            >
-                                <WhatsappIcon size={20} className="fill-white" />
-                                Consultar preço
-                            </a>
-                        )
-                    })()}
-                </div>
-            ) : (
-                <div className="hidden lg:block">
-                    <Button disabled={isOutOfStock || loading} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
-                        {isOutOfStock ? "Esgotado" : "Comprar Agora"}
-                    </Button>
-                    <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
-                        disabled={isOutOfStock || loading} onClick={handleAddToCart}>
-                        {loading ? "Adicionando..." : "Adicionar à sacola"}
-                    </Button>
-                </div>
-            )}
+            {
+                isProductOwner ? (
+                    <InfoCard
+                        message={isTeamMember
+                            ? "Você não pode comprar produtos de um negócio do qual faz parte da equipe."
+                            : "Você não pode comprar seus próprios produtos."}
+                        color="orange"
+                        className="mb-8"
+                    />
+                ) : !showPrice ? (
+                    <div className="hidden lg:block">
+                        {(() => {
+                            const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                            const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                            const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" no Dudit e gostaria de saber o preço.`)
+                            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                            return (
+                                <a
+                                    href={whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full mb-8 h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                                >
+                                    <WhatsappIcon size={20} className="fill-white" />
+                                    Consultar preço
+                                </a>
+                            )
+                        })()}
+                    </div>
+                ) : (
+                    <div className="hidden lg:block">
+                        <Button disabled={isOutOfStock || loading} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
+                            {isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                        </Button>
+                        <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
+                            disabled={isOutOfStock || loading} onClick={handleAddToCart}>
+                            {loading ? "Adicionando..." : "Adicionar à sacola"}
+                        </Button>
+                    </div>
+                )
+            }
 
             {/* Shipping */}
-            {!isProductOwner && (
-                <FormSection title="Entrega" className="mb-8">
-                    <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden">
-                        {/* CEP Input or User Address */}
-                        {userId ? (
-                            loadingAddresses ? (
-                                <div className="p-4 bg-brand-gray/10 text-center text-xs text-brand-inactive-text animate-pulse">
-                                    Carregando endereços...
+            {
+                !isProductOwner && (
+                    <FormSection title="Entrega" className="mb-8">
+                        <div className="flex flex-col border border-brand-border rounded-2xl bg-white overflow-hidden">
+                            {/* CEP Input or User Address */}
+                            {userId ? (
+                                loadingAddresses ? (
+                                    <div className="p-4 bg-brand-gray/10 text-center text-xs text-brand-inactive-text animate-pulse">
+                                        Carregando endereços...
+                                    </div>
+                                ) : userAddresses.length > 0 && selectedAddress ? (
+                                    <div className="flex items-center justify-between w-full p-4 bg-brand-gray/10">
+                                        <div className="flex items-stretch gap-3">
+                                            <img
+                                                src="https://img.dudit.com.br/static/Map.png"
+                                                alt="Endereço de entrega"
+                                                className="w-12 h-12 object-cover rounded-xl shrink-0"
+                                            />
+                                            <div className="flex flex-col justify-center">
+                                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
+                                                <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
+                                                    {selectedAddress.street}, {selectedAddress.number}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
+                                            Trocar
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-brand-gray/10 flex flex-col items-center justify-center text-center gap-2">
+                                        <p className="text-xs text-brand-inactive-text">Nenhum endereço cadastrado</p>
+                                        <Button variant="outline" size="sm" className="h-8 border-brand-green text-brand-green hover:bg-green-50" onClick={() => setShowAddressForm(true)}>
+                                            Cadastrar endereço
+                                        </Button>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="p-4 bg-brand-gray/10">
+                                    <CepInput
+                                        value={cep}
+                                        onChange={setCep}
+                                        label="Calcular entrega"
+                                    />
                                 </div>
-                            ) : userAddresses.length > 0 && selectedAddress ? (
-                                <div className="flex items-center justify-between w-full p-4 bg-brand-gray/10">
-                                    <div className="flex items-stretch gap-3">
-                                        <img
-                                            src="https://img.dudit.com.br/static/Map.png"
-                                            alt="Endereço de entrega"
-                                            className="w-12 h-12 object-cover rounded-xl shrink-0"
-                                        />
-                                        <div className="flex flex-col justify-center">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
-                                            <p className="text-xs text-brand-inactive-text max-w-[200px] sm:max-w-xs truncate">
-                                                {selectedAddress.street}, {selectedAddress.number}
-                                            </p>
+                            )}
+
+                            <Separator className="opacity-60" />
+
+                            {/* Delivery Option if configured */}
+                            {deliveryConfig?.settings?.isDeliveryEnabled ? (
+                                <>
+                                    <div className="flex justify-between items-start py-4 px-4">
+                                        <div>
+                                            <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
+                                            {deliveryLoading ? (
+                                                <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
+                                            ) : deliveryError ? (
+                                                <p className="text-xs text-red-500">{deliveryError}</p>
+                                            ) : calculatedAddress ? (
+                                                <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                                            ) : (
+                                                <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
+                                            )}
+                                        </div>
+                                        <div className="text-right">
+                                            {deliveryLoading ? (
+                                                <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                                            ) : deliveryFee !== null ? (
+                                                <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
+                                                    {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}
+                                                </p>
+                                            ) : (
+                                                <p className="text-sm font-semibold text-brand-inactive-text">-</p>
+                                            )}
                                         </div>
                                     </div>
-                                    <Button variant="link" size="sm" className="text-brand-green font-bold hover:underline p-0" onClick={() => setShowAddressModal(true)}>
-                                        Trocar
-                                    </Button>
-                                </div>
+
+                                    <Separator className="opacity-60" />
+                                </>
                             ) : (
-                                <div className="p-4 bg-brand-gray/10 flex flex-col items-center justify-center text-center gap-2">
-                                    <p className="text-xs text-brand-inactive-text">Nenhum endereço cadastrado</p>
-                                    <Button variant="outline" size="sm" className="h-8 border-brand-green text-brand-green hover:bg-green-50" onClick={() => setShowAddressForm(true)}>
-                                        Cadastrar endereço
-                                    </Button>
+                                <>
+                                    <div className="flex justify-between items-start py-4 px-4">
+                                        <div>
+                                            <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
+                                            <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-brand-dark">A combinar</p>
+                                        </div>
+                                    </div>
+
+                                    <Separator className="opacity-60" />
+                                </>
+                            )}
+
+                            {/* Retirar no local - Always show if store exists */}
+                            <div className="flex justify-between items-start py-4 px-4">
+                                <div>
+                                    <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
+                                    {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
+                                        <p className="text-xs text-brand-inactive-text">
+                                            Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                        </p>
+                                    )}
                                 </div>
-                            )
-                        ) : (
-                            <div className="p-4 bg-brand-gray/10">
-                                <CepInput
-                                    value={cep}
-                                    onChange={setCep}
-                                    label="Calcular entrega"
-                                />
-                            </div>
-                        )}
-
-                        <Separator className="opacity-60" />
-
-                        {/* Delivery Option if configured */}
-                        {deliveryConfig?.settings?.isDeliveryEnabled ? (
-                            <>
-                                <div className="flex justify-between items-start py-4 px-4">
-                                    <div>
-                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega pelo vendedor</p>
-                                        {deliveryLoading ? (
-                                            <p className="text-xs text-brand-inactive-text animate-pulse">Calculando...</p>
-                                        ) : deliveryError ? (
-                                            <p className="text-xs text-red-500">{deliveryError}</p>
-                                        ) : calculatedAddress ? (
-                                            <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
-                                        ) : (
-                                            <p className="text-xs text-brand-inactive-text">Informe seu CEP para calcular</p>
-                                        )}
-                                    </div>
-                                    <div className="text-right">
-                                        {deliveryLoading ? (
-                                            <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
-                                        ) : deliveryFee !== null ? (
-                                            <p className={`text-sm font-bold ${deliveryFee > 0 ? "text-brand-dark" : "text-brand-green"}`}>
-                                                {deliveryFee > 0 ? formatMoney(deliveryFee) : "Grátis"}
-                                            </p>
-                                        ) : (
-                                            <p className="text-sm font-semibold text-brand-inactive-text">-</p>
-                                        )}
-                                    </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold text-brand-green">Grátis</p>
                                 </div>
-
-                                <Separator className="opacity-60" />
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex justify-between items-start py-4 px-4">
-                                    <div>
-                                        <p className="text-sm text-brand-dark font-medium leading-snug">Entrega a combinar</p>
-                                        <p className="text-xs text-brand-inactive-text">Fale com o vendedor no WhatsApp após o pedido</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-brand-dark">A combinar</p>
-                                    </div>
-                                </div>
-
-                                <Separator className="opacity-60" />
-                            </>
-                        )}
-
-                        {/* Retirar no local - Always show if store exists */}
-                        <div className="flex justify-between items-start py-4 px-4">
-                            <div>
-                                <p className="text-sm text-brand-dark font-medium leading-snug">Retirar no local</p>
-                                {preparationEstimate && (Number(product.availability_value || 0) > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                                    <p className="text-xs text-brand-inactive-text">
-                                        Pronto {getReadyDayLabel(preparationEstimate) === "hoje" ? "hoje" : getReadyDayLabel(preparationEstimate)} entre {preparationEstimate.readyAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e {preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm font-bold text-brand-green">Grátis</p>
                             </div>
                         </div>
-                    </div>
-                </FormSection>
-            )}
+                    </FormSection>
+                )
+            }
 
             {/* Informações importantes Accordion */}
             <div className="border-t border-brand-border pt-4 mb-6">
@@ -1337,16 +1347,18 @@ export function ProductDetailsPageClient({
                 })()}
             </div>
 
-            {!isProductOwner && (
-                <button
-                    onClick={() => setShowReportModal(true)}
-                    className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text hover:text-[#d32f2f] transition-colors"
-                >
-                    <FlagIcon size={14} />
-                    Comunicar algo errado
-                </button>
-            )}
-        </div>
+            {
+                !isProductOwner && (
+                    <button
+                        onClick={() => setShowReportModal(true)}
+                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text hover:text-[#d32f2f] transition-colors"
+                    >
+                        <FlagIcon size={14} />
+                        Comunicar algo errado
+                    </button>
+                )
+            }
+        </div >
     )
 
     // ─── Lightbox ─────────────────────────────────────────────────────────────────

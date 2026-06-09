@@ -170,7 +170,7 @@ export function ServiceDetailsPageClient({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ entityType: "servico", entityId: service.id }),
-            }).catch(() => {})
+            }).catch(() => { })
         }
     }, [service?.id])
 
@@ -879,7 +879,7 @@ export function ServiceDetailsPageClient({
                     if (isFree) {
                         return (
                             <div className="space-y-1">
-                                <p className="text-3xl leading-none font-bold text-brand-dark">
+                                <p className="text-3xl leading-none font-bold text-brand-green">
                                     Gratuito
                                 </p>
                             </div>
@@ -896,18 +896,21 @@ export function ServiceDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                                <Badge variant="orange" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.discountPercent}% OFF
+                                </Badge>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                     </p>
-                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
-                                    <span className="text-xs md:text-sm font-semibold text-brand-green bg-green-50 border border-green-100 px-2 py-0.5 rounded-sm">no Pix</span>
+                                    <span className="text-sm font-semibold text-brand-green">no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
                                     ou {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
-                                    ver opções de pagamento
+                                    Ver opções de pagamento
                                 </Button>
                             </div>
                         );
@@ -918,14 +921,17 @@ export function ServiceDetailsPageClient({
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatCurrency(pricing.original)}</span>
+                                <Badge variant="orange" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.discountPercent}% OFF
+                                </Badge>
                                 <div className="flex items-center gap-2">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
                                         {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix}
                                     </p>
-                                    <span className="bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full">{pricing.discountPercent}% OFF</span>
                                 </div>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
-                                    ver opções de pagamento
+                                    Ver opções de pagamento
                                 </Button>
                             </div>
                         );
@@ -946,7 +952,7 @@ export function ServiceDetailsPageClient({
                                     ou {pricePrefix}{formatCurrency(pricing.original)}{billingSuffix} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
-                                    ver opções de pagamento
+                                    Ver opções de pagamento
                                 </Button>
                             </div>
                         );
@@ -959,7 +965,7 @@ export function ServiceDetailsPageClient({
                                 {pricePrefix}{formatCurrency(pricing.current)}{billingSuffix}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
-                                ver opções de pagamento
+                                Ver opções de pagamento
                             </Button>
                         </div>
                     );

@@ -1489,7 +1489,7 @@ export default function PromotionFormPage({
                                                 <div className="space-y-4">
                                                     {localPromotions.length === 0 ? (
                                                         <div className="space-y-6">
-                                                            <div className="flex flex-col items-center justify-center text-center py-12 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                            <div className="flex flex-col items-center justify-center text-center">
                                                                 <IconPlaceholder
                                                                     icon={TagIcon}
                                                                     title="Não há regras de promoção"
