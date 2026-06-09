@@ -78,6 +78,9 @@ export enum AdminActionType {
 
     // Notifications
     ANNOUNCEMENT_SEND = "notification.announcement_send",
+
+    // Marketplace search config
+    MARKETPLACE_SYNONYM_CHANGE = "marketplace.synonym_change",
 }
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────
@@ -93,6 +96,8 @@ export type AuditTargetType =
     | "review"
     | "return_request"
     | "advertisement"
+    | "marketplace_synonym_group"
+    | "marketplace_synonym_term"
 
 export interface AdminAuditLogEntry {
     adminUserId: string

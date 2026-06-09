@@ -9,7 +9,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { Button, DefaultModal, Input } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
-import { getSearchSuggestionsBucket } from "@/app/actions/marketplace/suggestions"
+import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
@@ -93,6 +93,7 @@ const Header: React.FC<HeaderProps> = ({
 
     const [searchValue, setSearchValue] = useState("")
     const [suggestionBucket, setSuggestionBucket] = useState<{ label: string; type: string }[]>([])
+    const [rpcSuggestions, setRpcSuggestions] = useState<{ label: string; type: string }[]>([])
     const [isSearchInputFocused, setIsSearchInputFocused] = useState(false)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false)
@@ -303,13 +304,33 @@ const Header: React.FC<HeaderProps> = ({
         loadSuggestions()
     }, [isSearchInputFocused, suggestionsLoaded])
 
+    useEffect(() => {
+        const trimmed = searchValue.trim()
+        if (trimmed.length < 2) {
+            setRpcSuggestions([])
+            return
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const results = await getMarketplaceAutocompleteAction(trimmed)
+                setRpcSuggestions(results)
+            } catch (error) {
+                console.error("Error loading autocomplete:", error)
+            }
+        }, 220)
+        return () => clearTimeout(timer)
+    }, [searchValue])
+
     const filteredSuggestions = useMemo(() => {
         if (!searchValue.trim()) return []
+        if (searchValue.trim().length >= 2 && rpcSuggestions.length > 0) {
+            return rpcSuggestions.slice(0, 8)
+        }
         const search = searchValue.toLowerCase().trim()
         return suggestionBucket
             .filter((item) => item.label.toLowerCase().includes(search))
             .slice(0, 8)
-    }, [suggestionBucket, searchValue])
+    }, [suggestionBucket, searchValue, rpcSuggestions])
 
     const showSearchDropdown = isSearchInputFocused && searchValue.length > 0 && filteredSuggestions.length > 0
     const showOverlay = isSearchInputFocused || isUserMenuOpen

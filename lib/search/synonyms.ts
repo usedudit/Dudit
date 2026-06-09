@@ -1,40 +1,14 @@
 /**
- * Lightweight local synonym dictionary for marketplace search expansion.
- * Keys and values should be accent-free lowercase (see normalizeSearchQuery).
+ * @deprecated Synonym expansion is handled in PostgreSQL (marketplace_synonym_groups).
+ * This module remains for backwards-compatible imports only.
  */
-export const MARKETPLACE_SYNONYMS: Record<string, string[]> = {
-  roupa: ["camisa", "camiseta", "calca", "bermuda", "short", "blusa", "jaqueta", "moda"],
-  roupas: ["camisa", "camiseta", "calca", "bermuda", "short", "blusa", "jaqueta", "moda"],
-  vestuario: ["camisa", "camiseta", "calca", "bermuda", "short", "blusa", "jaqueta", "moda"],
-  moda: ["camisa", "camiseta", "calca", "bermuda", "short", "blusa", "jaqueta", "roupa"],
+import { normalizeSearchQuery } from "./normalize"
 
-  pet: ["racao", "brinquedo", "coleira", "acessorio", "pets"],
-  pets: ["racao", "brinquedo", "coleira", "acessorio", "pet"],
-  ração: ["pet", "brinquedo", "coleira", "acessorio", "pets"],
-  brinquedo: ["pet", "racao", "coleira", "acessorio", "pets"],
-  coleira: ["pet", "racao", "brinquedo", "acessorio", "pets"],
-  acessorio: ["pet", "racao", "brinquedo", "coleira", "pets"],
-  adestramento: ["pet", "racao", "brinquedo", "coleira", "pets"],
-  adestrador: ["pet", "racao", "brinquedo", "coleira", "pets"],
-  adestrar: ["pet", "racao", "brinquedo", "coleira", "pets"],
-
-  veiculo: ["carro", "moto", "pneu", "peca", "auto"],
-  veiculos: ["carro", "moto", "pneu", "peca", "auto"],
-  carro: ["auto", "moto", "peca", "pneu"],
-
-  eletronico: ["celular", "tablet", "notebook", "computador", "fone"],
-  eletronicos: ["celular", "tablet", "notebook", "computador", "fone"],
-  tecnologia: ["celular", "tablet", "notebook", "computador", "fone"],
-
-  camiseta: ["camisa", "roupa", "moda"],
-  camisa: ["camiseta", "roupa", "moda"],
-  academia: ["treino", "esporte", "fitness", "roupa"],
-  treino: ["academia", "esporte", "fitness"],
-  esporte: ["academia", "treino", "fitness"],
-}
-
+/** Returns the normalized token only — DB expands synonyms at query time. */
 export function expandSynonyms(token: string): string[] {
-  const normalized = token.toLowerCase()
-  const direct = MARKETPLACE_SYNONYMS[normalized] || []
-  return Array.from(new Set([normalized, ...direct]))
+  const normalized = normalizeSearchQuery(token)
+  return normalized ? [normalized] : []
 }
+
+/** @deprecated Use database-managed synonym groups instead. */
+export const MARKETPLACE_SYNONYMS: Record<string, string[]> = {}

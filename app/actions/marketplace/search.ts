@@ -12,7 +12,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { getUserSessionData } from "@/lib/data/user"
 import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { resolveCityAndStateFromSlug } from "./products"
-import { buildMarketplaceTsQuery } from "@/lib/search/build-tsquery"
+import { normalizeSearchQuery } from "@/lib/search/normalize"
 import { applySellerDiversity } from "@/lib/marketplace/ranking"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice: number) {
@@ -669,8 +669,7 @@ async function searchMarketplacePostgresFTS(
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, lastId, cursorRank, partnerIds } = limits
     const supabase = getAdminClient()
 
-    const tsQuery = buildMarketplaceTsQuery(query)
-    if (!tsQuery) {
+    if (!normalizeSearchQuery(query)) {
         return { results: [], filteredIds: [] }
     }
 
@@ -686,7 +685,7 @@ async function searchMarketplacePostgresFTS(
 
     try {
         const { data: hits, error } = await supabase.rpc("search_marketplace", {
-            p_tsquery: tsQuery,
+            p_query: query,
             p_type: type,
             p_limit: limitCount,
             p_cursor_rank: cursorRank ?? null,
