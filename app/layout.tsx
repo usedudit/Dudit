@@ -57,6 +57,7 @@ import { QueryProvider } from "@/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { TransitionProvider } from "@/providers/transition-provider"
 import { FavoritesProvider } from "@/providers/favorites-provider"
+import { PushNotificationManager } from "@/components/notifications/PushNotificationManager"
 
 export default async function RootLayout({
     children,
@@ -160,6 +161,7 @@ export default async function RootLayout({
                             </FavoritesProvider>
                         </NotificationProvider>
                         <PWAUpdatePrompt />
+                        <PushNotificationManager />
                         <MarketplaceBottomMenu />
                     </QueryProvider>
                 </SupabaseProvider>

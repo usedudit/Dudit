@@ -687,10 +687,14 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     revalidatePath("/erp/dashboard")
     revalidatePath("/erp/servicos")
 
-    import("@/lib/services/whatsapp-automation.service")
-      .then(({ onAppointmentCreated }) => {
+    Promise.all([
+      import("@/lib/services/whatsapp-automation.service"),
+      import("@/lib/services/notification-automation.service"),
+    ])
+      .then(([whatsapp, notifications]) => {
         for (const row of createdRows) {
-          onAppointmentCreated(row).catch(console.error)
+          whatsapp.onAppointmentCreated(row).catch(console.error)
+          notifications.onAppointmentCreated(row).catch(console.error)
         }
       })
       .catch(() => { })
@@ -860,9 +864,16 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         .catch(console.error)
     }
 
+    const prevStatus = String(current.status)
+    const nextStatus = String(normalizedStatus)
     import("@/lib/services/whatsapp-automation.service")
       .then(({ onAppointmentStatusChanged }) =>
-        onAppointmentStatusChanged(finalRow, String(current.status), String(normalizedStatus)),
+        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
+      )
+      .catch(console.error)
+    import("@/lib/services/notification-automation.service")
+      .then(({ onAppointmentStatusChanged }) =>
+        onAppointmentStatusChanged(finalRow, prevStatus, nextStatus),
       )
       .catch(console.error)
 

@@ -152,6 +152,18 @@ export async function createRecurringSubscriptionAction(input: {
       )
       .catch(console.error)
 
+    import("@/lib/services/notification-automation.service")
+      .then(({ onSubscriptionCreated }) =>
+        onSubscriptionCreated({
+          partnerId: input.partnerId,
+          subscriptionId: data.id as string,
+          customerId: input.customerId,
+          customerName: customer.name,
+          planName: plan.name,
+        }),
+      )
+      .catch(console.error)
+
     await logAuditEvent({
       partnerId: input.partnerId,
       actorUserId: null,

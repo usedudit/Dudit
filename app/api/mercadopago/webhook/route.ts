@@ -359,6 +359,22 @@ async function processWebhookWithRetry(
 
     console.log(`[WEBHOOK] Order ${orderId} updated to "${orderStatus}"`)
 
+    if (previousSituation !== orderStatus) {
+      const { data: notifyOrder } = await supabase
+        .from("orders")
+        .select("id, order_number, partner_id, buyer_id, customer_name, total_amount, delivery_status, situation")
+        .eq("id", orderId)
+        .maybeSingle()
+
+      if (notifyOrder) {
+        import("@/lib/services/notification-automation.service")
+          .then(({ onOrderStatusChanged }) =>
+            onOrderStatusChanged(notifyOrder, orderStatus, undefined),
+          )
+          .catch(console.error)
+      }
+    }
+
     // ── Create revenue transaction when paid ──
     if (orderStatus === "paid") {
       try {

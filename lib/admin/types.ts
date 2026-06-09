@@ -75,6 +75,9 @@ export enum AdminActionType {
     AD_UPDATE = "advertising.update",
     AD_DELETE = "advertising.delete",
     AD_STATUS_CHANGE = "advertising.status_change",
+
+    // Notifications
+    ANNOUNCEMENT_SEND = "notification.announcement_send",
 }
 
 // ─── Audit Log Types ────────────────────────────────────────────────────────

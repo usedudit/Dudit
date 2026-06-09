@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon } from "@/lib/icons"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
@@ -15,6 +15,7 @@ import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import BottomSheet from "../BottomSheet"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 // Ícone selector (duas setas)
 const ChevronsUpDown = ({ className }: { className?: string }) => (
@@ -256,12 +257,9 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            className="rounded-full w-9 h-9 p-0 hidden md:flex items-center justify-center"
-                        >
-                            <NotificationIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                        </Button>
+                        <div className="hidden md:flex">
+                            <NotificationBell variant="erp" />
+                        </div>
 
                         <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
 

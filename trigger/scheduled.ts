@@ -3,6 +3,10 @@ import { executeWhatsappScheduledJob, executeWhatsappRetryBatch } from "./whatsa
 import { processWhatsappMessageById } from "@/lib/services/whatsapp-dispatch.service"
 import type { WhatsappScheduledJobPayload } from "./whatsapp-jobs"
 import { processPendingModerationJobs } from "@/lib/moderation/process-moderation-jobs"
+import {
+  executeNotificationScheduledJob,
+  type NotificationScheduledJobPayload,
+} from "./notification-jobs"
 
 export const whatsappScheduledJob = task({
   id: "whatsapp-scheduled-job",
@@ -50,6 +54,19 @@ export const whatsappSendMessage = task({
  * Chamado a cada 5 minutos via cron-job.org → /api/moderation/process
  * Usa Llama Guard 3 (Cloudflare AI) para moderar nomes e descrições.
  */
+export const notificationScheduledJob = task({
+  id: "notification-scheduled-job",
+  retry: {
+    maxAttempts: 5,
+    factor: 2,
+    minTimeoutInMs: 2000,
+    maxTimeoutInMs: 120000,
+  },
+  run: async (payload: NotificationScheduledJobPayload) => {
+    await executeNotificationScheduledJob(payload)
+  },
+})
+
 export const moderationTextJob = task({
   id: "moderation-text-job",
   retry: {

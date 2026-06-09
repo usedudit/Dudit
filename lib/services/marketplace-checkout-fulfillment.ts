@@ -261,6 +261,18 @@ async function createSubscriptionFromPlan(
 
   if (execError) throw execError
 
+  import("@/lib/services/notification-automation.service")
+    .then(({ onSubscriptionCreated }) =>
+      onSubscriptionCreated({
+        partnerId: params.partnerId,
+        subscriptionId: subscription.id as string,
+        customerId,
+        customerName: params.buyerName,
+        planName: undefined,
+      }),
+    )
+    .catch(console.error)
+
   return { subscriptionId: subscription.id as string, executionId: execution.id as string }
 }
 

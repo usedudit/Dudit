@@ -1568,6 +1568,16 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     await invalidateInventoryItems(partnerId, stockItems)
     await revalidateOrders(partnerId)
 
+    import("@/lib/services/notification-automation.service")
+        .then(({ onOrderStatusChanged }) =>
+            onOrderStatusChanged(
+                { ...order, partner_id: partnerId },
+                paymentState.situation,
+                order.delivery_status,
+            ),
+        )
+        .catch(console.error)
+
     return { success: true, orderId: order.id, orderNumber: order.order_number }
 }
 
@@ -2256,13 +2266,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)
 
+    const notifyOrder = { ...currentOrder, partner_id: data.partnerId, id: orderId }
+    const notifySituation =
+        paymentState.situation !== currentOrder.situation ? paymentState.situation : undefined
+    const notifyDelivery =
+        data.deliveryStatus !== currentOrder.delivery_status ? data.deliveryStatus : undefined
+
     import("@/lib/services/whatsapp-automation.service")
         .then(({ onOrderStatusChanged }) =>
-            onOrderStatusChanged(
-                { ...currentOrder, partner_id: data.partnerId, id: orderId },
-                paymentState.situation !== currentOrder.situation ? paymentState.situation : undefined,
-                data.deliveryStatus !== currentOrder.delivery_status ? data.deliveryStatus : undefined,
-            ),
+            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery),
+        )
+        .catch(console.error)
+
+    import("@/lib/services/notification-automation.service")
+        .then(({ onOrderStatusChanged }) =>
+            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery),
         )
         .catch(console.error)
 
@@ -2909,28 +2927,33 @@ export async function updateOrdersStatusInBatchAction(payload: {
     )
     await revalidateOrders(payload.partnerId)
 
-    import("@/lib/services/whatsapp-automation.service")
-        .then(({ onOrderStatusChanged }) => {
-            for (const order of currentOrders || []) {
-                if (payload.actionType === "payment_status" && payload.statusValue) {
-                    const paymentStatusMap: Record<string, string> = {
-                        paid: "paid",
-                        pending: "pending",
-                        partially_paid: "partially_paid",
-                    }
-                    const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
-                    onOrderStatusChanged({ ...order, partner_id: payload.partnerId }, situation).catch(console.error)
+    const dispatchOrderStatusSideEffects = async () => {
+        const [{ onOrderStatusChanged: onWhatsappOrder }, { onOrderStatusChanged: onNotifyOrder }] =
+            await Promise.all([
+                import("@/lib/services/whatsapp-automation.service"),
+                import("@/lib/services/notification-automation.service"),
+            ])
+
+        for (const order of currentOrders || []) {
+            const orderPayload = { ...order, partner_id: payload.partnerId }
+            if (payload.actionType === "payment_status" && payload.statusValue) {
+                const paymentStatusMap: Record<string, string> = {
+                    paid: "paid",
+                    pending: "pending",
+                    partially_paid: "partially_paid",
                 }
-                if (payload.actionType === "delivery_status" && payload.statusValue) {
-                    onOrderStatusChanged(
-                        { ...order, partner_id: payload.partnerId },
-                        undefined,
-                        payload.statusValue,
-                    ).catch(console.error)
-                }
+                const situation = paymentStatusMap[payload.statusValue] || payload.statusValue
+                onWhatsappOrder(orderPayload, situation).catch(console.error)
+                onNotifyOrder(orderPayload, situation).catch(console.error)
             }
-        })
-        .catch(() => { })
+            if (payload.actionType === "delivery_status" && payload.statusValue) {
+                onWhatsappOrder(orderPayload, undefined, payload.statusValue).catch(console.error)
+                onNotifyOrder(orderPayload, undefined, payload.statusValue).catch(console.error)
+            }
+        }
+    }
+
+    dispatchOrderStatusSideEffects().catch(console.error)
 
     if (overallWarnings.length > 0) {
         return { success: true, warning: overallWarnings.join(" | ") }
@@ -3192,11 +3215,13 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         await revalidateOrders(payload.partnerId)
 
         if (order.situation !== nextSituation) {
+            const notifyOrder = { ...order, partner_id: payload.partnerId }
             import("@/lib/services/whatsapp-automation.service")
-                .then(({ onOrderStatusChanged }) => {
-                    onOrderStatusChanged({ ...order, partner_id: payload.partnerId }, nextSituation).catch(console.error)
-                })
-                .catch(() => {})
+                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation))
+                .catch(console.error)
+            import("@/lib/services/notification-automation.service")
+                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation))
+                .catch(console.error)
         }
 
         return { success: true }

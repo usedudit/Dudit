@@ -227,3 +227,69 @@ const serwist = new Serwist({
 // Não é necessário adicionar manualmente.
 
 serwist.addEventListeners()
+
+// ============================================================
+// Firebase Cloud Messaging — background push (Android PWA)
+// Config is injected at build time from NEXT_PUBLIC_* env vars.
+// ============================================================
+const FCM_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || ""
+const FCM_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || ""
+
+if (FCM_API_KEY && FCM_PROJECT_ID) {
+  try {
+    // @ts-expect-error importScripts is available in service workers
+    importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js")
+    // @ts-expect-error importScripts is available in service workers
+    importScripts("https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging-compat.js")
+
+    // @ts-expect-error firebase compat global from importScripts
+    firebase.initializeApp({
+      apiKey: FCM_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+      projectId: FCM_PROJECT_ID,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
+    })
+
+    // @ts-expect-error firebase compat global from importScripts
+    const messaging = firebase.messaging()
+
+    messaging.onBackgroundMessage((payload: {
+      notification?: { title?: string; body?: string }
+      data?: { href?: string }
+    }) => {
+      const title = payload.notification?.title || "Dudit"
+      const body = payload.notification?.body || ""
+      const href = payload.data?.href || "/"
+
+      self.registration.showNotification(title, {
+        body,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        data: { href },
+      })
+    })
+
+    self.addEventListener("notificationclick", (event) => {
+      const notif = event.notification
+      notif.close()
+      const href = (notif.data && (notif.data as { href?: string }).href) || "/"
+      const url = href.startsWith("http") ? href : `${self.location.origin}${href}`
+
+      event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+          for (const client of windowClients) {
+            if ("focus" in client) {
+              return client.focus()
+            }
+          }
+          if (self.clients.openWindow) {
+            return self.clients.openWindow(url)
+          }
+        }),
+      )
+    })
+  } catch (err) {
+    console.warn("[sw] FCM background handler skipped", err)
+  }
+}

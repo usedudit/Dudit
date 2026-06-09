@@ -14,6 +14,7 @@ import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import citiesData from "@/lib/data/cities.json"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 interface HeaderProps {
     setView?: (
@@ -586,6 +587,10 @@ const Header: React.FC<HeaderProps> = ({
                                     ) : null}
                                 </>
                             ) : (
+                                <>
+                                {user && (
+                                    <NotificationBell variant="marketplace" className="shrink-0" />
+                                )}
                                 <Link href="/cart" prefetch={true} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                     <ShoppingBagIcon size={24} strokeWidth={2} />
                                     {cartCount > 0 && (
@@ -594,6 +599,7 @@ const Header: React.FC<HeaderProps> = ({
                                         </span>
                                     )}
                                 </Link>
+                                </>
                             )}
                         </div>
                     </div>
@@ -864,6 +870,8 @@ const Header: React.FC<HeaderProps> = ({
                                 </div>
                             )}
                         </div>
+
+                        {user && <NotificationBell variant="marketplace" />}
 
                         <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <Package size={20} />

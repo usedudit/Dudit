@@ -4,12 +4,13 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, NotificationIcon, ChevronDownIcon } from "@/lib/icons"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import Dropdown, { DropdownItem } from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { ShieldAlert } from "lucide-react"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 const ChevronRight = ({ className }: { className?: string }) => (
     <svg
@@ -130,12 +131,7 @@ export function AdminHeader({ sidebarOpen, setSidebarOpen, pageTitle, userProfil
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            className="rounded-full w-9 h-9 p-0 flex items-center justify-center"
-                        >
-                            <NotificationIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                        </Button>
+                        <NotificationBell variant="admin" />
 
                         <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
 

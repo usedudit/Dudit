@@ -1201,6 +1201,20 @@ export async function checkoutCartAction(
   await revalidateCart(user.id)
   await revalidateOrders(partnerId)
 
+  import("@/lib/services/notification-automation.service")
+    .then(({ onOrderStatusChanged }) =>
+      onOrderStatusChanged(
+        {
+          ...order,
+          partner_id: partnerId,
+          buyer_id: user.id,
+          customer_name: order.customer_name || user.email,
+        },
+        "pending",
+      ),
+    )
+    .catch(console.error)
+
   return {
     success: true,
     orderId: order.id,
