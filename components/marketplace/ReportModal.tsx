@@ -110,7 +110,7 @@ export function ReportModal({
                     <img
                         src="https://img.dudit.com.br/static/illustrations/DenunciarItem.png"
                         alt="Comunicar algo errado"
-                        className="w-64 h-auto object-contain transform translate-y-6"
+                        className="w-64 h-auto object-contain transform translate-y-7"
                     />
                 </div>
 

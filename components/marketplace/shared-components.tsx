@@ -14,6 +14,7 @@ import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { Badge } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -292,6 +293,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const hasDiscount = !!(product.originalPrice && product.originalPrice > product.price)
     const discountPercent = hasDiscount ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0
 
+    const campaignPricing = useMemo(() => {
+        if (!activePromo) return null
+        return computeItemCampaignPricing(
+            product.price,
+            null,
+            activePromo,
+            { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
+        )
+    }, [activePromo, product.price, product.id, itemType, (product as any).category_id])
+
+    const displayPrice = campaignPricing?.campaignPrice ?? product.price
+    const hasCampaignDiscount = campaignPricing != null && campaignPricing.campaignDiscount > 0
+    const referencePrice = product.originalPrice && product.originalPrice > displayPrice ? product.originalPrice : (displayPrice !== product.price ? product.price : undefined)
+
     const itemUrl = itemType === "plano"
         ? getPlanUrl(product, product.partners)
         : (itemType === "servico"
@@ -324,12 +339,17 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         loading="lazy"
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
-                        {showPrice && hasDiscount && (
+                        {showPrice && hasCampaignDiscount && (
+                            <Badge variant="blue" icon={null} className="whitespace-nowrap">
+                                {activePromo?.discountType === "percentage" ? `-${activePromo.discountValue}%` : `-${formatCurrency(campaignPricing!.campaignDiscount)}`}
+                            </Badge>
+                        )}
+                        {showPrice && hasDiscount && !hasCampaignDiscount && (
                             <Badge variant="orange" icon={null} className="whitespace-nowrap">
                                 -{discountPercent}%
                             </Badge>
                         )}
-                        {showPrice && activePromo && (
+                        {showPrice && activePromo && activePromo.promotionType !== "discount" && (
                             <span title={activePromo.name}>
                                 <Badge variant="blue" icon={<TagIcon size={10} />} className="whitespace-nowrap p-1.5 w-6 h-6 justify-center" />
                             </span>
@@ -354,9 +374,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
 
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex flex-col">
-                            {showPrice && product.originalPrice && (
+                            {showPrice && referencePrice && (
                                 <span className="text-xs text-brand-inactive-text line-through">
-                                    {formatCurrency(product.originalPrice)}
+                                    {formatCurrency(referencePrice)}
                                 </span>
                             )}
                             <div className="flex items-center gap-1.5">
@@ -366,7 +386,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                                     ) : (
                                         <>
                                             {itemType === "servico" && (product as any).price_type === "starting_at" ? "A partir de " : ""}
-                                            {formatCurrency(product.price)}
+                                            {formatCurrency(displayPrice)}
                                             {frequencyText || (itemType === "servico" ? getBillingUnitSuffix((product as any).billing_unit) : "")}
                                         </>
                                     )}

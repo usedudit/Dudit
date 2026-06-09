@@ -27,6 +27,7 @@ import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
 
@@ -531,30 +532,49 @@ export function ProductDetailsPageClient({
         const base = Number(product.price) || 0
         const promo = Number(product.promotional_price) || 0
         const hasPromo = promo > 0 && promo < base
-        const current = selectedVariant ? Number(selectedVariant.price_adjustment) || base : hasPromo ? promo : base
-        const total = current * quantity
+        const effective = selectedVariant ? Number(selectedVariant.price_adjustment) || base : hasPromo ? promo : base
+        const total = effective * quantity
+
+        // Campaign discount on top of effective price
+        const campaignPricingResult = activePromo
+            ? computeItemCampaignPricing(effective, null, activePromo, {
+                productId: product.id,
+                categoryId: product.category_id || undefined,
+              })
+            : null
+        const campaignPrice = campaignPricingResult?.campaignPrice ?? effective
+        const hasCampaignDiscount = campaignPricingResult != null && campaignPricingResult.campaignDiscount > 0
 
         // Real Pix Discount from Partner's payment methods
         const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
         const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = total * (1 - (pixDiscountPercent / 100))
+        const pixTotal = campaignPrice * quantity * (1 - (pixDiscountPercent / 100))
 
         // Real Installments from Partner's credit card method
         const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
         const hasCC = !!ccMethod
         const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-        const installmentPrice = total / maxInstallments
+        const installmentPrice = campaignPrice / maxInstallments
+
+        const totalDiscountPercent = base > 0 ? Math.round(((base - campaignPrice) / base) * 100) : 0
+
+        const campaignDiscountAmount = campaignPricingResult?.campaignDiscount ?? 0
+        const campaignDiscountLabel = activePromo?.discountType === "percentage"
+            ? `${activePromo.discountValue}%`
+            : `${formatCurrency(campaignDiscountAmount)}`
 
         return {
-            current, original: base, hasPromo: !selectedVariant && hasPromo, total,
+            current: effective, campaignPrice, original: base,
+            hasPromo: !selectedVariant && hasPromo,
+            hasCampaignDiscount, total,
             pix: pixTotal,
             pixDiscountPercent,
-            hasCC,
-            maxInstallments,
-            installment: installmentPrice,
+            hasCC, maxInstallments, installment: installmentPrice,
             discountPercent: Math.round(((base - promo) / base) * 100),
+            totalDiscountPercent,
+            campaignDiscountAmount, campaignDiscountLabel,
         }
-    }, [product, selectedVariant, quantity, partner])
+    }, [product, selectedVariant, quantity, partner, activePromo])
 
     const avgRating = useMemo(() =>
         reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,
@@ -963,13 +983,59 @@ export function ProductDetailsPageClient({
                         </p>
                     </div>
                 ) : (() => {
-                    const hasPromo = pricing.hasPromo;
+                    const hasCampaign = pricing.hasCampaignDiscount;
+                    const hasProductPromo = pricing.hasPromo && !hasCampaign;
                     const hasPix = pricing.pixDiscountPercent > 0;
-                    const pixUnitPrice = pricing.current * (1 - pricing.pixDiscountPercent / 100);
-                    const totalDiscountPercent = pricing.original > 0 ? Math.round(((pricing.original - pixUnitPrice) / pricing.original) * 100) : 0;
+                    const displayPrice = pricing.campaignPrice;
+                    const pixUnitPrice = displayPrice * (1 - pricing.pixDiscountPercent / 100);
+                    // Caso: Campanha + Pix
+                    if (hasCampaign && hasPix) {
+                        return (
+                            <div className="space-y-1">
+                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                <Badge variant="blue" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.campaignDiscountLabel} OFF
+                                </Badge>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="sm:text-lg md:text-4xl leading-none font-semibold text-brand-dark">
+                                        {formatMoney(pixUnitPrice)}
+                                    </p>
+                                    <span className="text-sm font-semibold text-brand-green">no Pix</span>
+                                </div>
+                                <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
+                                    ou {formatMoney(displayPrice)} em outros meios
+                                </p>
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 block text-left px-0 py-0">
+                                    Ver opções de pagamento
+                                </Button>
+                            </div>
+                        );
+                    }
 
-                    // Caso 3: Promoção + Pix (melhor opção)
-                    if (hasPromo && hasPix) {
+                    // Caso: Só campanha (sem Pix)
+                    if (hasCampaign && !hasPix) {
+                        return (
+                            <div className="space-y-1">
+                                <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
+                                <Badge variant="blue" className="ml-2">
+                                    <TagIcon size={12} />
+                                    {pricing.campaignDiscountLabel} OFF
+                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-3xl leading-none font-bold text-brand-dark">
+                                        {formatMoney(displayPrice)}
+                                    </p>
+                                </div>
+                                <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
+                                    Ver opções de pagamento
+                                </Button>
+                            </div>
+                        );
+                    }
+
+                    // Caso: Produto Promo + Pix
+                    if (hasProductPromo && hasPix) {
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
@@ -984,7 +1050,7 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm font-semibold text-brand-green">no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                    ou {formatMoney(pricing.current)} em outros meios
+                                    ou {formatMoney(displayPrice)} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 block text-left px-0 py-0">
                                     Ver opções de pagamento
@@ -993,8 +1059,8 @@ export function ProductDetailsPageClient({
                         );
                     }
 
-                    // Caso 1: Só promoção
-                    if (hasPromo && !hasPix) {
+                    // Caso: Só produto promo
+                    if (hasProductPromo && !hasPix) {
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
@@ -1004,7 +1070,7 @@ export function ProductDetailsPageClient({
                                 </Badge>
                                 <div className="flex items-center gap-2">
                                     <p className="text-3xl leading-none font-bold text-brand-dark">
-                                        {formatMoney(pricing.current)}
+                                        {formatMoney(displayPrice)}
                                     </p>
                                 </div>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
@@ -1014,8 +1080,8 @@ export function ProductDetailsPageClient({
                         );
                     }
 
-                    // Caso 2: Só desconto no Pix
-                    if (!hasPromo && hasPix) {
+                    // Caso: Só Pix
+                    if (!hasCampaign && !hasProductPromo && hasPix) {
                         return (
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text line-through font-normal">{formatMoney(pricing.original)}</span>
@@ -1026,7 +1092,7 @@ export function ProductDetailsPageClient({
                                     <span className="text-sm text-brand-green font-medium mt-auto">{pricing.pixDiscountPercent}% no Pix</span>
                                 </div>
                                 <p className="text-xs md:text-[0.875rem] text-brand-inactive-text mt-1">
-                                    ou {formatMoney(pricing.original)} em outros meios
+                                    ou {formatMoney(displayPrice)} em outros meios
                                 </p>
                                 <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                     Ver opções de pagamento
@@ -1035,11 +1101,11 @@ export function ProductDetailsPageClient({
                         );
                     }
 
-                    // Caso 4: Sem promoção e sem Pix
+                    // Caso: Sem desconto algum
                     return (
                         <div className="space-y-1">
                             <p className="text-3xl leading-none font-bold text-brand-dark">
-                                {formatMoney(pricing.current)}
+                                {formatMoney(displayPrice)}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
                                 Ver opções de pagamento
@@ -1391,7 +1457,7 @@ export function ProductDetailsPageClient({
                         <img
                             src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
                             alt="Pagamento"
-                            className="w-64 h-auto object-contain transform translate-y-6"
+                            className="w-64 h-auto object-contain transform translate-y-7"
                         />
                     </div>
 
@@ -1428,7 +1494,7 @@ export function ProductDetailsPageClient({
                         <img
                             src="https://img.dudit.com.br/static/illustrations/Responsabilidade.png"
                             alt="Responsabilidade"
-                            className="w-64 h-auto object-contain transform translate-y-6"
+                            className="w-64 h-auto object-contain transform translate-y-7"
                         />
                     </div>
 

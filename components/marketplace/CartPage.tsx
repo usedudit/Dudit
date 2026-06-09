@@ -18,6 +18,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { formatCurrency, formatDateToBR } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
+import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -101,6 +102,28 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         const basePrice = Number(item.products?.price || 0)
         const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
         return promoPrice > 0 && promoPrice < basePrice ? promoPrice : basePrice
+    }
+
+    const getItemDisplayPrice = (item: any, promotions: any[]) => {
+        const effective = getItemPrice(item)
+        if (!promotions?.length) return effective
+        for (const promo of promotions) {
+            if (promo.promotionType === "discount" && promo.is_active !== false) {
+                const result = computeItemCampaignPricing(effective, null, promo, {
+                    productId: item.product_id,
+                    categoryId: item.products?.category_id || undefined,
+                })
+                if (result && result.campaignDiscount > 0) return result.campaignPrice
+            }
+        }
+        return effective
+    }
+
+    const getPartnerDisplayTotal = (partnerId: string, items: any[]) => {
+        const promos = itemsByPartner[partnerId]?.promotions || []
+        return items
+            .filter((item: any) => getItemSelected(item))
+            .reduce((sum: number, item: any) => sum + getItemDisplayPrice(item, promos) * getItemQuantity(item), 0)
     }
 
     const getItemImage = (item: any) => {
@@ -328,14 +351,17 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const globalTotal = Object.values(itemsByPartner).reduce((acc: number, partner: any) => {
         const items = partner.items.filter((item: any) => getItemSelected(item))
         if (items.length === 0) return acc
-        const itemsTotal = items.reduce((sum: number, item: any) => sum + getItemPrice(item) * getItemQuantity(item), 0)
+        const itemsTotal = getPartnerDisplayTotal(partner.partner?.id, items)
         return acc + itemsTotal + getPartnerDeliveryFee(partner)
     }, 0)
 
-    const getPartnerSelectedTotal = (items: any[]) =>
+    const getPartnerSelectedTotal = (items: any[], partnerId?: string) =>
         items
             .filter((item: any) => getItemSelected(item))
-            .reduce((sum: number, item: any) => sum + getItemPrice(item) * getItemQuantity(item), 0)
+            .reduce((sum: number, item: any) => {
+                const price = partnerId ? getItemDisplayPrice(item, itemsByPartner[partnerId]?.promotions || []) : getItemPrice(item)
+                return sum + price * getItemQuantity(item)
+            }, 0)
 
     const getPartnerCheckoutProducts = (partnerId: string) =>
         itemsByPartner[partnerId].items
@@ -391,7 +417,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-12 space-y-8">
                             {Object.entries(itemsByPartner).map(([partnerId, data]: [string, any], index: number, array: any[]) => {
-                                const partnerItemsTotal = getPartnerSelectedTotal(data.items)
+                                const partnerPromos = data.promotions || []
+                                const partnerItemsTotal = getPartnerSelectedTotal(data.items, partnerId)
                                 const partnerDeliveryFee = getPartnerDeliveryFee(data)
                                 const partnerTotalWithDelivery = partnerItemsTotal > 0 ? partnerItemsTotal + partnerDeliveryFee : 0
                                 const expanded = isExpanded(partnerId)
@@ -463,7 +490,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                     {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
                                                                                         section.items
                                                                                             .filter((i: any) => getItemSelected(i))
-                                                                                            .reduce((s: number, i: any) => s + getItemPrice(i) * getItemQuantity(i), 0),
+                                                                                            .reduce((s: number, i: any) => s + getItemDisplayPrice(i, partnerPromos) * getItemQuantity(i), 0),
                                                                                     )}
                                                                                 </span>
                                                                             </div>,
@@ -538,7 +565,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             size="sm"
                                                                                                         />
                                                                                                     )}
-                                                                                                    <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemPrice(item)) : formatCurrency(getItemPrice(item) * itemQty)}</span>
+                                                                                                    <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemDisplayPrice(item, partnerPromos)) : formatCurrency(getItemDisplayPrice(item, partnerPromos) * itemQty)}</span>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
@@ -608,7 +635,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
-                                                                                                    <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemPrice(item))}</p>
+                                                                                                    <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemDisplayPrice(item, partnerPromos))}</p>
                                                                                                 </div>
 
                                                                                                 <div className="flex items-center justify-end gap-4">
@@ -623,7 +650,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             disabled={loading === item.id}
                                                                                                         />
                                                                                                     )}
-                                                                                                    <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemPrice(item)) : formatCurrency(getItemPrice(item) * itemQty)}</div>
+                                                                                                    <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemDisplayPrice(item, partnerPromos)) : formatCurrency(getItemDisplayPrice(item, partnerPromos) * itemQty)}</div>
                                                                                                     <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
                                                                                                 </div>
                                                                                             </div>
@@ -737,8 +764,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                     </AnimatePresence>
                                                 </div>
                                             </div>
-                                        </div>
-                                        {index !== array.length - 1 && (
+                                                                    </div>
+                                                                    {index !== array.length - 1 && (
                                             <div className="w-full h-[1px] bg-brand-border dark:bg-dark-border my-12" />
                                         )}
                                     </Fragment>)
