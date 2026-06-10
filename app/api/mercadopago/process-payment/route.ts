@@ -12,6 +12,7 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { validateCoupon } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import {
   priceMarketplaceCartCheckout,
   mapOrderItemsForPaymentInsert,
@@ -184,12 +185,39 @@ async function handler(request: NextRequest) {
         .in("id", cartItemIds!)
         .eq("user_id", buyerId)
 
+      // Resolve local payment method config for the unified engine
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(paymentFormData?.payment_method_id || ""))
+      let pmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
+      if (isUuid) {
+        const { data: pmtMethod } = await adminClient
+          .from("payment_methods")
+          .select("*, payment_method_installment_fees(installment_number, fee_percent)")
+          .eq("id", paymentFormData.payment_method_id)
+          .single()
+        if (pmtMethod) {
+          const fees = pmtMethod.payment_method_installment_fees || []
+          pmtConfig = {
+            discountPercent: Number(pmtMethod.discount_percent || 0),
+            feePercent: Number(pmtMethod.fee_percent || pmtMethod.percentage_rate || 0),
+            feeFixed: Number(pmtMethod.fee_fixed || pmtMethod.fixed_amount || 0),
+            feeBearer: (pmtMethod.fee_bearer || "merchant") as "merchant" | "customer",
+            maxInstallments: Number(pmtMethod.max_installments || 1),
+            installmentNumber: Math.max(1, Number(paymentFormData?.installments || 1)),
+            installmentFees: (fees || []).map((row: any) => ({
+              installmentNumber: Number(row.installment_number || 1),
+              feePercent: Number(row.fee_percent || 0),
+            })),
+          }
+        }
+      }
+
       const priced = await priceMarketplaceCartCheckout(adminClient, {
         userId: buyerId,
         cartItemIds: cartItemIds!,
         deliveryType: normalizedDeliveryType,
         deliveryAddress: deliveryAddress || "",
         couponCode,
+        paymentMethod: pmtConfig,
       })
 
       if (!priced.success) {
@@ -205,6 +233,8 @@ async function handler(request: NextRequest) {
       deliveryFee = priced.data.deliveryFee
       couponIdToSave = priced.data.couponId
       couponDiscountAmount = priced.data.couponDiscountAmount
+      paymentMethodDiscountAmount = priced.data.pricingResult.paymentMethodDiscountAmount
+      paymentMethodExtraAmount = priced.data.pricingResult.paymentMethodInterestAmount + priced.data.pricingResult.paymentMethodFeeAmount
       checkoutFulfillment = priced.data.fulfillmentPayload as unknown as Record<string, unknown>
       resolvedOrderDeliveryType =
         priced.data.fulfillmentPayload.deliveryType === "delivery" ? "delivery" : "pickup"
@@ -303,8 +333,8 @@ async function handler(request: NextRequest) {
         return NextResponse.json({ error: `Estoque insuficiente para ${item.name}` }, { status: 400 })
       }
 
-      const itemTotal = resolvedPrice * item.quantity
-      totalAmount += itemTotal
+      // Accumulated for coupon validation; final total comes from central engine
+      totalAmount += resolvedPrice * item.quantity
 
       validatedItems.push({
         product_id: resolvedProductId,
@@ -322,6 +352,15 @@ async function handler(request: NextRequest) {
     if (!useUnifiedCart) {
       deliveryFee = Number(body.deliveryFee || 0)
 
+      // ── Build pricing items from validated items ──────────────────────────
+      const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = validatedItems.map((v) => ({
+        productId: v.product_id,
+        unitPrice: v.product_price,
+        quantity: v.quantity,
+      }))
+
+      // ── Coupon validation ─────────────────────────────────────────────────
+      let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
       if (couponCode) {
         const couponResult = await validateCoupon({
           partnerId,
@@ -334,16 +373,56 @@ async function handler(request: NextRequest) {
 
         if (couponResult.valid) {
           couponIdToSave = couponResult.couponId || null
-          couponDiscountAmount = couponResult.discountAmount
-          totalAmount = Math.max(0, totalAmount - couponDiscountAmount)
-          if (isDev) console.log("Coupon applied:", couponCode, "Discount:", couponDiscountAmount, "New total:", totalAmount)
+          couponPricingData = {
+            id: couponResult.couponId || "",
+            code: couponCode,
+            discountType: "fixed",
+            discountValue: couponResult.discountAmount,
+            maxDiscountValue: null,
+            freeShipping: false,
+            allowCombination: true,
+          }
         }
       }
 
-      if (deliveryFee > 0) {
-        totalAmount += deliveryFee
-        if (isDev) console.log("Delivery fee applied:", deliveryFee, "New total:", totalAmount)
+      // ── Payment method config ─────────────────────────────────────────────
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(paymentFormData?.payment_method_id || ""))
+      let pmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
+      if (isUuid) {
+        const { data: pmtMethod } = await adminClient
+          .from("payment_methods")
+          .select("*, payment_method_installment_fees(installment_number, fee_percent)")
+          .eq("id", paymentFormData.payment_method_id)
+          .single()
+        if (pmtMethod) {
+          const fees = pmtMethod.payment_method_installment_fees || []
+          pmtConfig = {
+            discountPercent: Number(pmtMethod.discount_percent || 0),
+            feePercent: Number(pmtMethod.fee_percent || pmtMethod.percentage_rate || 0),
+            feeFixed: Number(pmtMethod.fee_fixed || pmtMethod.fixed_amount || 0),
+            feeBearer: (pmtMethod.fee_bearer || "merchant") as "merchant" | "customer",
+            maxInstallments: Number(pmtMethod.max_installments || 1),
+            installmentNumber: Math.max(1, Number(paymentFormData?.installments || 1)),
+            installmentFees: (fees || []).map((row: any) => ({
+              installmentNumber: Number(row.installment_number || 1),
+              feePercent: Number(row.fee_percent || 0),
+            })),
+          }
+        }
       }
+
+      // ── Central pricing engine (única fonte de verdade) ────────────────────
+      const pricingResult = calculateOrderPricing({
+        items: pricingItems,
+        shippingCost: deliveryFee,
+        coupon: couponPricingData,
+        paymentMethod: pmtConfig,
+      })
+
+      totalAmount = pricingResult.finalAmountWithPayment
+      couponDiscountAmount = pricingResult.couponDiscountAmount
+      paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
+      paymentMethodExtraAmount = pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount
 
       orderItemsForInsert = validatedItems.map((item) => ({
         product_id: item.product_id,
@@ -644,6 +723,7 @@ async function handler(request: NextRequest) {
         checkout_fulfillment: checkoutFulfillment,
         order_source: "Vitrine Online",
         promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
+        pricing_version: "2.0",
         amount_paid: paymentStatus === "approved" ? totalAmount : 0,
         paid_amount: paymentStatus === "approved" ? totalAmount : 0,
       })

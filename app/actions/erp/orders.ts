@@ -1427,6 +1427,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         delivery_address: deliveryAddressStr || null,
         finance_account_id: data.financeAccountId,
         created_by: user.id,
+        pricing_version: pricingResult.pricingVersion,
         ...(preparationEstimate || {}),
     }
 

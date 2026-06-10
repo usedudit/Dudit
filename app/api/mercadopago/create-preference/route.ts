@@ -6,6 +6,7 @@ import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 
 interface PreferenceRequest {
@@ -225,10 +226,58 @@ async function handler(request: NextRequest) {
       couponItems = items.map(i => ({ productId: i.id }))
     }
 
-    // DELIVERY FEE
+    // ── Central pricing engine (única fonte de verdade) ──────────────────────
     const deliveryFee = Number(body.deliveryFee || 0)
+
+    // Build pricing items from already-resolved preference items
+    type PricingItem = import("@/lib/services/pricing-engine").PricingItem
+    type PricingCoupon = import("@/lib/services/pricing-engine").PricingCoupon
+    const pricingItems: PricingItem[] = preferenceItems
+      .filter((p: any) => p.unit_price > 0)
+      .map((p: any) => ({
+        unitPrice: p.unit_price,
+        quantity: p.quantity,
+      }))
+
+    // Coupon validation
+    let couponPricingData: PricingCoupon | null = null
+    let couponDiscount = 0
+    if (body.couponCode) {
+      const itemsSubtotal = pricingItems.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0)
+      const couponResult = await validateCoupon({
+        partnerId,
+        code: body.couponCode,
+        customerId: user.id,
+        subtotal: itemsSubtotal,
+        shippingCost: deliveryFee,
+        items: couponItems,
+      }, adminClient)
+
+      if (couponResult.valid) {
+        couponDiscount = couponResult.discountAmount
+        couponPricingData = {
+          id: couponResult.couponId || "",
+          code: body.couponCode,
+          discountType: "fixed",
+          discountValue: couponDiscount,
+          maxDiscountValue: null,
+          freeShipping: false,
+          allowCombination: true,
+        }
+
+        if (couponDiscount > 0) {
+          preferenceItems.push({
+            title: `Desconto: ${body.couponCode}`,
+            unit_price: -couponDiscount,
+            quantity: 1,
+            currency_id: "BRL",
+          })
+        }
+      }
+    }
+
+    // Delivery fee item for MP display
     if (deliveryFee > 0) {
-      totalAmount += deliveryFee
       preferenceItems.push({
         title: "Taxa de entrega",
         unit_price: deliveryFee,
@@ -237,33 +286,13 @@ async function handler(request: NextRequest) {
       })
     }
 
-    // COUPON VALIDATION
-    let couponDiscount = 0
-    if (body.couponCode) {
-      const couponResult = await validateCoupon({
-        partnerId,
-        code: body.couponCode,
-        customerId: user.id,
-        subtotal: totalAmount - deliveryFee,
-        shippingCost: deliveryFee,
-        items: couponItems
-      }, adminClient)
-
-      if (couponResult.valid) {
-        couponDiscount = couponResult.discountAmount
-
-        // Add discount as a separate item in MP preference
-        if (couponDiscount > 0) {
-          preferenceItems.push({
-            title: `Desconto: ${body.couponCode}`,
-            unit_price: -couponDiscount,
-            quantity: 1,
-            currency_id: "BRL",
-          })
-          totalAmount -= couponDiscount
-        }
-      }
-    }
+    // Run central pricing for authoritative total
+    const pricingResult = calculateOrderPricing({
+      items: pricingItems,
+      shippingCost: deliveryFee,
+      coupon: couponPricingData,
+    })
+    totalAmount = pricingResult.finalTotal
 
     // SEGURANÃ‡A: Validar total
     const checkoutFinalTotal = Number(body.checkoutPricing?.finalTotal || 0)

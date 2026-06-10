@@ -142,7 +142,7 @@ Seja você um cliente em busca de produtos locais ou um empreendedor pronto para
 
 ## Dicas
 > [!IMPORTANT]
-> Ao criar a conta com Google, seu nome e foto de perfil são importados automaticamente.
+> Ao criar a conta com Google, seu nome é importado automaticamente. Para alterar depois, acesse **Perfil e Configurações**.
 
 ## Problemas comuns
 **"Não recebi o e-mail de confirmação"**

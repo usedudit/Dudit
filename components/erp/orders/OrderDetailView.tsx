@@ -84,16 +84,9 @@ const formatServiceSchedule = (dateStr: string, timeStr: string) => {
     if (!dateStr) return "";
     const parts = dateStr.split("-");
     if (parts.length !== 3) return dateStr;
-    const year = parts[0];
-    const monthIndex = parseInt(parts[1], 10) - 1;
     const day = parts[2];
-    
-    const months = [
-        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
-    ];
-    const monthName = months[monthIndex] || parts[1];
-    
+    const month = parts[1];
+    const year = parts[0];
     let timeFormatted = "";
     if (timeStr) {
         const timeParts = timeStr.split(":");
@@ -101,8 +94,7 @@ const formatServiceSchedule = (dateStr: string, timeStr: string) => {
             timeFormatted = ` às ${timeParts[0]}:${timeParts[1]}`;
         }
     }
-    
-    return `${day} de ${monthName} de ${year}${timeFormatted}`;
+    return `${day}/${month}/${year}${timeFormatted}`;
 };
 
 interface OrderDetailViewProps {
@@ -206,7 +198,36 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const pendingSuffix = paymentStatus.label !== "Pago" ? ` (${paymentStatus.label})` : ""
     const remainingPaymentAmount = Math.max(0, Number(order.total_amount || 0) - Number(order.paid_amount || 0))
     const hasPendingPayment = order.situation !== "paid" && order.situation !== "cancelled" && remainingPaymentAmount > 0.009
-    const paymentMethodLabel = `${order.payment_method || "Nao informado"}${pendingSuffix}`
+    const getPaymentTypeLabel = () => {
+        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
+        if (breakdownMethod) {
+            const m = breakdownMethod.toLowerCase();
+            if (m === "pix" || m === "bank_transfer") return "Pix";
+            if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) return "Cartão de Crédito";
+            if (m.includes("débito") || m.includes("debito") || m.includes("debit")) return "Cartão de Débito";
+            if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) return "Dinheiro";
+            if (m.includes("boleto")) return "Boleto";
+            return breakdownMethod;
+        }
+        const pm = String(order.payment_method || "").toLowerCase();
+        if (pm === "pix" || pm === "bank_transfer") return "Pix";
+        if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
+        if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
+        if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
+        if (pm.includes("boleto")) return "Boleto";
+        return order.payment_method || "Nao informado";
+    };
+    const paymentMethodLabel = `${getPaymentTypeLabel()}${pendingSuffix}`
+    const getPaymentIcon = () => {
+        const type = getPaymentTypeLabel().toLowerCase();
+        const icon = type === "pix" ? "Pix.png" :
+            type.includes("crédito") || type.includes("credito") || type.includes("credit") ? "CreditCard.png" :
+            type.includes("débito") || type.includes("debito") || type.includes("debit") ? "DebitCard.png" : null;
+        return icon ? (
+            <img src={`https://img.dudit.com.br/static/icons/payments/${icon}`} alt={getPaymentTypeLabel()} className="w-5 h-5 object-contain" />
+        ) : null;
+    }
     const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
         ? order.payment_breakdown.filter((entry: any) => entry?.method)
         : Number(order.paid_amount || 0) > 0 && order.payment_method
@@ -578,20 +599,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             <PaymentRow
                                                                 label="Método de Pagamento"
                                                                 value={
-                                                                    <div className="flex items-center gap-2">
-                                                                        {order.payment_provider === "Mercado Pago" && (
-                                                                            <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                                <img
-                                                                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                                                    alt="Mercado Pago"
-                                                                                    className="w-5 h-5 object-contain"
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                            {paymentMethodLabel}
-                                                                        </span>
-                                                                    </div>
+                                                                     <div className="flex items-center gap-2">
+                                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                             {getPaymentIcon()}
+                                                                         </div>
+                                                                         <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                             {paymentMethodLabel}
+                                                                         </span>
+                                                                     </div>
                                                                 } />
 
                                                             {paymentBreakdown.length > 1 && (
@@ -827,20 +842,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <PaymentRow
                                                             label="Método de Pagamento"
                                                             value={
-                                                                <div className="flex items-center gap-2">
-                                                                    {order.payment_provider === "Mercado Pago" && (
-                                                                        <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                            <img
-                                                                                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                                                alt="Mercado Pago"
-                                                                                className="w-5 h-5 object-contain"
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                        {paymentMethodLabel}
-                                                                    </span>
-                                                                </div>
+                                                                 <div className="flex items-center gap-2">
+                                                                     <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                                                                         {getPaymentIcon()}
+                                                                     </div>
+                                                                     <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                         {paymentMethodLabel}
+                                                                     </span>
+                                                                 </div>
                                                             } />
 
                                                         {paymentBreakdown.length > 1 && (

@@ -417,24 +417,36 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const showReturnButton = canRequestResolution || (hasAnyService && isPaidOrPartiallyPaid && !canCancelOrder);
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
-    const isPix = order.payment_method?.toLowerCase() === "pix" || order.payment_method?.toLowerCase() === "bank_transfer";
-    const paymentMethodName = isPix ? "Pix" : (order.payment_method || order.payment_provider || "Pix");
+    const getPaymentTypeLabel = () => {
+        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+        const breakdownMethod = breakdown.find((e: any) => e?.method)?.method;
+        if (breakdownMethod) {
+            const m = breakdownMethod.toLowerCase();
+            if (m === "pix" || m === "bank_transfer") return "Pix";
+            if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) return "Cartão de Crédito";
+            if (m.includes("débito") || m.includes("debito") || m.includes("debit")) return "Cartão de Débito";
+            if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) return "Dinheiro";
+            if (m.includes("boleto")) return "Boleto";
+            return breakdownMethod;
+        }
+        const pm = String(order.payment_method || "").toLowerCase();
+        if (pm === "pix" || pm === "bank_transfer") return "Pix";
+        if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
+        if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
+        if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
+        if (pm.includes("boleto")) return "Boleto";
+        return order.payment_method || order.payment_provider || "Pix";
+    };
 
-    const paymentMethodLower = String(order.payment_method || "").toLowerCase();
-    const isMp = order.payment_provider === "Mercado Pago" || order.payment_method === "Mercado Pago";
-    const isCredit = paymentMethodLower.includes("crédito") || paymentMethodLower.includes("credito") || paymentMethodLower.includes("credit");
-    const isDebit = paymentMethodLower.includes("débito") || paymentMethodLower.includes("debito") || paymentMethodLower.includes("debit");
-    const isCash = paymentMethodLower.includes("dinheiro") || paymentMethodLower.includes("cash") || paymentMethodLower.includes("money");
-
-    const PaymentIconEl = isMp ? (
-        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
-    ) : isPix ? (
+    const paymentMethodName = getPaymentTypeLabel();
+    const typeLower = paymentMethodName.toLowerCase();
+    const PaymentIconEl = typeLower === "pix" ? (
         <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />
-    ) : isCredit ? (
+    ) : typeLower.includes("crédito") || typeLower.includes("credito") || typeLower.includes("credit") ? (
         <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão de Crédito" className="w-5 h-5 object-contain shrink-0" />
-    ) : isDebit ? (
+    ) : typeLower.includes("débito") || typeLower.includes("debito") || typeLower.includes("debit") ? (
         <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão de Débito" className="w-5 h-5 object-contain shrink-0" />
-    ) : isCash ? (
+    ) : typeLower.includes("dinheiro") || typeLower.includes("cash") || typeLower.includes("money") ? (
         <MoneyIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
     ) : (
         <CreditCardIcon size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />
@@ -519,7 +531,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const handlePixClick = async () => {
-        if (order.situation !== "pending" || !isPix) return;
+        if (order.situation !== "pending" || paymentMethodName !== "Pix") return;
         try {
             setLoadingPayment(true);
             const response = await fetch("/api/orders/retry-payment", {
@@ -962,27 +974,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                         const isServiceCancelled = order.situation === "cancelled";
                                                         const isSub = !!item.recurring_plan_id || item.line_type === "subscription";
-                                                        const serviceName = isSub ? "Assinatura" : (item.services?.name || item.product_name);
                                                         const bookingDate = fulfillmentLine?.bookingMetadata?.date || null;
                                                         const bookingTime = fulfillmentLine?.bookingMetadata?.time || null;
+                                                        const addressTitle = isCustomerAddress && addressTypeLabel
+                                                            ? addressTypeLabel
+                                                            : "Endereço do estabelecimento";
                                                         return (
                                                             <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
                                                                 <img
                                                                     src="https://img.dudit.com.br/static/Map.png"
-                                                                    alt={serviceName}
+                                                                    alt={addressTitle}
                                                                     className="w-12 h-12 object-cover rounded-xl shrink-0"
                                                                 />
                                                                 <div className="flex flex-col justify-center min-w-0">
                                                                     <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate flex items-center gap-2">
-                                                                        {serviceName}
+                                                                        {addressTitle}
                                                                         {isServiceCancelled && (
                                                                             <Badge variant="red">Cancelado</Badge>
                                                                         )}
                                                                     </p>
                                                                     <p className="text-xs lg:text-sm text-brand-inactive-text">
                                                                         {bookingDate && bookingTime ? `${formatDate(bookingDate)} às ${bookingTime} | ` : ""}
-                                                                        Local: {getFulfillmentModeLabel(mode)?.toLowerCase()}
-                                                                        {isCustomerAddress && addressTypeLabel ? ` (${addressTypeLabel})` : ""}
+                                                                        {address}
                                                                     </p>
                                                                 </div>
                                                             </div>
@@ -1148,7 +1161,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         </TabsContent>
 
                         <TabsContent value="history" className="mt-0 focus-visible:ring-0">
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 md:p-8 space-y-8">
+                            <div className="space-y-8">
                                 <HistoryTimeline
                                     entries={historyEntries}
                                     title="Status do Acompanhamento"

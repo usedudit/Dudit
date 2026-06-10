@@ -6,6 +6,7 @@ import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finan
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 export type ClaimedRecurringExecution = {
   executionId: string
@@ -137,8 +138,8 @@ async function createRecurringOrder(params: {
 
   const productsMap = new Map((products || []).map((p) => [p.id, p]))
 
-  let subtotal = 0
   const orderItemsPayload: Array<Record<string, unknown>> = []
+  const pricingItems: import("@/lib/services/pricing-engine").PricingItem[] = []
 
   for (const item of productItems) {
     const product = productsMap.get(item.product_id!)
@@ -150,7 +151,13 @@ async function createRecurringOrder(params: {
       : variant?.price ?? Number(product.price || 0)
     const qty = Number(item.quantity || 1)
     const lineSubtotal = unitPrice * qty
-    subtotal += lineSubtotal
+
+    pricingItems.push({
+      productId: item.product_id,
+      unitPrice,
+      quantity: qty,
+      basePrice: unitPrice,
+    })
 
     orderItemsPayload.push({
       product_id: item.product_id,
@@ -163,7 +170,12 @@ async function createRecurringOrder(params: {
     })
   }
 
-  const totalAmount = subtotal
+  const pricingResult = calculateOrderPricing({
+    items: pricingItems,
+    shippingCost: 0,
+  })
+  const totalAmount = pricingResult.finalTotal
+  const subtotal = pricingResult.subtotal
 
   const orderPayload: Record<string, unknown> = {
     partner_id: claim.partnerId,
@@ -187,6 +199,7 @@ async function createRecurringOrder(params: {
     finance_account_id: financeAccountId,
     recurring_subscription_id: claim.subscriptionId,
     recurring_execution_id: claim.executionId,
+    pricing_version: pricingResult.pricingVersion,
   }
 
   const { data: order, error: orderError } = await supabase

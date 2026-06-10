@@ -17,7 +17,6 @@ import {
 } from "@/lib/commerce/capabilities"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
-import { formatDateToBR } from "@/lib/utils/formatters"
 
 export type ResolvedCartLine = {
   cartItemId: string
@@ -201,6 +200,7 @@ export async function resolveCheckoutCartLines(
           unitPrice,
           quantity: qty,
           promotionalPrice: product.promotional_price,
+          basePrice: Number(product.price) || 0,
           categoryId: product.category_id,
         },
         orderItemRow: {
@@ -263,7 +263,7 @@ export async function resolveCheckoutCartLines(
       }
 
       const subtotal = unitPrice * qty
-      const lineName = meta.instantPurchase ? service.name : `${service.name} — ${formatDateToBR(meta.date)} ${meta.time}`
+      const lineName = service.name
       const fulfillmentLine: CheckoutFulfillmentLine = {
         cartItemId: row.id,
         itemType: "service_booking",

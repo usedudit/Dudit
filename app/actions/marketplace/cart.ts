@@ -13,7 +13,6 @@ import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
 import { toCanonicalPaymentType, formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
@@ -825,16 +824,68 @@ export async function checkoutCartAction(
       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
     }
   }
+  // ── Resolve payment method first (before engine call) ──
+  let bestMethod: any = methodResult.data
+  const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
 
+  const { validateMarketplaceCheckoutPayment } = await import(
+    "@/lib/commerce/validate-marketplace-checkout-payment"
+  )
+  const paymentValidation = validateMarketplaceCheckoutPayment({
+    requirements,
+    paymentOption: useMercadoPago ? "mercadopago" : "traditional",
+    paymentMethodType: useMercadoPago ? null : chosenType,
+    productDeliveryType: deliveryType,
+    useMercadoPago,
+  })
+  if (!paymentValidation.valid) return { error: paymentValidation.error }
+
+  if (!bestMethod && !useMercadoPago) {
+    bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
+  }
+
+  if (!bestMethod && !useMercadoPago) {
+    return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
+  }
+
+  // Build payment method config for the unified engine
+  let pmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
+  if (bestMethod?.id) {
+    let fees = bestMethod.payment_method_installment_fees || null
+    if (!fees) {
+      const { data: feesData } = await supabase
+        .from("payment_method_installment_fees")
+        .select("installment_number, fee_percent")
+        .eq("payment_method_id", bestMethod.id)
+      fees = feesData || []
+    }
+    pmtConfig = {
+      discountPercent: Number(bestMethod.discount_percent || 0),
+      feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
+      feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
+      feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
+      maxInstallments: Number(bestMethod.max_installments || 1),
+      installmentNumber: Math.max(1, Number(installments || 1)),
+      installmentFees: (fees || []).map((row: any) => ({
+        installmentNumber: Number(row.installment_number || 1),
+        feePercent: Number(row.fee_percent || 0),
+      })),
+    }
+  }
+
+  // ── Single engine call with payment method ──
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
     shippingCost: deliveryFee,
     coupon: couponPricingData,
     promotions: promotionsData,
+    paymentMethod: pmtConfig,
   })
 
-  totalAmount = pricingResult.finalTotal
+  totalAmount = pricingResult.finalAmountWithPayment
   couponDiscountAmount = pricingResult.couponDiscountAmount
+  const paymentMethodDiscountAmount = pricingResult.paymentMethodDiscountAmount
+  const paymentMethodExtraAmount = pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount
 
   // Handle gift items insertion
   const giftProductIds = pricingResult.appliedGiftProductIds || []
@@ -878,62 +929,6 @@ export async function checkoutCartAction(
     }
   })
 
-  let bestMethod: any = methodResult.data
-
-  const chosenType = toCanonicalPaymentType(bestMethod?.type || bestMethod?.payment_type || paymentMethod)
-
-  const { validateMarketplaceCheckoutPayment } = await import(
-    "@/lib/commerce/validate-marketplace-checkout-payment"
-  )
-  const paymentValidation = validateMarketplaceCheckoutPayment({
-    requirements,
-    paymentOption: useMercadoPago ? "mercadopago" : "traditional",
-    paymentMethodType: useMercadoPago ? null : chosenType,
-    productDeliveryType: deliveryType,
-    useMercadoPago,
-  })
-  if (!paymentValidation.valid) return { error: paymentValidation.error }
-
-  if (!bestMethod && !useMercadoPago) {
-    bestMethod = await pickBestPaymentMethod(supabase as any, chosenType, partnerId, { preferDefault: true })
-  }
-
-  if (!bestMethod && !useMercadoPago) {
-    return { error: "Nenhum método de pagamento ativo foi encontrado para o tipo selecionado." }
-  }
-
-  let paymentAwareTotal = totalAmount
-  let paymentMethodDiscountAmount = 0
-  let paymentMethodExtraAmount = 0
-  if (bestMethod?.id) {
-    let fees = bestMethod.payment_method_installment_fees
-    if (!fees) {
-      const { data: feesData } = await supabase
-        .from("payment_method_installment_fees")
-        .select("installment_number, fee_percent")
-        .eq("payment_method_id", bestMethod.id)
-      fees = feesData || []
-    }
-    const calc = calculatePaymentAmounts({
-      originalAmount: totalAmount,
-      installmentNumber: Math.max(1, Number(installments || 1)),
-      paymentMethod: {
-        feePercent: Number(bestMethod.fee_percent || bestMethod.percentage_rate || 0),
-        feeFixed: Number(bestMethod.fee_fixed || bestMethod.fixed_amount || 0),
-        feeBearer: (bestMethod.fee_bearer || "merchant") as "merchant" | "customer",
-        discountPercent: Number(bestMethod.discount_percent || 0),
-        maxInstallments: Number(bestMethod.max_installments || 1),
-        installmentFees: fees.map((row: any) => ({
-          installmentNumber: Number(row.installment_number || 1),
-          feePercent: Number(row.fee_percent || 0),
-        })),
-      },
-    })
-    paymentAwareTotal = Number(calc.finalAmount || totalAmount)
-    paymentMethodDiscountAmount = Number(calc.paymentMethodDiscountAmount || 0)
-    paymentMethodExtraAmount = Number(calc.interestAmount || 0) + Number(calc.feeAmount || 0)
-  }
-
   const normalizedSnapshot = normalizeCheckoutPricingSnapshot(checkoutPricingSnapshot)
   if (checkoutPricingSnapshot && !normalizedSnapshot) {
     return { error: "Os valores do checkout nÃ£o conferem. Atualize a pÃ¡gina e tente novamente." }
@@ -946,7 +941,7 @@ export async function checkoutCartAction(
   const persistedPaymentMethodExtra = normalizedSnapshot
     ? roundMoney(normalizedSnapshot.paymentMethodInterest + normalizedSnapshot.paymentMethodFee)
     : paymentMethodExtraAmount
-  const persistedTotal = normalizedSnapshot?.finalTotal ?? paymentAwareTotal
+  const persistedTotal = normalizedSnapshot?.finalTotal ?? totalAmount
   const persistedCheckoutPricing = normalizedSnapshot || {
     subtotal: persistedSubtotal,
     couponDiscount: persistedCouponDiscount,
@@ -964,10 +959,10 @@ export async function checkoutCartAction(
       serverRecalculated: {
         subtotal: pricingResult.subtotal,
         couponDiscount: couponDiscountAmount,
-        paymentMethodDiscount: paymentMethodDiscountAmount,
-        paymentMethodExtra: paymentMethodExtraAmount,
+        paymentMethodDiscount: pricingResult.paymentMethodDiscountAmount,
+        paymentMethodExtra: pricingResult.paymentMethodInterestAmount + pricingResult.paymentMethodFeeAmount,
         deliveryFee,
-        finalTotal: paymentAwareTotal,
+        finalTotal: pricingResult.finalAmountWithPayment,
       },
     })
   }
@@ -1079,6 +1074,7 @@ export async function checkoutCartAction(
       promotions_applied: promotionsAppliedSnapshot,
       checkout_fulfillment: fulfillmentPayload,
       order_source: "Vitrine Online",
+      pricing_version: pricingResult.pricingVersion,
       ...preparationPayload,
     })
     .select()

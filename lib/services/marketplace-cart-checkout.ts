@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
-import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing-engine"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import {
@@ -32,6 +32,8 @@ export type MarketplaceCartCheckoutPricing = {
   reserveItems: Array<{ product_id: string; variant_id: string | null; quantity: number }>
   productIds: string[]
   partialCouponWarning: boolean
+  /** Valor final APÓS descontos/juros/taxa do método de pagamento */
+  finalAmountWithPayment: number
 }
 
 export async function priceMarketplaceCartCheckout(
@@ -42,6 +44,8 @@ export async function priceMarketplaceCartCheckout(
     deliveryType: "delivery" | "pickup"
     deliveryAddress: string
     couponCode?: string | null
+    /** Payment method configuration for discount/interest/fee computation */
+    paymentMethod?: PricingInput["paymentMethod"]
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
   const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
@@ -146,6 +150,7 @@ export async function priceMarketplaceCartCheckout(
     shippingCost: deliveryFee,
     coupon: couponPricingData,
     promotions: promotionsData,
+    paymentMethod: params.paymentMethod ?? undefined,
   })
 
   const giftProductIds = pricingResult.appliedGiftProductIds || []
@@ -215,7 +220,7 @@ export async function priceMarketplaceCartCheckout(
       resolvedLines,
       orderItems,
       fulfillmentPayload,
-      totalAmount: pricingResult.finalTotal,
+      totalAmount: pricingResult.finalAmountWithPayment,
       deliveryFee,
       distanceKm,
       deliveryBreakdown,
@@ -226,6 +231,7 @@ export async function priceMarketplaceCartCheckout(
       reserveItems,
       productIds,
       partialCouponWarning,
+      finalAmountWithPayment: pricingResult.finalAmountWithPayment,
     },
   }
 }

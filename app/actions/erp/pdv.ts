@@ -11,7 +11,7 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
-import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { calculateOrderPricing, type PricingItem } from "@/lib/services/pricing-engine"
 import {
     recalculateSplitPaymentFromBaseAmounts,
     toStoredBreakdownAmounts,
@@ -286,13 +286,24 @@ async function syncPosSaleToOrders(params: {
     const distanceKm = draft?.distance_km == null ? null : Number(draft.distance_km || 0)
     const deliveryBreakdown = (draft as any)?.delivery_breakdown || null
     const otherCosts = safeMoney(Number(draft?.other_costs || 0))
-    const subtotalValue = safeMoney((saleItems || []).reduce((acc: number, item: any) => {
-        const lineSubtotal = Number(item?.subtotal ?? Number(item?.quantity || 0) * Number(item?.unit_price || 0))
-        return acc + lineSubtotal
-    }, 0))
     const manualDiscount = safeMoney(Number((draft as any)?.discount_amount ?? sale.discount_amount ?? 0))
     const couponDiscount = safeMoney(Number((draft as any)?.coupon_discount_amount ?? 0))
-    const baseBeforePaymentMethod = safeMoney(Math.max(0, subtotalValue - manualDiscount - couponDiscount + shippingFee + otherCosts))
+
+    // ── Central pricing engine ───────────────────────────────────────────
+    const pricingItems: PricingItem[] = (saleItems || []).map((item: any) => ({
+        productId: item.product_id || null,
+        unitPrice: Number(item.unit_price || 0),
+        quantity: Number(item.quantity || 0),
+    }))
+    const pricingResult = calculateOrderPricing({
+        items: pricingItems,
+        shippingCost: shippingFee,
+        additionalCosts: otherCosts,
+        manualDiscount: manualDiscount > 0 ? { type: "fixed", value: manualDiscount } : null,
+    })
+
+    const subtotalValue = pricingResult.subtotal
+    const baseBeforePaymentMethod = safeMoney(Math.max(0, pricingResult.finalTotal - couponDiscount))
     const finalTotal = safeMoney(Number(sale.final_amount || 0))
     const paymentMethodDiscountAmount = safeMoney(Math.max(0, baseBeforePaymentMethod - finalTotal))
     const paymentMethodExtraAmount = safeMoney(Math.max(0, finalTotal - baseBeforePaymentMethod))
@@ -364,6 +375,7 @@ async function syncPosSaleToOrders(params: {
         created_by: params.actorUserId,
         inventory_deducted: true,
         order_number: finalOrderNumber,
+        pricing_version: pricingResult.pricingVersion,
         ...(preparationEstimate ? {
             preparation_time_minutes: preparationEstimate.preparationTimeMinutes,
             estimated_ready_at: preparationEstimate.readyAt.toISOString(),

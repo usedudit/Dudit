@@ -10,7 +10,7 @@ const PixIcon = ({ className }: { className?: string }) => (
 )
 
 export function PaymentMethodIndicator({ label }: { label?: string | null }) {
-    if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">Não informado</span>
+    if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
     const normalized = label.toLowerCase()
 
     let icon: React.ReactNode = null

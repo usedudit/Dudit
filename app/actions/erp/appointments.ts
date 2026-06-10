@@ -15,6 +15,7 @@ import { increment_usage_counter } from "@/lib/services/subscription.service"
 import { reserveOrderInventory, releaseOrderInventory, finalizeOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -581,6 +582,11 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     for (const row of createdRows) {
       const price = Number(row.price || 0)
       if (price > 0.009 && row.source !== "unavailable") {
+        // ── Central pricing engine ──────────────────────────────────────────
+        const pricingResult = calculateOrderPricing({
+          items: [{ unitPrice: price, quantity: 1 }],
+          shippingCost: 0,
+        })
         // 1. Create a pending order in public.orders
         const { data: order, error: orderErr } = await supabase
           .from("orders")
@@ -588,15 +594,16 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
             partner_id: partnerId,
             buyer_id: row.customer_id || null,
             customer_name: row.customer_name,
-            total_amount: price,
+            total_amount: pricingResult.finalTotal,
             discount_amount: 0,
-            final_amount: price,
+            final_amount: pricingResult.finalTotal,
             paid_amount: 0,
             situation: "pending",
             delivery_status: "delivered", // Fulfilled right away
             delivery_type: "pickup",
             payment_method: "pendente",
             order_source: "Manual",
+            pricing_version: pricingResult.pricingVersion,
             notes: row.notes || null,
             created_by: user.id,
           })
@@ -612,9 +619,9 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
           await supabase.from("order_items").insert({
             order_id: order.id,
             product_name: row.service_name || "Serviço",
-            product_price: price,
+            product_price: pricingResult.subtotal,
             quantity: 1,
-            subtotal: price,
+            subtotal: pricingResult.subtotal,
             line_type: "service_booking",
             fulfillment_mode: row.fulfillment_mode || "on_site",
           })

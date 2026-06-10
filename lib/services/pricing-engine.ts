@@ -4,30 +4,38 @@
  * ============================================================================
  *
  * Single source of truth for all pricing calculations across the platform:
- *   - ERP Orders
+ *   - Marketplace Checkout / Cart
+ *   - Orders (ERP)
  *   - POS (PDV)
- *   - Marketplace Checkout
+ *   - Agendamentos
+ *   - Assinaturas
  *
- * This is a PURE function with zero side effects and zero DB calls.
- * It runs identically on client and server.
+ * Pure function – zero side effects, zero DB calls, runs identically on
+ * client and server.
  *
- * ORDER OF OPERATIONS (fixed):
- *   1. Compute subtotal from items (using promotional price when lower)
- *   2. Apply manual discount sequentially
- *   3. Apply coupon discount sequentially
- *   4. Add shipping (zeroed if coupon grants free shipping)
- *   5. Add additional costs
- *   6. Clamp final total to max(0, result)
+ * ORDER OF OPERATIONS (fixed — NEVER reorder):
+ *   1. subtotalOriginal = sum of basePrice × quantity (before any discount)
+ *   2. Best item price = per-item min(unitPrice, manualPrice, campaignPrice)
+ *   3. ERP manual discount (optional, applied on top of step 2)
+ *   4. Coupon discount (with scenario comparison when allowCombination=false)
+ *   5. Shipping (zeroed if free shipping applies from coupon or campaign)
+ *   6. Additional costs
+ *   7. Payment method discount / interest / fee
+ *   8. finalTotal (never negative)
  *
- * SAFETY RULES:
- *   - Final total is NEVER negative
- *   - Shipping is zeroed exactly once for free-shipping coupons
- *   - max_discount_value is strictly enforced on coupon discounts
- *   - All monetary values are rounded to 2 decimal places
+ * ACCUMULATION RULES:
+ *   - Manual promo (promotionalPrice) and campaign discounts NEVER stack on
+ *     the same item; the engine always picks the lower effective price.
+ *   - Coupon with allowCombination=true stacks on top of item discounts.
+ *   - Coupon with allowCombination=false compares two full scenarios and
+ *     picks the cheaper one for the customer.
+ *   - Payment method calculation runs LAST, on the total after all other
+ *     discounts, shipping and costs.
  * ============================================================================
  */
 
 import { PricingPromotion, PromotionType, DiscountType, ApplyScope } from "@/lib/types/promotion"
+import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,11 +49,14 @@ export type PricingItem = {
   quantity: number
   /** Product-level promotional price (used instead of unitPrice when lower) */
   promotionalPrice?: number | null
+  /** Base price before any discount (product.price) */
+  basePrice?: number | null
   categoryId?: string | null
 }
 
 export type PricingCoupon = {
   id: string
+  code?: string | null
   discountType: "percentage" | "fixed" | "free_shipping"
   discountValue: number | null
   maxDiscountValue: number | null
@@ -63,10 +74,27 @@ export type PricingInput = {
   coupon?: PricingCoupon | null
   /** Pre-loaded promotion data */
   promotions?: PricingPromotion[] | null
+  /** Payment method configuration for discount/interest/fee calculation */
+  paymentMethod?: {
+    discountPercent: number
+    interestType?: "fixed" | "percentage"
+    interestValue?: number
+    feePercent?: number
+    feeFixed?: number
+    feeBearer?: "merchant" | "customer"
+    installmentFees?: Array<{ installmentNumber: number; feePercent: number }>
+    installmentNumber?: number
+    maxInstallments?: number
+  } | null
 }
 
+/** Current pricing engine version for audit trail */
+export const PRICING_VERSION = "2.0"
+
 export type PricingResult = {
-  /** Sum of effective unit prices × quantities */
+  /** Pricing engine version used for this calculation (audit trail) */
+  pricingVersion: string
+  /** Sum of effective unit prices × quantities (after best item price selection) */
   subtotal: number
   /** Savings from promotional prices vs original prices */
   promotionSavings: number
@@ -76,13 +104,13 @@ export type PricingResult = {
   couponDiscountAmount: number
   /** Campaign/Promotion discount amount */
   promotionDiscountAmount: number
-  /** Total of all discounts combined */
+  /** Total of all discounts combined (item + manual + coupon + promotion) */
   totalDiscounts: number
   /** Final shipping value (0 if free shipping coupon/promotion) */
   shipping: number
   /** Other costs passed through */
   additionalCosts: number
-  /** max(0, subtotal - discounts + shipping + additionalCosts) */
+  /** max(0, subtotal - discounts + shipping + additionalCosts), BEFORE payment method adjustments */
   finalTotal: number
   /** ID of the applied coupon (null if none) */
   appliedCouponId: string | null
@@ -94,6 +122,31 @@ export type PricingResult = {
   appliedGiftProductIds: string[]
   /** Whether any item was clamped to min R$0.01 to prevent free/negative pricing */
   minPriceWarning: boolean
+
+  // ── New breakdown fields (additive, never breaking) ────────────────────
+
+  /** Sum of basePrice × quantity before any discount */
+  subtotalOriginal: number
+  /** Total savings from per-item best-price selection (manual promo + campaign) */
+  itemDiscountAmount: number
+  /** Aggregated source of item-level discount: "manual" | "campaign" | "hybrid" | "none" */
+  itemDiscountSource: "manual" | "campaign" | "hybrid" | "none"
+  /** Campaign-only portion of item discounts */
+  campaignDiscountAmount: number
+  /** Coupon code text (when coupon is applied) */
+  couponCode: string | null
+  /** Whether coupon replaced campaign (allowCombination=false scenario B won) */
+  couponReplacedCampaign: boolean
+  /** Payment method discount amount */
+  paymentMethodDiscountAmount: number
+  /** Payment method interest amount */
+  paymentMethodInterestAmount: number
+  /** Payment method fee amount */
+  paymentMethodFeeAmount: number
+  /** Payment method applied discount percent */
+  appliedPaymentDiscountPercent: number
+  /** Final amount after ALL adjustments including payment method (the real charge) */
+  finalAmountWithPayment: number
 }
 
 // ---------------------------------------------------------------------------
@@ -108,19 +161,6 @@ function round2(n: number): number {
 /** Clamp a number to a minimum of 0 */
 function clampMin0(n: number): number {
   return Math.max(0, n)
-}
-
-/** Get the effective unit price considering promotional price */
-function effectiveUnitPrice(item: PricingItem): number {
-  if (
-    item.promotionalPrice != null &&
-    Number.isFinite(item.promotionalPrice) &&
-    item.promotionalPrice > 0 &&
-    item.promotionalPrice < item.unitPrice
-  ) {
-    return item.promotionalPrice
-  }
-  return item.unitPrice
 }
 
 // ---------------------------------------------------------------------------
@@ -163,80 +203,75 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   const rawShipping = clampMin0(Number(input.shippingCost) || 0)
   const rawAdditionalCosts = clampMin0(Number(input.additionalCosts) || 0)
 
-  // ── Step 1: Subtotal ──────────────────────────────────────────────────
-  let subtotal = 0
-  let promotionSavings = 0
-
+  // ── Step 1: subtotalOriginal (base price × qty, no discounts) ─────────
+  let subtotalOriginal = 0
   for (const item of items) {
     const qty = clampMin0(Number(item.quantity) || 0)
-    const originalPrice = clampMin0(Number(item.unitPrice) || 0)
-    const effective = clampMin0(effectiveUnitPrice(item))
-
-    subtotal += round2(effective * qty)
-    promotionSavings += round2((originalPrice - effective) * qty)
+    const base = clampMin0(Number(item.basePrice ?? item.unitPrice) || 0)
+    subtotalOriginal += round2(base * qty)
   }
+  subtotalOriginal = round2(subtotalOriginal)
 
-  subtotal = round2(subtotal)
-  promotionSavings = round2(clampMin0(promotionSavings))
+  // ── Step 2: Per-item best price (manual promo vs campaign) ────────────
+  // Build CartUnits where originalPrice = unitPrice, then apply campaigns
+  // to get campaignPrice. Finally pick min(unitPrice, manualPrice, campaignPrice).
 
-  // Construct individual units for promotion and coupon calculations
   const units: CartUnit[] = []
+
   for (const item of items) {
     const qty = clampMin0(Number(item.quantity) || 0)
-    const effective = clampMin0(effectiveUnitPrice(item))
+    const unitP = clampMin0(Number(item.unitPrice) || 0)
+    // promotionalPrice of 0 means free (will be clamped to R$0.01 minimum)
+    const promoP = item.promotionalPrice != null && item.promotionalPrice >= 0 && item.promotionalPrice < unitP
+      ? clampMin0(item.promotionalPrice)
+      : null
+
+    // Manual effective price (promotionalPrice if valid, else unitPrice)
+    const manualEffective = promoP ?? unitP
+
     for (let i = 0; i < qty; i++) {
       units.push({
         productId: item.productId || null,
         serviceId: item.serviceId || null,
         recurringPlanId: item.recurringPlanId || null,
         categoryId: item.categoryId || null,
-        originalPrice: effective,
-        currentPrice: effective,
+        originalPrice: unitP,
+        currentPrice: manualEffective, // start with manual price
       })
     }
   }
 
-  // ── Step 2: Promotions/Campaigns ──────────────────────────────────────
+  // Apply campaigns on TOP of manual price → we'll then pick min(manual, campaign)
   const appliedPromotionIds: string[] = []
   const appliedGiftProductIds: string[] = []
-  let promotionDiscountAmount = 0
-  let freeShippingApplied = false
+  let campaignDiscountAmount = 0
+  let freeShippingAppliedCampaign = false
 
   const sortedPromotions = [...(input.promotions || [])].sort((a, b) => b.priority - a.priority)
 
+  // We need to track campaign-only discount per unit to compare with manual price
+  // Store the campaign-influenced price separately
+  const campaignUnitPrices = units.map(u => u.originalPrice) // starts as unitPrice
+
+  // Helper: get indices of units in scope for a promotion
+  function eligibleUnitIndices(promo: PricingPromotion): number[] {
+    return units.reduce<number[]>((acc, u, idx) => {
+      if (isItemInScope(u, promo.applyScope, promo.applicableProductIds, promo.applicableCategoryIds, promo.applicableServiceIds)) {
+        acc.push(idx)
+      }
+      return acc
+    }, [])
+  }
+
   for (const promo of sortedPromotions) {
-    // Stacking check:
-    // If coupon is present and does not allow combination, skip all promotions.
-    // If promotion does not allow combination with coupons, skip this promotion.
-    if (input.coupon) {
-      if (input.coupon.allowCombination === false) {
-        continue
-      }
-      if (promo.allowCouponCombination === false) {
-        continue
-      }
-    }
+    // Skip promotions that block coupon combination
+    if (input.coupon && promo.allowCouponCombination === false) continue
 
-    // Filter units in scope
-    const eligibleUnits = units.filter((u) =>
-      isItemInScope(
-        u,
-        promo.applyScope,
-        promo.applicableProductIds,
-        promo.applicableCategoryIds,
-        promo.applicableServiceIds,
-      )
-    )
+    const eligibleIdx = eligibleUnitIndices(promo)
+    if (eligibleIdx.length === 0) continue
 
-    if (eligibleUnits.length === 0) {
-      continue
-    }
-
-    // Check minSpendAmount against eligible units original subtotal
-    const eligibleSubtotal = eligibleUnits.reduce((sum, u) => sum + u.originalPrice, 0)
-    if (promo.minSpendAmount != null && eligibleSubtotal < promo.minSpendAmount) {
-      continue
-    }
+    const eligibleOrigSum = eligibleIdx.reduce((sum, idx) => sum + units[idx].originalPrice, 0)
+    if (promo.minSpendAmount != null && eligibleOrigSum < promo.minSpendAmount) continue
 
     if (promo.promotionType === PromotionType.GIFT) {
       if (promo.giftProductId) {
@@ -248,135 +283,163 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         appliedPromotionIds.push(promo.id)
       }
     } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
-      freeShippingApplied = true
+      freeShippingAppliedCampaign = true
       appliedPromotionIds.push(promo.id)
     } else if (promo.promotionType === PromotionType.BUY_X_PAY_Y) {
       const buyQty = promo.buyQuantity || 1
       const payQty = promo.payQuantity || 1
       if (buyQty > payQty) {
-        // Sort units by currentPrice ascending so that the cheapest units are discounted first
-        eligibleUnits.sort((a, b) => a.currentPrice - b.currentPrice)
-        const totalEligibleQty = eligibleUnits.length
-        const freeUnitsCount = Math.floor(totalEligibleQty / buyQty) * (buyQty - payQty)
-
-        let promoApplied = false
-        for (let i = 0; i < freeUnitsCount; i++) {
-          const unit = eligibleUnits[i]
-          if (unit.currentPrice > 0) {
-            promotionDiscountAmount += unit.currentPrice
-            unit.currentPrice = 0
-            promoApplied = true
+        // Sort eligible indices by campaignUnitPrices ascending (cheapest first)
+        const sortedIdx = [...eligibleIdx].sort((a, b) => campaignUnitPrices[a] - campaignUnitPrices[b])
+        const freeCount = Math.floor(sortedIdx.length / buyQty) * (buyQty - payQty)
+        let applied = false
+        for (let fi = 0; fi < freeCount; fi++) {
+          const idx = sortedIdx[fi]
+          const price = campaignUnitPrices[idx]
+          if (price > 0) {
+            campaignDiscountAmount += price
+            campaignUnitPrices[idx] = 0
+            applied = true
           }
         }
-        if (promoApplied || freeUnitsCount > 0) {
+        if (applied || freeCount > 0) {
           appliedPromotionIds.push(promo.id)
         }
       }
     } else if (promo.promotionType === PromotionType.DISCOUNT) {
-      let discountAmt = 0
-
-      // For fixed discount, filter out units where discount value > unit price
-      let filteredEligible = eligibleUnits
+      // Filter eligible indices where current campaign price >= discount value (for FIXED)
+      let filteredIdx = eligibleIdx
       if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
-        filteredEligible = eligibleUnits.filter((u) => promo.discountValue! <= u.currentPrice)
+        filteredIdx = eligibleIdx.filter(idx => promo.discountValue! <= campaignUnitPrices[idx])
       }
 
-      if (filteredEligible.length === 0) continue
+      if (filteredIdx.length === 0) continue
 
-      const currentEligibleSubtotal = filteredEligible.reduce((sum, u) => sum + u.currentPrice, 0)
+      const eligibleCurrentSum = filteredIdx.reduce((sum, idx) => sum + campaignUnitPrices[idx], 0)
+      if (eligibleCurrentSum <= 0) continue
 
-      if (currentEligibleSubtotal > 0) {
-        if (promo.discountType === DiscountType.PERCENTAGE && promo.discountValue) {
-          const pct = Math.min(100, Math.max(0, promo.discountValue))
-          discountAmt = currentEligibleSubtotal * (pct / 100)
-        } else if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
-          discountAmt = Math.min(promo.discountValue, currentEligibleSubtotal)
-        }
+      let discountAmt = 0
+      if (promo.discountType === DiscountType.PERCENTAGE && promo.discountValue) {
+        const pct = Math.min(100, Math.max(0, promo.discountValue))
+        discountAmt = eligibleCurrentSum * (pct / 100)
+      } else if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
+        discountAmt = Math.min(promo.discountValue, eligibleCurrentSum)
+      }
 
-        if (promo.maxDiscountAmount != null && promo.maxDiscountAmount > 0) {
-          discountAmt = Math.min(discountAmt, promo.maxDiscountAmount)
-        }
+      if (promo.maxDiscountAmount != null && promo.maxDiscountAmount > 0) {
+        discountAmt = Math.min(discountAmt, promo.maxDiscountAmount)
+      }
 
-        discountAmt = round2(discountAmt)
+      discountAmt = round2(discountAmt)
+      if (discountAmt <= 0) continue
 
-        if (discountAmt > 0) {
-          // Distribute discount proportionally across currentPrice of units
-          let remainingDiscount = discountAmt
-          for (let i = 0; i < filteredEligible.length; i++) {
-            const unit = filteredEligible[i]
-            if (unit.currentPrice > 0) {
-              const share = round2((unit.currentPrice / currentEligibleSubtotal) * discountAmt)
-              const actualDiscount = Math.min(share, unit.currentPrice, remainingDiscount)
-              unit.currentPrice = round2(unit.currentPrice - actualDiscount)
-              remainingDiscount = round2(remainingDiscount - actualDiscount)
-            }
+      // Distribute discount proportionally across campaignUnitPrices
+      let remaining = discountAmt
+      for (let fi = 0; fi < filteredIdx.length; fi++) {
+        const idx = filteredIdx[fi]
+        const unitPrice = campaignUnitPrices[idx]
+        const share = round2((unitPrice / eligibleCurrentSum) * discountAmt)
+        const actualDiscount = Math.min(share, unitPrice, remaining)
+        campaignUnitPrices[idx] = round2(clampMin0(campaignUnitPrices[idx] - actualDiscount))
+        remaining = round2(remaining - actualDiscount)
+      }
+
+      // Mop up rounding remainder
+      if (remaining > 0) {
+        for (const idx of filteredIdx) {
+          if (campaignUnitPrices[idx] >= remaining) {
+            campaignUnitPrices[idx] = round2(campaignUnitPrices[idx] - remaining)
+            remaining = 0
+            break
           }
-
-          // Clean up rounding remainder
-          if (remainingDiscount > 0) {
-            for (const unit of filteredEligible) {
-              if (unit.currentPrice >= remainingDiscount) {
-                unit.currentPrice = round2(unit.currentPrice - remainingDiscount)
-                remainingDiscount = 0
-                break
-              }
-            }
-          }
-
-          promotionDiscountAmount += discountAmt
-          appliedPromotionIds.push(promo.id)
         }
       }
+
+      campaignDiscountAmount = round2(campaignDiscountAmount + discountAmt)
+      appliedPromotionIds.push(promo.id)
     }
   }
 
-  promotionDiscountAmount = round2(clampMin0(promotionDiscountAmount))
+  campaignDiscountAmount = round2(clampMin0(campaignDiscountAmount))
 
-  // Enforce minimum unit price of R$0.01 (never free, never negative)
+  // ── Step 2b: Compare manual vs campaign per unit, pick the best ───────
+  let itemDiscountAmount = 0
+  let itemCampaignSavings = 0
+  let itemManualSavings = 0
+  let aggregatedSource: "manual" | "campaign" | "hybrid" | "none" = "none"
   let minPriceWarning = false
-  for (const unit of units) {
-    if (unit.currentPrice < 0.01) {
-      const adjustment = round2(0.01 - unit.currentPrice)
-      promotionDiscountAmount = round2(promotionDiscountAmount - adjustment)
-      unit.currentPrice = 0.01
+
+  for (let ui = 0; ui < units.length; ui++) {
+    const u = units[ui]
+    const unitPrice = u.originalPrice
+    const manualP = u.currentPrice   // this was set to manual effective price earlier
+    const campaignP = campaignUnitPrices[ui]
+
+    // Pick the best price: min(unitPrice, manualPrice, campaignPrice)
+    const bestPrice = Math.min(unitPrice, manualP, campaignP)
+
+    // Attribute savings to source BEFORE clamping
+    const rawSavings = round2(unitPrice - bestPrice)
+    if (rawSavings > 0) {
+      itemDiscountAmount = round2(itemDiscountAmount + rawSavings)
+      if (bestPrice === manualP && manualP < unitPrice) {
+        itemManualSavings = round2(itemManualSavings + rawSavings)
+      } else if (bestPrice === campaignP && campaignP < unitPrice) {
+        itemCampaignSavings = round2(itemCampaignSavings + rawSavings)
+      }
+    }
+
+    // Clamp to minimum R$ 0.01
+    let effectiveBest = bestPrice
+    if (effectiveBest < 0.01) {
+      effectiveBest = 0.01
       minPriceWarning = true
     }
-  }
-  promotionDiscountAmount = round2(clampMin0(promotionDiscountAmount))
 
-  let currentTotal = round2(clampMin0(subtotal - promotionDiscountAmount))
-
-  // ── Step 3: Manual Discount ───────────────────────────────────────────
-  let manualDiscountAmount = 0
-
-  if (input.manualDiscount && input.manualDiscount.value > 0) {
-    const { type, value } = input.manualDiscount
-
-    if (type === "percentage") {
-      const pct = Math.min(100, Math.max(0, value))
-      manualDiscountAmount = round2(currentTotal * (pct / 100))
-    } else {
-      manualDiscountAmount = round2(Math.min(value, currentTotal))
-    }
+    u.currentPrice = effectiveBest
   }
 
-  manualDiscountAmount = round2(clampMin0(manualDiscountAmount))
-  currentTotal = round2(clampMin0(currentTotal - manualDiscountAmount))
+  // Determine aggregated source
+  if (itemManualSavings > 0 && itemCampaignSavings > 0) {
+    aggregatedSource = "hybrid"
+  } else if (itemManualSavings > 0) {
+    aggregatedSource = "manual"
+  } else if (itemCampaignSavings > 0) {
+    aggregatedSource = "campaign"
+  }
 
-  // ── Step 4: Coupon Discount ───────────────────────────────────────────
+  // promotionSavings = campaign-only portion (backward compat)
+  const promotionSavings = round2(clampMin0(itemCampaignSavings))
+  // promotionDiscountAmount = total campaign discounts (backward compat)
+  const promotionDiscountAmount = round2(clampMin0(itemCampaignSavings))
+
+  const subtotal = round2(clampMin0(units.reduce((sum, u) => sum + u.currentPrice, 0)))
+
+  let currentTotal = subtotal
+
+  // ── Step 3: Coupon (with scenario comparison) ─────────────────────────
+  // Coupon is computed BEFORE manual discount so scenario comparison is clean.
   let couponDiscountAmount = 0
   let appliedCouponId: string | null = null
+  let couponCode: string | null = null
+  let couponReplacedCampaign = false
+  let freeShippingApplied = freeShippingAppliedCampaign
+  let finalPromotionIds = [...appliedPromotionIds]
+  let finalGiftIds = [...appliedGiftProductIds]
+  let finalPromotionDiscountAmount = promotionDiscountAmount
+  let finalCampaignDiscountAmount = itemCampaignSavings
+  let finalItemDiscountAmount = itemDiscountAmount
+  let finalItemDiscountSource = aggregatedSource
+  let finalSubtotal = subtotal
+  let scenarioCouponTotal = currentTotal // total after coupon step (pre-manualDiscount)
 
   if (input.coupon) {
     const coupon = input.coupon
     appliedCouponId = coupon.id
+    couponCode = coupon.code || null
 
-    const hasManualDiscount = manualDiscountAmount > 0
-    const hasPromotionSavings = promotionSavings > 0
-    const hasCampaignPromotions = promotionDiscountAmount > 0
-    const isCombinationBlocked = coupon.allowCombination === false && (hasManualDiscount || hasPromotionSavings || hasCampaignPromotions)
-
-    if (!isCombinationBlocked) {
+    if (coupon.allowCombination === true) {
+      // Coupon stacks on top of current item-level subtotal
       if (coupon.discountType === "percentage" && coupon.discountValue) {
         const pct = Math.min(100, Math.max(0, coupon.discountValue))
         couponDiscountAmount = round2(currentTotal * (pct / 100))
@@ -384,52 +447,149 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         couponDiscountAmount = round2(Math.min(coupon.discountValue, currentTotal))
       }
 
-      // Enforce max_discount_value cap
-      if (
-        coupon.maxDiscountValue != null &&
-        coupon.maxDiscountValue > 0 &&
-        couponDiscountAmount > coupon.maxDiscountValue
-      ) {
+      if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponDiscountAmount > coupon.maxDiscountValue) {
         couponDiscountAmount = round2(coupon.maxDiscountValue)
       }
+      couponDiscountAmount = round2(clampMin0(couponDiscountAmount))
+      scenarioCouponTotal = round2(clampMin0(currentTotal - couponDiscountAmount))
+    } else {
+      // allowCombination === false: compare two scenarios
+      // Scenario A: campaign-only (currentTotal already has item best-price applied)
+      const totalWithCampaigns = currentTotal
 
-      // Free shipping
-      if (coupon.freeShipping || coupon.discountType === "free_shipping") {
-        freeShippingApplied = true
+      // Scenario B: coupon-only on subtotalOriginal (no item discounts)
+      let couponOnOriginal = 0
+      if (coupon.discountType === "percentage" && coupon.discountValue) {
+        const pct = Math.min(100, Math.max(0, coupon.discountValue))
+        couponOnOriginal = round2(subtotalOriginal * (pct / 100))
+      } else if (coupon.discountType === "fixed" && coupon.discountValue) {
+        couponOnOriginal = round2(Math.min(coupon.discountValue, subtotalOriginal))
       }
+      if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponOnOriginal > coupon.maxDiscountValue) {
+        couponOnOriginal = round2(coupon.maxDiscountValue)
+      }
+      couponOnOriginal = round2(clampMin0(couponOnOriginal))
+      const totalWithCouponOnly = round2(clampMin0(subtotalOriginal - couponOnOriginal))
+
+      // Compare – manualDiscount is NOT yet applied to either, so comparison is fair
+      if (totalWithCouponOnly < totalWithCampaigns) {
+        // Coupon scenario wins → reverse campaign discounts
+        couponReplacedCampaign = true
+        couponDiscountAmount = couponOnOriginal
+        finalPromotionDiscountAmount = 0
+        finalCampaignDiscountAmount = 0
+        finalItemDiscountAmount = 0
+        finalItemDiscountSource = "none"
+        finalSubtotal = subtotalOriginal
+        finalPromotionIds = []
+        finalGiftIds = []
+        freeShippingApplied = (coupon.freeShipping || coupon.discountType === "free_shipping")
+          ? true
+          : freeShippingAppliedCampaign
+        scenarioCouponTotal = totalWithCouponOnly
+      } else {
+        // Campaign scenario wins → no coupon applied
+        couponDiscountAmount = 0
+        appliedCouponId = null
+        couponCode = null
+        scenarioCouponTotal = totalWithCampaigns
+      }
+    }
+
+    // Free shipping from coupon
+    if (appliedCouponId && (coupon.freeShipping || coupon.discountType === "free_shipping")) {
+      freeShippingApplied = true
     }
   }
 
   couponDiscountAmount = round2(clampMin0(couponDiscountAmount))
-  currentTotal = round2(clampMin0(currentTotal - couponDiscountAmount))
+
+  // ── Step 4: ERP manual discount ───────────────────────────────────────
+  let manualDiscountAmount = 0
+  if (input.manualDiscount && input.manualDiscount.value > 0) {
+    const { type, value } = input.manualDiscount
+    if (type === "percentage") {
+      const pct = Math.min(100, Math.max(0, value))
+      manualDiscountAmount = round2(scenarioCouponTotal * (pct / 100))
+    } else {
+      manualDiscountAmount = round2(Math.min(value, scenarioCouponTotal))
+    }
+  }
+  manualDiscountAmount = round2(clampMin0(manualDiscountAmount))
+  currentTotal = round2(clampMin0(scenarioCouponTotal - manualDiscountAmount))
 
   // ── Step 5: Shipping ──────────────────────────────────────────────────
   const shipping = freeShippingApplied ? 0 : round2(rawShipping)
 
-  // ── Step 6: Additional Costs ──────────────────────────────────────────
+  // ── Step 6: Additional costs ──────────────────────────────────────────
   const additionalCosts = round2(rawAdditionalCosts)
-
-  // ── Step 7: Final Total (never negative) ──────────────────────────────
-  const totalDiscounts = round2(manualDiscountAmount + couponDiscountAmount + promotionDiscountAmount)
   currentTotal = round2(clampMin0(currentTotal + shipping))
   currentTotal = round2(clampMin0(currentTotal + additionalCosts))
+
+  // ── Step 7: Payment method discount / interest / fee ──────────────────
+  let paymentMethodDiscountAmount = 0
+  let paymentMethodInterestAmount = 0
+  let paymentMethodFeeAmount = 0
+  let appliedPaymentDiscountPercent = 0
+  let finalAmountWithPayment = currentTotal
+
+  if (input.paymentMethod) {
+    const pmt = input.paymentMethod
+    const paymentCalc = calculatePaymentAmounts({
+      originalAmount: currentTotal,
+      installmentNumber: pmt.installmentNumber ?? 1,
+      paymentMethod: {
+        feePercent: pmt.feePercent ?? 0,
+        feeFixed: pmt.feeFixed ?? 0,
+        feeBearer: pmt.feeBearer ?? "merchant",
+        discountPercent: pmt.discountPercent ?? 0,
+        maxInstallments: pmt.maxInstallments ?? 24,
+        installmentFees: pmt.installmentFees ?? [],
+        fixedInterestPercent: pmt.interestType === "fixed" ? (pmt.interestValue ?? 0) : 0,
+      },
+    })
+
+    paymentMethodDiscountAmount = round2(clampMin0(paymentCalc.paymentMethodDiscountAmount))
+    paymentMethodInterestAmount = round2(clampMin0(paymentCalc.interestAmount))
+    paymentMethodFeeAmount = round2(clampMin0(paymentCalc.feeAmount))
+    appliedPaymentDiscountPercent = paymentCalc.appliedDiscountPercent
+    finalAmountWithPayment = round2(clampMin0(paymentCalc.finalAmount))
+  }
+
+  // ── Step 8: Final total ───────────────────────────────────────────────
+  const totalDiscounts = round2(manualDiscountAmount + couponDiscountAmount + finalPromotionDiscountAmount)
   const finalTotal = round2(clampMin0(currentTotal))
 
   return {
-    subtotal,
+    pricingVersion: PRICING_VERSION,
+    // Existing backward-compat fields
+    subtotal: finalSubtotal,
     promotionSavings,
     manualDiscountAmount,
     couponDiscountAmount,
-    promotionDiscountAmount,
+    promotionDiscountAmount: finalPromotionDiscountAmount,
     totalDiscounts,
     shipping,
     additionalCosts,
     finalTotal,
     appliedCouponId,
     freeShippingApplied,
-    appliedPromotionIds,
-    appliedGiftProductIds,
+    appliedPromotionIds: finalPromotionIds,
+    appliedGiftProductIds: finalGiftIds,
     minPriceWarning,
+
+    // New breakdown fields
+    subtotalOriginal,
+    itemDiscountAmount: finalItemDiscountAmount,
+    itemDiscountSource: finalItemDiscountSource,
+    campaignDiscountAmount: finalCampaignDiscountAmount,
+    couponCode,
+    couponReplacedCampaign,
+    paymentMethodDiscountAmount,
+    paymentMethodInterestAmount,
+    paymentMethodFeeAmount,
+    appliedPaymentDiscountPercent,
+    finalAmountWithPayment,
   }
 }
 

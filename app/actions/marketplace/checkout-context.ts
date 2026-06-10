@@ -13,6 +13,9 @@ import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolv
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
+import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
+import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export type MarketplaceCheckoutDepositConfig = {
   available: boolean
@@ -85,7 +88,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     } else subscriptionsSubtotal += total
   }
 
-  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult] = await Promise.all([
+  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult, promosMap] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -102,7 +105,42 @@ export async function getMarketplaceCheckoutContextAction(input: {
       .eq("type", "pix")
       .eq("is_active", true)
       .maybeSingle(),
+    listActivePromotionsInBatch([resolved.partnerId], user.id),
   ])
+
+  const partnerPromotions = promosMap?.[resolved.partnerId] || []
+
+  // Apply campaign pricing to display lines and fix image URLs
+  for (const line of displayLines) {
+    if (line.imageUrl) {
+      line.imageUrl = getR2ImageUrl(line.imageUrl)
+    }
+    if (line.lineKind !== "product") continue
+    // Find the original resolved line for base price / promo data
+    const resolvedLine = resolved.lines.find(l => l.cartItemId === line.lineId)
+    if (!resolvedLine) continue
+    const basePrice = Number((resolvedLine.pricingItem as any).basePrice || line.unitPrice)
+    const promoPrice = (resolvedLine.pricingItem as any).promotionalPrice
+    const hasPromo = promoPrice != null && Number(promoPrice) > 0 && Number(promoPrice) < basePrice
+    const bestCampaign = partnerPromotions
+      .map((p: any) => computeItemCampaignPricing(
+        basePrice,
+        hasPromo ? Number(promoPrice) : null,
+        p,
+        { productId: resolvedLine.productId, categoryId: resolvedLine.categoryId },
+      ))
+      .filter((r: any) => r.discountSource === "campaign")
+      .sort((a: any, b: any) => a.bestPrice - b.bestPrice)[0]
+    if (bestCampaign) {
+      line.unitPrice = bestCampaign.bestPrice
+      line.lineTotal = bestCampaign.bestPrice * line.quantity
+    }
+  }
+
+  // Recalculate productsSubtotal with campaign pricing
+  productsSubtotal = displayLines
+    .filter(l => l.lineKind === "product")
+    .reduce((sum, l) => sum + l.lineTotal, 0)
 
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)

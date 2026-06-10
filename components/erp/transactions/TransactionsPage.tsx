@@ -30,7 +30,6 @@ import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
-import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
 import type {
     ERPTransaction,
     FinancialTransactionCursor,

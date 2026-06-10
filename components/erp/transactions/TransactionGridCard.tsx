@@ -7,6 +7,7 @@ import { CreditCardIcon, FileIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import type { ERPTransaction } from "../../../lib/services/transactions.types"
+import { PaymentMethodIndicator } from "./PaymentMethodIndicator";
 
 interface TransactionGridCardProps {
     transaction: ERPTransaction
@@ -82,9 +83,9 @@ const TransactionGridCard = React.memo(
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                {transaction.paymentType}
-                            </span>
+                            <div className="mt-1 flex items-center">
+                                <PaymentMethodIndicator label={transaction.paymentType} />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -109,9 +110,8 @@ const TransactionGridCard = React.memo(
                         <div className="flex flex-col gap-0.5 items-end shrink-0 text-right">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Vencimento</span>
                             <span className={`text-sm font-bold ${transaction.isOverdue ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
-                                {transaction.dueDateShort}
+                                {transaction.dueDateShort} | <DueDateCountdown transaction={transaction} align="right" />
                             </span>
-                            <DueDateCountdown transaction={transaction} align="right" />
                         </div>
                     </div>
 
