@@ -745,4 +745,101 @@ describe("computeItemCampaignPricing", () => {
     const r = computeItemCampaignPricing(1, null, discountPromotion({ discountValue: 99 }))
     expect(r.bestPrice).toBe(0.01)
   })
+
+  describe("Coupon & Campaign & Promotional Price Combination Matrix", () => {
+    it("stacks coupon and campaign when both allow combination", () => {
+      // Product: 100
+      // Campaign: 10% off (allowCouponCombination = true) -> 90
+      // Coupon: 10% off (allowCombination = true) -> 10% on 90 -> 81
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10, allowCouponCombination: true })],
+        coupon: coupon({ discountValue: 10, allowCombination: true }),
+      })
+      expect(r.subtotal).toBe(90)
+      expect(r.couponDiscountAmount).toBe(9)
+      expect(r.finalTotal).toBe(81)
+      expect(r.appliedCouponId).toBe("coupon-1")
+    })
+
+    it("does not stack coupon and campaign when coupon blocks combination", () => {
+      // Product: 100
+      // Campaign: 10% off (allowCouponCombination = true) -> 90
+      // Coupon: 20% off (allowCombination = false) -> 80
+      // Scenario A (campaign): 90. Scenario B (coupon): 80.
+      // Coupon wins! Subtotal reverts to 100, coupon discount 20, final total 80.
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10, allowCouponCombination: true })],
+        coupon: coupon({ discountValue: 20, allowCombination: false }),
+      })
+      expect(r.finalTotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(20)
+      expect(r.appliedCouponId).toBe("coupon-1")
+      expect(r.couponReplacedCampaign).toBe(true)
+    })
+
+    it("does not stack coupon and campaign when campaign blocks combination", () => {
+      // Product: 100
+      // Campaign: 20% off (allowCouponCombination = false) -> 80
+      // Coupon: 10% off (allowCombination = true) -> 90
+      // Campaign (80) wins! Coupon (90) is NOT applied because they cannot combine.
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 20, allowCouponCombination: false })],
+        coupon: coupon({ discountValue: 10, allowCombination: true }),
+      })
+      expect(r.finalTotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(0)
+      expect(r.appliedCouponId).toBeNull()
+      expect(r.couponReplacedCampaign).toBe(false)
+    })
+
+    it("does not stack coupon and campaign when both block combination", () => {
+      // Product: 100
+      // Campaign: 10% off (allowCouponCombination = false) -> 90
+      // Coupon: 20% off (allowCombination = false) -> 80
+      // Coupon (80) wins!
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10, allowCouponCombination: false })],
+        coupon: coupon({ discountValue: 20, allowCombination: false }),
+      })
+      expect(r.finalTotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(20)
+      expect(r.appliedCouponId).toBe("coupon-1")
+    })
+
+    it("stacks coupon on top of manual promotional price when coupon allows combination", () => {
+      // Product: price = 100, promotionalPrice = 80
+      // Coupon: 10% off (allowCombination = true)
+      // stacks -> 10% off on 80 -> 72
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, promotionalPrice: 80, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, allowCombination: true }),
+      })
+      expect(r.subtotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(8)
+      expect(r.finalTotal).toBe(72)
+    })
+
+    it("does not stack coupon with promotional price when coupon blocks combination", () => {
+      // Product: price = 100, promotionalPrice = 90
+      // Coupon: 20% off (allowCombination = false)
+      // Since they cannot combine, Scenario A (manual promo) = 90. Scenario B (coupon on original) = 80.
+      // Coupon wins! Subtotal reverts to 100, coupon discount 20, final total 80.
+      const r = calculateOrderPricing({
+        items: [{ unitPrice: 100, promotionalPrice: 90, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 20, allowCombination: false }),
+      })
+      expect(r.finalTotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(20)
+    })
+  })
 })

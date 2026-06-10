@@ -122,17 +122,19 @@ export async function validateCouponRow(
     return { valid: false, discountAmount: 0, errorMessage: "Valor mínimo da sacola não atingido." }
   }
 
-  // Allow combination check (do not allow combining with products on promotion or manual discounts)
-  if (coupon.allow_combination === false) {
-    // 1. Check manual discount
-    if (input.manualDiscount && input.manualDiscount.value > 0) {
-      return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com descontos manuais." }
-    }
+  // ── Allow combination check ──────────────────────────────────────────
+  // A. Check manual discount (only blocks if coupon itself blocks combination)
+  if (coupon.allow_combination === false && input.manualDiscount && input.manualDiscount.value > 0) {
+    return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com descontos manuais." }
+  }
 
-    // 2. Check promotional_price on products
-    const items = input.items || []
-    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
-    if (productIds.length > 0) {
+  const items = input.items || []
+  const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
+  const serviceIds = Array.from(new Set(items.map((item) => item.serviceId).filter(Boolean))) as string[]
+
+  if (productIds.length > 0 || serviceIds.length > 0) {
+    // B. Check promotional_price on products (only blocks if coupon itself blocks combination)
+    if (coupon.allow_combination === false && productIds.length > 0) {
       const { data: products } = await supabase
         .from("products")
         .select("id, price, promotional_price")
@@ -144,31 +146,91 @@ export async function validateCouponRow(
       if (hasPromo) {
         return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com produtos em promoção." }
       }
+    }
 
-      // 3. Check if any product is in an active campaign promotion
-      const { data: allActivePromos } = await supabase
-        .from("promotions")
-        .select("id")
-        .eq("partner_id", input.partnerId)
-        .eq("is_active", true)
-        .not("campaign_id", "is", null)
+    // C. Check promotional_price on services (only blocks if coupon itself blocks combination)
+    if (coupon.allow_combination === false && serviceIds.length > 0) {
+      const { data: services } = await supabase
+        .from("services")
+        .select("id, price, promotional_price")
+        .in("id", serviceIds)
 
-      if (allActivePromos && allActivePromos.length > 0) {
-        const activePromoIds = allActivePromos.map((p: any) => p.id)
-        const { data: promoProducts } = await supabase
-          .from("promotion_products")
-          .select("product_id")
-          .in("promotion_id", activePromoIds)
-          .in("product_id", productIds)
+      const hasPromo = (services || []).some(
+        (s: any) => s.promotional_price !== null && s.promotional_price > 0 && s.promotional_price < s.price
+      )
+      if (hasPromo) {
+        return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com serviços em promoção." }
+      }
+    }
 
-        if (promoProducts && promoProducts.length > 0) {
+    // D. Check active campaign promotions compatibility
+    let productCategoryIds: string[] = []
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("category_id")
+        .in("id", productIds)
+      productCategoryIds = Array.from(new Set((products || []).map((p: any) => p.category_id).filter(Boolean)))
+    }
+
+    const { data: allActivePromos } = await supabase
+      .from("promotions")
+      .select(`
+        id,
+        allow_coupon_combination,
+        apply_scope
+      `)
+      .eq("partner_id", input.partnerId)
+      .eq("is_active", true)
+      .not("campaign_id", "is", null)
+
+    if (allActivePromos && allActivePromos.length > 0) {
+      const promoIds = allActivePromos.map((p: any) => p.id)
+
+      const [promoProductsRes, promoServicesRes, promoCategoriesRes] = await Promise.all([
+        productIds.length > 0
+          ? supabase.from("promotion_products").select("promotion_id, product_id").in("promotion_id", promoIds).in("product_id", productIds)
+          : Promise.resolve({ data: [] }),
+        serviceIds.length > 0
+          ? supabase.from("promotion_services").select("promotion_id, service_id").in("promotion_id", promoIds).in("service_id", serviceIds)
+          : Promise.resolve({ data: [] }),
+        productCategoryIds.length > 0
+          ? supabase.from("promotion_categories").select("promotion_id, category_id").in("promotion_id", promoIds).in("category_id", productCategoryIds)
+          : Promise.resolve({ data: [] })
+      ])
+
+      const promoProducts = promoProductsRes.data || []
+      const promoServices = promoServicesRes.data || []
+      const promoCategories = promoCategoriesRes.data || []
+
+      const applicablePromotions = allActivePromos.filter((p: any) => {
+        if (p.apply_scope === "all" || p.apply_scope === "entire_cart") {
+          return items.length > 0
+        }
+        if (p.apply_scope === "specific_products" || p.apply_scope === "products") {
+          return promoProducts.some((pp: any) => pp.promotion_id === p.id)
+        }
+        if (p.apply_scope === "specific_services" || p.apply_scope === "services") {
+          return promoServices.some((ps: any) => ps.promotion_id === p.id)
+        }
+        if (p.apply_scope === "specific_categories" || p.apply_scope === "category") {
+          return promoCategories.some((pc: any) => pc.promotion_id === p.id)
+        }
+        return false
+      })
+
+      if (applicablePromotions.length > 0) {
+        if (coupon.allow_combination === false) {
           return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com campanhas ativas." }
+        }
+
+        const hasBlockedCampaign = applicablePromotions.some((p: any) => p.allow_coupon_combination === false)
+        if (hasBlockedCampaign) {
+          return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com a campanha ativa." }
         }
       }
     }
   }
-
-  const items = input.items || []
   let partialApplicabilityWarning = false
 
   // Apply scope (products, categories, services, subscriptions)

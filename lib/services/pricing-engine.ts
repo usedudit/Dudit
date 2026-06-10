@@ -264,8 +264,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   }
 
   for (const promo of sortedPromotions) {
-    // Skip promotions that block coupon combination
-    if (input.coupon && promo.allowCouponCombination === false) continue
+    // Skip promotions that block coupon combination (handled during coupon validation and stacking phase)
 
     const eligibleIdx = eligibleUnitIndices(promo)
     if (eligibleIdx.length === 0) continue
@@ -438,7 +437,14 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     appliedCouponId = coupon.id
     couponCode = coupon.code || null
 
-    if (coupon.allowCombination === true) {
+    const hasAppliedNonCombinablePromo = finalPromotionIds.some(promoId => {
+      const promo = (input.promotions || []).find(p => p.id === promoId)
+      return promo && promo.allowCouponCombination === false
+    })
+
+    const combinationAllowed = coupon.allowCombination === true && !hasAppliedNonCombinablePromo
+
+    if (combinationAllowed) {
       // Coupon stacks on top of current item-level subtotal
       if (coupon.discountType === "percentage" && coupon.discountValue) {
         const pct = Math.min(100, Math.max(0, coupon.discountValue))

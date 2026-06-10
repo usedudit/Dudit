@@ -38,31 +38,7 @@ import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
-function loggedComputeItemDisplayPrice(
-    surface: string,
-    id: string,
-    price: number,
-    promotional_price: number | null,
-    promotions: any[],
-    meta?: any
-) {
-    console.log(`[${surface}] Before computeItemDisplayPrice for ${id}:`, {
-        id,
-        price,
-        promotional_price,
-        promotionsCount: promotions.length,
-        promotions,
-    });
-    const res = computeItemDisplayPrice(price, promotional_price, promotions, meta);
-    console.log(`[${surface}] After computeItemDisplayPrice for ${id}:`, {
-        bestPrice: res.bestPrice,
-        originalPrice: res.originalPrice,
-        discountSource: res.discountSource,
-        discountPercent: res.discountPercent,
-        badgeVariant: res.badgeVariant,
-    });
-    return res;
-}
+
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
@@ -771,7 +747,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 notifyError(`"${product.name}" está sem estoque disponível.`)
                 return
             }
-            const pricing = loggedComputeItemDisplayPrice("CreateOrder", product.id, Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
+            const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
             const newItem = {
                 id: Math.random().toString(36).substr(2, 9),
                 productId: product.id,
