@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
-import { ItemCard, VitrineCard } from "./shared-components"
+import { ItemCard, VitrineCard, HeroBanner } from "./shared-components"
 import { IconPlaceholder, Button, DefaultModal, RadioButton } from "@/components/reusable"
 import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
@@ -18,7 +18,7 @@ import {
     SlidersHorizontal,
 } from "lucide-react"
 import Link from "next/link"
-import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
+import { applySellerDiversity, calcCategoryBrowseScore, sortByTrendingScore } from "@/lib/marketplace/ranking"
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
@@ -153,18 +153,169 @@ const ExploreContentSkeleton = ({ type }: { type: string }) => {
     )
 }
 
+// Category carousel with horizontal scroll
+const CategoryCarousel = ({
+    categories,
+    selectedCategories,
+    onToggleCategory,
+    onSeeAllCategories,
+}: {
+    categories: { id?: string; name: string; icon_url: string | null }[]
+    selectedCategories: string[]
+    onToggleCategory: (catName: string) => void
+    onSeeAllCategories: () => void
+}) => {
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const [showLeftArrow, setShowLeftArrow] = useState(false)
+    const [showRightArrow, setShowRightArrow] = useState(false)
+
+    const checkScroll = () => {
+        const el = scrollContainerRef.current
+        if (el) {
+            setShowLeftArrow(el.scrollLeft > 2)
+            setShowRightArrow(el.scrollLeft + el.clientWidth < el.scrollWidth - 5)
+        }
+    }
+
+    useEffect(() => {
+        const el = scrollContainerRef.current
+        if (el) {
+            checkScroll()
+            el.addEventListener("scroll", checkScroll)
+            window.addEventListener("resize", checkScroll)
+            const timer = setTimeout(checkScroll, 500)
+            return () => {
+                el.removeEventListener("scroll", checkScroll)
+                window.removeEventListener("resize", checkScroll)
+                clearTimeout(timer)
+            }
+        }
+    }, [categories])
+
+    const scroll = (direction: 'left' | 'right') => {
+        const el = scrollContainerRef.current
+        if (el) {
+            const scrollAmount = el.clientWidth * 0.75
+            el.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            })
+        }
+    }
+
+    return (
+        <div className="w-full animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg lg:text-2xl font-medium text-brand-dark">Categorias</h2>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={onSeeAllCategories}
+                        className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                    >
+                        Ver tudo
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                        {showLeftArrow && (
+                            <button
+                                onClick={() => scroll('left')}
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                            >
+                                <ChevronLeft className="w-4 h-4 text-brand-dark" />
+                            </button>
+                        )}
+                        {showRightArrow && (
+                            <button
+                                onClick={() => scroll('right')}
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                            >
+                                <ChevronRight className="w-4 h-4 text-brand-dark" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div
+                ref={scrollContainerRef}
+                className="flex gap-3 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-2 px-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {/* "Tudo" card */}
+                <div className="snap-start shrink-0 w-[110px]">
+                    <button
+                        onClick={() => onToggleCategory("__all__")}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${
+                            selectedCategories.length === 0
+                                ? 'bg-brand-green text-white border-brand-green'
+                                : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                        }`}
+                    >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            selectedCategories.length === 0 ? 'bg-white/20' : 'bg-brand-gray'
+                        }`}>
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1" />
+                                <rect x="14" y="3" width="7" height="7" rx="1" />
+                                <rect x="3" y="14" width="7" height="7" rx="1" />
+                                <rect x="14" y="14" width="7" height="7" rx="1" />
+                            </svg>
+                        </div>
+                        <span className="text-xs font-bold text-center leading-tight">Tudo</span>
+                    </button>
+                </div>
+
+                {/* Category cards */}
+                {(categories || []).map((cat) => {
+                    const isSelected = selectedCategories.includes(cat.name)
+                    return (
+                        <div key={cat.name} className="snap-start shrink-0 w-[110px]">
+                            <button
+                                onClick={() => onToggleCategory(cat.name)}
+                                className={`flex flex-col items-center gap-2 p-3 rounded-[16px] transition-all duration-200 w-full h-full border ${
+                                    isSelected
+                                        ? 'bg-brand-green text-white border-brand-green'
+                                        : 'bg-white text-brand-dark border-gray-200 hover:border-brand-green hover:bg-green-50'
+                                }`}
+                            >
+                                {cat.icon_url ? (
+                                    <img src={cat.icon_url} alt={cat.name} className="w-10 h-10 object-contain" />
+                                ) : (
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                        isSelected ? 'bg-white/20' : 'bg-brand-gray'
+                                    }`}>
+                                        <span className="text-lg">📦</span>
+                                    </div>
+                                )}
+                                <span className="text-[11px] font-bold text-center leading-tight line-clamp-2">{cat.name}</span>
+                            </button>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
 // Reusable Horizontal Carousel with Scroll-Aware Navigation Chevrons
 const HorizontalCarousel = ({
     title,
     items,
     renderItem,
     onSeeAll,
+    banner,
     itemWidthClass = "w-[230px]"
 }: {
     title: string
     items: any[]
     renderItem: (item: any) => React.ReactNode
     onSeeAll?: () => void
+    banner?: {
+        title: string
+        subtitle?: string
+        gradient: string
+        imageUrl?: string
+        link?: string
+    }
     itemWidthClass?: string
 }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -249,6 +400,25 @@ const HorizontalCarousel = ({
                 className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
+                {banner && (
+                    <div className="snap-start shrink-0 w-[170px] h-auto">
+                        <a
+                            href={banner.link || '#'}
+                            className={`flex flex-col items-center justify-center text-center p-4 rounded-[16px] w-full h-full min-h-[250px] bg-gradient-to-br ${banner.gradient} text-white hover:scale-[1.02] transition-all duration-300 shadow-md`}
+                        >
+                            {banner.imageUrl ? (
+                                <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover rounded-[16px]" />
+                            ) : (
+                                <div className="flex flex-col items-center gap-3">
+                                    <span className="font-extrabold text-xl leading-tight whitespace-pre-line">{banner.title}</span>
+                                    {banner.subtitle && (
+                                        <span className="text-xs font-medium opacity-90">{banner.subtitle}</span>
+                                    )}
+                                </div>
+                            )}
+                        </a>
+                    </div>
+                )}
                 {items.map((item, idx) => (
                     <div key={idx} className={`snap-start shrink-0 ${itemWidthClass}`}>
                         {renderItem(item)}
@@ -675,6 +845,32 @@ export function ExplorarPageClient({
         return filteredResults.filter(p => p.originalPrice !== undefined && p.originalPrice > p.price).slice(0, 20)
     }, [filteredResults, currentType])
 
+    const showFeaturedSections = currentType === 'tudo' && selectedCategories.length === 0 && !query && rawItems.length > 0
+
+    const promoCarouselItems = useMemo(() => {
+        if (!showFeaturedSections) return []
+        return normalizedInitialResults
+            .filter(p => p.itemType === 'produto' && p.originalPrice !== undefined && p.originalPrice > p.price)
+            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
+            .slice(0, 20)
+    }, [normalizedInitialResults, showFeaturedSections])
+
+    const bestRatedCarouselItems = useMemo(() => {
+        if (!showFeaturedSections) return []
+        return normalizedInitialResults
+            .filter(p => p.itemType === 'produto' && (p.rating ?? 0) >= 4.8)
+            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
+            .slice(0, 20)
+    }, [normalizedInitialResults, showFeaturedSections])
+
+    const bestSellingCarouselItems = useMemo(() => {
+        if (!showFeaturedSections) return []
+        return normalizedInitialResults
+            .filter(p => p.itemType === 'produto')
+            .sort((a, b) => calcCategoryBrowseScore(b) - calcCategoryBrowseScore(a))
+            .slice(0, 20)
+    }, [normalizedInitialResults, showFeaturedSections])
+
     const subcategoryGroups = useMemo(() => {
         if (selectedCategories.length === 0) return []
         const groups: { [key: string]: any[] } = {}
@@ -926,6 +1122,126 @@ export function ExplorarPageClient({
 
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto px-4 max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
+                    {/* FEATURED SECTIONS - only on default explore page */}
+                    {showFeaturedSections && (
+                        <div className="mb-4 lg:mb-8 space-y-6 lg:space-y-10">
+                            {/* 1. CATEGORY CARDS CAROUSEL */}
+                            <CategoryCarousel
+                                categories={categoriesList}
+                                selectedCategories={selectedCategories}
+                                onToggleCategory={(catName) => {
+                                    if (catName === "__all__") {
+                                        setSelectedCategories([])
+                                        updateUrl(selectedCitySlug, [], query, currentType)
+                                    } else {
+                                        toggleCategory(catName)
+                                    }
+                                }}
+                                onSeeAllCategories={() => {
+                                    setSelectedCategories([])
+                                    updateUrl(selectedCitySlug, [], query, currentType)
+                                }}
+                            />
+
+                            {/* 2. DUDIT BANNER */}
+                            <HeroBanner />
+
+                            {/* 3. VENDEDORES EM DESTAQUE */}
+                            {vitrinesDestaque.length > 0 && (
+                                <HorizontalCarousel
+                                    title="Vendedores em destaque"
+                                    items={vitrinesDestaque}
+                                    renderItem={(vitrine) => (
+                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                    )}
+                                    onSeeAll={() => {
+                                        setCurrentType("vitrines" as any)
+                                        updateUrl(selectedCitySlug, [], "", "vitrines")
+                                    }}
+                                    itemWidthClass="w-[270px] sm:w-[320px]"
+                                />
+                            )}
+
+                            {/* 4. ITENS EM PROMOÇÃO */}
+                            {promoCarouselItems.length > 0 && (
+                                <HorizontalCarousel
+                                    title="Em promoção"
+                                    items={promoCarouselItems}
+                                    renderItem={(item) => (
+                                        <ItemCard
+                                            key={item.id}
+                                            product={item}
+                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                            className="w-full"
+                                        />
+                                    )}
+                                    onSeeAll={() => {
+                                        setCurrentType("produtos" as any)
+                                        updateUrl(selectedCitySlug, [], "", "produtos")
+                                    }}
+                                    banner={{
+                                        title: "Em\nPromoção",
+                                        subtitle: "Ofertas imperdíveis",
+                                        gradient: "from-[#FF6B35] to-[#FF8C42]",
+                                    }}
+                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                />
+                            )}
+
+                            {/* 5. MELHOR AVALIADOS */}
+                            {bestRatedCarouselItems.length > 0 && (
+                                <HorizontalCarousel
+                                    title="Melhor avaliados"
+                                    items={bestRatedCarouselItems}
+                                    renderItem={(item) => (
+                                        <ItemCard
+                                            key={item.id}
+                                            product={item}
+                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                            className="w-full"
+                                        />
+                                    )}
+                                    onSeeAll={() => {
+                                        setCurrentType("produtos" as any)
+                                        updateUrl(selectedCitySlug, [], "", "produtos")
+                                    }}
+                                    banner={{
+                                        title: "Melhor\nAvaliados",
+                                        subtitle: "Nota acima de 4.8",
+                                        gradient: "from-[#11998e] to-[#38ef7d]",
+                                    }}
+                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                />
+                            )}
+
+                            {/* 6. MAIS VENDIDOS */}
+                            {bestSellingCarouselItems.length > 0 && (
+                                <HorizontalCarousel
+                                    title="Mais vendidos"
+                                    items={bestSellingCarouselItems}
+                                    renderItem={(item) => (
+                                        <ItemCard
+                                            key={item.id}
+                                            product={item}
+                                            userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                                            className="w-full"
+                                        />
+                                    )}
+                                    onSeeAll={() => {
+                                        setCurrentType("produtos" as any)
+                                        updateUrl(selectedCitySlug, [], "", "produtos")
+                                    }}
+                                    banner={{
+                                        title: "Mais\nVendidos",
+                                        subtitle: "Os queridinhos da cidade",
+                                        gradient: "from-[#4facfe] to-[#00f2fe]",
+                                    }}
+                                    itemWidthClass="w-[190px] sm:w-[210px]"
+                                />
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                         {/* SIDEBAR (Desktop only) */}
                         <ExplorarFilterSidebar
