@@ -27,6 +27,8 @@ import {
     removeCouponFromPreSaleAction,
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { findBestItemPrice } from "@/lib/services/pricing-engine"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -129,6 +131,23 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     // New states and computations
     const [isCameraOpen, setIsCameraOpen] = useState(false)
     const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
+
+    const [pdvPromotions, setPdvPromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setPdvPromotions(res)
+        }).catch(() => {})
+    }, [partnerId])
+
+    const getDisplayPrice = (prod: any) => {
+        const unitPrice = Number(prod.price || 0)
+        const p = prod.promotional_price ? Number(prod.promotional_price) : 0
+        const individualPromo = p > 0 && p < unitPrice ? p : null
+        const result = findBestItemPrice(unitPrice, individualPromo, pdvPromotions, { productId: prod.id, categoryId: prod.category || undefined })
+        return result.bestPrice
+    }
 
     const hasProductsInCatalog = useMemo(() => {
         return products.some(p => p.product_type !== "Serviço" && p.product_type !== "service")
@@ -427,6 +446,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             const found = prev.find((item) => item.productId === product.id && item.variantId === (variantId || null))
             if (!found) {
                 const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
+                const prodAny = product as any
+                const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
+                const effectiveUnit = selectedVariant
+                    ? listUnit
+                    : findBestItemPrice(Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
                 if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
                     return prev
@@ -442,7 +466,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         listUnitPrice: listUnit,
                         lineDiscountType: null,
                         lineDiscountValue: null,
-                        price: listUnit,
+                        price: effectiveUnit,
                         qty: normalizedQty,
                         image: (selectedVariant?.variant_options?.image as string | undefined) || product.images?.[0] || null,
                     },
@@ -1274,7 +1298,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                     {product.product_variants && product.product_variants.length > 0 && (
                                                         <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                                                     )}
-                                                    <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(product.price || 0))}</p>
+                                                    <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(getDisplayPrice(product))}</p>
 
                                                     <Button
                                                         variant="outline"

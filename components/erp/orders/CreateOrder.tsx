@@ -35,6 +35,8 @@ import { TagIcon, MoneyIcon, FileIcon, UserIcon } from "@/lib/icons"
 import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { findBestItemPrice } from "@/lib/services/pricing-engine"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
@@ -275,6 +277,15 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     // Instant product search (client-side bucket)
     const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 })
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
+
+    const [orderPromotions, setOrderPromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setOrderPromotions(res)
+        }).catch(() => {})
+    }, [partnerId])
 
     // Financial
     const [shippingFee, setShippingFee] = useState("0")
@@ -728,7 +739,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 id: Math.random().toString(36).substr(2, 9),
                 productId: product.id,
                 name: product.name,
-                unitPrice: product.price,
+                unitPrice: findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined }).bestPrice,
                 quantity: 1,
                 sortOrder: items.length,
                 image: product.image,
@@ -1367,6 +1378,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                             searchResults={productBucket.filteredResults}
                                             loadMoreProducts={productBucket.loadMore}
                                             hasMoreProducts={productBucket.hasMore}
+                                            searchPromotions={orderPromotions}
                                             subtotal={isPaidOrder ? originalSubtotal : subtotal}
                                             discountAmount={isPaidOrder ? originalDiscountAmount : discountAmount}
                                             discountValue={discountValue}

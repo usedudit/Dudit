@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreHorizontal, Trash2, Plus, Minus, ChevronRight, Banknote, Check, Gift, Split, DollarSign, RefreshCcw, Edit3, FileText, Mail, Printer, ChevronLeft, X, User } from 'lucide-react';
 import { Button, Badge, Dropdown, DropdownItem } from '../../../reusable';
 import { NumpadModal, PaymentOptionCard } from '../Shared';
 import { ServiceItemCard } from '../ServiceItemCard';
+import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: { onClose: () => void, onComplete: () => void, initialData: any, onPaymentSuccess?: () => void }) => {
     const [step, setStep] = useState<'summary' | 'processing' | 'receipt'>('summary');
@@ -16,12 +17,20 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: {
     const [isOthersInputOpen, setIsOthersInputOpen] = useState(false);
     const [currentEditingPaymentId, setCurrentEditingPaymentId] = useState<number | null>(null);
 
-    // Calculate totals based on initialData.services
+    // Calculate totals via central pricing engine
     const services = initialData?.services || [];
-    const subtotal = services.reduce((acc: number, s: any) => acc + (s.price || 0), 0);
+    const pricingResult = useMemo(() => calculateOrderPricing({
+        items: services.map((s: any) => ({
+            serviceId: s.id || undefined,
+            unitPrice: Number(s.price || 0),
+            quantity: 1,
+        })),
+        shippingCost: 0,
+    }), [services])
+    const subtotal = pricingResult.subtotal;
     const tax = 0; 
     const discount = 0;
-    const total = subtotal;
+    const total = pricingResult.finalTotal;
 
     // Initialize payment amount on load if only one method
     React.useEffect(() => {
@@ -131,6 +140,7 @@ const CheckoutSheet = ({ onClose, onComplete, initialData, onPaymentSuccess }: {
                                             service={service}
                                             onRemove={() => {}} // No-op for demo
                                             showActions={false}
+                                            promotions={[]}
                                         />
                                     ))}
                                 </div>

@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
-import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
+import { Button, Checkbox, Badge, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -82,32 +82,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const toggleVendor = (partnerId: string) =>
         setIsVendorExpanded(prev => ({ ...prev, [partnerId]: !prev[partnerId] }))
 
-    const getItemPrice = (item: any) => {
+    const getItemPricingContext = (item: any, promotions: any[]) => {
         const type = item.item_type || "product"
-        if (type === "service_booking") {
-            const meta = item.booking_metadata
-            return Number(meta?.price || item.services?.price || 0)
-        }
-        if (type === "subscription") {
-            const planItems = item.recurring_plans?.recurring_plan_items || []
-            return planItems.reduce(
-                (sum: number, pi: any) => sum + Number(pi.unit_price || 0) * Number(pi.quantity || 1),
-                0,
-            )
-        }
-        if (item.variant_id && item.product_variants) {
-            const variantPrice = Number(item.product_variants.price_adjustment)
-            if (variantPrice > 0) return variantPrice
-        }
-        const basePrice = Number(item.products?.price || 0)
-        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
-        return promoPrice > 0 && promoPrice < basePrice ? promoPrice : basePrice
-    }
-
-    const getItemDisplayPrice = (item: any, promotions: any[]) => {
-        const type = item.item_type || "product"
-        if (type !== "product") return getItemPrice(item)
-
         const basePrice = Number(item.products?.price || 0)
         const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
         const hasPromo = promoPrice > 0 && promoPrice < basePrice
@@ -116,26 +92,48 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             : basePrice
         const individualPromo = item.variant_id ? null : (hasPromo ? promoPrice : null)
 
-        if (promotions?.length) {
-            for (const promo of promotions) {
-                if (promo.promotionType === "discount" && promo.is_active !== false) {
-                    const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, {
-                        productId: item.product_id,
-                        categoryId: item.products?.category_id || undefined,
-                    })
-                    if (result.discountSource === "campaign") return result.bestPrice
+        // Non-product types: no campaign pricing, just manual promo
+        if (type !== "product") {
+            const bestPrice = individualPromo ?? unitPrice
+            return { bestPrice, referencePrice: bestPrice < unitPrice ? unitPrice : undefined, discountSource: bestPrice < unitPrice ? "manual" : "none" as const, discountPercent: 0, campaignDiscount: 0 }
+        }
+
+        // Find best campaign among ALL applicable promotions
+        let bestCampaign: { bestPrice: number; discountSource: "campaign" | "manual" | "none"; campaignDiscount: number } = { bestPrice: unitPrice, discountSource: "none", campaignDiscount: 0 }
+        for (const promo of promotions || []) {
+            if (promo.promotionType === "discount" && promo.is_active !== false) {
+                const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, {
+                    productId: item.product_id,
+                    categoryId: item.products?.category_id || undefined,
+                })
+                if (result.bestPrice < bestCampaign.bestPrice) {
+                    bestCampaign = {
+                        bestPrice: result.bestPrice,
+                        discountSource: result.discountSource as "campaign" | "manual" | "none",
+                        campaignDiscount: result.campaignDiscount,
+                    }
                 }
             }
         }
-        // Fallback: computeItemCampaignPricing sem promo já resolve manualPrice
-        return computeItemCampaignPricing(unitPrice, individualPromo, null).bestPrice
+
+        // Final best price with all promotions considered
+        const finalResult = bestCampaign.discountSource !== "none"
+            ? bestCampaign
+            : computeItemCampaignPricing(unitPrice, individualPromo, null)
+        const bestPrice = finalResult.bestPrice
+        const discountSource = finalResult.discountSource
+        const referencePrice = bestPrice < unitPrice ? unitPrice : undefined
+        const discountPercent = referencePrice ? Math.round((1 - bestPrice / unitPrice) * 100) : 0
+        return { bestPrice, referencePrice, discountSource, discountPercent, campaignDiscount: finalResult.campaignDiscount }
     }
+
+    const getItemBestPrice = (item: any, promotions: any[]) => getItemPricingContext(item, promotions).bestPrice
 
     const getPartnerDisplayTotal = (partnerId: string, items: any[]) => {
         const promos = itemsByPartner[partnerId]?.promotions || []
         return items
             .filter((item: any) => getItemSelected(item))
-            .reduce((sum: number, item: any) => sum + getItemDisplayPrice(item, promos) * getItemQuantity(item), 0)
+            .reduce((sum: number, item: any) => sum + getItemBestPrice(item, promos) * getItemQuantity(item), 0)
     }
 
     const getItemImage = (item: any) => {
@@ -371,7 +369,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         items
             .filter((item: any) => getItemSelected(item))
             .reduce((sum: number, item: any) => {
-                const price = partnerId ? getItemDisplayPrice(item, itemsByPartner[partnerId]?.promotions || []) : getItemPrice(item)
+                const price = partnerId ? getItemBestPrice(item, itemsByPartner[partnerId]?.promotions || []) : (item.products?.price || 0)
                 return sum + price * getItemQuantity(item)
             }, 0)
 
@@ -382,7 +380,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 id: item.variant_id || item.product_id || item.service_id || item.recurring_plan_id,
                 name: getItemName(item),
                 variant: item.variant_id && item.product_variants ? `${item.product_variants.variant_type}: ${item.product_variants.variant_name}` : undefined,
-                price: getItemPrice(item),
+                price: getItemBestPrice(item, partnerId ? itemsByPartner[partnerId]?.promotions || [] : []),
                 quantity: getItemQuantity(item),
                 image: getItemImage(item),
                 availabilityValue: Number(item.products?.availability_value || 0),
@@ -502,7 +500,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                     {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
                                                                                         section.items
                                                                                             .filter((i: any) => getItemSelected(i))
-                                                                                            .reduce((s: number, i: any) => s + getItemDisplayPrice(i, partnerPromos) * getItemQuantity(i), 0),
+                                                                                            .reduce((s: number, i: any) => s + getItemBestPrice(i, partnerPromos) * getItemQuantity(i), 0),
                                                                                     )}
                                                                                 </span>
                                                                             </div>,
@@ -577,7 +575,26 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             size="sm"
                                                                                                         />
                                                                                                     )}
-                                                                                                    <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemDisplayPrice(item, partnerPromos)) : formatCurrency(getItemDisplayPrice(item, partnerPromos) * itemQty)}</span>
+                                                                                                    <div className="flex items-center gap-2">
+                                                                                                        {(() => {
+                                                                                                            const ctx = getItemPricingContext(item, partnerPromos)
+                                                                                                            const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty
+                                                                                                            return (
+                                                                                                                <>
+                                                                                                                    {ctx.referencePrice && (
+                                                                                                                        <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</span>
+                                                                                                                    )}
+                                                                                                                    <span className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
+                                                                                                                    {ctx.discountSource === "campaign" && (
+                                                                                                                        <Badge variant="blue" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                    )}
+                                                                                                                    {ctx.discountSource === "manual" && (
+                                                                                                                        <Badge variant="orange" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                    )}
+                                                                                                                </>
+                                                                                                            )
+                                                                                                        })()}
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
@@ -647,7 +664,23 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
-                                                                                                    <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(getItemDisplayPrice(item, partnerPromos))}</p>
+                                                                                                    {(() => {
+                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
+                                                                                                        return (
+                                                                                                            <>
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    {ctx.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(ctx.referencePrice)}</span>}
+                                                                                                                    <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
+                                                                                                                    {ctx.discountSource === "campaign" && (
+                                                                                                                        <Badge variant="blue" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                    )}
+                                                                                                                    {ctx.discountSource === "manual" && (
+                                                                                                                        <Badge variant="orange" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                    )}
+                                                                                                                </div>
+                                                                                                            </>
+                                                                                                        )
+                                                                                                    })()}
                                                                                                 </div>
 
                                                                                                 <div className="flex items-center justify-end gap-4">
@@ -662,7 +695,16 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             disabled={loading === item.id}
                                                                                                         />
                                                                                                     )}
-                                                                                                    <div className="text-right min-w-[80px] font-semibold text-brand-dark dark:text-dark-heading">{isOutOfStock ? formatCurrency(getItemDisplayPrice(item, partnerPromos)) : formatCurrency(getItemDisplayPrice(item, partnerPromos) * itemQty)}</div>
+                                                                                                    {(() => {
+                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
+                                                                                                        const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty
+                                                                                                        return (
+                                                                                                            <div className="text-right min-w-[80px]">
+                                                                                                                {ctx.referencePrice && <p className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</p>}
+                                                                                                                <p className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</p>
+                                                                                                            </div>
+                                                                                                        )
+                                                                                                    })()}
                                                                                                     <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
                                                                                                 </div>
                                                                                             </div>

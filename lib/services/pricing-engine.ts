@@ -664,3 +664,56 @@ export function computeItemCampaignPricing(
     discountSource,
   }
 }
+
+export interface BestItemPrice {
+  bestPrice: number
+  referencePrice?: number
+  discountSource: DiscountSource
+  campaignDiscount: number
+  discountPercent: number
+}
+
+export function findBestItemPrice(
+  unitPrice: number,
+  individualPromo: number | null,
+  promotions: PricingPromotion[],
+  itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
+): BestItemPrice {
+  // Non-product items: no campaign pricing, just manual promo
+  if (!itemMeta?.productId && !itemMeta?.serviceId) {
+    const bestPrice = individualPromo ?? unitPrice
+    return {
+      bestPrice,
+      referencePrice: bestPrice < unitPrice ? unitPrice : undefined,
+      discountSource: bestPrice < unitPrice ? "manual" : "none",
+      campaignDiscount: 0,
+      discountPercent: bestPrice < unitPrice ? Math.round((1 - bestPrice / unitPrice) * 100) : 0,
+    }
+  }
+
+  // Find best campaign among ALL applicable promotions
+  let bestCampaign: { bestPrice: number; discountSource: DiscountSource; campaignDiscount: number } = {
+    bestPrice: unitPrice, discountSource: "none", campaignDiscount: 0,
+  }
+  for (const promo of promotions || []) {
+    if (promo.promotionType === "discount") {
+      const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, itemMeta)
+      if (result.bestPrice < bestCampaign.bestPrice) {
+        bestCampaign = {
+          bestPrice: result.bestPrice,
+          discountSource: result.discountSource,
+          campaignDiscount: result.campaignDiscount,
+        }
+      }
+    }
+  }
+
+  const finalResult = bestCampaign.discountSource !== "none"
+    ? bestCampaign
+    : computeItemCampaignPricing(unitPrice, individualPromo, null, itemMeta)
+
+  const bestPrice = finalResult.bestPrice
+  const referencePrice = bestPrice < unitPrice ? unitPrice : undefined
+  const discountPercent = referencePrice ? Math.round((1 - bestPrice / unitPrice) * 100) : 0
+  return { bestPrice, referencePrice, discountSource: finalResult.discountSource, discountPercent, campaignDiscount: finalResult.campaignDiscount }
+}

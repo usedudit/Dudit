@@ -370,7 +370,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-base font-bold text-brand-dark dark:text-dark-heading">{product.name}</h3>
               <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">SKU: {product.sku || "-"}</p>
-              <p className="mt-0.5 text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(product.price || 0))}</p>
+              <p className="mt-0.5 text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency((() => { const promo = product.promotional_price ? Number(product.promotional_price) : 0; return promo > 0 && promo < Number(product.price || 0) ? promo : Number(product.price || 0) })())}</p>
             </div>
           </div>
         </div>

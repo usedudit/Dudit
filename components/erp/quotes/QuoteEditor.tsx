@@ -21,6 +21,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { FadeIn } from '@/components/animations/FadeIn';
+import { findBestItemPrice } from "@/lib/services/pricing-engine";
 
 interface QuoteEditorProps {
     searchQuery: string;
@@ -89,6 +90,7 @@ interface QuoteEditorProps {
     salespersonId?: string;
     setSalespersonId?: (val: string) => void;
     salespeople?: { id: string; name: string }[];
+    quotePromotions?: any[];
 }
 
 const QuoteEditor = (props: QuoteEditorProps) => {
@@ -258,7 +260,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }).bestPrice)}</div>
                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                             {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                         </div>

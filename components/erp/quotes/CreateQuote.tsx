@@ -6,6 +6,8 @@ import { FadeIn } from '@/components/animations/FadeIn';
 import { AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { findBestItemPrice } from "@/lib/services/pricing-engine"
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectProductVariantSheet from '@/components/erp/pdv/SelectProductVariantSheet';
@@ -232,6 +234,15 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     // Persistence State (for isDirty)
     const [originalQuoteData, setOriginalQuoteData] = useState<any>(null);
 
+    const [quotePromotions, setQuotePromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setQuotePromotions(res)
+        }).catch(() => {})
+    }, [partnerId])
+
     // Pre-populate immediately from existingQuote (basic data from list) before background fetch
     const prePopulatedRef = useRef(false);
     useEffect(() => {
@@ -411,7 +422,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 notifyError("Estoque insuficiente", `"${product.name}" está sem estoque disponível.`);
                 return;
             }
-            addItem(product, undefined, undefined, 1, product.price);
+            addItem(product, undefined, undefined, 1, (() => { const p = product.promotional_price ? Number(product.promotional_price) : 0; return p > 0 && p < Number(product.price || 0) ? p : Number(product.price || 0) })());
             setIsProductSearchOpen(false);
             return;
         }
@@ -426,11 +437,16 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     };
 
     // 2. Add Item Logic
+    const getQuoteEffectivePrice = (prod: any) => {
+        const p = prod.promotional_price ? Number(prod.promotional_price) : 0
+        return p > 0 && p < Number(prod.price || 0) ? p : Number(prod.price || 0)
+    }
+
     const addItem = (product: any, variantName?: string, variantSku?: string, qty: number = 1, price?: number) => {
         setQuoteItems(prevItems => {
             const finalName = (variantName && variantName !== product.name) ? `${product.name} - ${variantName}` : product.name;
             const finalSku = variantSku || product.sku;
-            const finalPrice = price || product.price;
+            const finalPrice = price ?? getQuoteEffectivePrice(product);
 
             const existingItemIndex = prevItems.findIndex(i => i.id === product.id && i.variant === variantName);
 
@@ -1039,6 +1055,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                             onSearchFocus={productBucket.loadBucket}
                                             loadMoreProducts={productBucket.loadMore}
                                             hasMoreProducts={productBucket.hasMore}
+                                            quotePromotions={quotePromotions}
                                             handleProductClick={handleProductClick}
                                             addBlankItem={addBlankItem}
                                             quoteItems={quoteItems}

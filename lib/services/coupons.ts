@@ -129,7 +129,7 @@ export async function validateCouponRow(
       return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com descontos manuais." }
     }
 
-    // 2. Check products on promotion
+    // 2. Check promotional_price on products
     const items = input.items || []
     const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
     if (productIds.length > 0) {
@@ -143,6 +143,27 @@ export async function validateCouponRow(
       )
       if (hasPromo) {
         return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com produtos em promoção." }
+      }
+
+      // 3. Check if any product is in an active campaign promotion
+      const { data: allActivePromos } = await supabase
+        .from("promotions")
+        .select("id")
+        .eq("partner_id", input.partnerId)
+        .eq("is_active", true)
+        .not("campaign_id", "is", null)
+
+      if (allActivePromos && allActivePromos.length > 0) {
+        const activePromoIds = allActivePromos.map((p: any) => p.id)
+        const { data: promoProducts } = await supabase
+          .from("promotion_products")
+          .select("product_id")
+          .in("promotion_id", activePromoIds)
+          .in("product_id", productIds)
+
+        if (promoProducts && promoProducts.length > 0) {
+          return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com campanhas ativas." }
+        }
       }
     }
   }

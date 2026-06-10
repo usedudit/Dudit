@@ -6,6 +6,8 @@ import { MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { findBestItemPrice } from "@/lib/services/pricing-engine"
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
@@ -157,6 +159,15 @@ export const AppointmentSheet = ({
     };
 
     const isMobile = useMediaQuery("(max-width: 768px)");
+
+    const [aptPromotions, setAptPromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        listActivePromotionsForMarketplaceAction(partnerId).then(res => {
+            if (Array.isArray(res)) setAptPromotions(res)
+        }).catch(() => {})
+    }, [partnerId])
 
     // Status & Notes State
     const [status, setStatus] = useState(appointment?.status || 'Reservado');
@@ -442,24 +453,29 @@ export const AppointmentSheet = ({
     }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
+    const getEffectiveServicePrice = (svc: any) => {
+        return findBestItemPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id }).bestPrice
+    }
+
     const calculatedPrice = useMemo(() => {
         return selectedServices.reduce((acc, service) => {
+            const effectivePrice = getEffectiveServicePrice(service)
             if (service.pricingUnit === 'Por Dia') {
                 const start = new Date(`${startDateRange}T${startTimeRange}`);
                 const end = new Date(`${endDateRange}T${endTimeRange}`);
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 const chargeableDays = Math.max(1, diffDays);
-                return acc + (service.price * chargeableDays);
+                return acc + (effectivePrice * chargeableDays);
             } else if (service.pricingUnit === 'Por Hora') {
                 const start = new Date(`${startDateRange}T${startTimeRange}`);
                 const end = new Date(`${endDateRange}T${endTimeRange}`);
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
                 const chargeableHours = Math.max(1, diffHours);
-                return acc + (service.price * chargeableHours);
+                return acc + (effectivePrice * chargeableHours);
             } else {
-                return acc + service.price;
+                return acc + effectivePrice;
             }
         }, 0);
     }, [selectedServices, startDateRange, startTimeRange, endDateRange, endTimeRange]);
@@ -1274,7 +1290,7 @@ export const AppointmentSheet = ({
                                                                     />
                                                                 </div>
                                                             )}
-                                                            <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">{formatCurrency(item.price)}</div>
+                                                            <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">{formatCurrency(findBestItemPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }).bestPrice)}</div>
                                                         </div>
                                                     </div>
                                                 );
@@ -1713,6 +1729,7 @@ export const AppointmentSheet = ({
                                                 onRemove={!isLocked ? () => handleRemoveServiceRequest(idx) : undefined}
                                                 timeRange={getServiceTimeRange(idx)}
                                                 fulfillmentMode={appointment?.fulfillmentMode}
+                                                promotions={aptPromotions}
                                             />
                                         ))}
                                     </div>

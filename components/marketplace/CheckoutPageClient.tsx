@@ -112,6 +112,7 @@ interface MarketplaceAvailableCoupon {
     usagePerCustomer: number | null
     firstPurchaseOnly: boolean | null
     customerScope: "all" | "specific" | null
+    allowCombination?: boolean
     startsAt: string | null
     endsAt: string | null
     discountAmount: number
@@ -319,14 +320,34 @@ export function CheckoutPageClient() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showOutsideRadiusModal, setShowOutsideRadiusModal] = useState(false)
 
-    const [couponCode, setCouponCode] = useState("")
-    const [couponDiscount, setCouponDiscount] = useState(0)
-    const [availableCoupons, setAvailableCoupons] = useState<MarketplaceAvailableCoupon[]>([])
-    const [couponListLoading, setCouponListLoading] = useState(false)
-    const [showCouponModal, setShowCouponModal] = useState(false)
-    const [selectedCouponId, setSelectedCouponId] = useState<string>("")
-    const [couponError, setCouponError] = useState<string | null>(null)
-    const [couponPartialWarning, setCouponPartialWarning] = useState(false)
+const [couponCode, setCouponCode] = useState("")
+const [couponDiscount, setCouponDiscount] = useState(0)
+const [availableCoupons, setAvailableCoupons] = useState<MarketplaceAvailableCoupon[]>([])
+const [couponListLoading, setCouponListLoading] = useState(false)
+const [showCouponModal, setShowCouponModal] = useState(false)
+const [selectedCouponId, setSelectedCouponId] = useState<string>("")
+const [couponError, setCouponError] = useState<string | null>(null)
+const [couponPartialWarning, setCouponPartialWarning] = useState(false)
+
+// Filter out non-combinable coupons when any item has active discount
+const hasActiveItemDiscount = useMemo(() => {
+    if (checkoutContext?.lines) {
+        return checkoutContext.lines.some((l: any) => {
+            const uPrice = Number(l.unitaryPrice || l.price || 0)
+            const bPrice = Number(l.bestPrice || l.price || 0)
+            return bPrice < uPrice
+        })
+    }
+    return products.some((p) => {
+        const pAny = p as any
+        const promo = pAny.promotional_price ? Number(pAny.promotional_price) : 0
+        return promo > 0 && promo < Number(p.price || 0)
+    })
+}, [checkoutContext?.lines, products])
+const displayableCoupons = useMemo(() => {
+    if (!hasActiveItemDiscount) return availableCoupons
+    return availableCoupons.filter((c) => c.allowCombination !== false)
+}, [availableCoupons, hasActiveItemDiscount])
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -1209,15 +1230,15 @@ export function CheckoutPageClient() {
                     icon={TagIcon}
                     title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
                     titleClassName="text-sm"
-                    description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
+                    description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
                     className="px-0 py-4 gap-4 border-y border-x-0 border-brand-border dark:border-dark-border !bg-transparent !rounded-none shadow-none hover:border-brand-border dark:hover:border-dark-border"
                     onClick={() => {
-                        if (!couponListLoading && availableCoupons.length > 0) {
+                        if (!couponListLoading && displayableCoupons.length > 0) {
                             setSelectedCouponId(appliedCoupon?.id || "")
                             setShowCouponModal(true)
                         }
                     }}
-                    showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                    showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
                     right={
                         appliedCoupon ? (
                             <button
@@ -2402,20 +2423,20 @@ export function CheckoutPageClient() {
                                 </FormSection>
 
                                 {/* Coupon Selector */}
-                                {availableCoupons.length > 0 && (
+                                {displayableCoupons.length > 0 && (
                                     <FormSection title="Cupom de Desconto" hasSeparator>
                                         <ListItem
                                             icon={TagIcon}
                                             title={appliedCoupon ? getCouponTitle(appliedCoupon) : "Escolha um cupom"}
-                                            description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(availableCoupons.length))}
+                                            description={appliedCoupon ? "Cupom aplicado" : (couponListLoading ? "Verificando cupons disponíveis..." : getCouponCountLabel(displayableCoupons.length))}
                                             className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                             onClick={() => {
-                                                if (!couponListLoading && availableCoupons.length > 0) {
+                                                if (!couponListLoading && displayableCoupons.length > 0) {
                                                     setSelectedCouponId(appliedCoupon?.id || "")
                                                     setShowCouponModal(true)
                                                 }
                                             }}
-                                            showChevron={!couponListLoading && availableCoupons.length > 0 && !appliedCoupon}
+                                            showChevron={!couponListLoading && displayableCoupons.length > 0 && !appliedCoupon}
                                             right={
                                                 appliedCoupon ? (
                                                     <button
@@ -2703,8 +2724,8 @@ export function CheckoutPageClient() {
                 }
             >
                 <div className="space-y-3">
-                    {availableCoupons.length > 0 ? (
-                        availableCoupons.map((coupon) => (
+                    {displayableCoupons.length > 0 ? (
+                        displayableCoupons.map((coupon) => (
                             <ListItem
                                 icon={TagIcon}
                                 key={coupon.id}

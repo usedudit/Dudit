@@ -5,6 +5,7 @@ import { getEndTime } from './utils';
 import { InfoCard } from '@/components/reusable';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { getFulfillmentModeLabel } from '@/lib/orders/status';
+import { findBestItemPrice } from '@/lib/services/pricing-engine';
 
 interface ServiceItemCardProps {
     service: any;
@@ -15,6 +16,7 @@ interface ServiceItemCardProps {
     unavailable?: boolean;
     timeRange?: string;
     fulfillmentMode?: string | null;
+    promotions?: any[];
 }
 
 export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
@@ -26,6 +28,7 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
     unavailable = false,
     timeRange,
     fulfillmentMode,
+    promotions = [],
 }) => {
     // If explicit timeRange is passed, use it. Otherwise calc based on service.startTime or fallback
     const timeDisplay = timeRange
@@ -66,7 +69,7 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
                             <span className="ml-2">· {getFulfillmentModeLabel(fulfillmentMode)}</span>
                         )}
                     </div>
-                    <div className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(service.price)}</div>
+                    <div className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(findBestItemPrice(Number(service.price || 0), service.promotional_price && Number(service.promotional_price) < Number(service.price || 0) ? Number(service.promotional_price) : null, promotions, { serviceId: service.id }).bestPrice)}</div>
                 </div>
 
                 <div className="border-t border-brand-border dark:border-dark-border pt-2 mt-1 flex justify-between items-center">

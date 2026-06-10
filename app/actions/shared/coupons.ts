@@ -283,6 +283,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
             starts_at,
             ends_at,
             customer_scope,
+            allow_combination,
             is_automatic,
             is_active
         `)
@@ -318,6 +319,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
             usagePerCustomer: coupon.usage_per_customer,
             firstPurchaseOnly: coupon.first_purchase_only,
             customerScope: coupon.customer_scope,
+            allowCombination: coupon.allow_combination !== false,
             startsAt: coupon.starts_at,
             endsAt: coupon.ends_at,
             discountAmount: result.discountAmount,

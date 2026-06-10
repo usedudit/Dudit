@@ -22,6 +22,7 @@ import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { findBestItemPrice } from "@/lib/services/pricing-engine"
 
 function formatLocalISODate(date: Date) {
     const y = date.getFullYear()
@@ -78,6 +79,8 @@ interface OrderGeneralTabProps {
     manualItemNameErrors?: Set<number>
     manualItemPriceErrors?: Set<number>
     isSaving: boolean
+
+    searchPromotions?: any[]
 
     // Handlers
     setSearchQuery: (val: string) => void
@@ -156,7 +159,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     originalPaidAmount = 0,
     paymentMethodDiscountAmount = 0,
     paymentMethodExtraAmount = 0,
-    role = "OPERATOR"
+    role = "OPERATOR",
+    searchPromotions = [],
 }) => {
     const isMarketplaceLocked = isPaidOrder || role === 'DELIVERY';
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -312,7 +316,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }).bestPrice)}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.stock} em estoque
                                                             </div>
@@ -1042,7 +1046,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(product.price)}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }).bestPrice)}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.stock} em estoque
                                                             </div>
