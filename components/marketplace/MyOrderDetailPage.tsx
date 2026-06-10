@@ -18,7 +18,7 @@ import { canRequestOrderCancellation, canRequestPostFulfillmentResolution } from
 import { getPrimaryProductDisplayImage } from '@/lib/utils/product-display-images';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency, formatFullDate, formatTime } from '@/lib/utils';
+import { formatCurrency, formatDate, formatFullDate, formatTime } from '@/lib/utils';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -121,11 +121,7 @@ const getClientTimelineSteps = (order: any) => {
     const steps: { label: string; active: boolean; date?: string; time?: string; subLabel?: string | string[] }[] = [];
 
     if (isCancelled) {
-        if (hasOnlyServices) {
-            steps.push({ label: "Agendamento Criado", active: true, date: dateStrFull, time: dateStrTime });
-        } else {
-            steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
-        }
+        steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
         steps.push({
             label: isPaid ? "Pago" : "Aguardando pagamento",
             active: true,
@@ -142,11 +138,7 @@ const getClientTimelineSteps = (order: any) => {
     }
 
     // 1. First Step
-    if (hasOnlyServices) {
-        steps.push({ label: "Agendamento Criado", active: true, date: dateStrFull, time: dateStrTime });
-    } else {
-        steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
-    }
+    steps.push({ label: "Pedido Realizado", active: true, date: dateStrFull, time: dateStrTime });
 
     // 2. Second Step: Payment
     steps.push({
@@ -158,9 +150,9 @@ const getClientTimelineSteps = (order: any) => {
 
     if (hasOnlyServices) {
         // Service-only order:
-        // 3. Em progresso
+        // 3. Em andamento
         steps.push({
-            label: "Em progresso",
+            label: "Em andamento",
             active: isPaid && isPreparing,
             date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
             time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
@@ -182,16 +174,16 @@ const getClientTimelineSteps = (order: any) => {
         const productText = productsCount === 1 ? "1 produto sendo preparado" : `${productsCount} produtos sendo preparados`;
 
         steps.push({
-            label: "Em Execução",
+            label: "Em progresso",
             active: isPaid && isPreparing,
             date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
             time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined,
             subLabel: [serviceText, productText]
         });
 
-        // 4. Pronto para Retirada/Enviado (only for products)
+        // 4. Finalizado
         steps.push({
-            label: isPickup ? "Pronto para retirada" : "Enviado",
+            label: "Finalizado",
             active: isPaid && isSent,
             date: isPaid && isSent ? (updateDateStr || dateStrFull) : undefined,
             time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
@@ -206,9 +198,9 @@ const getClientTimelineSteps = (order: any) => {
         });
     } else {
         // Standard product-only order:
-        // 3. Preparando
+        // 3. Em andamento
         steps.push({
-            label: "Preparando",
+            label: "Em andamento",
             active: isPaid && isPreparing,
             date: isPaid && isPreparing ? (updateDateStr || dateStrFull) : undefined,
             time: isPaid && isPreparing ? (updateTimeStr || dateStrTime) : undefined
@@ -222,10 +214,10 @@ const getClientTimelineSteps = (order: any) => {
             time: isPaid && isSent ? (updateTimeStr || dateStrTime) : undefined
         });
 
-        // 5. Entregue / Retirado
-        let finalLabel = isPickup ? "Retirado" : "Entregue";
+        // 5. Pedido retirado / Pedido entregue
+        let finalLabel = isPickup ? "Pedido retirado" : "Pedido entregue";
         if (order.delivery_status === "delivery_failed") {
-            finalLabel = "Não entregue";
+            finalLabel = isPickup ? "Retirada não realizada" : "Não entregue";
         }
         steps.push({
             label: finalLabel,
@@ -377,16 +369,17 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             changeLines = Array.isArray(step.subLabel) ? step.subLabel : [step.subLabel];
         } else {
             if (step.label === "Pedido Realizado") changeLines = ["Seu pedido foi registrado em nosso sistema."];
-            else if (step.label === "Agendamento Criado") changeLines = ["Seu agendamento foi registrado em nosso sistema."];
             else if (step.label === "Aguardando pagamento") changeLines = ["Aguardando a confirmação do pagamento pelo intermediador."];
             else if (step.label === "Pago") changeLines = ["Pagamento confirmado com sucesso."];
-            else if (step.label === "Preparando") changeLines = ["O vendedor está preparando os itens do seu pedido."];
+            else if (step.label === "Em andamento" || step.label === "Em progresso") changeLines = ["O vendedor está processando seu pedido."];
             else if (step.label === "Enviado") changeLines = ["Seu pedido saiu para entrega."];
             else if (step.label === "Pronto para retirada") changeLines = ["Produtos do pedido estão prontos para serem retirados no local."];
-            else if (step.label === "Entregue") changeLines = ["O pedido foi entregue ao destinatário."];
-            else if (step.label === "Retirado") changeLines = ["O pedido foi retirado na loja."];
+            else if (step.label === "Finalizado") changeLines = ["Seu pedido está em fase de conclusão."];
+            else if (step.label === "Pedido entregue") changeLines = ["O pedido foi entregue ao destinatário."];
+            else if (step.label === "Pedido retirado") changeLines = ["O pedido foi retirado na loja."];
+            else if (step.label === "Concluído") changeLines = ["O serviço foi concluído."];
             else if (step.label === "Cancelado") changeLines = ["O pedido foi cancelado."];
-            else if (step.label === "Não entregue" || step.label === "Entrega não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
+            else if (step.label === "Não entregue" || step.label === "Entrega não realizada" || step.label === "Retirada não realizada") changeLines = ["Não foi possível realizar a entrega do pedido."];
             else changeLines = ["Etapa concluída."];
         }
 
@@ -684,15 +677,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 </h3>
                                 {isService ? (
                                     <>
-                                        <div className="text-xs text-brand-inactive-text mt-0.5 flex items-center gap-1.5">
-                                            {fulfillmentMode && getFulfillmentModeLabel(fulfillmentMode)}
-                                            {isService && order.situation === "cancelled" && (
-                                                <Badge variant="red">Cancelado</Badge>
-                                            )}
-                                        </div>
-                                        {bookingDate && bookingTime && (
+                                        {bookingDate && bookingTime ? (
                                             <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                {formatFullDate(bookingDate)} as {bookingTime}
+                                                {formatDate(bookingDate)} às {bookingTime}
+                                                {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
+                                            </div>
+                                        ) : fulfillmentMode ? (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                {getFulfillmentModeLabel(fulfillmentMode)}
+                                            </div>
+                                        ) : null}
+                                        {isService && order.situation === "cancelled" && (
+                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                <Badge variant="red">Cancelado</Badge>
                                             </div>
                                         )}
                                     </>
@@ -845,15 +842,19 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             </h3>
                                                             {isService ? (
                                                                 <>
-                                                                    <div className="text-xs text-brand-inactive-text mt-0.5 flex items-center gap-1.5">
-                                                                        {fulfillmentMode && getFulfillmentModeLabel(fulfillmentMode)}
-                                                                        {isService && order.situation === "cancelled" && (
-                                                                            <Badge variant="red">Cancelado</Badge>
-                                                                        )}
-                                                                    </div>
-                                                                    {bookingDate && bookingTime && (
+                                                                    {bookingDate && bookingTime ? (
                                                                         <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                                            {formatFullDate(bookingDate)} as {bookingTime}
+                                                                            {formatDate(bookingDate)} às {bookingTime}
+                                                                            {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
+                                                                        </div>
+                                                                    ) : fulfillmentMode ? (
+                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                            {getFulfillmentModeLabel(fulfillmentMode)}
+                                                                        </div>
+                                                                    ) : null}
+                                                                    {isService && order.situation === "cancelled" && (
+                                                                        <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                            <Badge variant="red">Cancelado</Badge>
                                                                         </div>
                                                                     )}
                                                                 </>
@@ -961,23 +962,27 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                         const isServiceCancelled = order.situation === "cancelled";
                                                         const isSub = !!item.recurring_plan_id || item.line_type === "subscription";
-                                                        const serviceLabel = isSub ? "Assinatura" : `Serviço ${getFulfillmentModeLabel(mode)?.toLowerCase()}`;
+                                                        const serviceName = isSub ? "Assinatura" : (item.services?.name || item.product_name);
+                                                        const bookingDate = fulfillmentLine?.bookingMetadata?.date || null;
+                                                        const bookingTime = fulfillmentLine?.bookingMetadata?.time || null;
                                                         return (
                                                             <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
                                                                 <img
                                                                     src="https://img.dudit.com.br/static/Map.png"
-                                                                    alt={serviceLabel}
+                                                                    alt={serviceName}
                                                                     className="w-12 h-12 object-cover rounded-xl shrink-0"
                                                                 />
                                                                 <div className="flex flex-col justify-center min-w-0">
                                                                     <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate flex items-center gap-2">
-                                                                        {serviceLabel}
+                                                                        {serviceName}
                                                                         {isServiceCancelled && (
                                                                             <Badge variant="red">Cancelado</Badge>
                                                                         )}
                                                                     </p>
                                                                     <p className="text-xs lg:text-sm text-brand-inactive-text">
-                                                                        {isCustomerAddress && addressTypeLabel ? `${addressTypeLabel}: ` : ""}{address}
+                                                                        {bookingDate && bookingTime ? `${formatDate(bookingDate)} às ${bookingTime} | ` : ""}
+                                                                        Local: {getFulfillmentModeLabel(mode)?.toLowerCase()}
+                                                                        {isCustomerAddress && addressTypeLabel ? ` (${addressTypeLabel})` : ""}
                                                                     </p>
                                                                 </div>
                                                             </div>

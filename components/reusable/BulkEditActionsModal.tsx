@@ -16,6 +16,7 @@ import {
     DeliveryFailedIcon
 } from "@/lib/icons"
 
+import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
 import DefaultModal from "./DefaultModal"
 
 // --- Tipagens ---
@@ -45,6 +46,7 @@ interface BulkEditActionsModalProps {
         deliveredCount: number
         cancelledCount: number
         totalCount: number
+        deliveryTypes?: string[]
     }
     onApply: (payload: BulkActionPayload) => Promise<void>
 }
@@ -416,14 +418,14 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                     { value: 'pending', label: 'Pendente' },
                     { value: 'paid', label: 'Pago' },
                     { value: 'partially_paid', label: 'Parcialmente Pago' }
-                ] : [
-                    { value: 'not_sent', label: 'Não enviado' },
-                    { value: 'preparing', label: 'Preparando' },
-                    { value: 'sent', label: 'Enviado' },
-                    { value: 'delivered', label: 'Entregue' },
-                    { value: 'pickup_available', label: 'Disponível para retirada' },
-                    { value: 'delivery_failed', label: 'Falha na entrega' }
-                ]
+                ] : (() => {
+                    const types = orderSelectionGuards?.deliveryTypes || []
+                    const hasDelivery = types.some(t => t === "delivery" || !t)
+                    const hasPickup = types.some(t => t === "pickup")
+                    if (hasDelivery && hasPickup) return MIXED_STATUS_OPTIONS
+                    if (hasPickup) return PICKUP_STATUS_OPTIONS
+                    return DELIVERY_STATUS_OPTIONS
+                })()
                 return (
                     <div className="space-y-3 pt-2">
                         {ignoredByRuleCount > 0 && (

@@ -94,3 +94,55 @@ export function getFulfillmentModeLabel(mode?: string | null) {
       return mode ? mode.replace(/_/g, " ") : "Não informado"
   }
 }
+
+const DELIVERY_LABELS: Record<string, string> = {
+  not_sent: "Não enviado",
+  pending: "Pendente",
+  preparing: "Em preparação",
+  sent: "Enviado",
+  delivered: "Entregue",
+  pickup_available: "Pronto para retirada",
+  delivery_failed: "Falha na entrega",
+  cancelled: "Cancelada",
+}
+
+const PICKUP_LABELS: Record<string, string> = {
+  not_sent: "Não preparado",
+  pending: "Pendente",
+  preparing: "Em preparação",
+  sent: "Pronto para retirada",
+  delivered: "Retirado",
+  pickup_available: "Pronto para retirada",
+  delivery_failed: "Não retirado",
+  cancelled: "Cancelada",
+}
+
+export function getDeliveryStatusLabelForType(status?: string | null, deliveryType?: string | null) {
+  if (!status) return "Não informado"
+  const map = deliveryType === "pickup" ? PICKUP_LABELS : DELIVERY_LABELS
+  return map[status] || status
+}
+
+export const DELIVERY_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Não enviado" },
+  { value: "preparing", label: "Em preparação" },
+  { value: "sent", label: "Enviado" },
+  { value: "delivered", label: "Entregue" },
+  { value: "delivery_failed", label: "Falha na entrega" },
+]
+
+export const PICKUP_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Não preparado" },
+  { value: "preparing", label: "Em preparação" },
+  { value: "pickup_available", label: "Pronto para retirada" },
+  { value: "delivered", label: "Retirado" },
+  { value: "delivery_failed", label: "Não retirado" },
+]
+
+export const MIXED_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Não enviado/Não preparado" },
+  { value: "preparing", label: "Em preparação" },
+  { value: "sent", label: "Enviado/Pronto para retirada" },
+  { value: "delivered", label: "Entregue/Retirado" },
+  { value: "delivery_failed", label: "Falha na entrega/Não retirado" },
+]

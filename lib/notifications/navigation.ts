@@ -18,7 +18,7 @@ export function getNotificationHref(params: {
     if (audience === "seller" || audience === "admin") {
       return `/erp/orders?view=${encodeURIComponent(entityId)}`
     }
-    const orderNumber = data?.order_number
+    const orderNumber = data?.orderNumber as string | undefined ?? data?.order_number as string | undefined
     if (typeof orderNumber === "string" && orderNumber.length > 0) {
       return `/pedidos?tab=details&order_number=${encodeURIComponent(orderNumber)}`
     }

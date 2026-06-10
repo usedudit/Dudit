@@ -291,7 +291,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
 
                                                             const cardContent = (
                                                                 <>
-                                                                    <div className="w-16 h-16 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center p-1 shrink-0">
+                                                                    <div className="w-16 h-16 bg-white border border-brand-border dark:border-dark-border rounded-[8px] flex items-center justify-center shrink-0">
                                                                         <img src={itemImage} alt={item.products?.name || item.services?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                                                                     </div>
                                                                     <div className="flex-1 min-w-0 flex flex-col justify-center">

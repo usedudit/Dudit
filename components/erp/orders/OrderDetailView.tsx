@@ -244,8 +244,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     // Detect if order has services vs products for dynamic timeline labels
     const orderItems = order.order_items || []
-    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => !item.product_id && !item.variant_id)
-    const hasAnyService = orderItems.some((item: any) => !item.product_id && !item.variant_id)
+    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking")
+    const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking")
     const hasMixedItems = hasAnyService && !hasOnlyServices
 
     const timelineDate = (isActive: boolean) => {
@@ -264,7 +264,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (isCancelled) {
             const cancelledAt = order.updated_at || order.created_at
             return [
-                { label: hasOnlyServices ? "Agendamento Criado" : "Pedido Realizado", date: baseDate, time: baseTime, active: true },
+                { label: "Pedido Realizado", date: baseDate, time: baseTime, active: true },
                 { label: isPaid ? "Pago" : "Aguardando pagamento", date: baseDate, time: baseTime, active: true },
                 { label: "Cancelado", date: formatDayMonth(cancelledAt), time: formatTime(cancelledAt), active: true }
             ]
@@ -281,15 +281,15 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
         const isPickup = isPickupOrder
 
-        let finalLabel = isPickup ? "Pedido Retirado" : "Entregue"
+        let finalLabel = isPickup ? "Pedido retirado" : "Pedido entregue"
         if (status === "delivery_failed") {
-            finalLabel = "Entrega não realizada"
+            finalLabel = isPickup ? "Retirada não realizada" : "Entrega não realizada"
         }
 
         if (hasOnlyServices) {
             return [
                 {
-                    label: "Agendamento Criado",
+                    label: "Pedido Realizado",
                     date: baseDate,
                     time: baseTime,
                     active: true
@@ -301,7 +301,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     active: true
                 },
                 {
-                    label: "Em progresso",
+                    label: "Em andamento",
                     date: isPaid && isPreparing ? preparingMeta.date : undefined,
                     time: isPaid && isPreparing ? preparingMeta.time : undefined,
                     active: isPaid && isPreparing
@@ -335,14 +335,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     active: true
                 },
                 {
-                    label: "Em Execução",
+                    label: "Em progresso",
                     date: isPaid && isPreparing ? preparingMeta.date : undefined,
                     time: isPaid && isPreparing ? preparingMeta.time : undefined,
                     active: isPaid && isPreparing,
                     subLabel: [serviceText, productText]
                 },
                 {
-                    label: isPickup ? "Pronto para retirada" : "Enviado",
+                    label: "Finalizado",
                     date: isPaid && isSent ? sentMeta.date : undefined,
                     time: isPaid && isSent ? sentMeta.time : undefined,
                     active: isPaid && isSent
@@ -370,7 +370,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 active: true
             },
             {
-                label: "Preparando",
+                label: "Em andamento",
                 date: isPaid && isPreparing ? preparingMeta.date : undefined,
                 time: isPaid && isPreparing ? preparingMeta.time : undefined,
                 active: isPaid && isPreparing
@@ -487,33 +487,36 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
                                                             <div className="relative px-4">
                                                                 <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                                    <div
-                                                                        className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                        style={{ width: `${timelineSteps.length <= 1 ? 0 : ((timelineSteps.filter((s) => s.active).length - 1) / (timelineSteps.length - 1)) * 100}%` }}
-                                                                    ></div>
+                                                    <div
+                                                        className={`absolute left-0 h-full rounded-full transition-all duration-500 ${order.delivery_status === "delivery_failed" ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                        style={{ width: `${timelineSteps.length <= 1 ? 0 : ((timelineSteps.filter((s) => s.active).length - 1) / (timelineSteps.length - 1)) * 100}%` }}
+                                                    ></div>
 
-                                                                    {timelineSteps.map((step, idx) => (
-                                                                        <div key={idx} className="relative flex flex-col items-center">
-                                                                            <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                                <span className={`text-xs font-medium ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                                    {step.label}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                            </div>
-                                                                            <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                                {step.date ? (
-                                                                                    <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                                        <span>{step.date}</span>
-                                                                                        {step.time && <span>{step.time}</span>}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                                )}
-                                                                            </div>
+                                                    {timelineSteps.map((step, idx) => {
+                                                        const isLastFailed = order.delivery_status === "delivery_failed" && idx === timelineSteps.length - 1;
+                                                        return (
+                                                            <div key={idx} className="relative flex flex-col items-center">
+                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                    <span className={`text-xs font-medium ${step.active ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                        {step.label}
+                                                                    </span>
+                                                                </div>
+                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                </div>
+                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                    {step.date ? (
+                                                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                            <span>{step.date}</span>
+                                                                            {step.time && <span>{step.time}</span>}
                                                                         </div>
-                                                                    ))}
+                                                                    ) : (
+                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -524,7 +527,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
                                                         <div className="space-y-4">
                                                             {(order.order_items || []).map((item: any) => {
-                                                                const isService = !item.product_id && !item.variant_id;
+                                                                const isService = !!item.service_id || item.line_type === "service_booking";
                                                                 const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                                 return (
                                                                     <div key={item.id} className="flex items-start gap-4">
@@ -540,19 +543,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
                                                                                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
                                                                             </div>
-                                                                            {isService ? (
-                                                                                scheduleInfo ? (
-                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                        Agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                        Sem agendamento vinculado
-                                                                                    </div>
-                                                                                )
-                                                                            ) : (
-                                                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
-                                                                            )}
+                                                                    {isService ? (
+                                                                        scheduleInfo ? (
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                SKU: {item.sku || "N/A"}
+                                                                            </div>
+                                                                        )
+                                                                    ) : (
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                    )}
                                                                             <div className="flex items-center gap-2 text-xs mt-1">
                                                                                 <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                 <span className="text-brand-border dark:text-dark-border">|</span>
@@ -605,11 +608,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                             <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>} />
 
-                                                            <PaymentRow
-                                                                label="Tipo de Entrega"
-                                                                value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                    {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                                                </span>} />
+                                                            {!hasOnlyServices && (
+                                                                <PaymentRow
+                                                                    label="Tipo de Entrega"
+                                                                    value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                        {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
+                                                                    </span>} />
+                                                            )}
 
                                                             {Number(order.delivery_fee || 0) > 0 && (
                                                                 <PaymentRow
@@ -725,11 +730,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 showChevron={true}
                                                                 onClick={() => setIsStepsSheetOpen(true)}
                                                                 left={
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${order.delivery_status === "delivery_failed"
                                                                         ? "bg-brand-red/10 text-brand-red"
                                                                         : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
                                                                         }`}>
-                                                                        <div className={`w-2.5 h-2.5 rounded-full ${order.delivery_status === "delivery_failed" && currentStep.label === "Entrega não realizada"
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${order.delivery_status === "delivery_failed"
                                                                             ? "bg-brand-red"
                                                                             : "bg-brand-dark dark:bg-dark-heading"
                                                                             }`} />
@@ -776,7 +781,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 {/* 4. Itens do Pedido */}
                                                 <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
                                                     <div className="space-y-4">
-                                                        {(order.order_items || []).map((item: any) => (
+                                                        {(order.order_items || []).map((item: any) => {
+                                                            const isService = !!item.service_id || item.line_type === "service_booking";
+                                                            const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
+                                                            return (
                                                             <div key={item.id} className="flex items-start gap-4">
                                                                 <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                                     <img
@@ -790,13 +798,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
                                                                         <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
                                                                     </div>
-                                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                    {isService ? (
+                                                                        scheduleInfo ? (
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                SKU: {item.sku || "N/A"}
+                                                                            </div>
+                                                                        )
+                                                                    ) : (
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                    )}
                                                                     <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
                                                                         <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </FormSection>
 
@@ -836,11 +857,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                         <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>} />
 
-                                                        <PaymentRow
-                                                            label="Tipo de Entrega"
-                                                            value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                                            </span>} />
+                                                        {!hasOnlyServices && (
+                                                            <PaymentRow
+                                                                label="Tipo de Entrega"
+                                                                value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                    {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
+                                                                </span>} />
+                                                        )}
 
                                                         {Number(order.delivery_fee || 0) > 0 && (
                                                             <PaymentRow
@@ -941,27 +964,30 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 title="Status do Pedido"
             >
                 <div className="space-y-0 my-4 px-2">
-                    {timelineSteps.map((step, idx) => (
-                        <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
-                            <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                            </div>
-                            <div className="flex flex-col text-left">
-                                <span className={`text-sm font-semibold ${step.active ? (order.delivery_status === "delivery_failed" && idx === 3 ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                    {step.label}
-                                </span>
-                                {step.date ? (
-                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                        {step.date} às {step.time}
+                    {timelineSteps.map((step, idx) => {
+                        const isLastFailed = order.delivery_status === "delivery_failed" && idx === timelineSteps.length - 1;
+                        return (
+                            <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
+                                <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className={`text-sm font-semibold ${step.active ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                        {step.label}
                                     </span>
-                                ) : (
-                                    <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
-                                )}
+                                    {step.date ? (
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                            {step.date} às {step.time}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
-            </BottomSheet>
+                                            </BottomSheet>
 
         </>
     )

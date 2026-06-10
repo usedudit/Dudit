@@ -53,7 +53,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import NotesSheet from "@/components/erp/shared/NotesSheet"
 import { updateOrderNotesAction, updateOrdersStatusInBatchAction, getERPOrdersPageAction, getOrderDetailsAction, type ERPOrderListCursor } from "@/app/actions/erp/orders"
-import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusLabelForType, DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -79,6 +79,7 @@ interface Order {
     created_at_time: number;
     situation: string;
     delivery_status?: string;
+    delivery_type?: string;
     notes?: string;
     previousSituationBeforeCancel?: string | null;
     returnCount: number;
@@ -301,7 +302,8 @@ export default function OrdersPage({
                 }
 
                 const orderItems = o.order_items || []
-                const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => !item.product_id && !item.variant_id)
+                const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking")
+                const deliveryType = o.delivery_type || "delivery"
 
                 return {
                     originalId: o.id,
@@ -312,7 +314,7 @@ export default function OrdersPage({
                     statusLabel: statusInfo.label,
                     statusColor: statusInfo.color,
                     statusIcon: statusInfo.icon,
-                    deliveryStatusLabel: deliveryInfo.label,
+                    deliveryStatusLabel: getDeliveryStatusLabelForType(o.delivery_status, deliveryType),
                     deliveryStatusColor: deliveryInfo.variant,
                     deliveryStatusIcon: deliveryIconMap[o.delivery_status || "not_sent"] || <BlockedIcon size={12} />,
                     isUnfulfilled: false,
@@ -324,6 +326,7 @@ export default function OrdersPage({
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
                     delivery_status: o.delivery_status,
+                    delivery_type: deliveryType,
                     notes: o.notes || "",
                     previousSituationBeforeCancel: o.previous_situation_before_cancel || null,
                     returnCount: Number(o.return_count || 0),
@@ -427,14 +430,15 @@ export default function OrdersPage({
     }, [openEntity])
     const openDeliveryStatusModal = (order: Order) => {
         setDeliveryStatusModal({ open: true, order })
-        const statusLabel = order.deliveryStatusLabel
+        const status = order.delivery_status
+        const isPickup = order.delivery_type === "pickup"
         setDeliveryStatusValue(
-            statusLabel === "Não enviado" ? "not_sent"
-                : statusLabel === "Preparando" ? "preparing"
-                    : statusLabel === "Enviado" ? "sent"
-                        : statusLabel === "Entregue" ? "delivered"
-                            : statusLabel === "Disponível para retirada" || statusLabel === "Pronto retirada" ? "pickup_available"
-                                : statusLabel === "Entrega não realizada" || statusLabel === "Falha na entrega" ? "delivery_failed"
+            status === "not_sent" || status === "pending" ? "not_sent"
+                : status === "preparing" ? "preparing"
+                    : isPickup && status === "pickup_available" ? "pickup_available"
+                        : status === "sent" || status === "pickup_available" ? "sent"
+                            : status === "delivered" ? "delivered"
+                                : status === "delivery_failed" ? "delivery_failed"
                                     : "not_sent"
         )
     }
@@ -696,6 +700,7 @@ export default function OrdersPage({
                                     items_count: Number(order.order_items?.length || 0),
                                     created_at_time: new Date(order.created_at || Date.now()).getTime(),
                                     situation: order.situation || "pending",
+                                    delivery_type: order.delivery_type || "delivery",
                                     notes: order.notes || "",
                                     previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
                                     returnCount: Number(order.return_count || order.return_requests?.length || 0),
@@ -1084,6 +1089,7 @@ export default function OrdersPage({
                     paidCount: selectedOrdersForBulkActions.filter((order) => order.situation === "paid").length,
                     deliveredCount: selectedOrdersForBulkActions.filter((order) => order.delivery_status === "delivered").length,
                     cancelledCount: selectedOrdersForBulkActions.filter((order) => order.situation === "cancelled").length,
+                    deliveryTypes: selectedOrdersForBulkActions.map((order) => order.delivery_type || "delivery"),
                 }}
                 onApply={handleBulkEditApply}
             />
@@ -1137,12 +1143,9 @@ export default function OrdersPage({
                         onChange={(e) => setDeliveryStatusValue(e.target.value)}
                         className="w-full rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-3 py-2 text-sm"
                     >
-                        <option value="not_sent">Não enviado</option>
-                        <option value="preparing">Preparando</option>
-                        <option value="sent">Enviado</option>
-                        <option value="delivered">Entregue</option>
-                        <option value="pickup_available">Disponível para retirada</option>
-                        <option value="delivery_failed">Entrega não realizada</option>
+                        {(deliveryStatusModal.order?.delivery_type === "pickup" ? PICKUP_STATUS_OPTIONS : DELIVERY_STATUS_OPTIONS).map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
                     </select>
                 </div>
             </DefaultModal>

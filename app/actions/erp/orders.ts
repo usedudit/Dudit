@@ -3000,11 +3000,12 @@ export async function getERPOrdersPageAction(
                 situation,
                 previous_situation_before_cancel,
                 delivery_status,
+                delivery_type,
                 order_source,
                 created_at,
                 stores(name),
                 return_requests!order_id(id),
-                order_items(quantity, product_id, variant_id)
+                order_items(quantity, product_id, variant_id, service_id, line_type)
             `
 
         const selectWithPosSale = `
