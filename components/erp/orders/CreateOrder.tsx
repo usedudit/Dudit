@@ -36,7 +36,7 @@ import SelectCouponSheet from "@/components/erp/pdv/SelectCouponSheet"
 import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { findBestItemPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 // Tabs
@@ -346,6 +346,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
     }, [items])
 
+    const hasWinningDiscount = useMemo(() => {
+        return items.some((item) => {
+            if (item.isManual) return false
+            const original = Number(item.originalPrice ?? item.unitPrice)
+            return item.unitPrice < original
+        })
+    }, [items])
+
     const discountAmount = useMemo(() => {
         if (discountType === 'percentage') {
             return (subtotal * discountValue) / 100
@@ -520,6 +528,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         variantId: item.variant_id || null,
                         name: item.product_name,
                         unitPrice: Number(item.product_price),
+                        originalPrice: Number(item.products?.price || item.product_price),
+                        hasDiscount: Number(item.product_price) < Number(item.products?.price || item.product_price),
                         quantity: Number(item.quantity),
                         sortOrder: Number(item.sort_order ?? 0),
                         image: item.product_variants?.image || item.products?.images?.[0] || item.image || item.product?.image || null,
@@ -735,11 +745,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 notifyError(`"${product.name}" está sem estoque disponível.`)
                 return
             }
+            const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
             const newItem = {
                 id: Math.random().toString(36).substr(2, 9),
                 productId: product.id,
                 name: product.name,
-                unitPrice: findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined }).bestPrice,
+                unitPrice: pricing.bestPrice,
+                originalPrice: Number(product.price || 0),
+                hasDiscount: pricing.hasDiscount,
                 quantity: 1,
                 sortOrder: items.length,
                 image: product.image,
@@ -775,6 +788,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     variantId: variant.id,
                     name: `${selectedProductForVariant.name} - ${variant.name}`,
                     unitPrice: variant.price || selectedProductForVariant.price,
+                    originalPrice: variant.price || selectedProductForVariant.price,
+                    hasDiscount: false,
                     quantity: sel.qty,
                     sortOrder: items.length + newItems.length,
                     image: variant.image || selectedProductForVariant.image,
@@ -1957,6 +1972,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     subtotal={subtotal}
                     selectedCustomerId={selectedCustomer?.id || null}
                     appliedCouponId={couponId}
+                    hasWinningDiscount={hasWinningDiscount}
                     onApplyCoupon={async (coupon) => {
                         setCouponCode(coupon.code)
                         await handleApplyCoupon()

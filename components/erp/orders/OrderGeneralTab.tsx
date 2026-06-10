@@ -23,7 +23,7 @@ import QuantitySelector from "@/components/reusable/QuantitySelector"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
-import { findBestItemPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
 function formatLocalISODate(date: Date) {
     const y = date.getFullYear()
@@ -178,13 +178,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
         return dateStr
     }
 
-    const getSearchPricing = (prod: any) => findBestItemPrice(
-        Number(prod.price || 0),
-        prod.promotional_price && Number(prod.promotional_price) < Number(prod.price || 0) ? Number(prod.promotional_price) : null,
-        searchPromotions,
-        { productId: prod.id, categoryId: prod.category_id || undefined },
-    )
-
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
     const paymentMethodLabel = `${originalPaymentMethod || "Não informado"}${pendingSuffix}`
@@ -324,7 +317,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = getSearchPricing(product); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.stock} em estoque
                                                             </div>
@@ -1054,7 +1047,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = getSearchPricing(product); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.stock} em estoque
                                                             </div>

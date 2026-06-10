@@ -5,7 +5,7 @@ import { getEndTime } from './utils';
 import { InfoCard, Badge } from '@/components/reusable';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { getFulfillmentModeLabel } from '@/lib/orders/status';
-import { findBestItemPrice } from '@/lib/services/pricing-engine';
+import { computeItemDisplayPrice } from '@/lib/services/pricing-engine';
 
 interface ServiceItemCardProps {
     service: any;
@@ -69,7 +69,7 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
                             <span className="ml-2">· {getFulfillmentModeLabel(fulfillmentMode)}</span>
                         )}
                     </div>
-                    {(() => { const pr = findBestItemPrice(Number(service.price || 0), service.promotional_price && Number(service.promotional_price) < Number(service.price || 0) ? Number(service.promotional_price) : null, promotions, { serviceId: service.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                    {(() => { const pr = computeItemDisplayPrice(Number(service.price || 0), service.promotional_price && Number(service.promotional_price) < Number(service.price || 0) ? Number(service.promotional_price) : null, promotions, { serviceId: service.id }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
                 </div>
 
                 <div className="border-t border-brand-border dark:border-dark-border pt-2 mt-1 flex justify-between items-center">

@@ -7,7 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, EditIcon, SaveIcon } from '@/lib/icons';
 import QuoteEditor from './QuoteEditor';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { findBestItemPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import QuotePreview from './QuotePreview';
 import SelectCustomerSheet from '../clientes/SelectCustomerSheet';
 import SelectProductVariantSheet from '@/components/erp/pdv/SelectProductVariantSheet';

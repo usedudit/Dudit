@@ -333,17 +333,11 @@ const [couponPartialWarning, setCouponPartialWarning] = useState(false)
 const hasActiveItemDiscount = useMemo(() => {
     if (checkoutContext?.lines) {
         return checkoutContext.lines.some((l: any) => {
-            const uPrice = Number(l.unitaryPrice || l.price || 0)
-            const bPrice = Number(l.bestPrice || l.price || 0)
-            return bPrice < uPrice
+            return l.discountSource === "campaign" || l.discountSource === "manual"
         })
     }
-    return products.some((p) => {
-        const pAny = p as any
-        const promo = pAny.promotional_price ? Number(pAny.promotional_price) : 0
-        return promo > 0 && promo < Number(p.price || 0)
-    })
-}, [checkoutContext?.lines, products])
+    return false
+}, [checkoutContext?.lines])
 const displayableCoupons = useMemo(() => {
     if (!hasActiveItemDiscount) return availableCoupons
     return availableCoupons.filter((c) => c.allowCombination !== false)

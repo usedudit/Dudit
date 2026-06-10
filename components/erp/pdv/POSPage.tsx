@@ -28,7 +28,7 @@ import {
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { findBestItemPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -141,14 +141,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         }).catch(() => {})
     }, [partnerId])
 
-    const getPdvPricing = (prod: any) => {
-        const unitPrice = Number(prod.price || 0)
-        const promoVal = prod.promotional_price ? Number(prod.promotional_price) : 0
-        const individualPromo = promoVal > 0 && promoVal < unitPrice ? promoVal : null
-        return findBestItemPrice(unitPrice, individualPromo, pdvPromotions, { productId: prod.id, categoryId: prod.category || undefined })
-    }
-
-    const getDisplayPrice = (prod: any) => getPdvPricing(prod).bestPrice
+    const getDisplayPrice = (prod: any) => computeItemDisplayPrice(
+        Number(prod.price || 0),
+        prod.promotional_price && Number(prod.promotional_price) < Number(prod.price || 0) ? Number(prod.promotional_price) : null,
+        pdvPromotions,
+        { productId: prod.id, categoryId: prod.category || undefined },
+    ).bestPrice
 
     const hasProductsInCatalog = useMemo(() => {
         return products.some(p => p.product_type !== "Serviço" && p.product_type !== "service")
@@ -366,6 +364,23 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
     const itemCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart])
     const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.qty), 0), [cart])
+    const hasWinningDiscount = useMemo(() => {
+        return cart.some((item) => {
+            const prod = products.find((p) => p.id === item.productId)
+            if (!prod) {
+                return item.price < (item.listUnitPrice ?? item.price)
+            }
+            const promoPrice = prod.promotional_price ? Number(prod.promotional_price) : 0
+            const hasPromo = promoPrice > 0 && promoPrice < Number(prod.price || 0)
+            const pricing = computeItemDisplayPrice(
+                Number(prod.price || 0) + (item.variantId ? (item.listUnitPrice ? (item.listUnitPrice - Number(prod.price || 0)) : 0) : 0),
+                hasPromo ? promoPrice : null,
+                pdvPromotions,
+                { productId: prod.id, categoryId: prod.category || undefined }
+            )
+            return pricing.hasDiscount
+        })
+    }, [cart, products, pdvPromotions])
     const discountVal = useMemo(() => {
         if (discountType === "percentage") {
             return (subtotal * discountAmount) / 100
@@ -451,7 +466,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
                 const effectiveUnit = selectedVariant
                     ? listUnit
-                    : findBestItemPrice(Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
+                    : computeItemDisplayPrice(Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
                 if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
                     return prev
@@ -1299,7 +1314,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                     {product.product_variants && product.product_variants.length > 0 && (
                                                         <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                                                     )}
-                                                    {(() => { const pr = getPdvPricing(product); const ref = pr.referencePrice; return (<><div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{ref && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(ref)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div></>) })()}
+                                                    {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }); return (<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
 
                                                     <Button
                                                         variant="outline"
@@ -1855,6 +1870,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         subtotal={subtotal}
                         selectedCustomerId={selectedCustomerId || null}
                         appliedCouponId={appliedCouponId}
+                        hasWinningDiscount={hasWinningDiscount}
                         onApplyCoupon={async (coupon) => {
                             await applyCouponCode(coupon.code)
                             setIsCouponSheetOpen(false)

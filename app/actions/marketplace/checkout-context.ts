@@ -14,7 +14,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
-import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export type MarketplaceCheckoutDepositConfig = {
@@ -115,31 +115,38 @@ export async function getMarketplaceCheckoutContextAction(input: {
     if (line.imageUrl) {
       line.imageUrl = getR2ImageUrl(line.imageUrl)
     }
-    if (line.lineKind !== "product") continue
+    if (line.lineKind !== "product" && line.lineKind !== "service_booking") continue
     // Find the original resolved line for base price / promo data
     const resolvedLine = resolved.lines.find(l => l.cartItemId === line.lineId)
     if (!resolvedLine) continue
     const basePrice = Number((resolvedLine.pricingItem as any).basePrice || line.unitPrice)
     const promoPrice = (resolvedLine.pricingItem as any).promotionalPrice
     const hasPromo = promoPrice != null && Number(promoPrice) > 0 && Number(promoPrice) < basePrice
-    const bestCampaign = partnerPromotions
-      .map((p: any) => computeItemCampaignPricing(
-        basePrice,
-        hasPromo ? Number(promoPrice) : null,
-        p,
-        { productId: resolvedLine.productId, categoryId: resolvedLine.categoryId },
-      ))
-      .filter((r: any) => r.discountSource === "campaign")
-      .sort((a: any, b: any) => a.bestPrice - b.bestPrice)[0]
-    if (bestCampaign) {
-      line.unitPrice = bestCampaign.bestPrice
-      line.lineTotal = bestCampaign.bestPrice * line.quantity
-    }
+
+    const pricing = computeItemDisplayPrice(
+      basePrice,
+      hasPromo ? Number(promoPrice) : null,
+      partnerPromotions,
+      {
+        productId: resolvedLine.productId,
+        categoryId: resolvedLine.categoryId,
+        serviceId: resolvedLine.serviceId,
+      }
+    )
+
+    line.unitPrice = pricing.bestPrice
+    line.lineTotal = pricing.bestPrice * line.quantity
+    line.discountSource = pricing.discountSource
+    line.bestPrice = pricing.bestPrice
   }
 
-  // Recalculate productsSubtotal with campaign pricing
+  // Recalculate subtotals with campaign pricing
   productsSubtotal = displayLines
     .filter(l => l.lineKind === "product")
+    .reduce((sum, l) => sum + l.lineTotal, 0)
+
+  servicesSubtotal = displayLines
+    .filter(l => l.lineKind === "service_booking")
     .reduce((sum, l) => sum + l.lineTotal, 0)
 
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")

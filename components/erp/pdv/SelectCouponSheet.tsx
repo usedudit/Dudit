@@ -18,6 +18,7 @@ interface SelectCouponSheetProps {
   onRemoveCoupon?: () => void
   subtotal: number
   selectedCustomerId?: string | null
+  hasWinningDiscount?: boolean
 }
 
 type CouponItem = {
@@ -31,6 +32,7 @@ type CouponItem = {
   apply_scope?: "all" | "categories" | "products" | "services" | string | null
   customer_scope?: "all" | "specific" | string | null
   coupon_customers?: Array<{ customer_id: string | null }>
+  allow_combination?: boolean
 }
 
 const SelectCouponSheet = ({
@@ -42,6 +44,7 @@ const SelectCouponSheet = ({
   onRemoveCoupon,
   subtotal,
   selectedCustomerId,
+  hasWinningDiscount = false,
 }: SelectCouponSheetProps) => {
   const [search, setSearch] = useState("")
   const [manualCode, setManualCode] = useState("")
@@ -79,6 +82,10 @@ const SelectCouponSheet = ({
   const getCouponBlockReason = (coupon: CouponItem) => {
     if (!coupon.is_active) {
       return "Cupom inativo."
+    }
+
+    if (coupon.allow_combination === false && hasWinningDiscount) {
+      return "Cupom não cumulativo. Itens do carrinho já possuem desconto."
     }
 
     const applyScope = String(coupon.apply_scope || "all")

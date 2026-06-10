@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from "react"
-import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon } from "@/lib/icons"
+import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon } from "@/lib/icons"
 import { FavoriteButton } from "./FavoriteButton"
 import Link from "next/link"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -14,7 +14,7 @@ import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { Badge } from "@/components/reusable"
 import { useFavorites } from "@/providers/favorites-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -276,39 +276,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
         }
     }, [partnerId])
 
-    const activePromo = useMemo(() => {
-        return activePromotions.find((promo) => {
-            if (promo.applyScope === "entire_cart") return true
-            if (itemType === "produto") {
-                if (promo.applyScope === "specific_products" && promo.applicableProductIds?.includes(product.id)) return true
-                if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
-            } else if (itemType === "servico") {
-                if (promo.applyScope === "specific_services" && promo.applicableServiceIds?.includes(product.id)) return true
-                if (promo.applyScope === "category" && (product as any).category_id && promo.applicableCategoryIds?.includes((product as any).category_id)) return true
-            }
-            return false
-        })
-    }, [activePromotions, product.id, itemType, (product as any).category_id])
-
-    const campaignPricing = useMemo(() => {
+    const pricing = useMemo(() => {
         const basePrice = Number(product.originalPrice) || Number(product.price) || 0
         const individualPromo = product.originalPrice ? Number(product.price) : null
-        return computeItemCampaignPricing(
+        return computeItemDisplayPrice(
             basePrice,
             individualPromo,
-            activePromo || null,
+            activePromotions,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
         )
-    }, [activePromo, product.price, product.originalPrice, product.id, itemType, (product as any).category_id])
+    }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id])
 
-    const displayPrice = campaignPricing.bestPrice
-    const discountSource = campaignPricing.discountSource
-    const hasCampaignDiscount = discountSource === "campaign"
-    const hasManualPromo = discountSource === "manual"
-    const hasAnyDiscount = hasCampaignDiscount || hasManualPromo
-    const basePrice = Number(product.originalPrice) || Number(product.price) || 0
-    const discountPercent = hasAnyDiscount ? Math.round((1 - displayPrice / basePrice) * 100) : 0
-    const referencePrice = hasAnyDiscount ? basePrice : undefined
+    const displayPrice = pricing.bestPrice
+    const referencePrice = pricing.referencePrice
+    const discountPercent = pricing.discountPercent
 
     const itemUrl = itemType === "plano"
         ? getPlanUrl(product, product.partners)
@@ -342,20 +323,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         loading="lazy"
                     />
                     <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap max-w-[80%]">
-                        {showPrice && hasCampaignDiscount && (
-                            <Badge variant="blue" icon={null} className="whitespace-nowrap">
-                                {activePromo?.discountType === "percentage" ? `-${activePromo.discountValue}%` : `-${formatCurrency(campaignPricing.campaignDiscount)}`}
-                            </Badge>
+                        {showPrice && pricing.badgeVariant === "blue" && (
+                            <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pricing.discountPercent}%</Badge>
                         )}
-                        {showPrice && hasManualPromo && (
-                            <Badge variant="orange" icon={null} className="whitespace-nowrap">
-                                -{discountPercent}%
-                            </Badge>
-                        )}
-                        {showPrice && activePromo && activePromo.promotionType !== "discount" && !hasCampaignDiscount && (
-                            <span title={activePromo.name}>
-                                <Badge variant="blue" icon={<TagIcon size={10} />} className="whitespace-nowrap p-1.5 w-6 h-6 justify-center" />
-                            </span>
+                        {showPrice && pricing.badgeVariant === "orange" && (
+                            <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pricing.discountPercent}%</Badge>
                         )}
                     </div>
                     {itemType !== "plano" && (

@@ -5,6 +5,7 @@ export type PDVProduct = {
   sku?: string | null
   gtin?: string | null
   price: number
+  promotional_price?: number | null
   stock_available: number
   allow_sell_without_stock?: boolean
   images?: string[] | null

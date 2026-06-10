@@ -47,7 +47,7 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
 
@@ -552,10 +552,10 @@ export function ServiceDetailsPageClient({
         const effective = hasPromo ? promo : base
 
         // Compute best price: compares manual promo vs campaign discount
-        const campaignPricingResult = computeItemCampaignPricing(
+        const campaignPricingResult = computeItemDisplayPrice(
             base, hasPromo ? promo : null,
-            activePromo || null,
-            { productId: service.id, categoryId: service.category_id || undefined },
+            activePromotions,
+            { productId: service.id, serviceId: service.id, categoryId: service.category_id || undefined },
         )
 
         const bestPrice = campaignPricingResult.bestPrice
@@ -590,7 +590,7 @@ export function ServiceDetailsPageClient({
             discountPercent: Math.round(((base - promo) / base) * 100),
             campaignDiscountLabel,
         }
-    }, [service, partner, activePromo])
+    }, [service, partner, activePromo, activePromotions])
 
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: [{

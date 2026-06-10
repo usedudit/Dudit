@@ -665,12 +665,42 @@ export function computeItemCampaignPricing(
   }
 }
 
+export type BadgeVariant = "blue" | "orange" | null
+
+export interface ItemDisplayPrice {
+  bestPrice: number
+  originalPrice: number
+  referencePrice?: number
+  discountSource: DiscountSource
+  campaignDiscount: number
+  discountPercent: number
+  badgeVariant: BadgeVariant
+  hasDiscount: boolean
+  couponEligible: boolean
+}
+
 export interface BestItemPrice {
   bestPrice: number
   referencePrice?: number
   discountSource: DiscountSource
   campaignDiscount: number
   discountPercent: number
+}
+
+export function computeItemDisplayPrice(
+  unitPrice: number,
+  individualPromo: number | null,
+  promotions: PricingPromotion[],
+  itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
+): ItemDisplayPrice {
+  const raw = findBestItemPrice(unitPrice, individualPromo, promotions, itemMeta)
+  const badgeVariant: BadgeVariant =
+    raw.discountSource === "campaign" ? "blue"
+    : raw.discountSource === "manual" ? "orange"
+    : null
+  const hasDiscount = raw.bestPrice < unitPrice
+  const couponEligible = !hasDiscount
+  return { ...raw, originalPrice: unitPrice, badgeVariant, hasDiscount, couponEligible }
 }
 
 export function findBestItemPrice(
@@ -716,4 +746,12 @@ export function findBestItemPrice(
   const referencePrice = bestPrice < unitPrice ? unitPrice : undefined
   const discountPercent = referencePrice ? Math.round((1 - bestPrice / unitPrice) * 100) : 0
   return { bestPrice, referencePrice, discountSource: finalResult.discountSource, discountPercent, campaignDiscount: finalResult.campaignDiscount }
+}
+
+export function isCouponEligibleForItems(
+  allowCombination: boolean,
+  itemsDisplay: Array<{ couponEligible: boolean }>,
+): boolean {
+  if (allowCombination) return true
+  return itemsDisplay.every((item) => item.couponEligible)
 }

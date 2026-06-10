@@ -18,7 +18,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { formatCurrency, formatDateToBR } from "@/lib/utils"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
-import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -83,48 +83,17 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         setIsVendorExpanded(prev => ({ ...prev, [partnerId]: !prev[partnerId] }))
 
     const getItemPricingContext = (item: any, promotions: any[]) => {
-        const type = item.item_type || "product"
         const basePrice = Number(item.products?.price || 0)
-        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
-        const hasPromo = promoPrice > 0 && promoPrice < basePrice
         const unitPrice = (item.variant_id && item.product_variants)
             ? Number(item.product_variants.price_adjustment) || basePrice
             : basePrice
-        const individualPromo = item.variant_id ? null : (hasPromo ? promoPrice : null)
-
-        // Non-product types: no campaign pricing, just manual promo
-        if (type !== "product") {
-            const bestPrice = individualPromo ?? unitPrice
-            return { bestPrice, referencePrice: bestPrice < unitPrice ? unitPrice : undefined, discountSource: bestPrice < unitPrice ? "manual" : "none" as const, discountPercent: 0, campaignDiscount: 0 }
-        }
-
-        // Find best campaign among ALL applicable promotions
-        let bestCampaign: { bestPrice: number; discountSource: "campaign" | "manual" | "none"; campaignDiscount: number } = { bestPrice: unitPrice, discountSource: "none", campaignDiscount: 0 }
-        for (const promo of promotions || []) {
-            if (promo.promotionType === "discount" && promo.is_active !== false) {
-                const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, {
-                    productId: item.product_id,
-                    categoryId: item.products?.category_id || undefined,
-                })
-                if (result.bestPrice < bestCampaign.bestPrice) {
-                    bestCampaign = {
-                        bestPrice: result.bestPrice,
-                        discountSource: result.discountSource as "campaign" | "manual" | "none",
-                        campaignDiscount: result.campaignDiscount,
-                    }
-                }
-            }
-        }
-
-        // Final best price with all promotions considered
-        const finalResult = bestCampaign.discountSource !== "none"
-            ? bestCampaign
-            : computeItemCampaignPricing(unitPrice, individualPromo, null)
-        const bestPrice = finalResult.bestPrice
-        const discountSource = finalResult.discountSource
-        const referencePrice = bestPrice < unitPrice ? unitPrice : undefined
-        const discountPercent = referencePrice ? Math.round((1 - bestPrice / unitPrice) * 100) : 0
-        return { bestPrice, referencePrice, discountSource, discountPercent, campaignDiscount: finalResult.campaignDiscount }
+        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
+        const individualPromo = (!item.variant_id && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice : null
+        return computeItemDisplayPrice(unitPrice, individualPromo, promotions || [], {
+            productId: item.product_id,
+            serviceId: (item.item_type || "product") !== "product" ? item.product_id : undefined,
+            categoryId: item.products?.category_id || undefined,
+        })
     }
 
     const getItemBestPrice = (item: any, promotions: any[]) => getItemPricingContext(item, promotions).bestPrice

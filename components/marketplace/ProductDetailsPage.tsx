@@ -27,7 +27,7 @@ import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { getPartnerUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { computeItemCampaignPricing } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
 import type { SponsoredAd } from "@/lib/ads/types"
 
@@ -537,9 +537,9 @@ export function ProductDetailsPageClient({
         // Compute best price: compares manual promo vs campaign discount
         const pricingUnitPrice = selectedVariant ? Number(selectedVariant.price_adjustment) || base : base
         const pricingPromo = selectedVariant ? null : (hasPromo ? promo : null)
-        const campaignPricingResult = computeItemCampaignPricing(
+        const campaignPricingResult = computeItemDisplayPrice(
             pricingUnitPrice, pricingPromo,
-            activePromo || null,
+            activePromotions,
             { productId: product.id, categoryId: product.category_id || undefined },
         )
 
@@ -578,7 +578,7 @@ export function ProductDetailsPageClient({
             totalDiscountPercent,
             campaignDiscountLabel,
         }
-    }, [product, selectedVariant, quantity, partner, activePromo])
+    }, [product, selectedVariant, quantity, partner, activePromo, activePromotions])
 
     const avgRating = useMemo(() =>
         reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,
