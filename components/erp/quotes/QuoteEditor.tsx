@@ -15,7 +15,7 @@ import {
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
-import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection } from '@/components/reusable';
+import { Button, Input, TabsContent, FormDropdown, MoneyInput, PercentageInput, DatePicker, ThreeDotsLoader, IconPlaceholder, Pagination, InfoCard, ListItem, FormSection, Badge } from '@/components/reusable';
 import { UserProfileImage } from "@/lib/utils/UserProfileImage";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { formatCurrency } from "@/lib/utils";
@@ -96,6 +96,12 @@ interface QuoteEditorProps {
 const QuoteEditor = (props: QuoteEditorProps) => {
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
+    const getSearchPricing = (prod: any) => findBestItemPrice(
+        Number(prod.price || 0),
+        prod.promotional_price && Number(prod.promotional_price) < Number(prod.price || 0) ? Number(prod.promotional_price) : null,
+        props.quotePromotions || [],
+        { productId: prod.id, categoryId: prod.category_id || undefined },
+    )
     const [currentPage, setCurrentPage] = React.useState(1);
     const totalPages = Math.ceil(props.quoteItems.length / ITEMS_PER_PAGE);
     const paginatedItems = props.quoteItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -260,7 +266,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                        <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(findBestItemPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }).bestPrice)}</div>
+                                                        {(() => { const pr = getSearchPricing(product); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                             {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                         </div>

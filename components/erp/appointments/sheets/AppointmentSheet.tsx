@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
-import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard } from '@/components/reusable';
+import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { findBestItemPrice } from "@/lib/services/pricing-engine"
@@ -453,9 +453,9 @@ export const AppointmentSheet = ({
     }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
-    const getEffectiveServicePrice = (svc: any) => {
-        return findBestItemPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id }).bestPrice
-    }
+    const getServicePricing = (svc: any) => findBestItemPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id })
+
+    const getEffectiveServicePrice = (svc: any) => getServicePricing(svc).bestPrice
 
     const calculatedPrice = useMemo(() => {
         return selectedServices.reduce((acc, service) => {
@@ -1290,7 +1290,7 @@ export const AppointmentSheet = ({
                                                                     />
                                                                 </div>
                                                             )}
-                                                            <div className="font-bold text-brand-dark dark:text-dark-heading mt-2">{formatCurrency(findBestItemPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }).bestPrice)}</div>
+                                                            {(() => { const pr = getServicePricing(item); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
                                                         </div>
                                                     </div>
                                                 );

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton } from "@/components/reusable"
+import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -141,13 +141,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         }).catch(() => {})
     }, [partnerId])
 
-    const getDisplayPrice = (prod: any) => {
+    const getPdvPricing = (prod: any) => {
         const unitPrice = Number(prod.price || 0)
-        const p = prod.promotional_price ? Number(prod.promotional_price) : 0
-        const individualPromo = p > 0 && p < unitPrice ? p : null
-        const result = findBestItemPrice(unitPrice, individualPromo, pdvPromotions, { productId: prod.id, categoryId: prod.category || undefined })
-        return result.bestPrice
+        const promoVal = prod.promotional_price ? Number(prod.promotional_price) : 0
+        const individualPromo = promoVal > 0 && promoVal < unitPrice ? promoVal : null
+        return findBestItemPrice(unitPrice, individualPromo, pdvPromotions, { productId: prod.id, categoryId: prod.category || undefined })
     }
+
+    const getDisplayPrice = (prod: any) => getPdvPricing(prod).bestPrice
 
     const hasProductsInCatalog = useMemo(() => {
         return products.some(p => p.product_type !== "Serviço" && p.product_type !== "service")
@@ -1298,7 +1299,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                     {product.product_variants && product.product_variants.length > 0 && (
                                                         <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                                                     )}
-                                                    <p className="mt-0.5 font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(getDisplayPrice(product))}</p>
+                                                    {(() => { const pr = getPdvPricing(product); const ref = pr.referencePrice; return (<><div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{ref && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(ref)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.discountSource === "campaign" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.discountSource === "manual" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div></>) })()}
 
                                                     <Button
                                                         variant="outline"
