@@ -23,6 +23,32 @@ import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/q
 import { FadeIn } from '@/components/animations/FadeIn';
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine";
 
+function loggedComputeItemDisplayPrice(
+    surface: string,
+    id: string,
+    price: number,
+    promotional_price: number | null,
+    promotions: any[],
+    meta?: any
+) {
+    console.log(`[${surface}] Before computeItemDisplayPrice for ${id}:`, {
+        id,
+        price,
+        promotional_price,
+        promotionsCount: promotions.length,
+        promotions,
+    });
+    const res = computeItemDisplayPrice(price, promotional_price, promotions, meta);
+    console.log(`[${surface}] After computeItemDisplayPrice for ${id}:`, {
+        bestPrice: res.bestPrice,
+        originalPrice: res.originalPrice,
+        discountSource: res.discountSource,
+        discountPercent: res.discountPercent,
+        badgeVariant: res.badgeVariant,
+    });
+    return res;
+}
+
 interface QuoteEditorProps {
     searchQuery: string;
     setSearchQuery: (val: string) => void;
@@ -260,7 +286,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                         {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                                         {(() => { const pr = loggedComputeItemDisplayPrice("QuoteEditor", product.id, Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                             {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                         </div>

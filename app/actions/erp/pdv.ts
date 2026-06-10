@@ -461,7 +461,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
     const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
         supabase
             .from("products")
-            .select("id, name, sku, price, stock_available, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .select("id, name, sku, price, promotional_price, category:category_id, stock_available, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .order("created_at", { ascending: false })

@@ -8,6 +8,32 @@ import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePick
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+
+function loggedComputeItemDisplayPrice(
+    surface: string,
+    id: string,
+    price: number,
+    promotional_price: number | null,
+    promotions: any[],
+    meta?: any
+) {
+    console.log(`[${surface}] Before computeItemDisplayPrice for ${id}:`, {
+        id,
+        price,
+        promotional_price,
+        promotionsCount: promotions.length,
+        promotions,
+    });
+    const res = computeItemDisplayPrice(price, promotional_price, promotions, meta);
+    console.log(`[${surface}] After computeItemDisplayPrice for ${id}:`, {
+        bestPrice: res.bestPrice,
+        originalPrice: res.originalPrice,
+        discountSource: res.discountSource,
+        discountPercent: res.discountPercent,
+        badgeVariant: res.badgeVariant,
+    });
+    return res;
+}
 import { usePermissions } from '@/lib/permission-context';
 import { RecurrenceView, ActivityLog } from '../Shared';
 import { Appointment } from '../types';
@@ -453,7 +479,7 @@ export const AppointmentSheet = ({
     }, [mode, appointment, initialTimeSlot, initialDraft, selectedDate, defaultDate, initialStaffId, staffSource]);
 
     // Calculate Price dynamically for Time-Based Services
-    const getEffectiveServicePrice = (svc: any) => computeItemDisplayPrice(Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id }).bestPrice
+    const getEffectiveServicePrice = (svc: any) => loggedComputeItemDisplayPrice("AppointmentSheet", svc.id, Number(svc.price || 0), svc.promotional_price && Number(svc.promotional_price) < Number(svc.price || 0) ? Number(svc.promotional_price) : null, aptPromotions, { serviceId: svc.id }).bestPrice
 
     const calculatedPrice = useMemo(() => {
         return selectedServices.reduce((acc, service) => {
@@ -1288,7 +1314,7 @@ export const AppointmentSheet = ({
                                                                     />
                                                                 </div>
                                                             )}
-                                                             {(() => { const pr = computeItemDisplayPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                                             {(() => { const pr = loggedComputeItemDisplayPrice("AppointmentSheet", item.id, Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
                                                         </div>
                                                     </div>
                                                 );

@@ -29,6 +29,33 @@ import {
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+
+function loggedComputeItemDisplayPrice(
+    surface: string,
+    id: string,
+    price: number,
+    promotional_price: number | null,
+    promotions: any[],
+    meta?: any
+) {
+    console.log(`[${surface}] Before computeItemDisplayPrice for ${id}:`, {
+        id,
+        price,
+        promotional_price,
+        promotionsCount: promotions.length,
+        promotions,
+    });
+    const res = computeItemDisplayPrice(price, promotional_price, promotions, meta);
+    console.log(`[${surface}] After computeItemDisplayPrice for ${id}:`, {
+        bestPrice: res.bestPrice,
+        originalPrice: res.originalPrice,
+        discountSource: res.discountSource,
+        discountPercent: res.discountPercent,
+        badgeVariant: res.badgeVariant,
+    });
+    return res;
+}
+
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -141,7 +168,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         }).catch(() => {})
     }, [partnerId])
 
-    const getDisplayPrice = (prod: any) => computeItemDisplayPrice(
+    const getDisplayPrice = (prod: any) => loggedComputeItemDisplayPrice(
+        "POSPage",
+        prod.id,
         Number(prod.price || 0),
         prod.promotional_price && Number(prod.promotional_price) < Number(prod.price || 0) ? Number(prod.promotional_price) : null,
         pdvPromotions,
@@ -372,7 +401,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             }
             const promoPrice = prod.promotional_price ? Number(prod.promotional_price) : 0
             const hasPromo = promoPrice > 0 && promoPrice < Number(prod.price || 0)
-            const pricing = computeItemDisplayPrice(
+            const pricing = loggedComputeItemDisplayPrice(
+                "POSPage",
+                prod.id,
                 Number(prod.price || 0) + (item.variantId ? (item.listUnitPrice ? (item.listUnitPrice - Number(prod.price || 0)) : 0) : 0),
                 hasPromo ? promoPrice : null,
                 pdvPromotions,
@@ -466,7 +497,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
                 const effectiveUnit = selectedVariant
                     ? listUnit
-                    : computeItemDisplayPrice(Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
+                    : loggedComputeItemDisplayPrice("POSPage", product.id, Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
                 if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
                     return prev
@@ -1314,7 +1345,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                     {product.product_variants && product.product_variants.length > 0 && (
                                                         <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
                                                     )}
-                                                    {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }); return (<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                                    {(() => { const pr = loggedComputeItemDisplayPrice("POSPage", product.id, Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }); return (<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
 
                                                     <Button
                                                         variant="outline"

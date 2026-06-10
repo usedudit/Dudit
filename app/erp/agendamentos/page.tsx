@@ -38,7 +38,7 @@ async function loadCatalogs(partnerId: string) {
       .limit(500),
     supabase
       .from("services")
-      .select("id, name, price, duration_minutes, buffer_minutes, billing_unit, service_categories!category_id(name)")
+      .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, service_categories!category_id(name)")
       .eq("partner_id", partnerId)
       .eq("is_active", true)
       .order("name")
@@ -105,6 +105,8 @@ async function loadCatalogs(partnerId: string) {
       id: String(s.id),
       name: String(s.name || ""),
       price: Number(s.price || 0),
+      promotional_price: s.promotional_price ? Number(s.promotional_price) : null,
+      category_id: s.category_id || null,
       duration: String(Number(s.duration_minutes || 60)),
       bufferMinutes: Number(s.buffer_minutes || 0),
       category: (s as any).service_categories?.name || "Serviços",

@@ -279,12 +279,27 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const pricing = useMemo(() => {
         const basePrice = Number(product.originalPrice) || Number(product.price) || 0
         const individualPromo = product.originalPrice ? Number(product.price) : null
-        return computeItemDisplayPrice(
+        console.log("Marketplace ItemCard before computeItemDisplayPrice:", {
+            id: product.id,
+            price: basePrice,
+            promotional_price: individualPromo,
+            promotionsCount: activePromotions.length,
+            promotions: activePromotions,
+        });
+        const res = computeItemDisplayPrice(
             basePrice,
             individualPromo,
             activePromotions,
             { productId: itemType === "produto" ? product.id : undefined, serviceId: itemType === "servico" ? product.id : undefined, categoryId: (product as any).category_id || undefined },
         )
+        console.log("Marketplace ItemCard after computeItemDisplayPrice:", {
+            bestPrice: res.bestPrice,
+            originalPrice: res.originalPrice,
+            discountSource: res.discountSource,
+            discountPercent: res.discountPercent,
+            badgeVariant: res.badgeVariant,
+        });
+        return res;
     }, [activePromotions, product.price, product.originalPrice, product.id, itemType, (product as any).category_id])
 
     const displayPrice = pricing.bestPrice

@@ -70,7 +70,7 @@ export async function fetchPartnerProductsBucket() {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, sku, gtin, price, stock_available, allow_sell_without_stock, images, unit, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+    .select("id, name, sku, gtin, price, promotional_price, category_id, stock_available, allow_sell_without_stock, images, unit, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("name")
@@ -87,6 +87,8 @@ export async function fetchPartnerProductsBucket() {
     sku: p.sku || "N/A",
     gtin: p.gtin || null,
     price: p.price || 0,
+    promotional_price: p.promotional_price,
+    category_id: p.category_id || null,
     stock: p.stock_available || 0,
     allow_sell_without_stock: Boolean(p.allow_sell_without_stock),
     image: p.images && p.images.length > 0 ? p.images[0] : null,
@@ -220,6 +222,8 @@ export type PartnerServiceBucketItem = {
   id: string
   name: string
   price: number
+  promotional_price?: number | null
+  category_id?: string | null
   duration: number
   bufferMinutes: number
   category: string | null
@@ -236,7 +240,7 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, price, duration_minutes, buffer_minutes, billing_unit, is_active, service_categories!category_id(name)")
+    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, service_categories!category_id(name)")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("name")
@@ -251,6 +255,8 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
     id: String(s.id),
     name: String(s.name || ""),
     price: Number(s.price || 0),
+    promotional_price: s.promotional_price ? Number(s.promotional_price) : null,
+    category_id: s.category_id || null,
     duration: Number(s.duration_minutes || 60),
     bufferMinutes: Number(s.buffer_minutes || 0),
     category: s.service_categories?.name || null,
