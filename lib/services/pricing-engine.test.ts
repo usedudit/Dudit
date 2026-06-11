@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest"
 import {
   calculateOrderPricing,
   computeItemCampaignPricing,
+  computeItemDisplayPrice,
+  isCouponEligibleForItems,
   type PricingItem,
   type PricingCoupon,
   type PricingInput,
@@ -1122,6 +1124,155 @@ describe("computeItemCampaignPricing", () => {
       expect(r.appliedPromotionIds).toContain("gift-promo-out-of-stock")
       expect(r.appliedGiftProductIds).not.toContain("gift-item")
       expect(r.appliedGiftProductIds.length).toBe(0)
+    })
+  })
+
+  describe("Checklist Final Verification Tests", () => {
+    // 1. Mesmo item em 2 campanhas
+    it("Checklist: Mesmo item em 2 campanhas (Campanha A = 10%, Campanha B = R$20 fixed) -> Apenas a que resultar no menor preço ganha", () => {
+      // Base price = 100
+      // Campanha A: 10% off (discount = 10, price = 90)
+      // Campanha B: R$ 20 off fixed (discount = 20, price = 80)
+      // Expected: Campanha B wins because it results in 80 (lowest price / highest discount)
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "camp-A", priority: 1, discountType: DiscountType.PERCENTAGE, discountValue: 10 }),
+          discountPromotion({ id: "camp-B", priority: 1, discountType: DiscountType.FIXED, discountValue: 20 }),
+        ],
+      })
+      expect(r.subtotal).toBe(80)
+      expect(r.appliedPromotionIds).toContain("camp-B")
+      expect(r.appliedPromotionIds).not.toContain("camp-A")
+      expect(r.itemDiscountSource).toBe("campaign")
+    })
+
+    it("Checklist: Mesmo item em 2 campanhas (Campanha A = 10%, Campanha B = R$20 fixed) -> Campanha A ganha se base for R$300", () => {
+      // Base price = 300
+      // Campanha A: 10% off (discount = 30, price = 270)
+      // Campanha B: R$ 20 off fixed (discount = 20, price = 280)
+      // Expected: Campanha A wins because it results in 270 (lowest price / highest discount)
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 300, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "camp-A", priority: 1, discountType: DiscountType.PERCENTAGE, discountValue: 10 }),
+          discountPromotion({ id: "camp-B", priority: 1, discountType: DiscountType.FIXED, discountValue: 20 }),
+        ],
+      })
+      expect(r.subtotal).toBe(270)
+      expect(r.appliedPromotionIds).toContain("camp-A")
+      expect(r.appliedPromotionIds).not.toContain("camp-B")
+    })
+
+    // 2. Promotional price vs campanha
+    it("Checklist: Promotional price vs campanha (preço normal: 100, promotional_price: 60, campanha: 30% (70)) -> ganha promotional_price (60) e badge laranja", () => {
+      // normal = 100, promotionalPrice = 60, campaign = 30% off (70)
+      // Expected: best price = 60 (manual wins), badgeVariant = orange
+      const display = computeItemDisplayPrice(
+        100,
+        60,
+        [discountPromotion({ id: "camp-30", discountType: DiscountType.PERCENTAGE, discountValue: 30 })],
+        { productId: "p1" }
+      )
+      expect(display.bestPrice).toBe(60)
+      expect(display.discountSource).toBe("manual")
+      expect(display.badgeVariant).toBe("orange")
+    })
+
+    it("Checklist: Promotional price vs campanha (preço normal: 100, promotional_price: 90, campanha: 50% (50)) -> ganha campanha (50) e badge azul", () => {
+      // normal = 100, promotionalPrice = 90, campaign = 50% off (50)
+      // Expected: best price = 50 (campaign wins), badgeVariant = blue
+      const display = computeItemDisplayPrice(
+        100,
+        90,
+        [discountPromotion({ id: "camp-50", discountType: DiscountType.PERCENTAGE, discountValue: 50 })],
+        { productId: "p1" }
+      )
+      expect(display.bestPrice).toBe(50)
+      expect(display.discountSource).toBe("campaign")
+      expect(display.badgeVariant).toBe("blue")
+    })
+
+    // 3. GIFT: Subtotal acima de R$200 ganha brinde
+    it("Checklist: GIFT - Subtotal acima de R$200 ganha brinde", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 250, quantity: 1 }], // subtotal = 250
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({
+            id: "gift-promo-200",
+            promotionType: PromotionType.GIFT,
+            minSpendAmount: 200,
+            giftProductId: "gift-item-123",
+            discountType: null,
+            discountValue: null,
+          }),
+        ],
+      })
+      expect(r.appliedGiftProductIds).toContain("gift-item-123")
+      expect(r.appliedPromotionIds).toContain("gift-promo-200")
+      // Validações adicionais para GIFT: valor 0 do brinde (brindes não somam ao total do pedido)
+      expect(r.subtotal).toBe(250)
+    })
+
+    // 4. GIFT sem estoque: Brinde estoque = 0, desconto e promoção continuam, brinde some
+    it("Checklist: GIFT sem estoque (giftUnavailable = true) -> promoção continua ativa, mas o brinde não aparece", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 250, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({
+            id: "gift-promo-200",
+            promotionType: PromotionType.GIFT,
+            minSpendAmount: 200,
+            giftProductId: "gift-item-123",
+            giftUnavailable: true, // out of stock
+            discountType: null,
+            discountValue: null,
+          }),
+        ],
+      })
+      expect(r.appliedPromotionIds).toContain("gift-promo-200")
+      expect(r.appliedGiftProductIds).not.toContain("gift-item-123")
+      expect(r.appliedGiftProductIds.length).toBe(0)
+    })
+
+    // 5. Cupons: Cupom NÃO combinável
+    it("Checklist: Cupom NÃO combinável (allowCombination = false) com promotional_price -> cupom bloqueado", () => {
+      const display = computeItemDisplayPrice(100, 80, [], { productId: "p1" })
+      const isEligible = isCouponEligibleForItems(false, [display])
+      expect(isEligible).toBe(false)
+    })
+
+    it("Checklist: Cupom NÃO combinável (allowCombination = false) com campanha -> cupom bloqueado", () => {
+      const display = computeItemDisplayPrice(
+        100,
+        null,
+        [discountPromotion({ id: "camp-10", discountValue: 10 })],
+        { productId: "p1" }
+      )
+      const isEligible = isCouponEligibleForItems(false, [display])
+      expect(isEligible).toBe(false)
+    })
+
+    // 6. Cupons: Cupom combinável
+    it("Checklist: Cupom combinável (allowCombination = true) com promotional_price -> cupom liberado", () => {
+      const display = computeItemDisplayPrice(100, 80, [], { productId: "p1" })
+      const isEligible = isCouponEligibleForItems(true, [display])
+      expect(isEligible).toBe(true)
+    })
+
+    it("Checklist: Cupom combinável (allowCombination = true) com campanha -> cupom liberado", () => {
+      const display = computeItemDisplayPrice(
+        100,
+        null,
+        [discountPromotion({ id: "camp-10", discountValue: 10 })],
+        { productId: "p1" }
+      )
+      const isEligible = isCouponEligibleForItems(true, [display])
+      expect(isEligible).toBe(true)
     })
   })
 })

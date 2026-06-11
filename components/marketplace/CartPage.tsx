@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
-import { Button, Checkbox, Badge, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -551,10 +551,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             <div className="flex flex-col items-end">
                                                                                                                 <div className="flex items-center gap-1">
                                                                                                                     {ctx.discountSource === "campaign" && (
-                                                                                                                        <Badge variant="blue" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                        <p className="text-xs text-brand-blue">
+                                                                                                                            -{ctx.discountPercent}%
+                                                                                                                        </p>
                                                                                                                     )}
                                                                                                                     {ctx.discountSource === "manual" && (
-                                                                                                                        <Badge variant="orange" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                        <p className="text-xs text-brand-orange">
+                                                                                                                            -{ctx.discountPercent}%
+                                                                                                                        </p>
                                                                                                                     )}
                                                                                                                     {ctx.referencePrice && (
                                                                                                                         <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</span>
@@ -633,20 +637,14 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
                                                                                                     )}
-                                                                    {(() => {
-                                                                        const ctx = getItemPricingContext(item, partnerPromos)
-                                                                        return (
-                                                                            <div className="flex items-center gap-2">
-                                                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
-                                                                                {ctx.discountSource === "campaign" && (
-                                                                                    <Badge variant="blue" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
-                                                                                )}
-                                                                                {ctx.discountSource === "manual" && (
-                                                                                    <Badge variant="orange" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
-                                                                                )}
-                                                                            </div>
-                                                                        )
-                                                                    })()}
+                                                                                                    {(() => {
+                                                                                                        const ctx = getItemPricingContext(item, partnerPromos)
+                                                                                                        return (
+                                                                                                            <div className="flex items-center gap-2">
+                                                                                                                <p className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(ctx.bestPrice)}</p>
+                                                                                                            </div>
+                                                                                                        )
+                                                                                                    })()}
                                                                                                 </div>
 
                                                                                                 <div className="flex items-center justify-end gap-4">
@@ -668,15 +666,19 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                             <div className="text-right min-w-[80px]">
                                                                                                                 <div className="flex items-center justify-end gap-1 flex-wrap">
                                                                                                                     {ctx.discountSource === "campaign" && (
-                                                                                                                        <Badge variant="blue" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                        <p className="text-xs text-brand-blue">
+                                                                                                                            -{ctx.discountPercent}%
+                                                                                                                        </p>
                                                                                                                     )}
                                                                                                                     {ctx.discountSource === "manual" && (
-                                                                                                                        <Badge variant="orange" icon={null} className="text-[10px] whitespace-nowrap">-{ctx.discountPercent}%</Badge>
+                                                                                                                        <p className="text-xs text-brand-orange">
+                                                                                                                            -{ctx.discountPercent}%
+                                                                                                                        </p>
                                                                                                                     )}
                                                                                                                     {ctx.referencePrice && <p className="text-xs text-brand-inactive-text line-through">{formatCurrency(isOutOfStock ? ctx.referencePrice : ctx.referencePrice * itemQty)}</p>}
                                                                                                                 </div>
                                                                                                                 <p className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</p>
-                                                                            </div>
+                                                                                                            </div>
                                                                                                         )
                                                                                                     })()}
                                                                                                     <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>

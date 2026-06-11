@@ -637,6 +637,8 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
           const itemsToInsert = [
             {
               order_id: order.id,
+              product_id: null,
+              variant_id: null,
               product_name: row.service_name || "Serviço",
               product_price: pricingResult.subtotal,
               quantity: 1,
@@ -644,6 +646,10 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
               line_type: "service_booking",
               fulfillment_mode: row.fulfillment_mode || "on_site",
               service_id: row.service_id,
+              is_gift: false,
+              original_price: null,
+              is_promotional: false,
+              promotion_id: null,
             },
             ...giftItems.map(item => ({
               order_id: order.id,

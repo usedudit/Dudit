@@ -1068,6 +1068,8 @@ export async function checkoutCartAction(
     order_id: order.id,
     is_promotional: item.is_promotional ?? false,
     promotion_id: item.promotion_id ?? null,
+    is_gift: item.is_gift ?? false,
+    original_price: item.original_price ?? null,
   }))
 
   const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)

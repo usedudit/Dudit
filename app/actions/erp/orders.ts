@@ -1483,7 +1483,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             product_price: item.unitPrice,
             quantity: item.quantity,
             subtotal: item.unitPrice * item.quantity,
-            sort_order: item.sortOrder
+            sort_order: item.sortOrder,
+            is_gift: false,
+            original_price: null,
+            is_promotional: false,
+            promotion_id: null,
         })),
         ...giftItemsToInsert
     ]
@@ -2238,7 +2242,11 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             product_price: item.unitPrice,
             quantity: item.quantity,
             subtotal: item.unitPrice * item.quantity,
-            sort_order: item.sortOrder
+            sort_order: item.sortOrder,
+            is_gift: false,
+            original_price: null,
+            is_promotional: false,
+            promotion_id: null,
         })),
         ...giftItemsToInsert
     ]
