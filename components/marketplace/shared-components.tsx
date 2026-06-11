@@ -242,21 +242,30 @@ interface ItemCardProps {
     userCoords?: { lat: number; lng: number } | null
     showSeller?: boolean
     className?: string
+    promotions?: any[]
 }
 
 // Simple client-side cache for partner promotions to avoid redundant network requests
 const promotionsCache: Record<string, Promise<any[]>> = {}
+const promotionsValueCache: Record<string, any[]> = {}
 
 function getCachedPartnerPromotions(partnerId: string) {
     if (!promotionsCache[partnerId]) {
         promotionsCache[partnerId] = listActivePromotionsForMarketplaceAction(partnerId)
-            .then(res => Array.isArray(res) ? res : [])
-            .catch(() => [])
+            .then(res => {
+                const arr = Array.isArray(res) ? res : []
+                promotionsValueCache[partnerId] = arr
+                return arr
+            })
+            .catch(() => {
+                promotionsValueCache[partnerId] = []
+                return []
+            })
     }
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]" }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions }) => {
     const { isFavorited } = useFavorites()
     const itemType = (product as any).itemType === "plano" ? "plano" : ((product as any).itemType === "servico" ? "servico" : "produto")
     const favorited = itemType !== "plano" ? isFavorited(product.id, itemType) : false
@@ -268,13 +277,27 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage) : null
     const partnerId = partner?.id || null
 
-    const [activePromotions, setActivePromotions] = useState<any[]>([])
+    const [activePromotions, setActivePromotions] = useState<any[]>(() => {
+        if (preloadedPromotions) return preloadedPromotions
+        if (partnerId && promotionsValueCache[partnerId]) {
+            return promotionsValueCache[partnerId]
+        }
+        return []
+    })
 
     useEffect(() => {
-        if (partnerId) {
-            getCachedPartnerPromotions(partnerId).then(setActivePromotions)
+        if (preloadedPromotions) {
+            setActivePromotions(preloadedPromotions)
+            return
         }
-    }, [partnerId])
+        if (partnerId) {
+            if (promotionsValueCache[partnerId]) {
+                setActivePromotions(promotionsValueCache[partnerId])
+            } else {
+                getCachedPartnerPromotions(partnerId).then(setActivePromotions)
+            }
+        }
+    }, [partnerId, preloadedPromotions])
 
     const pricing = useMemo(() => {
         const basePrice = Number(product.originalPrice) || Number(product.price) || 0

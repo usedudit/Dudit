@@ -37,6 +37,98 @@
 import { PricingPromotion, PromotionType, DiscountType, ApplyScope } from "@/lib/types/promotion"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
+const sortedPromotionsCache = new WeakMap<PricingPromotion[], PricingPromotion[]>()
+const emptyPromoArray: PricingPromotion[] = []
+
+export function getSortedPromotions(promotions: PricingPromotion[] | null | undefined): PricingPromotion[] {
+  const promoArray = promotions || emptyPromoArray
+  let cached = sortedPromotionsCache.get(promoArray)
+  if (!cached) {
+    cached = [...promoArray].sort((a, b) => b.priority - a.priority)
+    sortedPromotionsCache.set(promoArray, cached)
+  }
+  return cached
+}
+
+interface IndexedPromotions {
+  byProduct: Map<string, PricingPromotion[]>
+  byService: Map<string, PricingPromotion[]>
+  byCategory: Map<string, PricingPromotion[]>
+  entireCart: PricingPromotion[]
+}
+
+const promotionIndexCache = new WeakMap<PricingPromotion[], IndexedPromotions>()
+
+function getIndexedPromotions(promotions: PricingPromotion[]): IndexedPromotions {
+  const promoArray = promotions || emptyPromoArray
+  let cached = promotionIndexCache.get(promoArray)
+  if (!cached) {
+    const byProduct = new Map<string, PricingPromotion[]>()
+    const byService = new Map<string, PricingPromotion[]>()
+    const byCategory = new Map<string, PricingPromotion[]>()
+    const entireCart: PricingPromotion[] = []
+
+    for (const promo of promoArray) {
+      if (promo.applyScope === ApplyScope.ENTIRE_CART) {
+        entireCart.push(promo)
+      } else if (promo.applyScope === ApplyScope.SPECIFIC_PRODUCTS && promo.applicableProductIds) {
+        for (const pid of promo.applicableProductIds) {
+          if (!byProduct.has(pid)) byProduct.set(pid, [])
+          byProduct.get(pid)!.push(promo)
+        }
+      } else if (promo.applyScope === ApplyScope.SPECIFIC_SERVICES && promo.applicableServiceIds) {
+        for (const sid of promo.applicableServiceIds) {
+          if (!byService.has(sid)) byService.set(sid, [])
+          byService.get(sid)!.push(promo)
+        }
+      } else if (promo.applyScope === ApplyScope.CATEGORY && promo.applicableCategoryIds) {
+        for (const cid of promo.applicableCategoryIds) {
+          if (!byCategory.has(cid)) byCategory.set(cid, [])
+          byCategory.get(cid)!.push(promo)
+        }
+      }
+    }
+
+    cached = { byProduct, byService, byCategory, entireCart }
+    promotionIndexCache.set(promoArray, cached)
+  }
+  return cached
+}
+
+const promoSetsCache = new WeakMap<PricingPromotion, {
+  products: Set<string>
+  categories: Set<string>
+  services: Set<string>
+}>()
+
+function getPromoSets(promo: PricingPromotion) {
+  let cached = promoSetsCache.get(promo)
+  if (!cached) {
+    cached = {
+      products: new Set(promo.applicableProductIds || []),
+      categories: new Set(promo.applicableCategoryIds || []),
+      services: new Set(promo.applicableServiceIds || []),
+    }
+    promoSetsCache.set(promo, cached)
+  }
+  return cached
+}
+
+const promotionMapCache = new WeakMap<PricingPromotion[], Map<string, PricingPromotion>>()
+
+function getPromotionMap(promotions: PricingPromotion[]): Map<string, PricingPromotion> {
+  const promoArray = promotions || emptyPromoArray
+  let cached = promotionMapCache.get(promoArray)
+  if (!cached) {
+    cached = new Map()
+    for (const p of promoArray) {
+      cached.set(p.id, p)
+    }
+    promotionMapCache.set(promoArray, cached)
+  }
+  return cached
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -169,22 +261,21 @@ function clampMin0(n: number): number {
 
 function isItemInScope(
   item: CartUnit,
-  applyScope: ApplyScope,
-  applicableProductIds?: string[] | null,
-  applicableCategoryIds?: string[] | null,
-  applicableServiceIds?: string[] | null,
+  promo: PricingPromotion,
 ): boolean {
+  const applyScope = promo.applyScope
   if (applyScope === ApplyScope.ENTIRE_CART) {
     return true
   }
+  const sets = getPromoSets(promo)
   if (applyScope === ApplyScope.SPECIFIC_PRODUCTS) {
-    return Boolean(item.productId && applicableProductIds?.includes(item.productId))
+    return Boolean(item.productId && sets.products.has(item.productId))
   }
   if (applyScope === ApplyScope.CATEGORY) {
-    return Boolean(item.categoryId && applicableCategoryIds?.includes(item.categoryId))
+    return Boolean(item.categoryId && sets.categories.has(item.categoryId))
   }
   if (applyScope === ApplyScope.SPECIFIC_SERVICES) {
-    return Boolean(item.serviceId && applicableServiceIds?.includes(item.serviceId))
+    return Boolean(item.serviceId && sets.services.has(item.serviceId))
   }
   return false
 }
@@ -247,7 +338,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   let campaignDiscountAmount = 0
   let freeShippingAppliedCampaign = false
 
-  const sortedPromotions = [...(input.promotions || [])].sort((a, b) => b.priority - a.priority)
+  const sortedPromotions = getSortedPromotions(input.promotions)
 
   // We need to track campaign-only discount per unit to compare with manual price
   // Store the campaign-influenced price separately
@@ -256,7 +347,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   // Helper: get indices of units in scope for a promotion
   function eligibleUnitIndices(promo: PricingPromotion): number[] {
     return units.reduce<number[]>((acc, u, idx) => {
-      if (isItemInScope(u, promo.applyScope, promo.applicableProductIds, promo.applicableCategoryIds, promo.applicableServiceIds)) {
+      if (isItemInScope(u, promo)) {
         acc.push(idx)
       }
       return acc
@@ -437,8 +528,9 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     appliedCouponId = coupon.id
     couponCode = coupon.code || null
 
+    const promoMap = getPromotionMap(input.promotions || [])
     const hasAppliedNonCombinablePromo = finalPromotionIds.some(promoId => {
-      const promo = (input.promotions || []).find(p => p.id === promoId)
+      const promo = promoMap.get(promoId)
       return promo && promo.allowCouponCombination === false
     })
 
@@ -614,6 +706,7 @@ export function computeItemCampaignPricing(
   promotion: PricingPromotion | null,
   itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
 ): ItemCampaignPricing {
+  if ((globalThis as any).__pricing_stats) (globalThis as any).__pricing_stats.campaignPricingCount++
   const manualPrice =
     promotionalPrice != null && promotionalPrice > 0 && promotionalPrice < unitPrice
       ? promotionalPrice
@@ -693,12 +786,29 @@ export interface BestItemPrice {
   discountPercent: number
 }
 
+if (!(globalThis as any).__pricing_stats) {
+  ;(globalThis as any).__pricing_stats = { computeCount: 0, findBestCount: 0, campaignPricingCount: 0 }
+}
+
+export function getPricingCallStats() {
+  return (globalThis as any).__pricing_stats || { computeCount: 0, findBestCount: 0, campaignPricingCount: 0 }
+}
+
+export function resetPricingCallStats() {
+  if ((globalThis as any).__pricing_stats) {
+    ;(globalThis as any).__pricing_stats.computeCount = 0
+    ;(globalThis as any).__pricing_stats.findBestCount = 0
+    ;(globalThis as any).__pricing_stats.campaignPricingCount = 0
+  }
+}
+
 export function computeItemDisplayPrice(
   unitPrice: number,
   individualPromo: number | null,
   promotions: PricingPromotion[],
   itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
 ): ItemDisplayPrice {
+  if ((globalThis as any).__pricing_stats) (globalThis as any).__pricing_stats.computeCount++
   const raw = findBestItemPrice(unitPrice, individualPromo, promotions, itemMeta)
   const badgeVariant: BadgeVariant =
     raw.discountSource === "campaign" ? "blue"
@@ -715,6 +825,7 @@ export function findBestItemPrice(
   promotions: PricingPromotion[],
   itemMeta?: { productId?: string | null; serviceId?: string | null; categoryId?: string | null },
 ): BestItemPrice {
+  if ((globalThis as any).__pricing_stats) (globalThis as any).__pricing_stats.findBestCount++
   // Non-product items: no campaign pricing, just manual promo
   if (!itemMeta?.productId && !itemMeta?.serviceId) {
     const bestPrice = individualPromo ?? unitPrice
@@ -727,19 +838,35 @@ export function findBestItemPrice(
     }
   }
 
-  // Find best campaign among ALL applicable promotions
+  // Find best campaign among ONLY applicable promotions
   let bestCampaign: { bestPrice: number; discountSource: DiscountSource; campaignDiscount: number } = {
     bestPrice: unitPrice, discountSource: "none", campaignDiscount: 0,
   }
-  for (const promo of promotions || []) {
-    if (promo.promotionType === "discount") {
-      const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, itemMeta)
-      if (result.bestPrice < bestCampaign.bestPrice) {
-        bestCampaign = {
-          bestPrice: result.bestPrice,
-          discountSource: result.discountSource,
-          campaignDiscount: result.campaignDiscount,
-        }
+
+  const indexed = getIndexedPromotions(promotions)
+  const candidates: PricingPromotion[] = []
+
+  if (itemMeta?.productId) {
+    const matched = indexed.byProduct.get(itemMeta.productId)
+    if (matched) candidates.push(...matched)
+  }
+  if (itemMeta?.serviceId) {
+    const matched = indexed.byService.get(itemMeta.serviceId)
+    if (matched) candidates.push(...matched)
+  }
+  if (itemMeta?.categoryId) {
+    const matched = indexed.byCategory.get(itemMeta.categoryId)
+    if (matched) candidates.push(...matched)
+  }
+  candidates.push(...indexed.entireCart)
+
+  for (const promo of candidates) {
+    const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, itemMeta)
+    if (result.bestPrice < bestCampaign.bestPrice) {
+      bestCampaign = {
+        bestPrice: result.bestPrice,
+        discountSource: result.discountSource,
+        campaignDiscount: result.campaignDiscount,
       }
     }
   }

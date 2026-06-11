@@ -26,6 +26,7 @@ import { useNotification } from "@/hooks/use-notification"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
+import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 
 interface VendorPageClientProps {
     partner: any
@@ -478,7 +479,7 @@ function CarouselNav({ targetRef, showSeeAll, onSeeAll }: { targetRef: React.Ref
     )
 }
 
-function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: string; items: any[]; partner: any; onSeeAll?: () => void; sectionId?: string }) {
+function ItemsCarousel({ title, items, partner, onSeeAll, sectionId, promotions }: { title: string; items: any[]; partner: any; onSeeAll?: () => void; sectionId?: string; promotions?: any[] }) {
     const ref = useRef<HTMLDivElement>(null)
     if (!items.length) return null
     return (
@@ -490,7 +491,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId }: { title: 
             <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">
                 {items.slice(0, 20).map(item => (
                     <div key={item.id} className="snap-start">
-                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} />
+                        <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={promotions} />
                     </div>
                 ))}
             </div>
@@ -562,7 +563,16 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const { user } = useSupabase()
     const isStoreOwner = user?.id === partner.userId || user?.id === partner.user_id
 
-    useEffect(() => { setIsMounted(true) }, [])
+    const [partnerPromotions, setPartnerPromotions] = useState<any[]>([])
+
+    useEffect(() => {
+        setIsMounted(true)
+        if (partner?.id) {
+            listActivePromotionsForMarketplaceAction(partner.id)
+                .then(res => setPartnerPromotions(Array.isArray(res) ? res : []))
+                .catch(() => {})
+        }
+    }, [partner?.id])
 
     const partnerRawImage = partner.store_avatar || partner.store_image_url || partner.profile_image_url || partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
@@ -934,15 +944,15 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 md:gap-x-5 md:gap-y-10">
-                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" />)}
+                                        {categoryItems.map(item => <ItemCard key={item.id} product={normalizeItemForCard(item, partner)} showSeller={false} className="w-full" promotions={partnerPromotions} />)}
                                     </div>
                                 </section>
                             ) : (
                                 <>
                                     <CouponsCarousel coupons={coupons} onCouponClick={setSelectedCoupon} />
-                                    <ItemsCarousel title="Produtos destacados" items={featuredItems} partner={partner} sectionId="featured" />
+                                    <ItemsCarousel title="Produtos destacados" items={featuredItems} partner={partner} sectionId="featured" promotions={partnerPromotions} />
                                     {groupedItems.map(group => (
-                                        <ItemsCarousel key={group.id} title={group.name} items={group.items} partner={partner} sectionId={group.id} onSeeAll={() => openCategory(group.id)} />
+                                        <ItemsCarousel key={group.id} title={group.name} items={group.items} partner={partner} sectionId={group.id} onSeeAll={() => openCategory(group.id)} promotions={partnerPromotions} />
                                     ))}
                                     {!groupedItems.length && (
                                         <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item encontrado" subtitle="Tente buscar por outro termo." />

@@ -110,14 +110,21 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const partnerPromotions = promosMap?.[resolved.partnerId] || []
 
+  const resolvedLinesMap = new Map<string, any>()
+  for (const l of resolved.lines || []) {
+    if (l.cartItemId) {
+      resolvedLinesMap.set(l.cartItemId, l)
+    }
+  }
+
   // Apply campaign pricing to display lines and fix image URLs
   for (const line of displayLines) {
     if (line.imageUrl) {
       line.imageUrl = getR2ImageUrl(line.imageUrl)
     }
     if (line.lineKind !== "product" && line.lineKind !== "service_booking") continue
-    // Find the original resolved line for base price / promo data
-    const resolvedLine = resolved.lines.find(l => l.cartItemId === line.lineId)
+    // Find the original resolved line for base price / promo data using Map lookup
+    const resolvedLine = resolvedLinesMap.get(line.lineId)
     if (!resolvedLine) continue
     const basePrice = Number((resolvedLine.pricingItem as any).basePrice || line.unitPrice)
     const promoPrice = (resolvedLine.pricingItem as any).promotionalPrice
