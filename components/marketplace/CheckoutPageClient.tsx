@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon, CheckCircleIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon, CheckCircleIcon, LockIcon } from "@/lib/icons"
 import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, Checkbox } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -117,6 +117,11 @@ interface MarketplaceAvailableCoupon {
     endsAt: string | null
     discountAmount: number
     freeShipping?: boolean
+    partialApplicabilityWarning?: boolean
+    blocked?: boolean
+    errorMessage?: string
+    eligibleItemsCount?: number
+    totalItemsCount?: number
 }
 
 interface MarketplacePaymentPreview {
@@ -329,19 +334,7 @@ const [selectedCouponId, setSelectedCouponId] = useState<string>("")
 const [couponError, setCouponError] = useState<string | null>(null)
 const [couponPartialWarning, setCouponPartialWarning] = useState(false)
 
-// Filter out non-combinable coupons when any item has active discount
-const hasActiveItemDiscount = useMemo(() => {
-    if (checkoutContext?.lines) {
-        return checkoutContext.lines.some((l: any) => {
-            return l.discountSource === "campaign" || l.discountSource === "manual"
-        })
-    }
-    return false
-}, [checkoutContext?.lines])
-const displayableCoupons = useMemo(() => {
-    if (!hasActiveItemDiscount) return availableCoupons
-    return availableCoupons.filter((c) => c.allowCombination !== false)
-}, [availableCoupons, hasActiveItemDiscount])
+const displayableCoupons = availableCoupons
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -1104,6 +1097,11 @@ const displayableCoupons = useMemo(() => {
                                         <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
                                             {line.baseName || line.displayName}
                                         </h4>
+                                        {line.isGift && (
+                                            <div className="mt-1">
+                                                <Badge variant="green">Você ganhou este brinde</Badge>
+                                            </div>
+                                        )}
                                         {line.variantName && (
                                             <div className="text-xs text-brand-inactive-text mt-0.5">
                                                 {line.variantName}
@@ -1114,7 +1112,14 @@ const displayableCoupons = useMemo(() => {
                                         </div>
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
-                                        {formatCurrency(line.lineTotal)}
+                                        {line.isGift ? (
+                                            <div className="flex items-center gap-1.5 justify-end">
+                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
+                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                            </div>
+                                        ) : (
+                                            formatCurrency(line.lineTotal)
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1139,6 +1144,11 @@ const displayableCoupons = useMemo(() => {
                                         <h4 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate">
                                             {line.baseName || line.displayName}
                                         </h4>
+                                        {line.isGift && (
+                                            <div className="mt-1">
+                                                <Badge variant="green">Você ganhou este brinde</Badge>
+                                            </div>
+                                        )}
                                         {line.bookingSummary && (
                                             <div className="text-xs text-brand-inactive-text mt-0.5">
                                                 {line.bookingSummary}
@@ -1149,7 +1159,14 @@ const displayableCoupons = useMemo(() => {
                                         </div>
                                     </div>
                                     <div className="text-sm font-bold text-brand-dark dark:text-dark-heading shrink-0 pr-1">
-                                        {formatCurrency(line.lineTotal)}
+                                        {line.isGift ? (
+                                            <div className="flex items-center gap-1.5 justify-end">
+                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(line.originalPrice || 0)}</span>
+                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                            </div>
+                                        ) : (
+                                            formatCurrency(line.lineTotal)
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1255,7 +1272,9 @@ const displayableCoupons = useMemo(() => {
                 )}
                 {couponPartialWarning && appliedCoupon && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                        Este cupom não se aplica a alguns itens da sacola. O desconto foi calculado apenas sobre os itens elegíveis.
+                        {appliedCoupon.eligibleItemsCount !== undefined && appliedCoupon.totalItemsCount !== undefined
+                            ? `Desconto aplicado a ${appliedCoupon.eligibleItemsCount} de ${appliedCoupon.totalItemsCount} itens.`
+                            : "Este cupom não se aplica a alguns itens da sacola. O desconto foi calculado apenas sobre os itens elegíveis."}
                     </p>
                 )}
             </div>
@@ -2453,7 +2472,9 @@ const displayableCoupons = useMemo(() => {
                                         )}
                                         {couponPartialWarning && appliedCoupon && (
                                             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                                Cupom elegível apenas para alguns itens da sacola.
+                                                {appliedCoupon.eligibleItemsCount !== undefined && appliedCoupon.totalItemsCount !== undefined
+                                                    ? `Desconto aplicado a ${appliedCoupon.eligibleItemsCount} de ${appliedCoupon.totalItemsCount} itens.`
+                                                    : "Cupom elegível apenas para alguns itens da sacola."}
                                             </p>
                                         )}
                                     </FormSection>
@@ -2711,7 +2732,10 @@ const displayableCoupons = useMemo(() => {
                         <Button variant="outline" onClick={() => setShowCouponModal(false)}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleApplySelectedCoupon} disabled={!selectedCouponId}>
+                        <Button
+                            onClick={handleApplySelectedCoupon}
+                            disabled={!selectedCouponId || availableCoupons.find(c => c.id === selectedCouponId)?.blocked}
+                        >
                             Aplicar
                         </Button>
                     </>
@@ -2724,16 +2748,36 @@ const displayableCoupons = useMemo(() => {
                                 icon={TagIcon}
                                 key={coupon.id}
                                 title={getCouponTitle(coupon)}
-                                description={getCouponSubtitle(coupon)}
-                                className={`px-4 py-3 gap-4 border rounded-xl cursor-pointer ${selectedCouponId === coupon.id ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}
-                                onClick={() => setSelectedCouponId(coupon.id)}
+                                description={
+                                    coupon.blocked
+                                        ? "Não aplicável aos itens atuais do pedido."
+                                        : `${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`
+                                }
+                                className={`px-4 py-3 gap-4 border rounded-xl ${
+                                    coupon.blocked
+                                        ? "opacity-50 cursor-not-allowed border-brand-border dark:border-dark-border"
+                                        : selectedCouponId === coupon.id
+                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10 cursor-pointer"
+                                        : "border-brand-border dark:border-dark-border cursor-pointer"
+                                }`}
+                                onClick={() => {
+                                    if (!coupon.blocked) {
+                                        setSelectedCouponId(coupon.id)
+                                    }
+                                }}
                                 right={
-                                    <RadioButton
-                                        name="marketplace-coupon"
-                                        value={coupon.id}
-                                        checked={selectedCouponId === coupon.id}
-                                        onChange={() => setSelectedCouponId(coupon.id)}
-                                    />
+                                    coupon.blocked ? (
+                                        <LockIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body mr-1" />
+                                    ) : (
+                                        <RadioButton
+                                            name="marketplace-coupon"
+                                            value={coupon.id}
+                                            checked={selectedCouponId === coupon.id}
+                                            onChange={() => {
+                                                setSelectedCouponId(coupon.id)
+                                            }}
+                                        />
+                                    )
                                 }
                             />
                         ))

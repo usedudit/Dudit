@@ -609,7 +609,7 @@ export async function listActivePromotionsForMarketplaceAction(partnerId: string
     })
   }
 
-  return activePromos
+  return await filterRawPromotionsByGiftStock(activePromos, supabase)
 }
 
 export async function getPromotionScopeDataAction(partnerId: string) {
@@ -830,6 +830,123 @@ export async function listActivePromotionsInBatch(partnerIds: string[], customer
     })
   }
 
+  for (const partnerId of Object.keys(result)) {
+    result[partnerId] = await filterRawPromotionsByGiftStock(result[partnerId], supabase)
+  }
   return result
 }
 
+
+
+export async function filterRawPromotionsByGiftStock(
+  promotions: PricingPromotion[],
+  supabase: any
+): Promise<PricingPromotion[]> {
+  const giftProductIds = Array.from(
+    new Set(
+      promotions
+        .filter((p) => p.promotionType === PromotionType.GIFT && p.giftProductId)
+        .map((p) => p.giftProductId as string)
+    )
+  )
+
+  if (giftProductIds.length === 0) {
+    return promotions
+  }
+
+  const { data: productsData, error } = await supabase
+    .from("products")
+    .select("id, stock_available, is_active")
+    .in("id", giftProductIds)
+
+  if (error || !productsData) {
+    console.error("Error fetching gift products stock:", error)
+    return promotions
+  }
+
+  const stockMap = new Map<string, { stockAvailable: number; isActive: boolean }>()
+  for (const p of productsData) {
+    stockMap.set(p.id, {
+      stockAvailable: Number(p.stock_available || 0),
+      isActive: Boolean(p.is_active),
+    })
+  }
+
+  return promotions.map((p) => {
+    if (p.promotionType === PromotionType.GIFT && p.giftProductId) {
+      const prod = stockMap.get(p.giftProductId)
+      if (!prod || !prod.isActive || prod.stockAvailable <= 0) {
+        return {
+          ...p,
+          giftUnavailable: true,
+        }
+      }
+    }
+    return p
+  })
+}
+
+export async function buildGiftOrderItems(
+  supabase: any,
+  giftIds: string[],
+  promotions: PricingPromotion[]
+) {
+  if (!giftIds || giftIds.length === 0) return []
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, price, is_active, stock_available")
+    .in("id", giftIds)
+
+  const { data: services } = await supabase
+    .from("services")
+    .select("id, name, price, is_active")
+    .in("id", giftIds)
+
+  const items: any[] = []
+
+  for (const giftId of giftIds) {
+    const promo = promotions.find((p) => p.giftProductId === giftId || p.giftServiceId === giftId)
+    if (!promo) continue
+
+    const prod = (products || []).find((p: any) => p.id === giftId)
+    if (prod) {
+      if (!prod.is_active || (prod.stock_available ?? 0) <= 0) {
+        continue
+      }
+      items.push({
+        product_id: prod.id,
+        service_id: null,
+        variant_id: null,
+        product_name: `[BRINDE] ${prod.name}`,
+        product_price: 0,
+        original_price: Number(prod.price || 0),
+        quantity: 1,
+        subtotal: 0,
+        is_gift: true,
+        is_promotional: true,
+        promotion_id: promo.id,
+      })
+    } else {
+      const serv = (services || []).find((s: any) => s.id === giftId)
+      if (serv) {
+        if (!serv.is_active) continue
+        items.push({
+          product_id: null,
+          service_id: serv.id,
+          variant_id: null,
+          product_name: `[BRINDE] ${serv.name}`,
+          product_price: 0,
+          original_price: Number(serv.price || 0),
+          quantity: 1,
+          subtotal: 0,
+          is_gift: true,
+          is_promotional: true,
+          promotion_id: promo.id,
+        })
+      }
+    }
+  }
+
+  return items
+}

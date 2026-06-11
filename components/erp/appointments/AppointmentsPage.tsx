@@ -173,6 +173,8 @@ const AppointmentsPage = ({
         paymentStatus: row.payment_status || "unpaid",
         fulfillmentMode: row.fulfillment_mode || null,
         needsReschedule: Boolean(row.needs_reschedule),
+        serviceId: row.service_id || null,
+        categoryId: row.category_id || null,
     }), []);
 
     // Catalogs come from SSR props - only refresh unavailable types when needed
@@ -451,6 +453,8 @@ const AppointmentsPage = ({
                     customerName: payload.customerName || payload.customer || selectedAppointment.customer,
                     customerId: payload.customerId || null,
                     serviceName: payload.service || payload.serviceName,
+                    serviceId: payload.serviceId || selectedAppointment.serviceId || null,
+                    categoryId: payload.categoryId || selectedAppointment.categoryId || null,
                     date: payload.date || selectedAppointment.date,
                     time: payload.time || selectedAppointment.time,
                     endDate: payload.endDate || selectedAppointment.endDate,
@@ -472,6 +476,8 @@ const AppointmentsPage = ({
                 const rows = (Array.isArray(payload) ? payload : [payload]).map((item) => ({
                     customerName: item.customerName || 'Cliente Sem Nome',
                     serviceName: item.serviceName || 'Serviço',
+                    serviceId: item.serviceId || null,
+                    categoryId: item.categoryId || null,
                     date: item.date || formatDateStr(currentDate),
                     time: item.time || '09:00',
                     endDate: item.endDate || item.date || formatDateStr(currentDate),

@@ -155,26 +155,9 @@ export async function priceMarketplaceCartCheckout(
 
   const giftProductIds = pricingResult.appliedGiftProductIds || []
   if (giftProductIds.length > 0) {
-    const { data: giftProducts } = await adminClient
-      .from("products")
-      .select("id, name, is_active, stock_available")
-      .in("id", giftProductIds)
-
-    for (const giftId of giftProductIds) {
-      const giftProd = (giftProducts || []).find((p: any) => p.id === giftId)
-      if (!giftProd || !giftProd.is_active || (giftProd.stock_available ?? 0) <= 0) continue
-      const promo = promotionsData.find((p) => p.giftProductId === giftId)
-      orderItems.push({
-        product_id: giftProd.id,
-        variant_id: null,
-        product_name: `[BRINDE] ${giftProd.name}`,
-        product_price: 0,
-        quantity: 1,
-        subtotal: 0,
-        is_promotional: true,
-        promotion_id: promo?.id || null,
-      })
-    }
+    const { buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+    const giftOrderItems = await buildGiftOrderItems(adminClient, giftProductIds, promotionsData)
+    orderItems.push(...giftOrderItems)
   }
 
   const promotionsAppliedSnapshot = (pricingResult.appliedPromotionIds || []).map((id) => {
@@ -199,7 +182,7 @@ export async function priceMarketplaceCartCheckout(
         quantity: line.quantity,
       })),
     ...orderItems
-      .filter((item: any) => item.is_promotional)
+      .filter((item: any) => item.is_promotional && item.product_id)
       .map((item: any) => ({
         product_id: item.product_id as string,
         variant_id: null,
@@ -255,6 +238,8 @@ export function mapOrderItemsForPaymentInsert(
     recurring_plan_id: item.recurring_plan_id ?? null,
     is_promotional: item.is_promotional ?? false,
     promotion_id: item.promotion_id ?? null,
+    is_gift: item.is_gift ?? false,
+    original_price: item.original_price ?? null,
   }))
 }
 

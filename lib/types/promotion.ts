@@ -5,6 +5,25 @@ export enum PromotionType {
     FREE_SHIPPING = "free_shipping"
 }
 
+export enum CampaignCategory {
+    PRICE = "price",
+    BENEFIT = "benefit"
+}
+
+export function getCampaignCategory(type: PromotionType): CampaignCategory {
+    switch (type) {
+        case PromotionType.DISCOUNT:
+        case PromotionType.BUY_X_PAY_Y:
+            return CampaignCategory.PRICE;
+        case PromotionType.GIFT:
+        case PromotionType.FREE_SHIPPING:
+            return CampaignCategory.BENEFIT;
+        default:
+            return CampaignCategory.BENEFIT;
+    }
+}
+
+
 export enum DiscountType {
     PERCENTAGE = "percentage",
     FIXED = "fixed"
@@ -37,4 +56,6 @@ export interface PricingPromotion {
     applicableProductIds?: string[]
     applicableCategoryIds?: string[]
     applicableServiceIds?: string[]
+    giftUnavailable?: boolean
 }
+

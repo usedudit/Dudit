@@ -34,7 +34,7 @@
  * ============================================================================
  */
 
-import { PricingPromotion, PromotionType, DiscountType, ApplyScope } from "@/lib/types/promotion"
+import { PricingPromotion, PromotionType, DiscountType, ApplyScope, CampaignCategory, getCampaignCategory } from "@/lib/types/promotion"
 import { calculatePaymentAmounts } from "@/lib/payments/calculation"
 
 const sortedPromotionsCache = new WeakMap<PricingPromotion[], PricingPromotion[]>()
@@ -154,6 +154,11 @@ export type PricingCoupon = {
   maxDiscountValue: number | null
   freeShipping: boolean
   allowCombination?: boolean
+  applyScope?: string | null
+  applicableProductIds?: string[] | null
+  applicableServiceIds?: string[] | null
+  applicableCategoryIds?: string[] | null
+  applicablePlanIds?: string[] | null
 }
 
 export type PricingInput = {
@@ -239,6 +244,13 @@ export type PricingResult = {
   appliedPaymentDiscountPercent: number
   /** Final amount after ALL adjustments including payment method (the real charge) */
   finalAmountWithPayment: number
+  eligibleSubtotal: number
+  ineligibleSubtotal: number
+  eligibleItemIds: string[]
+  ineligibleItemIds: string[]
+  eligibleItemsCount: number
+  ineligibleItemsCount: number
+  couponApplicability: "full" | "partial" | "none"
 }
 
 // ---------------------------------------------------------------------------
@@ -354,32 +366,91 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     }, [])
   }
 
-  for (const promo of sortedPromotions) {
-    // Skip promotions that block coupon combination (handled during coupon validation and stacking phase)
+  // ── Separation and Winner Selection ──
+  const pricePromotions: PricingPromotion[] = []
+  const benefitPromotions: PricingPromotion[] = []
 
+  for (const promo of sortedPromotions) {
+    if (getCampaignCategory(promo.promotionType) === CampaignCategory.PRICE) {
+      pricePromotions.push(promo)
+    } else {
+      benefitPromotions.push(promo)
+    }
+  }
+
+  // Evaluate PRICE campaigns to select exactly one winner
+  let winningPricePromo: PricingPromotion | null = null
+  let maxDiscount = -1
+
+  for (const promo of pricePromotions) {
     const eligibleIdx = eligibleUnitIndices(promo)
     if (eligibleIdx.length === 0) continue
 
     const eligibleOrigSum = eligibleIdx.reduce((sum, idx) => sum + units[idx].originalPrice, 0)
     if (promo.minSpendAmount != null && eligibleOrigSum < promo.minSpendAmount) continue
 
-    if (promo.promotionType === PromotionType.GIFT) {
-      if (promo.giftProductId) {
-        appliedGiftProductIds.push(promo.giftProductId)
-        appliedPromotionIds.push(promo.id)
-      }
-      if (promo.giftServiceId) {
-        appliedGiftProductIds.push(promo.giftServiceId)
-        appliedPromotionIds.push(promo.id)
-      }
-    } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
-      freeShippingAppliedCampaign = true
-      appliedPromotionIds.push(promo.id)
-    } else if (promo.promotionType === PromotionType.BUY_X_PAY_Y) {
+    let discount = 0
+    if (promo.promotionType === PromotionType.BUY_X_PAY_Y) {
       const buyQty = promo.buyQuantity || 1
       const payQty = promo.payQuantity || 1
       if (buyQty > payQty) {
-        // Sort eligible indices by campaignUnitPrices ascending (cheapest first)
+        const sortedIdx = [...eligibleIdx].sort((a, b) => units[a].originalPrice - units[b].originalPrice)
+        const freeCount = Math.floor(sortedIdx.length / buyQty) * (buyQty - payQty)
+        for (let fi = 0; fi < freeCount; fi++) {
+          discount += units[sortedIdx[fi]].originalPrice
+        }
+      }
+    } else if (promo.promotionType === PromotionType.DISCOUNT) {
+      let filteredIdx = eligibleIdx
+      if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
+        filteredIdx = eligibleIdx.filter(idx => promo.discountValue! <= units[idx].originalPrice)
+      }
+
+      if (filteredIdx.length > 0) {
+        const eligibleCurrentSum = filteredIdx.reduce((sum, idx) => sum + units[idx].originalPrice, 0)
+        if (eligibleCurrentSum > 0) {
+          let discountAmt = 0
+          if (promo.discountType === DiscountType.PERCENTAGE && promo.discountValue) {
+            const pct = Math.min(100, Math.max(0, promo.discountValue))
+            discountAmt = eligibleCurrentSum * (pct / 100)
+          } else if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
+            discountAmt = Math.min(promo.discountValue, eligibleCurrentSum)
+          }
+
+          if (promo.maxDiscountAmount != null && promo.maxDiscountAmount > 0) {
+            discountAmt = Math.min(discountAmt, promo.maxDiscountAmount)
+          }
+
+          discount = round2(discountAmt)
+        }
+      }
+    }
+
+    if (discount > 0) {
+      if (winningPricePromo === null) {
+        winningPricePromo = promo
+        maxDiscount = discount
+      } else {
+        if (promo.priority > winningPricePromo.priority) {
+          winningPricePromo = promo
+          maxDiscount = discount
+        } else if (promo.priority === winningPricePromo.priority) {
+          if (discount > maxDiscount) {
+            winningPricePromo = promo
+            maxDiscount = discount
+          }
+        }
+      }
+    }
+  }
+
+  // Apply winning PRICE campaign
+  if (winningPricePromo) {
+    const eligibleIdx = eligibleUnitIndices(winningPricePromo)
+    if (winningPricePromo.promotionType === PromotionType.BUY_X_PAY_Y) {
+      const buyQty = winningPricePromo.buyQuantity || 1
+      const payQty = winningPricePromo.payQuantity || 1
+      if (buyQty > payQty) {
         const sortedIdx = [...eligibleIdx].sort((a, b) => campaignUnitPrices[a] - campaignUnitPrices[b])
         const freeCount = Math.floor(sortedIdx.length / buyQty) * (buyQty - payQty)
         let applied = false
@@ -393,59 +464,83 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
           }
         }
         if (applied || freeCount > 0) {
-          appliedPromotionIds.push(promo.id)
+          appliedPromotionIds.push(winningPricePromo.id)
         }
       }
-    } else if (promo.promotionType === PromotionType.DISCOUNT) {
-      // Filter eligible indices where current campaign price >= discount value (for FIXED)
+    } else if (winningPricePromo.promotionType === PromotionType.DISCOUNT) {
       let filteredIdx = eligibleIdx
-      if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
-        filteredIdx = eligibleIdx.filter(idx => promo.discountValue! <= campaignUnitPrices[idx])
+      if (winningPricePromo.discountType === DiscountType.FIXED && winningPricePromo.discountValue) {
+        filteredIdx = eligibleIdx.filter(idx => winningPricePromo.discountValue! <= campaignUnitPrices[idx])
       }
 
-      if (filteredIdx.length === 0) continue
+      if (filteredIdx.length > 0) {
+        const eligibleCurrentSum = filteredIdx.reduce((sum, idx) => sum + campaignUnitPrices[idx], 0)
+        if (eligibleCurrentSum > 0) {
+          let discountAmt = 0
+          if (winningPricePromo.discountType === DiscountType.PERCENTAGE && winningPricePromo.discountValue) {
+            const pct = Math.min(100, Math.max(0, winningPricePromo.discountValue))
+            discountAmt = eligibleCurrentSum * (pct / 100)
+          } else if (winningPricePromo.discountType === DiscountType.FIXED && winningPricePromo.discountValue) {
+            discountAmt = Math.min(winningPricePromo.discountValue, eligibleCurrentSum)
+          }
 
-      const eligibleCurrentSum = filteredIdx.reduce((sum, idx) => sum + campaignUnitPrices[idx], 0)
-      if (eligibleCurrentSum <= 0) continue
+          if (winningPricePromo.maxDiscountAmount != null && winningPricePromo.maxDiscountAmount > 0) {
+            discountAmt = Math.min(discountAmt, winningPricePromo.maxDiscountAmount)
+          }
 
-      let discountAmt = 0
-      if (promo.discountType === DiscountType.PERCENTAGE && promo.discountValue) {
-        const pct = Math.min(100, Math.max(0, promo.discountValue))
-        discountAmt = eligibleCurrentSum * (pct / 100)
-      } else if (promo.discountType === DiscountType.FIXED && promo.discountValue) {
-        discountAmt = Math.min(promo.discountValue, eligibleCurrentSum)
-      }
+          discountAmt = round2(discountAmt)
+          if (discountAmt > 0) {
+            let remaining = discountAmt
+            for (let fi = 0; fi < filteredIdx.length; fi++) {
+              const idx = filteredIdx[fi]
+              const unitPrice = campaignUnitPrices[idx]
+              const share = round2((unitPrice / eligibleCurrentSum) * discountAmt)
+              const actualDiscount = Math.min(share, unitPrice, remaining)
+              campaignUnitPrices[idx] = round2(clampMin0(campaignUnitPrices[idx] - actualDiscount))
+              remaining = round2(remaining - actualDiscount)
+            }
 
-      if (promo.maxDiscountAmount != null && promo.maxDiscountAmount > 0) {
-        discountAmt = Math.min(discountAmt, promo.maxDiscountAmount)
-      }
+            if (remaining > 0) {
+              for (const idx of filteredIdx) {
+                if (campaignUnitPrices[idx] >= remaining) {
+                  campaignUnitPrices[idx] = round2(campaignUnitPrices[idx] - remaining)
+                  remaining = 0
+                  break
+                }
+              }
+            }
 
-      discountAmt = round2(discountAmt)
-      if (discountAmt <= 0) continue
-
-      // Distribute discount proportionally across campaignUnitPrices
-      let remaining = discountAmt
-      for (let fi = 0; fi < filteredIdx.length; fi++) {
-        const idx = filteredIdx[fi]
-        const unitPrice = campaignUnitPrices[idx]
-        const share = round2((unitPrice / eligibleCurrentSum) * discountAmt)
-        const actualDiscount = Math.min(share, unitPrice, remaining)
-        campaignUnitPrices[idx] = round2(clampMin0(campaignUnitPrices[idx] - actualDiscount))
-        remaining = round2(remaining - actualDiscount)
-      }
-
-      // Mop up rounding remainder
-      if (remaining > 0) {
-        for (const idx of filteredIdx) {
-          if (campaignUnitPrices[idx] >= remaining) {
-            campaignUnitPrices[idx] = round2(campaignUnitPrices[idx] - remaining)
-            remaining = 0
-            break
+            campaignDiscountAmount = round2(campaignDiscountAmount + discountAmt)
+            appliedPromotionIds.push(winningPricePromo.id)
           }
         }
       }
+    }
+  }
 
-      campaignDiscountAmount = round2(campaignDiscountAmount + discountAmt)
+  // Apply all applicable BENEFIT campaigns (they can coexist)
+  for (const promo of benefitPromotions) {
+    const eligibleIdx = eligibleUnitIndices(promo)
+    if (eligibleIdx.length === 0) continue
+
+    const eligibleOrigSum = eligibleIdx.reduce((sum, idx) => sum + units[idx].originalPrice, 0)
+    if (promo.minSpendAmount != null && eligibleOrigSum < promo.minSpendAmount) continue
+
+    if (promo.promotionType === PromotionType.GIFT) {
+      if (promo.giftUnavailable) {
+        appliedPromotionIds.push(promo.id)
+      } else {
+        if (promo.giftProductId) {
+          appliedGiftProductIds.push(promo.giftProductId)
+          appliedPromotionIds.push(promo.id)
+        }
+        if (promo.giftServiceId) {
+          appliedGiftProductIds.push(promo.giftServiceId)
+          appliedPromotionIds.push(promo.id)
+        }
+      }
+    } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
+      freeShippingAppliedCampaign = true
       appliedPromotionIds.push(promo.id)
     }
   }
@@ -507,8 +602,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
   let currentTotal = subtotal
 
-  // ── Step 3: Coupon (with scenario comparison) ─────────────────────────
-  // Coupon is computed BEFORE manual discount so scenario comparison is clean.
+  // ── Step 3: Coupon (evaluated per-line) ─────────────────────────
   let couponDiscountAmount = 0
   let appliedCouponId: string | null = null
   let couponCode: string | null = null
@@ -523,57 +617,216 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
   let finalSubtotal = subtotal
   let scenarioCouponTotal = currentTotal // total after coupon step (pre-manualDiscount)
 
+  let eligibleSubtotal = subtotal
+  let ineligibleSubtotal = 0
+  let eligibleItemIds: string[] = []
+  let ineligibleItemIds: string[] = []
+  let eligibleItemsCount = items.length
+  let ineligibleItemsCount = 0
+  let couponApplicability: "full" | "partial" | "none" = "none"
+
+  const lineUnitsMap = new Map<string, CartUnit[]>()
+  for (const u of units) {
+    const key = u.productId || u.serviceId || u.recurringPlanId || ""
+    if (!lineUnitsMap.has(key)) lineUnitsMap.set(key, [])
+    lineUnitsMap.get(key)!.push(u)
+  }
+
   if (input.coupon) {
     const coupon = input.coupon
-    appliedCouponId = coupon.id
-    couponCode = coupon.code || null
-
     const promoMap = getPromotionMap(input.promotions || [])
-    const hasAppliedNonCombinablePromo = finalPromotionIds.some(promoId => {
+
+    // 1. Calculate Scenario A (Campaigns/Manual Promo are kept, Coupon applied to eligible items)
+    let eligibleSubtotalScenarioA = 0
+    let ineligibleSubtotalScenarioA = 0
+    let eligibleItemIdsScenarioA: string[] = []
+    let ineligibleItemIdsScenarioA: string[] = []
+    let eligibleItemsCountScenarioA = 0
+    let ineligibleItemsCountScenarioA = 0
+
+    for (const item of items) {
+      const key = item.productId || item.serviceId || item.recurringPlanId || ""
+      const lineUnits = lineUnitsMap.get(key) || []
+      const lineBestPriceTotal = lineUnits.reduce((sum, u) => sum + u.currentPrice, 0)
+
+      let lineEligible = true
+
+      // Scope eligibility
+      let scopeEligible = true
+      const applyScope = coupon.applyScope || "all"
+      if (applyScope !== "all") {
+        if (applyScope === "products") {
+          scopeEligible = Boolean(item.productId && coupon.applicableProductIds?.includes(item.productId))
+        } else if (applyScope === "services") {
+          scopeEligible = Boolean(item.serviceId && coupon.applicableServiceIds?.includes(item.serviceId))
+        } else if (applyScope === "categories") {
+          scopeEligible = Boolean(item.categoryId && coupon.applicableCategoryIds?.includes(item.categoryId))
+        } else if (applyScope === "subscriptions") {
+          scopeEligible = Boolean(item.recurringPlanId && coupon.applicablePlanIds?.includes(item.recurringPlanId))
+        } else {
+          scopeEligible = false
+        }
+      }
+
+      if (!scopeEligible) {
+        lineEligible = false
+      } else {
+        // Combination eligibility
+        const hasManualPromo = item.promotionalPrice != null && item.promotionalPrice >= 0 && item.promotionalPrice < item.unitPrice
+        let hasCampaign = false
+        let hasNonCombinableCampaign = false
+
+        for (const promoId of appliedPromotionIds) {
+          const promo = promoMap.get(promoId)
+          if (promo && isItemInScope(item as any, promo)) {
+            if (getCampaignCategory(promo.promotionType) === CampaignCategory.PRICE) {
+              hasCampaign = true
+            }
+            if (promo.allowCouponCombination === false) {
+              hasNonCombinableCampaign = true
+            }
+          }
+        }
+
+        if (coupon.allowCombination === false) {
+          if (hasManualPromo || hasCampaign) {
+            lineEligible = false
+          }
+        } else {
+          if (hasNonCombinableCampaign) {
+            lineEligible = false
+          }
+        }
+      }
+
+      if (lineEligible) {
+        eligibleSubtotalScenarioA += lineBestPriceTotal
+        eligibleItemIdsScenarioA.push(key)
+        eligibleItemsCountScenarioA++
+      } else {
+        ineligibleSubtotalScenarioA += lineBestPriceTotal
+        ineligibleItemIdsScenarioA.push(key)
+        ineligibleItemsCountScenarioA++
+      }
+    }
+
+    eligibleSubtotalScenarioA = round2(eligibleSubtotalScenarioA)
+    ineligibleSubtotalScenarioA = round2(ineligibleSubtotalScenarioA)
+
+    let couponDiscountScenarioA = 0
+    if (eligibleItemsCountScenarioA > 0) {
+      if (coupon.discountType === "percentage" && coupon.discountValue) {
+        const pct = Math.min(100, Math.max(0, coupon.discountValue))
+        couponDiscountScenarioA = round2(eligibleSubtotalScenarioA * (pct / 100))
+      } else if (coupon.discountType === "fixed" && coupon.discountValue) {
+        couponDiscountScenarioA = round2(Math.min(coupon.discountValue, eligibleSubtotalScenarioA))
+      } else if (coupon.discountType === "free_shipping") {
+        // handled via shippingCost zeroing
+      }
+
+      if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponDiscountScenarioA > coupon.maxDiscountValue) {
+        couponDiscountScenarioA = round2(coupon.maxDiscountValue)
+      }
+      couponDiscountScenarioA = round2(clampMin0(couponDiscountScenarioA))
+    }
+
+    const totalScenarioA = round2(clampMin0(currentTotal - couponDiscountScenarioA))
+
+    // 2. Check if coupon combination is allowed globally
+    const hasAppliedNonCombinablePromo = appliedPromotionIds.some(promoId => {
       const promo = promoMap.get(promoId)
       return promo && promo.allowCouponCombination === false
     })
-
     const combinationAllowed = coupon.allowCombination === true && !hasAppliedNonCombinablePromo
 
     if (combinationAllowed) {
-      // Coupon stacks on top of current item-level subtotal
-      if (coupon.discountType === "percentage" && coupon.discountValue) {
-        const pct = Math.min(100, Math.max(0, coupon.discountValue))
-        couponDiscountAmount = round2(currentTotal * (pct / 100))
-      } else if (coupon.discountType === "fixed" && coupon.discountValue) {
-        couponDiscountAmount = round2(Math.min(coupon.discountValue, currentTotal))
-      }
+      // Scenario A wins
+      eligibleSubtotal = eligibleSubtotalScenarioA
+      ineligibleSubtotal = ineligibleSubtotalScenarioA
+      eligibleItemIds = eligibleItemIdsScenarioA
+      ineligibleItemIds = ineligibleItemIdsScenarioA
+      eligibleItemsCount = eligibleItemsCountScenarioA
+      ineligibleItemsCount = ineligibleItemsCountScenarioA
+      couponApplicability = eligibleItemsCount > 0 ? (ineligibleItemsCount === 0 ? "full" : "partial") : "none"
 
-      if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponDiscountAmount > coupon.maxDiscountValue) {
-        couponDiscountAmount = round2(coupon.maxDiscountValue)
+      if (eligibleItemsCount > 0) {
+        appliedCouponId = coupon.id
+        couponCode = coupon.code || null
+        couponDiscountAmount = couponDiscountScenarioA
+        scenarioCouponTotal = totalScenarioA
+      } else {
+        couponDiscountAmount = 0
+        appliedCouponId = null
+        couponCode = null
+        scenarioCouponTotal = currentTotal
       }
-      couponDiscountAmount = round2(clampMin0(couponDiscountAmount))
-      scenarioCouponTotal = round2(clampMin0(currentTotal - couponDiscountAmount))
     } else {
-      // allowCombination === false: compare two scenarios
-      // Scenario A: campaign-only (currentTotal already has item best-price applied)
-      const totalWithCampaigns = currentTotal
+      // 3. Calculate Scenario B (Coupon wins, campaigns and manual promos are reverted on coupon-eligible items)
+      let eligibleSubtotalScenarioB = 0
+      let ineligibleSubtotalScenarioB = 0
+      let eligibleItemIdsScenarioB: string[] = []
+      let ineligibleItemIdsScenarioB: string[] = []
+      let eligibleItemsCountScenarioB = 0
+      let ineligibleItemsCountScenarioB = 0
 
-      // Scenario B: coupon-only on subtotalOriginal (no item discounts)
-      let couponOnOriginal = 0
-      if (coupon.discountType === "percentage" && coupon.discountValue) {
-        const pct = Math.min(100, Math.max(0, coupon.discountValue))
-        couponOnOriginal = round2(subtotalOriginal * (pct / 100))
-      } else if (coupon.discountType === "fixed" && coupon.discountValue) {
-        couponOnOriginal = round2(Math.min(coupon.discountValue, subtotalOriginal))
-      }
-      if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponOnOriginal > coupon.maxDiscountValue) {
-        couponOnOriginal = round2(coupon.maxDiscountValue)
-      }
-      couponOnOriginal = round2(clampMin0(couponOnOriginal))
-      const totalWithCouponOnly = round2(clampMin0(subtotalOriginal - couponOnOriginal))
+      for (const item of items) {
+        const key = item.productId || item.serviceId || item.recurringPlanId || ""
+        const lineUnits = lineUnitsMap.get(key) || []
+        const lineOriginalTotal = lineUnits.reduce((sum, u) => sum + u.originalPrice, 0)
 
-      // Compare – manualDiscount is NOT yet applied to either, so comparison is fair
-      if (totalWithCouponOnly < totalWithCampaigns) {
-        // Coupon scenario wins → reverse campaign discounts
+        let scopeEligible = true
+        const applyScope = coupon.applyScope || "all"
+        if (applyScope !== "all") {
+          if (applyScope === "products") {
+            scopeEligible = Boolean(item.productId && coupon.applicableProductIds?.includes(item.productId))
+          } else if (applyScope === "services") {
+            scopeEligible = Boolean(item.serviceId && coupon.applicableServiceIds?.includes(item.serviceId))
+          } else if (applyScope === "categories") {
+            scopeEligible = Boolean(item.categoryId && coupon.applicableCategoryIds?.includes(item.categoryId))
+          } else if (applyScope === "subscriptions") {
+            scopeEligible = Boolean(item.recurringPlanId && coupon.applicablePlanIds?.includes(item.recurringPlanId))
+          } else {
+            scopeEligible = false
+          }
+        }
+
+        if (scopeEligible) {
+          eligibleSubtotalScenarioB += lineOriginalTotal
+          eligibleItemIdsScenarioB.push(key)
+          eligibleItemsCountScenarioB++
+        } else {
+          ineligibleSubtotalScenarioB += lineOriginalTotal
+          ineligibleItemIdsScenarioB.push(key)
+          ineligibleItemsCountScenarioB++
+        }
+      }
+
+      eligibleSubtotalScenarioB = round2(eligibleSubtotalScenarioB)
+      ineligibleSubtotalScenarioB = round2(ineligibleSubtotalScenarioB)
+
+      let couponDiscountScenarioB = 0
+      if (eligibleItemsCountScenarioB > 0) {
+        if (coupon.discountType === "percentage" && coupon.discountValue) {
+          const pct = Math.min(100, Math.max(0, coupon.discountValue))
+          couponDiscountScenarioB = round2(eligibleSubtotalScenarioB * (pct / 100))
+        } else if (coupon.discountType === "fixed" && coupon.discountValue) {
+          couponDiscountScenarioB = round2(Math.min(coupon.discountValue, eligibleSubtotalScenarioB))
+        } else if (coupon.discountType === "free_shipping") {
+          // handled via freeShippingApplied
+        }
+
+        if (coupon.maxDiscountValue != null && coupon.maxDiscountValue > 0 && couponDiscountScenarioB > coupon.maxDiscountValue) {
+          couponDiscountScenarioB = round2(coupon.maxDiscountValue)
+        }
+        couponDiscountScenarioB = round2(clampMin0(couponDiscountScenarioB))
+      }
+
+      const totalScenarioB = round2(clampMin0(subtotalOriginal - couponDiscountScenarioB))
+
+      if (totalScenarioB < totalScenarioA) {
+        // Scenario B wins! Coupon replaces campaign
         couponReplacedCampaign = true
-        couponDiscountAmount = couponOnOriginal
+        couponDiscountAmount = couponDiscountScenarioB
         finalPromotionDiscountAmount = 0
         finalCampaignDiscountAmount = 0
         finalItemDiscountAmount = 0
@@ -584,20 +837,40 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         freeShippingApplied = (coupon.freeShipping || coupon.discountType === "free_shipping")
           ? true
           : freeShippingAppliedCampaign
-        scenarioCouponTotal = totalWithCouponOnly
+
+        eligibleSubtotal = eligibleSubtotalScenarioB
+        ineligibleSubtotal = ineligibleSubtotalScenarioB
+        eligibleItemIds = eligibleItemIdsScenarioB
+        ineligibleItemIds = ineligibleItemIdsScenarioB
+        eligibleItemsCount = eligibleItemsCountScenarioB
+        ineligibleItemsCount = ineligibleItemsCountScenarioB
+        couponApplicability = eligibleItemsCount > 0 ? (ineligibleItemsCount === 0 ? "full" : "partial") : "none"
+
+        appliedCouponId = coupon.id
+        couponCode = coupon.code || null
+        scenarioCouponTotal = totalScenarioB
       } else {
-        // Campaign scenario wins → no coupon applied
+        // Scenario A wins! Campaign is better, coupon is discarded
+        eligibleSubtotal = eligibleSubtotalScenarioA
+        ineligibleSubtotal = ineligibleSubtotalScenarioA
+        eligibleItemIds = eligibleItemIdsScenarioA
+        ineligibleItemIds = ineligibleItemIdsScenarioA
+        eligibleItemsCount = eligibleItemsCountScenarioA
+        ineligibleItemsCount = ineligibleItemsCountScenarioA
+        couponApplicability = "none"
         couponDiscountAmount = 0
         appliedCouponId = null
         couponCode = null
-        scenarioCouponTotal = totalWithCampaigns
+        scenarioCouponTotal = currentTotal
       }
     }
+  } else {
+    scenarioCouponTotal = currentTotal
+  }
 
-    // Free shipping from coupon
-    if (appliedCouponId && (coupon.freeShipping || coupon.discountType === "free_shipping")) {
-      freeShippingApplied = true
-    }
+  // Free shipping from coupon
+  if (appliedCouponId && (input.coupon?.freeShipping || input.coupon?.discountType === "free_shipping")) {
+    freeShippingApplied = true
   }
 
   couponDiscountAmount = round2(clampMin0(couponDiscountAmount))
@@ -688,6 +961,13 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     paymentMethodFeeAmount,
     appliedPaymentDiscountPercent,
     finalAmountWithPayment,
+    eligibleSubtotal,
+    ineligibleSubtotal,
+    eligibleItemIds,
+    ineligibleItemIds,
+    eligibleItemsCount,
+    ineligibleItemsCount,
+    couponApplicability,
   }
 }
 
@@ -839,10 +1119,6 @@ export function findBestItemPrice(
   }
 
   // Find best campaign among ONLY applicable promotions
-  let bestCampaign: { bestPrice: number; discountSource: DiscountSource; campaignDiscount: number } = {
-    bestPrice: unitPrice, discountSource: "none", campaignDiscount: 0,
-  }
-
   const indexed = getIndexedPromotions(promotions)
   const candidates: PricingPromotion[] = []
 
@@ -860,20 +1136,40 @@ export function findBestItemPrice(
   }
   candidates.push(...indexed.entireCart)
 
-  for (const promo of candidates) {
+  // Filter candidates to only PRICE campaigns
+  const priceCandidates = candidates.filter(
+    (promo) => getCampaignCategory(promo.promotionType) === CampaignCategory.PRICE
+  )
+
+  let winningPromo: PricingPromotion | null = null
+  let maxDiscount = -1
+  let bestCampaignResult: ReturnType<typeof computeItemCampaignPricing> | null = null
+
+  for (const promo of priceCandidates) {
     const result = computeItemCampaignPricing(unitPrice, individualPromo, promo, itemMeta)
-    if (result.bestPrice < bestCampaign.bestPrice) {
-      bestCampaign = {
-        bestPrice: result.bestPrice,
-        discountSource: result.discountSource,
-        campaignDiscount: result.campaignDiscount,
+    const discount = round2(unitPrice - result.bestPrice)
+    if (discount > 0) {
+      if (winningPromo === null) {
+        winningPromo = promo
+        maxDiscount = discount
+        bestCampaignResult = result
+      } else {
+        if (promo.priority > winningPromo.priority) {
+          winningPromo = promo
+          maxDiscount = discount
+          bestCampaignResult = result
+        } else if (promo.priority === winningPromo.priority) {
+          if (discount > maxDiscount) {
+            winningPromo = promo
+            maxDiscount = discount
+            bestCampaignResult = result
+          }
+        }
       }
     }
   }
 
-  const finalResult = bestCampaign.discountSource !== "none"
-    ? bestCampaign
-    : computeItemCampaignPricing(unitPrice, individualPromo, null, itemMeta)
+  const finalResult = bestCampaignResult || computeItemCampaignPricing(unitPrice, individualPromo, null, itemMeta)
 
   const bestPrice = finalResult.bestPrice
   const referencePrice = bestPrice < unitPrice ? unitPrice : undefined

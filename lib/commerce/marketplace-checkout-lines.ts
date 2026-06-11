@@ -47,6 +47,8 @@ export type MarketplaceCheckoutDisplayLine = {
   bookingMetadata?: ServiceBookingMetadata | null
   discountSource?: "manual" | "campaign" | "none"
   bestPrice?: number
+  isGift?: boolean
+  originalPrice?: number
 }
 
 export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): MarketplaceCheckoutDisplayLine[] {

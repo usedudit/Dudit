@@ -1532,10 +1532,6 @@ export default function PromotionFormPage({
 
                                                     {/* Right Column: Rule limits and status */}
                                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                        <h3 className="hidden lg:block text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 pb-2 border-b border-transparent invisible">
-                                                            Limitações e Status
-                                                        </h3>
-
                                                         <SidebarCard hasTopStrip={true}>
                                                             <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-5">Limitações</h3>
                                                             <div className="space-y-4">

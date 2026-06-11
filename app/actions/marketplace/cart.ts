@@ -889,32 +889,10 @@ export async function checkoutCartAction(
 
   // Handle gift items insertion
   const giftProductIds = pricingResult.appliedGiftProductIds || []
-  let giftProducts: any[] = []
   if (giftProductIds.length > 0) {
-    const { data: giftData } = await adminClient
-      .from("products")
-      .select("id, name, price, stock_available, category_id, is_active")
-      .in("id", giftProductIds)
-    giftProducts = giftData || []
-  }
-
-  for (const giftId of giftProductIds) {
-    const giftProd = giftProducts.find(p => p.id === giftId)
-    if (!giftProd || !giftProd.is_active || (giftProd.stock_available ?? 0) <= 0) {
-      continue
-    }
-
-    const promo = promotionsData.find(p => p.giftProductId === giftId)
-    orderItems.push({
-      product_id: giftProd.id,
-      variant_id: null,
-      product_name: `[BRINDE] ${giftProd.name}`,
-      product_price: 0,
-      quantity: 1,
-      subtotal: 0,
-      is_promotional: true,
-      promotion_id: promo?.id || null,
-    })
+    const { buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+    const giftOrderItems = await buildGiftOrderItems(adminClient, giftProductIds, promotionsData)
+    orderItems.push(...giftOrderItems)
   }
 
 
@@ -1125,7 +1103,7 @@ export async function checkoutCartAction(
         quantity: line.quantity,
       })),
     ...orderItems
-      .filter((item: any) => item.is_promotional)
+      .filter((item: any) => item.is_promotional && item.product_id)
       .map((item: any) => ({
         product_id: item.product_id,
         variant_id: null,

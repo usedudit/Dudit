@@ -842,4 +842,286 @@ describe("computeItemCampaignPricing", () => {
       expect(r.couponDiscountAmount).toBe(20)
     })
   })
+
+  describe("Mandatory Coupon Refactor Verification", () => {
+    // 1. Products only
+    it("Products only coupon eligibility", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, discountType: "fixed", applyScope: "products", applicableProductIds: ["p1"] }),
+      })
+      expect(r.finalTotal).toBe(90)
+      expect(r.couponDiscountAmount).toBe(10)
+      expect(r.couponApplicability).toBe("full")
+    })
+
+    // 2. Services only
+    it("Services only coupon eligibility", () => {
+      const r = calculateOrderPricing({
+        items: [{ serviceId: "s1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, discountType: "fixed", applyScope: "services", applicableServiceIds: ["s1"] }),
+      })
+      expect(r.finalTotal).toBe(90)
+      expect(r.couponDiscountAmount).toBe(10)
+      expect(r.couponApplicability).toBe("full")
+    })
+
+    // 3. Mixed carts
+    it("Mixed carts coupon eligibility", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, quantity: 1 },
+          { serviceId: "s1", unitPrice: 100, quantity: 1 }
+        ],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, discountType: "percentage", applyScope: "products", applicableProductIds: ["p1"] }),
+      })
+      // coupon applies to p1 only
+      expect(r.couponDiscountAmount).toBe(10) // 10% of 100
+      expect(r.finalTotal).toBe(190)
+      expect(r.couponApplicability).toBe("partial")
+    })
+
+    // 4. Partial applicability
+    it("Partial applicability", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, quantity: 1 },
+          { productId: "p2", unitPrice: 100, quantity: 1 }
+        ],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 20, discountType: "fixed", applyScope: "products", applicableProductIds: ["p1"] }),
+      })
+      expect(r.couponDiscountAmount).toBe(20)
+      expect(r.couponApplicability).toBe("partial")
+      expect(r.eligibleItemIds).toContain("p1")
+      expect(r.ineligibleItemIds).toContain("p2")
+    })
+
+    // 5. Full applicability
+    it("Full applicability", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, quantity: 1 },
+          { productId: "p2", unitPrice: 100, quantity: 1 }
+        ],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 20, discountType: "fixed", applyScope: "all" }),
+      })
+      expect(r.couponDiscountAmount).toBe(20)
+      expect(r.couponApplicability).toBe("full")
+    })
+
+    // 6. No applicability
+    it("No applicability", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 20, discountType: "fixed", applyScope: "products", applicableProductIds: ["p2"] }),
+      })
+      expect(r.couponDiscountAmount).toBe(0)
+      expect(r.couponApplicability).toBe("none")
+      expect(r.appliedCouponId).toBeNull()
+    })
+
+    // 7. Quantity > 1
+    it("Quantity > 1 coupon eligibility", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 3 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, discountType: "percentage", applyScope: "products", applicableProductIds: ["p1"] }),
+      })
+      expect(r.couponDiscountAmount).toBe(30) // 10% of (100 * 3)
+      expect(r.couponApplicability).toBe("full")
+    })
+
+    // 8. Campaign-compatible coupons
+    it("Campaign-compatible coupons", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10, allowCouponCombination: true })],
+        coupon: coupon({ discountValue: 10, discountType: "percentage", allowCombination: true }),
+      })
+      // campaign 10% -> 90. coupon 10% of 90 -> 9. final = 81.
+      expect(r.finalTotal).toBe(81)
+      expect(r.couponDiscountAmount).toBe(9)
+      expect(r.couponApplicability).toBe("full")
+    })
+
+    // 9. Campaign-incompatible coupons
+    it("Campaign-incompatible coupons", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10 })],
+        coupon: coupon({ discountValue: 20, discountType: "percentage", allowCombination: false }),
+      })
+      expect(r.finalTotal).toBe(80)
+      expect(r.couponDiscountAmount).toBe(20)
+      expect(r.couponReplacedCampaign).toBe(true)
+    })
+
+    // 10. Manual promotional prices
+    it("Manual promotional prices coupon eligibility", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, promotionalPrice: 80, quantity: 1 }],
+        shippingCost: 0,
+        coupon: coupon({ discountValue: 10, discountType: "percentage", allowCombination: true }),
+      })
+      expect(r.finalTotal).toBe(72)
+      expect(r.couponDiscountAmount).toBe(8)
+    })
+
+    // 11. Mixed promotional price + campaign carts
+    it("Mixed promotional price + campaign carts", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, promotionalPrice: 80, quantity: 1 },
+          { productId: "p2", unitPrice: 100, quantity: 1 }
+        ],
+        shippingCost: 0,
+        promotions: [discountPromotion({ discountValue: 10, applyScope: ApplyScope.SPECIFIC_PRODUCTS, applicableProductIds: ["p2"], allowCouponCombination: true })],
+        coupon: coupon({ discountValue: 10, discountType: "percentage", allowCombination: true }),
+      })
+      expect(r.subtotal).toBe(170)
+      expect(r.couponDiscountAmount).toBe(17)
+      expect(r.finalTotal).toBe(153)
+      expect(r.couponApplicability).toBe("full")
+    })
+  })
+
+  describe("Campaign Architecture: PRICE vs BENEFIT campaigns", () => {
+    // 1. Multiple PRICE campaigns (non-stacking, priority/discount winner selection)
+    it("selects exactly one winning PRICE campaign (highest priority wins)", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "promo-low-priority", priority: 1, discountValue: 30 }), // 30% off
+          discountPromotion({ id: "promo-high-priority", priority: 10, discountValue: 15 }), // 15% off
+        ],
+      })
+      // High priority promo wins even though it has a lower discount
+      expect(r.subtotal).toBe(85)
+      expect(r.appliedPromotionIds).toContain("promo-high-priority")
+      expect(r.appliedPromotionIds).not.toContain("promo-low-priority")
+    })
+
+    it("selects exactly one winning PRICE campaign (highest discount wins when priorities are equal)", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "promo-less-discount", priority: 5, discountValue: 10 }), // 10% off
+          discountPromotion({ id: "promo-more-discount", priority: 5, discountValue: 25 }), // 25% off
+        ],
+      })
+      // Same priority, but promo-more-discount has a higher discount (25% vs 10%)
+      expect(r.subtotal).toBe(75)
+      expect(r.appliedPromotionIds).toContain("promo-more-discount")
+      expect(r.appliedPromotionIds).not.toContain("promo-less-discount")
+    })
+
+    // 2. PRICE + BENEFIT coexistence
+    it("allows a BENEFIT campaign to coexist with the winning PRICE campaign", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 20,
+        promotions: [
+          discountPromotion({ id: "price-promo", priority: 5, discountValue: 10 }), // 10% off (PRICE)
+          discountPromotion({
+            id: "benefit-promo",
+            priority: 1,
+            promotionType: PromotionType.FREE_SHIPPING,
+            discountType: null,
+            discountValue: null,
+          }), // Free shipping (BENEFIT)
+        ],
+      })
+      // Both the winning price campaign and the benefit campaign are applied
+      expect(r.subtotal).toBe(90)
+      expect(r.shipping).toBe(0) // Free shipping applied
+      expect(r.appliedPromotionIds).toContain("price-promo")
+      expect(r.appliedPromotionIds).toContain("benefit-promo")
+    })
+
+    // 3. Promotional price beating campaigns
+    it("picks manual promotional price when it beats the winning campaign", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, promotionalPrice: 60, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "price-promo", priority: 5, discountValue: 20 }), // 20% off → 80
+        ],
+      })
+      // min(100, 60, 80) = 60 → manual promotional price wins
+      expect(r.subtotal).toBe(60)
+      expect(r.itemDiscountSource).toBe("manual")
+      // Although campaign discount is not used, it was evaluated and selected
+      expect(r.appliedPromotionIds).toContain("price-promo")
+    })
+
+    // 4. Campaigns beating promotional prices
+    it("picks campaign price when it beats the manual promotional price", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, promotionalPrice: 90, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "price-promo", priority: 5, discountValue: 30 }), // 30% off → 70
+        ],
+      })
+      // min(100, 90, 70) = 70 → campaign wins
+      expect(r.subtotal).toBe(70)
+      expect(r.itemDiscountSource).toBe("campaign")
+      expect(r.appliedPromotionIds).toContain("price-promo")
+    })
+
+    // 5. Gifts combined with discounts
+    it("applies both a winning PRICE campaign and a GIFT BENEFIT campaign", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "price-promo", priority: 5, discountValue: 15 }), // 15% off (PRICE)
+          discountPromotion({
+            id: "gift-promo",
+            priority: 1,
+            promotionType: PromotionType.GIFT,
+            giftProductId: "gift-item",
+            discountType: null,
+            discountValue: null,
+          }), // Gift (BENEFIT)
+        ],
+      })
+      expect(r.subtotal).toBe(85)
+      expect(r.appliedGiftProductIds).toContain("gift-item")
+      expect(r.appliedPromotionIds).toContain("price-promo")
+      expect(r.appliedPromotionIds).toContain("gift-promo")
+    })
+
+    // 6. Gift stockout behavior (campaign stays active, gift is skipped)
+    it("keeps campaign active but skips gift when gift is unavailable (stockout)", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({
+            id: "gift-promo-out-of-stock",
+            priority: 1,
+            promotionType: PromotionType.GIFT,
+            giftProductId: "gift-item",
+            giftUnavailable: true,
+            discountType: null,
+            discountValue: null,
+          }),
+        ],
+      })
+      expect(r.appliedPromotionIds).toContain("gift-promo-out-of-stock")
+      expect(r.appliedGiftProductIds).not.toContain("gift-item")
+      expect(r.appliedGiftProductIds.length).toBe(0)
+    })
+  })
 })

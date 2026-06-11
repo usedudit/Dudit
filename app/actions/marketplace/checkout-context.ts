@@ -14,7 +14,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 export type MarketplaceCheckoutDepositConfig = {
@@ -155,6 +155,71 @@ export async function getMarketplaceCheckoutContextAction(input: {
   servicesSubtotal = displayLines
     .filter(l => l.lineKind === "service_booking")
     .reduce((sum, l) => sum + l.lineTotal, 0)
+
+  // Calculate order pricing with promotions to check for earned gifts
+  const pricingItems = resolved.lines.map((line) => line.pricingItem)
+  const pricingResult = calculateOrderPricing({
+    items: pricingItems,
+    shippingCost: 0,
+    promotions: partnerPromotions,
+  })
+
+  const giftIds = pricingResult.appliedGiftProductIds || []
+  if (giftIds.length > 0) {
+    const [productsRes, servicesRes] = await Promise.all([
+      admin
+        .from("products")
+        .select("id, name, price, images")
+        .in("id", giftIds),
+      admin
+        .from("services")
+        .select("id, name, price, images")
+        .in("id", giftIds),
+    ])
+
+    const giftProducts = productsRes.data || []
+    const giftServices = servicesRes.data || []
+
+    for (const giftId of giftIds) {
+      const prod = giftProducts.find((p: any) => p.id === giftId)
+      if (prod) {
+        displayLines.push({
+          lineId: `gift-${prod.id}`,
+          lineKind: "product",
+          displayName: `[BRINDE] ${prod.name}`,
+          quantity: 1,
+          unitPrice: 0,
+          lineTotal: 0,
+          fulfillmentMode: null,
+          paymentRequirement: "none",
+          imageUrl: prod.images && Array.isArray(prod.images) && prod.images[0] ? getR2ImageUrl(prod.images[0]) : null,
+          baseName: prod.name,
+          variantName: null,
+          isGift: true,
+          originalPrice: Number(prod.price || 0),
+        })
+      } else {
+        const serv = giftServices.find((s: any) => s.id === giftId)
+        if (serv) {
+          displayLines.push({
+            lineId: `gift-${serv.id}`,
+            lineKind: "service_booking",
+            displayName: `[BRINDE] ${serv.name}`,
+            quantity: 1,
+            unitPrice: 0,
+            lineTotal: 0,
+            fulfillmentMode: null,
+            paymentRequirement: "none",
+            imageUrl: serv.images && Array.isArray(serv.images) && serv.images[0] ? getR2ImageUrl(serv.images[0]) : null,
+            baseName: serv.name,
+            variantName: null,
+            isGift: true,
+            originalPrice: Number(serv.price || 0),
+          })
+        }
+      }
+    }
+  }
 
   const depositAllowed = hasMinimumPlan(plan?.slug || "free", "crescer")
   const depositPercent = Number(partnerRow?.service_deposit_percentage || 50)

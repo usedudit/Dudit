@@ -34,6 +34,8 @@ export type AppointmentInput = {
   customerName: string
   customerId?: string | null
   serviceName: string
+  serviceId?: string | null
+  categoryId?: string | null
   date: string
   time: string
   endDate?: string | null
@@ -76,6 +78,8 @@ function toDbPayload(input: AppointmentInput, partnerId: string) {
     customer_id: input.customerId || null,
     customer_name: String(input.customerName || "Cliente Sem Nome").trim(),
     service_name: String(input.serviceName || "Serviço").trim(),
+    service_id: input.serviceId || null,
+    category_id: input.categoryId || null,
     start_date: input.date,
     start_time: input.time,
     end_date: input.endDate || input.date,
@@ -583,10 +587,24 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
       const price = Number(row.price || 0)
       if (price > 0.009 && row.source !== "unavailable") {
         // ── Central pricing engine ──────────────────────────────────────────
+        const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+        const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, row.customer_id || null)
+        const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+
         const pricingResult = calculateOrderPricing({
-          items: [{ unitPrice: price, quantity: 1 }],
+          items: [{
+            serviceId: row.service_id,
+            categoryId: row.category_id,
+            unitPrice: price,
+            quantity: 1
+          }],
           shippingCost: 0,
+          promotions: filteredPromotions,
         })
+
+        const giftIds = pricingResult.appliedGiftProductIds || []
+        const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+
         // 1. Create a pending order in public.orders
         const { data: order, error: orderErr } = await supabase
           .from("orders")
@@ -616,15 +634,67 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
 
         if (order?.id) {
           // 2. Insert into order_items
-          await supabase.from("order_items").insert({
-            order_id: order.id,
-            product_name: row.service_name || "Serviço",
-            product_price: pricingResult.subtotal,
-            quantity: 1,
-            subtotal: pricingResult.subtotal,
-            line_type: "service_booking",
-            fulfillment_mode: row.fulfillment_mode || "on_site",
-          })
+          const itemsToInsert = [
+            {
+              order_id: order.id,
+              product_name: row.service_name || "Serviço",
+              product_price: pricingResult.subtotal,
+              quantity: 1,
+              subtotal: pricingResult.subtotal,
+              line_type: "service_booking",
+              fulfillment_mode: row.fulfillment_mode || "on_site",
+              service_id: row.service_id,
+            },
+            ...giftItems.map(item => ({
+              order_id: order.id,
+              product_id: item.product_id,
+              service_id: item.service_id,
+              product_name: item.product_name,
+              product_price: 0,
+              original_price: item.original_price,
+              quantity: 1,
+              subtotal: 0,
+              line_type: item.service_id ? "service_booking" : "product",
+              is_gift: true,
+              is_promotional: true,
+              promotion_id: item.promotion_id,
+            }))
+          ]
+          await supabase.from("order_items").insert(itemsToInsert)
+
+          // Reserve stock for physical gift products
+          const giftStockItems = giftItems
+            .filter(item => item.product_id)
+            .map((item) => ({
+              product_id: item.product_id,
+              variant_id: null,
+              quantity: 1,
+            }))
+
+          if (giftStockItems.length > 0) {
+            await reserveOrderInventory({
+              client: supabase,
+              partnerId,
+              orderId: order.id,
+              items: giftStockItems,
+            })
+          }
+
+          // Register audit log for skipped gifts (due to stock or inactive)
+          const skippedGifts = filteredPromotions.filter(
+            (p) => p.giftUnavailable && pricingResult.appliedPromotionIds.includes(p.id)
+          )
+          for (const promo of skippedGifts) {
+            await logAuditEvent({
+              partnerId,
+              actorUserId: user.id,
+              entityType: "appointment",
+              entityId: row.id,
+              actionType: "created",
+              changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
+              source: "manual",
+            })
+          }
 
           // 3. Update the appointment with marketplace_order_id and payment_status
           await supabase
@@ -732,6 +802,8 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
         customerName: payload.customerName ?? current.customer_name,
         customerId: payload.customerId ?? current.customer_id,
         serviceName: payload.serviceName ?? current.service_name,
+        serviceId: payload.serviceId ?? current.service_id,
+        categoryId: payload.categoryId ?? current.category_id,
         date: payload.date ?? current.start_date,
         time: payload.time ?? current.start_time,
         endDate: payload.endDate ?? current.end_date,
@@ -776,6 +848,7 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
           product_price: orderPrice,
           subtotal: orderPrice,
           fulfillment_mode: updated.fulfillment_mode || "on_site",
+          service_id: updated.service_id,
         })
         .eq("order_id", updated.marketplace_order_id)
     }

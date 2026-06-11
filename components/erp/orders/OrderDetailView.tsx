@@ -561,8 +561,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="flex justify-between items-start mb-1">
-                                                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
+                                                                                <div className="flex flex-col gap-1 min-w-0">
+                                                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                                    {item.is_gift && (
+                                                                                        <div className="mt-0.5">
+                                                                                            <Badge variant="green">Brinde</Badge>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
+                                                                                    {item.is_gift ? (
+                                                                                        <div className="flex items-center gap-1.5">
+                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        formatCurrency(item.subtotal || item.product_price * item.quantity)
+                                                                                    )}
+                                                                                </span>
                                                                             </div>
                                                                     {isService ? (
                                                                         scheduleInfo ? (
@@ -580,7 +596,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             <div className="flex items-center gap-2 text-xs mt-1">
                                                                                 <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
                                                                                 <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(item.product_price, item.products?.unit)}</span>
+                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                                    {item.is_gift ? (
+                                                                                        <span className="flex items-center gap-1.5 inline-flex">
+                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        formatProductUnitPrice(item.product_price, item.products?.unit)
+                                                                                    )}
+                                                                                </span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -810,8 +835,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex justify-between items-start mb-1">
-                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.subtotal || item.product_price * item.quantity)}</span>
+                                                                        <div className="flex flex-col gap-1 min-w-0">
+                                                                            <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                            {item.is_gift && (
+                                                                                <div className="mt-0.5">
+                                                                                    <Badge variant="green">Brinde</Badge>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
+                                                                            {item.is_gift ? (
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                formatCurrency(item.subtotal || item.product_price * item.quantity)
+                                                                            )}
+                                                                        </span>
                                                                     </div>
                                                                     {isService ? (
                                                                         scheduleInfo ? (
@@ -827,7 +868,15 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
                                                                     )}
                                                                     <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                        <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
+                                                                        {item.is_gift ? (
+                                                                            <span className="flex items-center gap-1.5">
+                                                                                <span>{item.quantity} un. •</span>
+                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>

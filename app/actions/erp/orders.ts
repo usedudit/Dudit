@@ -1350,6 +1350,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     }
 
     // ── Server-side pricing recalculation ────────────────────────────────
+    const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+    const rawPromotions = await listActivePromotionsForMarketplaceAction(partnerId, data.customerId || null)
+    const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+
     const pricingResult = calculateOrderPricing({
         items: sanitizedItems.map((item) => ({
             productId: item.productId || null,
@@ -1360,7 +1364,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         additionalCosts: Number(data.additionalCosts || 0),
         manualDiscount: (data.discountValue > 0 && data.discountType !== "coupon") ? { type: data.discountType as "fixed" | "percentage", value: data.discountValue } : null,
         coupon: couponPricingData,
+        promotions: filteredPromotions,
     })
+
+    const giftIds = pricingResult.appliedGiftProductIds || []
+    const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
 
     // Override client-sent values with server-computed ones
     couponDiscountAmount = pricingResult.couponDiscountAmount
@@ -1452,16 +1460,33 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     const orderError = orderInsertResult.error
     if (orderError) return { error: orderError.message }
 
-    const itemsToInsert = sanitizedItems.map(item => ({
+    const giftItemsToInsert = giftItems.map((item, idx) => ({
         order_id: order.id,
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        product_name: item.customName || "Item manual",
-        product_price: item.unitPrice,
-        quantity: item.quantity,
-        subtotal: item.unitPrice * item.quantity,
-        sort_order: item.sortOrder
+        product_id: item.product_id,
+        variant_id: null,
+        product_name: item.product_name,
+        product_price: 0,
+        quantity: 1,
+        subtotal: 0,
+        sort_order: sanitizedItems.length + idx + 1,
+        is_gift: true,
+        original_price: item.original_price,
+        is_promotional: true,
+        promotion_id: item.promotion_id,
     }))
+    const itemsToInsert = [
+        ...sanitizedItems.map(item => ({
+            order_id: order.id,
+            product_id: item.productId,
+            variant_id: item.variantId || null,
+            product_name: item.customName || "Item manual",
+            product_price: item.unitPrice,
+            quantity: item.quantity,
+            subtotal: item.unitPrice * item.quantity,
+            sort_order: item.sortOrder
+        })),
+        ...giftItemsToInsert
+    ]
 
     const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
     if (itemsError) {
@@ -1469,11 +1494,22 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         return { error: itemsError.message }
     }
 
-    const stockItems = sanitizedItems.map((item) => ({
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        quantity: item.quantity,
-    }))
+    const stockItems = [
+        ...sanitizedItems
+            .filter(item => item.productId)
+            .map((item) => ({
+                product_id: item.productId,
+                variant_id: item.variantId || null,
+                quantity: item.quantity,
+            })),
+        ...giftItems
+            .filter(item => item.product_id)
+            .map((item) => ({
+                product_id: item.product_id,
+                variant_id: null,
+                quantity: 1,
+            }))
+    ]
 
     const reserveResult = await reserveOrderInventory({
         client: supabase,
@@ -1527,6 +1563,21 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         changeLines: ["criou venda"],
         source: "manual",
     })
+
+    const skippedGifts = filteredPromotions.filter(
+        (p) => p.giftUnavailable && pricingResult.appliedPromotionIds.includes(p.id)
+    )
+    for (const promo of skippedGifts) {
+        await logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: order.id,
+            actionType: "created",
+            changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
+            source: "manual",
+        })
+    }
 
     await increment_usage_counter(partnerId, "orders_month_count")
 
@@ -1944,14 +1995,83 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         }
     }
 
-    const delta = buildInventoryMovementDelta(currentOrder.order_items || [], sanitizedItems)
+    // ── Coupon validation and promotions fetch for updates ─────────────────────────────────────
+    let couponIdToSave: string | null = data.couponId || null
+    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
+    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
+
+    if (data.couponCode?.trim()) {
+        const couponValidation = await validateCoupon({
+            partnerId: data.partnerId,
+            code: data.couponCode,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (couponValidation.valid) {
+            couponIdToSave = couponValidation.couponId || null
+            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+            couponPricingData = couponValidation.pricingCoupon || null
+        } else {
+            couponIdToSave = null
+            couponDiscountAmount = 0
+        }
+    } else if (couponIdToSave) {
+        const couponValidation = await validateCouponById(couponIdToSave, {
+            partnerId: data.partnerId,
+            customerId: data.customerId || null,
+            subtotal: Number(data.subtotal || 0),
+            shippingCost: Number(data.shippingCost || 0),
+            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
+        })
+        if (couponValidation.valid) {
+            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
+            couponPricingData = couponValidation.pricingCoupon || null
+        } else {
+            couponIdToSave = null
+            couponDiscountAmount = 0
+        }
+    }
+
+    const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock, buildGiftOrderItems } = await import("@/app/actions/shared/promotions")
+    const rawPromotions = await listActivePromotionsForMarketplaceAction(data.partnerId, data.customerId || null)
+    const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+
+    const updatePricingResult = calculateOrderPricing({
+        items: sanitizedItems.map((item) => ({
+            productId: item.productId || null,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+        })),
+        shippingCost: Number(data.shippingCost || 0),
+        additionalCosts: Number(data.additionalCosts || 0),
+        manualDiscount: (data.discountValue > 0 && data.discountType !== "coupon") ? { type: data.discountType as "fixed" | "percentage", value: data.discountValue } : null,
+        coupon: couponPricingData,
+        promotions: filteredPromotions,
+    })
+
+    const giftIds = updatePricingResult.appliedGiftProductIds || []
+    const giftItems = await buildGiftOrderItems(supabase, giftIds, filteredPromotions)
+
+    const nextItemsForDelta = [
+        ...sanitizedItems,
+        ...giftItems.map((item) => ({
+            productId: item.product_id,
+            variantId: item.variant_id,
+            customName: item.product_name,
+            quantity: item.quantity,
+        })),
+    ]
+
+    const delta = buildInventoryMovementDelta(currentOrder.order_items || [], nextItemsForDelta)
     const stockItemsToValidate = currentOrder.inventory_deducted
         ? delta.outgoing.map((item) => ({
             productId: item.product_id,
             variantId: item.variant_id || null,
             quantity: item.quantity,
         }))
-        : sanitizedItems
+        : nextItemsForDelta
     const stockValidationError = await validateERPItemsStock({
         supabase,
         partnerId: data.partnerId,
@@ -1994,57 +2114,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         return { success: true, noChanges: true }
     }
 
-    // ── Coupon validation for updates ─────────────────────────────────────
-    let couponIdToSave: string | null = data.couponId || null
-    let couponDiscountAmount = Math.max(0, Number(data.couponDiscountAmount || 0))
-    let couponPricingData: import("@/lib/services/pricing-engine").PricingCoupon | null = null
 
-    if (data.couponCode?.trim()) {
-        const couponValidation = await validateCoupon({
-            partnerId: data.partnerId,
-            code: data.couponCode,
-            customerId: data.customerId || null,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (couponValidation.valid) {
-            couponIdToSave = couponValidation.couponId || null
-            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-            couponPricingData = couponValidation.pricingCoupon || null
-        } else {
-            couponIdToSave = null
-            couponDiscountAmount = 0
-        }
-    } else if (couponIdToSave) {
-        const couponValidation = await validateCouponById(couponIdToSave, {
-            partnerId: data.partnerId,
-            customerId: data.customerId || null,
-            subtotal: Number(data.subtotal || 0),
-            shippingCost: Number(data.shippingCost || 0),
-            items: sanitizedItems.map((item) => ({ productId: item.productId || null })),
-        })
-        if (couponValidation.valid) {
-            couponDiscountAmount = Number(couponValidation.discountAmount || 0)
-            couponPricingData = couponValidation.pricingCoupon || null
-        } else {
-            couponIdToSave = null
-            couponDiscountAmount = 0
-        }
-    }
-
-    // ── Server-side pricing recalculation ────────────────────────────────
-    const updatePricingResult = calculateOrderPricing({
-        items: sanitizedItems.map((item) => ({
-            productId: item.productId || null,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-        })),
-        shippingCost: Number(data.shippingCost || 0),
-        additionalCosts: Number(data.additionalCosts || 0),
-        manualDiscount: (data.discountValue > 0 && data.discountType !== "coupon") ? { type: data.discountType as "fixed" | "percentage", value: data.discountValue } : null,
-        coupon: couponPricingData,
-    })
 
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
     let updateServerTotal = updatePricingResult.finalTotal
@@ -2145,25 +2215,53 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     await supabase.from("order_items").delete().eq("order_id", orderId)
 
-    const itemsToInsert = sanitizedItems.map(item => ({
+    const giftItemsToInsert = giftItems.map((item, idx) => ({
         order_id: orderId,
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        product_name: item.customName || "Item manual",
-        product_price: item.unitPrice,
-        quantity: item.quantity,
-        subtotal: item.unitPrice * item.quantity,
-        sort_order: item.sortOrder
+        product_id: item.product_id,
+        variant_id: null,
+        product_name: item.product_name,
+        product_price: 0,
+        quantity: 1,
+        subtotal: 0,
+        sort_order: sanitizedItems.length + idx + 1,
+        is_gift: true,
+        original_price: item.original_price,
+        is_promotional: true,
+        promotion_id: item.promotion_id,
     }))
+    const itemsToInsert = [
+        ...sanitizedItems.map(item => ({
+            order_id: orderId,
+            product_id: item.productId,
+            variant_id: item.variantId || null,
+            product_name: item.customName || "Item manual",
+            product_price: item.unitPrice,
+            quantity: item.quantity,
+            subtotal: item.unitPrice * item.quantity,
+            sort_order: item.sortOrder
+        })),
+        ...giftItemsToInsert
+    ]
 
     const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
     if (itemsError) return { error: itemsError.message }
 
-    const stockItems = sanitizedItems.map((item) => ({
-        product_id: item.productId,
-        variant_id: item.variantId || null,
-        quantity: item.quantity,
-    }))
+    const stockItems = [
+        ...sanitizedItems
+            .filter(item => item.productId)
+            .map((item) => ({
+                product_id: item.productId,
+                variant_id: item.variantId || null,
+                quantity: item.quantity,
+            })),
+        ...giftItems
+            .filter(item => item.product_id)
+            .map((item) => ({
+                product_id: item.product_id,
+                variant_id: null,
+                quantity: 1,
+            }))
+    ]
 
     if (currentOrder.inventory_deducted) {
         if (delta.incoming.length > 0) {
@@ -2263,6 +2361,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         },
         source: "manual",
     })
+
+    const skippedGifts = filteredPromotions.filter(
+        (p) => p.giftUnavailable && updatePricingResult.appliedPromotionIds.includes(p.id)
+    )
+    for (const promo of skippedGifts) {
+        await logAuditEvent({
+            partnerId: data.partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "updated",
+            changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
+            source: "manual",
+        })
+    }
 
     await invalidateInventoryItems(data.partnerId, stockItems)
     await revalidateOrders(data.partnerId)

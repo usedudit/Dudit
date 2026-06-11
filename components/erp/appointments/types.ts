@@ -28,6 +28,8 @@ export interface Appointment {
     recurrence?: 'none' | 'daily' | 'weekly';
     saleId?: string | null;
     marketplaceOrderId?: string | null;
+    serviceId?: string | null;
+    categoryId?: string | null;
 }
 
 // Helper interface for layout calculation

@@ -27,6 +27,8 @@ export type CouponValidationResult = {
   freeShipping?: boolean
   /** Some cart lines are not eligible for this coupon */
   partialApplicabilityWarning?: boolean
+  eligibleItemsCount?: number
+  totalItemsCount?: number
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
@@ -122,55 +124,64 @@ export async function validateCouponRow(
     return { valid: false, discountAmount: 0, errorMessage: "Valor mínimo da sacola não atingido." }
   }
 
-  // ── Allow combination check ──────────────────────────────────────────
-  // A. Check manual discount (only blocks if coupon itself blocks combination)
-  if (coupon.allow_combination === false && input.manualDiscount && input.manualDiscount.value > 0) {
-    return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com descontos manuais." }
+  // ── Retrieve target scopes from relational tables ───────────────────
+  let applicableProductIds: string[] | null = null
+  let applicableServiceIds: string[] | null = null
+  let applicableCategoryIds: string[] | null = null
+  let applicablePlanIds: string[] | null = null
+
+  if (coupon.apply_scope === "products") {
+    const { data } = await supabase.from("coupon_products").select("product_id").eq("coupon_id", coupon.id)
+    applicableProductIds = (data || []).map((r: any) => r.product_id).filter(Boolean)
+  } else if (coupon.apply_scope === "services") {
+    const { data } = await supabase.from("coupon_services").select("service_id").eq("coupon_id", coupon.id)
+    applicableServiceIds = (data || []).map((r: any) => r.service_id).filter(Boolean)
+  } else if (coupon.apply_scope === "categories") {
+    const { data } = await supabase.from("coupon_categories").select("category_id").eq("coupon_id", coupon.id)
+    applicableCategoryIds = (data || []).map((r: any) => r.category_id).filter(Boolean)
+  } else if (coupon.apply_scope === "subscriptions") {
+    const { data } = await supabase.from("coupon_subscriptions").select("recurring_plan_id").eq("coupon_id", coupon.id)
+    applicablePlanIds = (data || []).map((r: any) => r.recurring_plan_id).filter(Boolean)
   }
 
+  // ── Allow combination and scope check ───────────────────────────────
   const items = input.items || []
   const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
   const serviceIds = Array.from(new Set(items.map((item) => item.serviceId).filter(Boolean))) as string[]
 
-  if (productIds.length > 0 || serviceIds.length > 0) {
-    // B. Check promotional_price on products (only blocks if coupon itself blocks combination)
-    if (coupon.allow_combination === false && productIds.length > 0) {
+  let eligibleCount = 0
+  let partialApplicabilityWarning = false
+  let eligibleSubtotal = 0
+
+  if (items.length > 0) {
+    const productDetails = new Map<string, { category_id: string | null; isPromo: boolean }>()
+    const productPrices = new Map<string, number>()
+    if (productIds.length > 0) {
       const { data: products } = await supabase
         .from("products")
-        .select("id, price, promotional_price")
+        .select("id, category_id, price, promotional_price")
         .in("id", productIds)
-
-      const hasPromo = (products || []).some(
-        (p: any) => p.promotional_price !== null && p.promotional_price > 0 && p.promotional_price < p.price
-      )
-      if (hasPromo) {
-        return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com produtos em promoção." }
+      for (const p of products || []) {
+        const isPromo = p.promotional_price !== null && p.promotional_price > 0 && p.promotional_price < p.price
+        productDetails.set(p.id, { category_id: p.category_id || null, isPromo })
+        const bestP = isPromo ? p.promotional_price : p.price
+        productPrices.set(p.id, Number(bestP) || 0)
       }
     }
 
-    // C. Check promotional_price on services (only blocks if coupon itself blocks combination)
-    if (coupon.allow_combination === false && serviceIds.length > 0) {
+    const serviceDetails = new Map<string, { isPromo: boolean }>()
+    const servicePrices = new Map<string, number>()
+    if (serviceIds.length > 0) {
       const { data: services } = await supabase
         .from("services")
         .select("id, price, promotional_price")
         .in("id", serviceIds)
-
-      const hasPromo = (services || []).some(
-        (s: any) => s.promotional_price !== null && s.promotional_price > 0 && s.promotional_price < s.price
-      )
-      if (hasPromo) {
-        return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com serviços em promoção." }
+      for (const s of services || []) {
+        const isPromo = s.promotional_price !== null && s.promotional_price > 0 && s.promotional_price < s.price
+        serviceDetails.set(s.id, { isPromo })
+        const bestS = isPromo ? s.promotional_price : s.price
+        servicePrices.set(s.id, Number(bestS) || 0)
       }
-    }
-
-    // D. Check active campaign promotions compatibility
-    let productCategoryIds: string[] = []
-    if (productIds.length > 0) {
-      const { data: products } = await supabase
-        .from("products")
-        .select("category_id")
-        .in("id", productIds)
-      productCategoryIds = Array.from(new Set((products || []).map((p: any) => p.category_id).filter(Boolean)))
     }
 
     const { data: allActivePromos } = await supabase
@@ -184,150 +195,123 @@ export async function validateCouponRow(
       .eq("is_active", true)
       .not("campaign_id", "is", null)
 
-    if (allActivePromos && allActivePromos.length > 0) {
-      const promoIds = allActivePromos.map((p: any) => p.id)
+    const promoIds = allActivePromos ? allActivePromos.map((p: any) => p.id) : []
+    const [promoProductsRes, promoServicesRes, promoCategoriesRes] = await Promise.all([
+      productIds.length > 0 && promoIds.length > 0
+        ? supabase.from("promotion_products").select("promotion_id, product_id").in("promotion_id", promoIds).in("product_id", productIds)
+        : Promise.resolve({ data: [] }),
+      serviceIds.length > 0 && promoIds.length > 0
+        ? supabase.from("promotion_services").select("promotion_id, service_id").in("promotion_id", promoIds).in("service_id", serviceIds)
+        : Promise.resolve({ data: [] }),
+      productIds.length > 0 && promoIds.length > 0
+        ? supabase.from("products").select("category_id").in("id", productIds).then(async ({ data: products }: any) => {
+            const catIds = Array.from(new Set((products || []).map((p: any) => p.category_id).filter(Boolean)))
+            if (catIds.length === 0) return { data: [] }
+            return supabase.from("promotion_categories").select("promotion_id, category_id").in("promotion_id", promoIds).in("category_id", catIds)
+          })
+        : Promise.resolve({ data: [] })
+    ])
 
-      const [promoProductsRes, promoServicesRes, promoCategoriesRes] = await Promise.all([
-        productIds.length > 0
-          ? supabase.from("promotion_products").select("promotion_id, product_id").in("promotion_id", promoIds).in("product_id", productIds)
-          : Promise.resolve({ data: [] }),
-        serviceIds.length > 0
-          ? supabase.from("promotion_services").select("promotion_id, service_id").in("promotion_id", promoIds).in("service_id", serviceIds)
-          : Promise.resolve({ data: [] }),
-        productCategoryIds.length > 0
-          ? supabase.from("promotion_categories").select("promotion_id, category_id").in("promotion_id", promoIds).in("category_id", productCategoryIds)
-          : Promise.resolve({ data: [] })
-      ])
+    const promoProductsData = promoProductsRes.data || []
+    const promoServicesData = promoServicesRes.data || []
+    const promoCategoriesData = promoCategoriesRes.data || []
 
-      const promoProducts = promoProductsRes.data || []
-      const promoServices = promoServicesRes.data || []
-      const promoCategories = promoCategoriesRes.data || []
-
-      const applicablePromotions = allActivePromos.filter((p: any) => {
-        if (p.apply_scope === "all" || p.apply_scope === "entire_cart") {
-          return items.length > 0
-        }
-        if (p.apply_scope === "specific_products" || p.apply_scope === "products") {
-          return promoProducts.some((pp: any) => pp.promotion_id === p.id)
-        }
-        if (p.apply_scope === "specific_services" || p.apply_scope === "services") {
-          return promoServices.some((ps: any) => ps.promotion_id === p.id)
-        }
-        if (p.apply_scope === "specific_categories" || p.apply_scope === "category") {
-          return promoCategories.some((pc: any) => pc.promotion_id === p.id)
-        }
-        return false
-      })
-
-      if (applicablePromotions.length > 0) {
-        if (coupon.allow_combination === false) {
-          return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com campanhas ativas." }
-        }
-
-        const hasBlockedCampaign = applicablePromotions.some((p: any) => p.allow_coupon_combination === false)
-        if (hasBlockedCampaign) {
-          return { valid: false, discountAmount: 0, errorMessage: "Este cupom não pode ser combinado com a campanha ativa." }
-        }
+    const doesPromoApplyToItem = (promo: any, item: any): boolean => {
+      if (promo.apply_scope === "all" || promo.apply_scope === "entire_cart") {
+        return true
       }
-    }
-  }
-  let partialApplicabilityWarning = false
-
-  // Apply scope (products, categories, services, subscriptions)
-  if (coupon.apply_scope !== "all") {
-    if (coupon.apply_scope === "products") {
-      const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
-      if (productIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para produtos específicos." }
-      const { data: links } = await supabase
-        .from("coupon_products")
-        .select("product_id")
-        .eq("coupon_id", coupon.id)
-        .in("product_id", productIds)
-      if (!links || links.length === 0) {
-        return {
-          valid: true,
-          discountAmount: 0,
-          partialApplicabilityWarning: items.length > 0,
-          couponId: undefined,
-          pricingCoupon: null,
-        }
+      if ((promo.apply_scope === "specific_products" || promo.apply_scope === "products") && item.productId) {
+        return promoProductsData.some((pp: any) => pp.promotion_id === promo.id && pp.product_id === item.productId)
       }
-    }
-
-    if (coupon.apply_scope === "categories") {
-      const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean))) as string[]
-      if (productIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para categorias específicas." }
-      const [{ data: productRows }, { data: categoryRows }] = await Promise.all([
-        supabase.from("products").select("id, category_id").in("id", productIds),
-        supabase.from("coupon_categories").select("category_id").eq("coupon_id", coupon.id),
-      ])
-      const allowed = new Set((categoryRows || []).map((row: any) => row.category_id))
-      const hasEligibleProduct = (productRows || []).some((row: any) => row.category_id && allowed.has(row.category_id))
-      if (!hasEligibleProduct) {
-        return {
-          valid: true,
-          discountAmount: 0,
-          partialApplicabilityWarning: items.length > 0,
-          couponId: undefined,
-          pricingCoupon: null,
-        }
+      if ((promo.apply_scope === "specific_services" || promo.apply_scope === "services") && item.serviceId) {
+        return promoServicesData.some((ps: any) => ps.promotion_id === promo.id && ps.service_id === item.serviceId)
       }
-    }
-
-    if (coupon.apply_scope === "services") {
-      const serviceIds = Array.from(new Set(items.map((item) => item.serviceId).filter(Boolean))) as string[]
-      if (serviceIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para serviços." }
-      const { data: links } = await supabase
-        .from("coupon_services")
-        .select("service_id")
-        .eq("coupon_id", coupon.id)
-        .in("service_id", serviceIds)
-      if (!links || links.length === 0) {
-        return {
-          valid: true,
-          discountAmount: 0,
-          partialApplicabilityWarning: items.length > 0,
-          couponId: undefined,
-          pricingCoupon: null,
-        }
+      if ((promo.apply_scope === "specific_categories" || promo.apply_scope === "category") && item.productId) {
+        const catId = productDetails.get(item.productId)?.category_id
+        return Boolean(catId && promoCategoriesData.some((pc: any) => pc.promotion_id === promo.id && pc.category_id === catId))
       }
-    }
-
-    if (coupon.apply_scope === "subscriptions") {
-      const planIds = Array.from(new Set(items.map((item) => item.recurringPlanId).filter(Boolean))) as string[]
-      if (planIds.length === 0) return { valid: false, discountAmount: 0, errorMessage: "Cupom válido apenas para assinaturas." }
-      const { data: links } = await supabase
-        .from("coupon_subscriptions")
-        .select("recurring_plan_id")
-        .eq("coupon_id", coupon.id)
-        .in("recurring_plan_id", planIds)
-      if (!links || links.length === 0) {
-        return {
-          valid: true,
-          discountAmount: 0,
-          partialApplicabilityWarning: items.length > 0,
-          couponId: undefined,
-          pricingCoupon: null,
-        }
-      }
-    }
-  }
-
-  if (coupon.apply_scope !== "all" && items.length > 0) {
-    const hasIneligible = items.some((item) => {
-      if (coupon.apply_scope === "products") return !item.productId
-      if (coupon.apply_scope === "services") return !item.serviceId
-      if (coupon.apply_scope === "subscriptions") return !item.recurringPlanId
-      if (coupon.apply_scope === "categories") return !item.productId
       return false
-    })
-    partialApplicabilityWarning = hasIneligible
+    }
+
+    for (const item of items) {
+      let isScopeEligible = true
+      if (coupon.apply_scope !== "all") {
+        if (coupon.apply_scope === "products") {
+          isScopeEligible = Boolean(item.productId && applicableProductIds?.includes(item.productId))
+        } else if (coupon.apply_scope === "services") {
+          isScopeEligible = Boolean(item.serviceId && applicableServiceIds?.includes(item.serviceId))
+        } else if (coupon.apply_scope === "subscriptions") {
+          isScopeEligible = Boolean(item.recurringPlanId && applicablePlanIds?.includes(item.recurringPlanId))
+        } else if (coupon.apply_scope === "categories" && item.productId) {
+          const catId = productDetails.get(item.productId)?.category_id
+          isScopeEligible = Boolean(catId && applicableCategoryIds?.includes(catId))
+        } else {
+          isScopeEligible = false
+        }
+      }
+
+      if (!isScopeEligible) {
+        partialApplicabilityWarning = true
+        continue
+      }
+
+      // Check combination
+      const isManualPromo = item.productId
+        ? (productDetails.get(item.productId)?.isPromo ?? false)
+        : item.serviceId
+        ? (serviceDetails.get(item.serviceId)?.isPromo ?? false)
+        : false
+
+      let isCampaignActive = false
+      let isNonCombinableCampaignActive = false
+
+      if (allActivePromos) {
+        for (const promo of allActivePromos) {
+          if (doesPromoApplyToItem(promo, item)) {
+            isCampaignActive = true
+            if (promo.allow_coupon_combination === false) {
+              isNonCombinableCampaignActive = true
+            }
+          }
+        }
+      }
+
+      let itemEligible = true
+      if (coupon.allow_combination === false) {
+        if (isManualPromo || isCampaignActive) {
+          itemEligible = false
+        }
+      } else {
+        if (isNonCombinableCampaignActive) {
+          itemEligible = false
+        }
+      }
+
+      const itemPrice = item.productId
+        ? (productPrices.get(item.productId) ?? 0)
+        : item.serviceId
+        ? (servicePrices.get(item.serviceId) ?? 0)
+        : 0
+
+      if (itemEligible) {
+        eligibleCount++
+        eligibleSubtotal += itemPrice
+      } else {
+        partialApplicabilityWarning = true
+      }
+    }
+
+    if (eligibleCount === 0) {
+      return { valid: false, discountAmount: 0, errorMessage: "Nenhum item da sacola é elegível para este cupom." }
+    }
   }
 
-  // Calculate discount amount (scoped coupons apply only when at least one eligible line exists)
+  // Calculate estimated discount amount based on eligible subtotal
+  const finalSubtotal = items.length > 0 ? eligibleSubtotal : subtotal
+
   let discountAmount = 0
   if (coupon.discount_type === "percentage") {
-    discountAmount = safeMoney(subtotal * (Number(coupon.discount_value || 0) / 100))
+    discountAmount = safeMoney(finalSubtotal * (Number(coupon.discount_value || 0) / 100))
   } else if (coupon.discount_type === "fixed") {
     discountAmount = safeMoney(Number(coupon.discount_value || 0))
   } else if (coupon.discount_type === "free_shipping") {
@@ -337,7 +321,7 @@ export async function validateCouponRow(
   if (coupon.max_discount_value !== null) {
     discountAmount = Math.min(discountAmount, safeMoney(Number(coupon.max_discount_value || 0)))
   }
-  discountAmount = safeMoney(Math.min(discountAmount, safeMoney(subtotal + shippingCost)))
+  discountAmount = safeMoney(Math.min(discountAmount, safeMoney(finalSubtotal + shippingCost)))
 
   // Build PricingCoupon for the unified engine
   const isFreeShipping = coupon.discount_type === "free_shipping" || Boolean(coupon.free_shipping)
@@ -348,6 +332,11 @@ export async function validateCouponRow(
     maxDiscountValue: coupon.max_discount_value != null ? Number(coupon.max_discount_value) : null,
     freeShipping: isFreeShipping,
     allowCombination: Boolean(coupon.allow_combination),
+    applyScope: coupon.apply_scope || "all",
+    applicableProductIds,
+    applicableServiceIds,
+    applicableCategoryIds,
+    applicablePlanIds,
   }
 
   return {
@@ -358,6 +347,8 @@ export async function validateCouponRow(
     pricingCoupon,
     freeShipping: isFreeShipping,
     partialApplicabilityWarning,
+    eligibleItemsCount: eligibleCount,
+    totalItemsCount: items.length,
   }
 }
 

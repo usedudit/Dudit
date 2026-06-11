@@ -687,6 +687,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate group-hover:text-brand-green transition-colors">
                                     {item.products?.name || item.product_name}
                                 </h3>
+                                {item.is_gift && (
+                                    <div className="mt-1">
+                                        <Badge variant="green">Brinde</Badge>
+                                    </div>
+                                )}
                                 {isService ? (
                                     <>
                                         {bookingDate && bookingTime ? (
@@ -713,7 +718,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </>
                                 )}
                                 <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                    {formatProductUnitPrice(item.product_price, item.products?.unit)}
+                                    {item.is_gift ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                        </div>
+                                    ) : (
+                                        formatProductUnitPrice(item.product_price, item.products?.unit)
+                                    )}
                                 </div>
                             </div>
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
@@ -852,6 +864,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
                                                                 {item.products?.name || item.product_name}
                                                             </h3>
+                                                            {item.is_gift && (
+                                                                <div className="mt-1">
+                                                                    <Badge variant="green">Brinde</Badge>
+                                                                </div>
+                                                            )}
                                                             {isService ? (
                                                                 <>
                                                                     {bookingDate && bookingTime ? (
@@ -878,7 +895,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 </>
                                                             )}
                                                             <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                                                {formatProductUnitPrice(item.product_price, item.products?.unit)}
+                                                                {item.is_gift ? (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    formatProductUnitPrice(item.product_price, item.products?.unit)
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="text-sm text-brand-inactive-text shrink-0 pr-1">

@@ -672,6 +672,8 @@ export const AppointmentSheet = ({
                     duration: combDur,
                     staffId: sId,
                     staffName: staff ? staff.name : 'Profissional',
+                    serviceId: svcs[0]?.id || null,
+                    categoryId: svcs[0]?.category_id || null,
                 };
             });
 
@@ -726,6 +728,8 @@ export const AppointmentSheet = ({
                         date: dateStr,
                         staffId: sId,
                         staffName: staff ? staff.name : 'Profissional',
+                        serviceId: svcs[0]?.id || null,
+                        categoryId: svcs[0]?.category_id || null,
                         recurrenceGroupId,
                         recurrenceRule: recurrenceFreq === 'Diário' ? 'daily' : 'weekly'
                     });
@@ -826,6 +830,8 @@ export const AppointmentSheet = ({
             staffId: selectedServices[0]?.staffId,
             date: finalDateStr,
             time: timeStr,
+            serviceId: selectedServices[0]?.id || null,
+            categoryId: selectedServices[0]?.category_id || null,
         };
         onSave(updatedApp);
     };

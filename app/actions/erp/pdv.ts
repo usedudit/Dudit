@@ -34,6 +34,10 @@ type DraftItemInput = {
     listUnitPrice?: number | null
     lineDiscountType?: "fixed" | "percentage" | null
     lineDiscountValue?: number | null
+    isGift?: boolean
+    originalPrice?: number | null
+    isPromotional?: boolean
+    promotionId?: string | null
 }
 
 type DraftUpsertInput = {
@@ -200,6 +204,10 @@ function normalizeDraftItems(items: DraftItemInput[]) {
                     ? Math.max(0, Math.min(100, Math.round(Number(item.lineDiscountValue) * 100) / 100))
                     : safeMoney(Number(item.lineDiscountValue))
                 : null,
+        is_gift: Boolean(item.isGift),
+        original_price: item.originalPrice != null ? Number(item.originalPrice) : null,
+        is_promotional: Boolean(item.isPromotional),
+        promotion_id: item.promotionId || null,
     }))
 
     for (const item of normalized) {
@@ -434,6 +442,10 @@ async function syncPosSaleToOrders(params: {
         quantity: Number(item.quantity || 0),
         subtotal: safeMoney(Number(item.subtotal || 0)),
         sort_order: index,
+        is_gift: Boolean(item.is_gift),
+        original_price: item.original_price != null ? Number(item.original_price) : null,
+        is_promotional: Boolean(item.is_promotional),
+        promotion_id: item.promotion_id || null,
     }))
 
     if (orderItems.length > 0) {
@@ -528,6 +540,10 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     const discountAmount = safeMoney(Math.min(Math.max(0, input.discountAmount), subtotalFromItems))
     const shippingFee = safeMoney(input.shippingFee ?? 0)
     const otherCosts = safeMoney(input.otherCosts ?? 0)
+    const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock } = await import("@/app/actions/shared/promotions")
+    const rawPromotions = await listActivePromotionsForMarketplaceAction(input.partnerId, input.customerId || null)
+    const filteredPromotions = await filterRawPromotionsByGiftStock(rawPromotions, supabase)
+
     const pricingResult = calculateOrderPricing({
         items: normalizedItems.map((item) => ({
             productId: item.product_id || null,
@@ -538,8 +554,66 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
         additionalCosts: otherCosts,
         manualDiscount: discountAmount > 0 ? { type: "fixed", value: discountAmount } : null,
         coupon: null,
+        promotions: filteredPromotions,
     })
     const totalAmount = safeMoney(pricingResult.finalTotal)
+
+    const giftIds = pricingResult.appliedGiftProductIds || []
+    if (giftIds.length > 0) {
+        const [productsRes, servicesRes] = await Promise.all([
+            supabase.from("products").select("id, name, price, images").in("id", giftIds),
+            supabase.from("services").select("id, name, price, images").in("id", giftIds),
+        ])
+        const giftProducts = productsRes.data || []
+        const giftServices = servicesRes.data || []
+
+        for (const giftId of giftIds) {
+            const promo = filteredPromotions.find(p => p.giftProductId === giftId || p.giftServiceId === giftId)
+            if (!promo) continue
+
+            const prod = giftProducts.find((p: any) => p.id === giftId)
+            if (prod) {
+                normalizedItems.push({
+                    product_id: prod.id,
+                    variant_id: null,
+                    variant_name: null,
+                    name: `[BRINDE] ${prod.name}`,
+                    quantity: 1,
+                    unit_price: 0,
+                    total_price: 0,
+                    image: prod.images && Array.isArray(prod.images) && prod.images[0] ? prod.images[0] : null,
+                    list_unit_price: null,
+                    line_discount_type: null,
+                    line_discount_value: null,
+                    is_gift: true,
+                    original_price: Number(prod.price || 0),
+                    is_promotional: true,
+                    promotion_id: promo.id,
+                })
+            } else {
+                const serv = giftServices.find((s: any) => s.id === giftId)
+                if (serv) {
+                    normalizedItems.push({
+                        product_id: null,
+                        variant_id: null,
+                        variant_name: null,
+                        name: `[BRINDE] ${serv.name}`,
+                        quantity: 1,
+                        unit_price: 0,
+                        total_price: 0,
+                        image: serv.images && Array.isArray(serv.images) && serv.images[0] ? serv.images[0] : null,
+                        list_unit_price: null,
+                        line_discount_type: null,
+                        line_discount_value: null,
+                        is_gift: true,
+                        original_price: Number(serv.price || 0),
+                        is_promotional: true,
+                        promotion_id: promo.id,
+                    })
+                }
+            }
+        }
+    }
 
     if (normalizedItems.length === 0) return { success: false as const, error: "Não é possível salvar pré-venda sem itens." }
     if (discountAmount < 0 || totalAmount < 0 || shippingFee < 0 || otherCosts < 0) {

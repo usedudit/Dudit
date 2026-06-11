@@ -305,7 +305,12 @@ export async function listApplicableMarketplaceCouponsAction(input: {
     const applicableCoupons = []
 
     for (const { coupon, result } of validationResults) {
-        if (!result.valid) continue
+        const isBlocked = !result.valid && (
+            result.errorMessage === "Nenhum item da sacola é elegível para este cupom." ||
+            result.errorMessage === "Cupom não aplicável aos itens do carrinho."
+        )
+
+        if (!result.valid && !isBlocked) continue
 
         applicableCoupons.push({
             id: coupon.id,
@@ -324,6 +329,9 @@ export async function listApplicableMarketplaceCouponsAction(input: {
             endsAt: coupon.ends_at,
             discountAmount: result.discountAmount,
             freeShipping: result.freeShipping,
+            partialApplicabilityWarning: result.partialApplicabilityWarning,
+            blocked: isBlocked,
+            errorMessage: result.errorMessage,
         })
     }
 
