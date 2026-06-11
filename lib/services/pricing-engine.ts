@@ -681,9 +681,9 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
           if (promo && isItemInScope(item as any, promo)) {
             if (getCampaignCategory(promo.promotionType) === CampaignCategory.PRICE) {
               hasCampaign = true
-            }
-            if (promo.allowCouponCombination === false) {
-              hasNonCombinableCampaign = true
+              if (promo.allowCouponCombination === false) {
+                hasNonCombinableCampaign = true
+              }
             }
           }
         }
@@ -735,7 +735,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
     // 2. Check if coupon combination is allowed globally
     const hasAppliedNonCombinablePromo = appliedPromotionIds.some(promoId => {
       const promo = promoMap.get(promoId)
-      return promo && promo.allowCouponCombination === false
+      return promo && getCampaignCategory(promo.promotionType) === CampaignCategory.PRICE && promo.allowCouponCombination === false
     })
     const combinationAllowed = coupon.allowCombination === true && !hasAppliedNonCombinablePromo
 
@@ -850,18 +850,34 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         couponCode = coupon.code || null
         scenarioCouponTotal = totalScenarioB
       } else {
-        // Scenario A wins! Campaign is better, coupon is discarded
-        eligibleSubtotal = eligibleSubtotalScenarioA
-        ineligibleSubtotal = ineligibleSubtotalScenarioA
-        eligibleItemIds = eligibleItemIdsScenarioA
-        ineligibleItemIds = ineligibleItemIdsScenarioA
-        eligibleItemsCount = eligibleItemsCountScenarioA
-        ineligibleItemsCount = ineligibleItemsCountScenarioA
-        couponApplicability = "none"
-        couponDiscountAmount = 0
-        appliedCouponId = null
-        couponCode = null
-        scenarioCouponTotal = currentTotal
+        // Scenario A wins!
+        if (coupon.allowCombination === true && eligibleItemsCountScenarioA > 0) {
+          eligibleSubtotal = eligibleSubtotalScenarioA
+          ineligibleSubtotal = ineligibleSubtotalScenarioA
+          eligibleItemIds = eligibleItemIdsScenarioA
+          ineligibleItemIds = ineligibleItemIdsScenarioA
+          eligibleItemsCount = eligibleItemsCountScenarioA
+          ineligibleItemsCount = ineligibleItemsCountScenarioA
+          couponApplicability = eligibleItemsCount > 0 ? (ineligibleItemsCount === 0 ? "full" : "partial") : "none"
+
+          appliedCouponId = coupon.id
+          couponCode = coupon.code || null
+          couponDiscountAmount = couponDiscountScenarioA
+          scenarioCouponTotal = totalScenarioA
+        } else {
+          // Scenario A wins! Campaign is better, coupon is discarded
+          eligibleSubtotal = eligibleSubtotalScenarioA
+          ineligibleSubtotal = ineligibleSubtotalScenarioA
+          eligibleItemIds = eligibleItemIdsScenarioA
+          ineligibleItemIds = ineligibleItemIdsScenarioA
+          eligibleItemsCount = eligibleItemsCountScenarioA
+          ineligibleItemsCount = ineligibleItemsCountScenarioA
+          couponApplicability = "none"
+          couponDiscountAmount = 0
+          appliedCouponId = null
+          couponCode = null
+          scenarioCouponTotal = currentTotal
+        }
       }
     }
   } else {

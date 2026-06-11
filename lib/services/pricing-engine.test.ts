@@ -1274,5 +1274,77 @@ describe("computeItemCampaignPricing", () => {
       const isEligible = isCouponEligibleForItems(true, [display])
       expect(isEligible).toBe(true)
     })
+
+    // Improvements Verification
+    it("Checklist Improvements: GIFT promotion with allowCouponCombination = false does NOT block a combinable coupon", () => {
+      const r = calculateOrderPricing({
+        items: [{ productId: "p1", unitPrice: 100, quantity: 1 }],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({
+            id: "gift-promo",
+            promotionType: PromotionType.GIFT,
+            giftProductId: "gift-item",
+            allowCouponCombination: false, // Should be ignored since it is a GIFT (BENEFIT) promo
+            discountType: null,
+            discountValue: null,
+          }),
+        ],
+        coupon: coupon({ discountValue: 10, allowCombination: true }),
+      })
+      // Coupon should stack successfully with the gift
+      expect(r.appliedPromotionIds).toContain("gift-promo")
+      expect(r.appliedGiftProductIds).toContain("gift-item")
+      expect(r.appliedCouponId).toBe("coupon-1")
+      expect(r.couponDiscountAmount).toBe(10)
+      expect(r.finalTotal).toBe(90)
+    })
+
+    it("Checklist Improvements: Combinable coupon applies partially in Scenario A when one item has promotionalPrice and another has non-combinable campaign", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, promotionalPrice: 90, quantity: 1 }, // combinable manual promo
+          { productId: "p2", unitPrice: 100, quantity: 1 }, // non-combinable campaign
+        ],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "camp-non-comb", priority: 1, applyScope: ApplyScope.SPECIFIC_PRODUCTS, applicableProductIds: ["p2"], discountValue: 20, allowCouponCombination: false }), // 20% off -> 80
+        ],
+        coupon: coupon({ discountValue: 10, discountType: "percentage", allowCombination: true }), // 10% off
+      })
+      // Scenario A total: Item 1 (90 * 0.9 = 81) + Item 2 (80, no coupon) = 161
+      // Scenario B total: Item 1 (90) + Item 2 (90) = 180 (coupon only, campaigns reverted)
+      // Scenario A wins because 161 < 180.
+      // Since coupon is combinable, we keep the coupon applied to p1.
+      expect(r.finalTotal).toBe(161)
+      expect(r.couponDiscountAmount).toBe(9) // 10% of 90 (Item 1 price after manual promo)
+      expect(r.appliedCouponId).toBe("coupon-1")
+      expect(r.couponApplicability).toBe("partial")
+      expect(r.couponReplacedCampaign).toBe(false)
+      expect(r.appliedPromotionIds).toContain("camp-non-comb")
+    })
+
+    it("Checklist Improvements: Scenario B wins and reverts all campaigns when coupon discount is much better, even when coupon is combinable", () => {
+      const r = calculateOrderPricing({
+        items: [
+          { productId: "p1", unitPrice: 100, promotionalPrice: 95, quantity: 1 }, // combinable manual promo
+          { productId: "p2", unitPrice: 100, quantity: 1 }, // non-combinable campaign
+        ],
+        shippingCost: 0,
+        promotions: [
+          discountPromotion({ id: "camp-non-comb", priority: 1, applyScope: ApplyScope.SPECIFIC_PRODUCTS, applicableProductIds: ["p2"], discountValue: 5, allowCouponCombination: false }), // 5% off -> 95
+        ],
+        coupon: coupon({ discountValue: 50, discountType: "percentage", allowCombination: true }), // 50% off
+      })
+      // Scenario A total: Item 1 (95 * 0.5 = 47.5) + Item 2 (95, no coupon) = 142.5
+      // Scenario B total: Item 1 (50) + Item 2 (50) = 100 (coupon only, campaigns reverted)
+      // Scenario B wins because 100 < 142.5.
+      expect(r.finalTotal).toBe(100)
+      expect(r.couponDiscountAmount).toBe(100) // 50% of 200 (original subtotal)
+      expect(r.appliedCouponId).toBe("coupon-1")
+      expect(r.couponApplicability).toBe("full")
+      expect(r.couponReplacedCampaign).toBe(true)
+      expect(r.appliedPromotionIds).toEqual([]) // campaigns reverted
+    })
   })
 })

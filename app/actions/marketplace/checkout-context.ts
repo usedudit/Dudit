@@ -9,13 +9,14 @@ import {
   type MarketplaceCheckoutDisplayLine,
 } from "@/lib/commerce/marketplace-checkout-lines"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
-import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerDeliveryConfigAction } from "@/app/actions/shared/delivery"
-import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { cachedResolveCheckoutCartLines, cachedListActivePromotionsInBatch } from "@/lib/cache/checkout-cache"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getCachedAddresses } from "@/app/actions/shared/addresses"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 
 export type MarketplaceCheckoutDepositConfig = {
   available: boolean
@@ -51,6 +52,26 @@ export type MarketplaceCheckoutContextResult =
         partnerEnabled: boolean
         pickupEnabled: boolean
       }
+      deliverySettings: Record<string, unknown> | null
+      storefrontPaymentMethods: Array<{
+        id: string
+        type: string
+        discountPercent: number
+        feePercent: number
+        feeFixed: number
+        maxInstallments: number
+        supportsInstallments: boolean
+        cardBrand: string | null
+      }>
+      userAddresses: Record<string, unknown>[]
+      partnerBumpProducts: Record<string, unknown>[]
+      mpAcceptedPaymentMethods: {
+        credit_card: boolean
+        debit_card: boolean
+        pix: boolean
+        boleto: boolean
+        mercado_pago_wallet: boolean
+      }
     }
   | { success: false; error: string }
 
@@ -67,7 +88,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   }
 
   const admin = getAdminClient()
-  const resolved = await resolveCheckoutCartLines(admin, user.id, input.cartItemIds)
+  const resolved = await cachedResolveCheckoutCartLines(admin, user.id, input.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const lineContexts = buildCheckoutLineContextsFromResolved(resolved.lines)
@@ -88,11 +109,11 @@ export async function getMarketplaceCheckoutContextAction(input: {
     } else subscriptionsSubtotal += total
   }
 
-  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult, promosMap] = await Promise.all([
+  const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
-        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -105,7 +126,28 @@ export async function getMarketplaceCheckoutContextAction(input: {
       .eq("type", "pix")
       .eq("is_active", true)
       .maybeSingle(),
-    listActivePromotionsInBatch([resolved.partnerId], user.id),
+      cachedListActivePromotionsInBatch([resolved.partnerId], user.id),
+    admin
+      .from("payment_methods")
+      .select(
+        "id, type, payment_type, is_active, discount_percent, fee_percent, fee_fixed, max_installments, supports_installments, priority, card_brand"
+      )
+      .eq("partner_id", resolved.partnerId)
+      .eq("is_active", true)
+      .order("is_default", { ascending: false })
+      .order("priority", { ascending: false })
+      .order("discount_percent", { ascending: false }),
+    getCachedAddresses(user.id, "user"),
+    admin
+      .from("products")
+      .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+      .eq("partner_id", resolved.partnerId)
+      .eq("is_active", true)
+      .eq("moderation_status", "approved")
+      .eq("show_in_marketplace", true)
+      .gt("stock_available", 0)
+      .order("created_at", { ascending: false })
+      .limit(5),
   ])
 
   const partnerPromotions = promosMap?.[resolved.partnerId] || []
@@ -241,6 +283,35 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const addresses = partnerRow?.addresses
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses
 
+  const rawMethods = (storefrontPaymentMethodsResult as any)?.data || []
+  const bestByType = new Map<string, any>()
+  const typeOrder = ["pix", "credit_card", "debit_card", "cash", "other"]
+  for (const m of rawMethods) {
+    const canonicalType = toCanonicalPaymentType(m.type || m.payment_type)
+    if (bestByType.has(canonicalType)) continue
+    bestByType.set(canonicalType, {
+      id: String(m.id),
+      type: canonicalType,
+      discountPercent: Math.max(0, Number(m.discount_percent || 0)),
+      feePercent: Math.max(0, Number(m.fee_percent || 0)),
+      feeFixed: Math.max(0, Number(m.fee_fixed || 0)),
+      maxInstallments: Math.max(1, Number(m.max_installments || 1)),
+      supportsInstallments: Boolean(m.supports_installments ?? ((m.max_installments || 1) > 1)),
+      cardBrand: m.card_brand || null,
+    })
+  }
+  const storefrontPaymentMethods = typeOrder.filter((t) => bestByType.has(t)).map((t) => bestByType.get(t)!)
+
+  const mpAcct = (partnerRow as any)?.mp_accepted_payment_methods
+  const mpAcceptedPaymentMethods = {
+    credit_card: true,
+    debit_card: true,
+    pix: true,
+    boleto: true,
+    mercado_pago_wallet: true,
+    ...(mpAcct || {}),
+  }
+
   return {
     success: true,
     requirements,
@@ -276,5 +347,10 @@ export async function getMarketplaceCheckoutContextAction(input: {
         ? Boolean(deliveryConfig.settings.isPickupEnabled ?? true)
         : true,
     },
+    deliverySettings: deliveryConfig.success ? (deliveryConfig.settings as Record<string, unknown>) : null,
+    storefrontPaymentMethods,
+    userAddresses: (userAddresses || []) as Record<string, unknown>[],
+    partnerBumpProducts: ((bumpProductsResult as any)?.data || []) as Record<string, unknown>[],
+    mpAcceptedPaymentMethods: mpAcceptedPaymentMethods as any,
   }
 }

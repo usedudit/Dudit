@@ -7,7 +7,7 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { validateCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
-import { resolveCheckoutCartLines } from "@/lib/services/marketplace-cart-resolver"
+import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
 
 interface PreferenceRequest {
   items?: Array<{
@@ -124,7 +124,7 @@ async function handler(request: NextRequest) {
         .in("id", body.cartItemIds!)
         .eq("user_id", user.id)
 
-      const resolved = await resolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
+      const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, body.cartItemIds!)
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }

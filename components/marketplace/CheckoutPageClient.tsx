@@ -24,10 +24,9 @@ import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
-import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
-import { getStorefrontPaymentMethodsAction, type StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
-import { getPartnerOrderBumps } from "@/app/actions/marketplace/partners"
-import { getMpAcceptedPaymentMethodsPublicAction, type MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import type { StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
+import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
 import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
@@ -383,28 +382,6 @@ const displayableCoupons = availableCoupons
     const [partnerProducts, setPartnerProducts] = useState<any[]>([])
     const [loadingBumps, setLoadingBumps] = useState(false)
 
-    useEffect(() => {
-        if (!partnerId) return
-        let active = true
-        setLoadingBumps(true)
-        getPartnerOrderBumps(partnerId)
-            .then((res) => {
-                if (!active) return
-                if (res) {
-                    setPartnerProducts(res)
-                }
-            })
-            .catch((err) => {
-                console.error("Error fetching order bump products:", err)
-            })
-            .finally(() => {
-                if (active) setLoadingBumps(false)
-            })
-        return () => {
-            active = false
-        }
-    }, [partnerId])
-
     const bumpCandidates = useMemo(() => {
         const checkoutIds = new Set(products.map(p => p.id))
         return partnerProducts.filter((p: any) => {
@@ -465,10 +442,10 @@ const displayableCoupons = availableCoupons
 
     // Auto-set paymentOption to "traditional" for non-MP stores
     useEffect(() => {
-        if (!storefrontMethodsLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null) {
+        if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null) {
             setPaymentOption("traditional")
         }
-    }, [storefrontMethodsLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption])
+    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -480,50 +457,53 @@ const displayableCoupons = availableCoupons
         }
     }, [paymentOption, checkoutContext?.deposit.available])
 
+    // Sync all data from checkout context when it loads
     useEffect(() => {
-        let active = true
-        if (!partnerId) return
-            ; (async () => {
-                const config = await getPartnerDeliveryConfigAction(partnerId)
-                if (!active || !config.success) return
-                setDeliveryPlanEnabled(config.capability.deliveryEnabled)
-                setDeliveryEnabled(Boolean(config.settings.isDeliveryEnabled))
-                setPickupEnabled(Boolean(config.settings.isPickupEnabled ?? true))
-                setDeliverySettings(config.settings)
+        if (!checkoutContext) return
+        if (checkoutContext.deliverySettings) {
+            setDeliverySettings(checkoutContext.deliverySettings)
+        }
+        setDeliveryPlanEnabled(checkoutContext.delivery.planEnabled)
+        setDeliveryEnabled(checkoutContext.delivery.partnerEnabled)
+        setPickupEnabled(checkoutContext.delivery.pickupEnabled)
 
-                const canDel = config.capability.deliveryEnabled && config.settings.isDeliveryEnabled
-                const canPick = Boolean(config.settings.isPickupEnabled ?? true)
-                if (!canDel && canPick) {
-                    setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
-                } else if (canDel && !canPick) {
-                    setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
-                }
-            })()
-        return () => { active = false }
-    }, [partnerId])
+        const canDel = checkoutContext.delivery.planEnabled && checkoutContext.delivery.partnerEnabled
+        const canPick = checkoutContext.delivery.pickupEnabled
+        if (!canDel && canPick) {
+            setFormData((prev) => ({ ...prev, deliveryType: "pickup" }))
+        } else if (canDel && !canPick) {
+            setFormData((prev) => ({ ...prev, deliveryType: "delivery" }))
+        }
 
+        if (checkoutContext.storefrontPaymentMethods.length > 0) {
+            setStorefrontMethods(checkoutContext.storefrontPaymentMethods as any)
+        }
+        setStorefrontMethodsLoading(false)
 
-    // Carrega métodos de pagamento reais do vendedor
-    useEffect(() => {
-        let active = true
-        if (!partnerId) return
-        setStorefrontMethodsLoading(true)
-            ; (async () => {
-                const result = await getStorefrontPaymentMethodsAction(partnerId)
-                if (!active) return
-                if (result.success && result.methods.length > 0) {
-                    setStorefrontMethods(result.methods)
-                    // Se o método atual não está entre os disponíveis, limpa a seleção
-                    const hasSelectedMethod = formData.paymentMethod === "mercadopago" ||
-                        result.methods.some((m) => m.id === formData.paymentMethod || m.type === formData.paymentMethod)
-                    if (formData.paymentMethod && !hasSelectedMethod) {
-                        setFormData((prev) => ({ ...prev, paymentMethod: "", installments: 1 }))
-                    }
-                }
-                setStorefrontMethodsLoading(false)
-            })()
-        return () => { active = false }
-    }, [partnerId])
+        const addresses = checkoutContext.userAddresses as unknown as UserAddress[]
+        if (addresses.length > 0) {
+            setUserAddresses(addresses)
+            const defaultAddress = addresses.find((a) => a.is_default)
+            if (defaultAddress) {
+                setSelectedAddressId(defaultAddress.id)
+                const addressStr = buildAddressString(defaultAddress)
+                setFormData((prev) => ({
+                    ...prev,
+                    deliveryAddress: addressStr,
+                }))
+            }
+        }
+        setLoadingAddresses(false)
+
+        if (checkoutContext.mpAcceptedPaymentMethods) {
+            setMpAcceptedPaymentMethods(checkoutContext.mpAcceptedPaymentMethods as any)
+        }
+
+        if (checkoutContext.partnerBumpProducts.length > 0) {
+            setPartnerProducts(checkoutContext.partnerBumpProducts)
+        }
+        setLoadingBumps(false)
+    }, [checkoutContext])
 
     const [openSections, setOpenSections] = useState({ delivery: true, payment: true, notes: false })
     const toggleSection = (key: keyof typeof openSections) =>
@@ -535,23 +515,12 @@ const displayableCoupons = availableCoupons
     const [mpAcceptedPaymentMethods, setMpAcceptedPaymentMethods] = useState<MpAcceptedPaymentMethods | undefined>(undefined)
 
     useEffect(() => {
-        if (!partnerId) return
-        getMpAcceptedPaymentMethodsPublicAction(partnerId)
-            .then(setMpAcceptedPaymentMethods)
-            .catch((err) => console.error("Error loading MP accepted payment methods:", err))
-    }, [partnerId])
-
-    useEffect(() => {
         if (user) {
             setUserId(user.id)
             setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuário")
             setUserEmail(user.email || "")
         }
     }, [user])
-
-    useEffect(() => {
-        if (userId) loadUserAddresses()
-    }, [userId])
 
     const loadUserAddresses = async () => {
         if (!userId) return
@@ -664,7 +633,10 @@ const displayableCoupons = availableCoupons
     )
     const showDeliveryFeeRow = Boolean(requirements?.showProductFulfillmentOptions)
 
-    const totalAmount = products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0)
+    const totalAmount = useMemo(
+        () => products.reduce((sum, p) => sum + p.price * (quantities[p.id] || p.quantity), 0),
+        [products, quantities],
+    )
     const checkoutBaseTotal = useMemo(() => {
         if (payDepositOnly && checkoutContext?.deposit.available) {
             const nonServiceSubtotal = (checkoutContext.productsSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
@@ -673,8 +645,10 @@ const displayableCoupons = availableCoupons
         }
         return Math.max(0, totalAmount - couponDiscount)
     }, [payDepositOnly, checkoutContext, totalAmount, couponDiscount])
-    const checkoutTotalWithDelivery =
-        checkoutBaseTotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
+    const checkoutTotalWithDelivery = useMemo(
+        () => checkoutBaseTotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0),
+        [checkoutBaseTotal, showDeliveryFeeRow, isPickup, deliveryFee],
+    )
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
         credit_card: "Cartão de crédito",
@@ -837,8 +811,8 @@ const displayableCoupons = availableCoupons
         paymentOption === "traditional" &&
         formData.paymentMethod
     )
-    const serializedCouponItems = useMemo(() => {
-        const items = (sessionData?.source === "cart" && sessionData.cartItems?.length)
+    const couponItems = useMemo(() => {
+        return (sessionData?.source === "cart" && sessionData.cartItems?.length)
             ? sessionData.cartItems.map((item) => ({
                 productId: item.itemType === "product" || !item.itemType ? item.productId : null,
                 serviceId: item.itemType === "service_booking" ? (item.serviceId || item.productId) : null,
@@ -849,10 +823,9 @@ const displayableCoupons = availableCoupons
                     ? { serviceId: product.id }
                     : { productId: product.id }
             ));
-        return JSON.stringify(items);
     }, [products, sessionData])
 
-    const couponItems = useMemo(() => JSON.parse(serializedCouponItems), [serializedCouponItems])
+    const couponItemsKey = useMemo(() => JSON.stringify(couponItems), [couponItems])
 
     const appliedCoupon = useMemo(
         () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
@@ -860,7 +833,10 @@ const displayableCoupons = availableCoupons
     )
     const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
 
-    const orderSubtotal = checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount
+    const orderSubtotal = useMemo(
+        () => checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount,
+        [checkoutContext?.productsSubtotal, totalAmount],
+    )
 
     useEffect(() => {
         let active = true
@@ -1452,7 +1428,7 @@ const displayableCoupons = availableCoupons
 
     useEffect(() => {
         void loadApplicableCoupons()
-    }, [partnerId, userId, totalAmount, serializedCouponItems])
+    }, [partnerId, userId, totalAmount, couponItemsKey])
 
     const refreshCouponPartialWarning = async (code: string) => {
         if (!partnerId || !code.trim()) {

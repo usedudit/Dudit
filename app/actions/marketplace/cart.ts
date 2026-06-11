@@ -17,11 +17,12 @@ import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
-import { listActivePromotionsForMarketplaceAction, listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
+import { listActivePromotionsInBatch } from "@/app/actions/shared/promotions"
+import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import {
-  resolveCheckoutCartLines,
   buildFulfillmentPayload,
 } from "@/lib/services/marketplace-cart-resolver"
+import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 
 export type MarketplaceCheckoutPricingSnapshot = {
@@ -678,7 +679,7 @@ export async function checkoutCartAction(
     ),
   )
 
-  const resolved = await resolveCheckoutCartLines(adminClient, user.id, cartItemIds)
+  const resolved = await cachedResolveCheckoutCartLines(adminClient, user.id, cartItemIds)
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
@@ -753,7 +754,7 @@ export async function checkoutCartAction(
         orderSubtotal: totalAmount,
       })
       : Promise.resolve({ success: true, fee: 0, distanceKm: null, breakdown: null }),
-    listActivePromotionsForMarketplaceAction(partnerId, user.id),
+    cachedListActivePromotionsForMarketplaceAction(partnerId, user.id),
     (isUuid && !useMercadoPago)
       ? supabase
         .from("payment_methods")

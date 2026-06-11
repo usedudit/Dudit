@@ -298,7 +298,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                         <div className="flex justify-between items-start">
                                                                             <div>
                                                                                 <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-0.5 group-hover:text-brand-green transition-colors">
-                                                                                    {item.products?.name || item.services?.name || item.product_name}
+                                                                                    {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.services?.name || item.product_name}
                                                                                 </h4>
 
                                                                                 {item.product_variants?.variant_name && (

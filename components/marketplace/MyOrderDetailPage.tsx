@@ -684,49 +684,44 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 <img src={itemImage} alt={item.products?.name || item.product_name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate group-hover:text-brand-green transition-colors">
-                                    {item.products?.name || item.product_name}
-                                </h3>
-                                {item.is_gift && (
-                                    <div className="mt-1">
-                                        <Badge variant="green">Brinde</Badge>
-                                    </div>
-                                )}
-                                {isService ? (
-                                    <>
-                                        {bookingDate && bookingTime ? (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                {formatDate(bookingDate)} às {bookingTime}
-                                                {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
-                                            </div>
-                                        ) : fulfillmentMode ? (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                {getFulfillmentModeLabel(fulfillmentMode)}
-                                            </div>
-                                        ) : null}
-                                        {isService && order.situation === "cancelled" && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">
-                                                <Badge variant="red">Cancelado</Badge>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        {item.product_variants?.variant_name && (
-                                            <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
-                                        )}
-                                    </>
-                                )}
-                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
-                                    {item.is_gift ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                        </div>
-                                    ) : (
-                                        formatProductUnitPrice(item.product_price, item.products?.unit)
-                                    )}
-                                </div>
+                                                                <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm truncate group-hover:text-brand-green transition-colors">
+                                                                    {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.product_name}
+                                                                </h3>
+                                                                {isService ? (
+                                                                    <>
+                                                                        {bookingDate && bookingTime ? (
+                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                {formatDate(bookingDate)} às {bookingTime}
+                                                                                {fulfillmentMode ? ` | Local: ${getFulfillmentModeLabel(fulfillmentMode)}` : ""}
+                                                                            </div>
+                                                                        ) : fulfillmentMode ? (
+                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                {getFulfillmentModeLabel(fulfillmentMode)}
+                                                                            </div>
+                                                                        ) : null}
+                                                                        {isService && order.situation === "cancelled" && (
+                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">
+                                                                                <Badge variant="red">Cancelado</Badge>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        {item.product_variants?.variant_name && (
+                                                                            <div className="text-xs text-brand-inactive-text mt-0.5">{item.product_variants.variant_name}</div>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                                                    {item.is_gift ? (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        formatProductUnitPrice(item.product_price, item.products?.unit)
+                                                                    )}
+                                                                </div>
                             </div>
                             <div className="text-sm text-brand-inactive-text shrink-0 pr-1">
                                 {!isService ? formatProductQuantity(item.quantity, item.products?.unit) : ""}
@@ -862,13 +857,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm group-hover:text-brand-green transition-colors truncate">
-                                                                {item.products?.name || item.product_name}
+                                                                {item.is_gift && <span className="text-brand-green font-bold">[BRINDE] </span>}{item.products?.name || item.product_name}
                                                             </h3>
-                                                            {item.is_gift && (
-                                                                <div className="mt-1">
-                                                                    <Badge variant="green">Brinde</Badge>
-                                                                </div>
-                                                            )}
                                                             {isService ? (
                                                                 <>
                                                                     {bookingDate && bookingTime ? (

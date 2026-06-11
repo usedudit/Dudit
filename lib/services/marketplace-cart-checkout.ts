@@ -5,13 +5,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { validateCoupon, findBestAutomaticCoupon } from "@/lib/services/coupons"
 import { calculateOrderPricing, type PricingInput } from "@/lib/services/pricing-engine"
-import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
+import { cachedListActivePromotionsForMarketplaceAction } from "@/lib/cache/checkout-cache"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import {
-  resolveCheckoutCartLines,
   buildFulfillmentPayload,
   type ResolvedCartLine,
 } from "@/lib/services/marketplace-cart-resolver"
+import { cachedResolveCheckoutCartLines } from "@/lib/cache/checkout-cache"
 import type { CheckoutFulfillmentPayload } from "@/lib/types/marketplace-cart"
 
 export type MarketplaceCartCheckoutPricing = {
@@ -48,7 +48,7 @@ export async function priceMarketplaceCartCheckout(
     paymentMethod?: PricingInput["paymentMethod"]
   },
 ): Promise<{ success: true; data: MarketplaceCartCheckoutPricing } | { success: false; error: string }> {
-  const resolved = await resolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
+  const resolved = await cachedResolveCheckoutCartLines(adminClient, params.userId, params.cartItemIds)
   if (!resolved.success) return { success: false, error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
@@ -143,7 +143,7 @@ export async function priceMarketplaceCartCheckout(
     }
   }
 
-  const promotionsData = await listActivePromotionsForMarketplaceAction(partnerId, params.userId)
+  const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
 
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
