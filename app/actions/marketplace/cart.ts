@@ -1073,8 +1073,31 @@ export async function checkoutCartAction(
   const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
 
   if (itemsError) {
+    console.error("[CHECKOUT] Erro ao inserir order_items:", {
+      orderId: order.id,
+      errorMessage: itemsError.message,
+      errorCode: itemsError.code,
+      errorDetails: itemsError.details,
+      errorHint: itemsError.hint,
+      itemCount: itemsToInsert.length,
+      itemKeys: itemsToInsert.map((item: any) => Object.keys(item)),
+      items: itemsToInsert.map((item: any) => ({
+        product_id: item.product_id,
+        service_id: item.service_id,
+        product_name: item.product_name,
+        product_price: item.product_price,
+        quantity: item.quantity,
+        subtotal: item.subtotal,
+        line_type: item.line_type,
+        fulfillment_mode: item.fulfillment_mode,
+        is_gift: item.is_gift,
+        is_promotional: item.is_promotional,
+        promotion_id: item.promotion_id,
+        original_price: item.original_price,
+      })),
+    })
     await supabase.from("orders").delete().eq("id", order.id)
-    return { error: "Erro ao adicionar itens ao pedido" }
+    return { error: `Erro ao adicionar itens ao pedido: ${itemsError.message}${itemsError.details ? ` (${itemsError.details})` : ""}${itemsError.hint ? ` — ${itemsError.hint}` : ""}` }
   }
 
   // ATOMIC STOCK DECREMENT (MED-04) - Paralelizado para performance

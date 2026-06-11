@@ -14,7 +14,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { getPartnerUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
-import { listApplicableMarketplaceCouponsAction, validateCouponAction } from "@/app/actions/shared/coupons"
+import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction, updateCartItemFulfillmentModeAction } from "@/app/actions/marketplace/cart"
@@ -1459,7 +1459,7 @@ const displayableCoupons = availableCoupons
             setCouponPartialWarning(false)
             return
         }
-        const result = await validateCouponAction({
+        const result = await validateMarketplaceCouponAction({
             partnerId,
             code,
             customerId: userId,
