@@ -85,7 +85,7 @@ const SelectCouponSheet = ({
     }
 
     if (coupon.allow_combination === false && hasWinningDiscount) {
-      return "Cupom não cumulativo. Itens do carrinho já possuem desconto."
+      return "Cupom não cumulativo. Itens do pedido já possuem desconto."
     }
 
     const applyScope = String(coupon.apply_scope || "all")

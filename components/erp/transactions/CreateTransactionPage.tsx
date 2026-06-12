@@ -99,6 +99,16 @@ function toYmd(d: Date | string | undefined): string {
     return format(date, "yyyy-MM-dd")
 }
 
+function formatLocalYmdToIso(ymd: string): string {
+    if (!ymd) return new Date().toISOString()
+    const todayYmd = format(new Date(), "yyyy-MM-dd")
+    if (ymd === todayYmd) {
+        return new Date().toISOString()
+    }
+    const localDate = new Date(`${ymd}T12:00:00`)
+    return isNaN(localDate.getTime()) ? new Date().toISOString() : localDate.toISOString()
+}
+
 function normalizeName(value: string) {
     return value.trim().replace(/\s+/g, " ").toLowerCase()
 }
@@ -832,7 +842,7 @@ export default function CreateTransactionPage({
                         patch.categoryId = categoryId || null
                         patch.subcategoryId = subcategoryId || null
                         patch.status = status
-                        patch.paymentDate = status === "paid" ? paymentDate : null
+                        patch.paymentDate = status === "paid" ? formatLocalYmdToIso(paymentDate) : null
                     }
 
                     // Only allow financial fields if NOT locked
@@ -844,7 +854,7 @@ export default function CreateTransactionPage({
                         patch.contactType = cp.contactTypeResolved
                         patch.paymentMethodId = paymentMethodId
                         patch.dueDate = isSalesOrigin ? null : dueDate
-                        patch.transactionDate = isSalesOrigin ? paymentDate : dueDate
+                        patch.transactionDate = isSalesOrigin ? (paymentDate ? formatLocalYmdToIso(paymentDate) : null) : (dueDate ? toMiddayIsoFromYmd(dueDate) : null)
                     }
                 }
 
@@ -962,8 +972,8 @@ export default function CreateTransactionPage({
                     contactType: needsContactPanel ? cp.contactTypeResolved : null,
                     paymentType: "Reembolso",
                     dueDate,
-                    paymentDate: status === "paid" ? paymentDate : null,
-                    transactionDate: dueDate,
+                    paymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
+                    transactionDate: dueDate ? toMiddayIsoFromYmd(dueDate) : null,
                     status,
                     notes: notes || null,
                     origin: "manual",
@@ -1063,7 +1073,7 @@ export default function CreateTransactionPage({
                     paymentMethodId: paymentMethodId || null,
                     notes: notes || null,
                     initialStatus: status,
-                    firstInstallmentPaymentDate: status === "paid" ? paymentDate : null,
+                    firstInstallmentPaymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                 })
                 if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
                 success("Parcelamento criado com sucesso!")
@@ -1088,8 +1098,8 @@ export default function CreateTransactionPage({
                 paymentType,
                 paymentMethodId,
                 dueDate,
-                paymentDate: status === "paid" ? paymentDate : null,
-                transactionDate: dueDate,
+                paymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
+                transactionDate: dueDate ? toMiddayIsoFromYmd(dueDate) : null,
                 status,
                 notes: notes || null,
                 origin: "manual",
@@ -2072,11 +2082,13 @@ export default function CreateTransactionPage({
                 >
                     <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
                         <p>A conta de origem selecionada não possui saldo suficiente para essa transferência.</p>
+
                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 space-y-2 text-brand-dark dark:text-dark-heading font-medium">
                             <p>Saldo atual: {formatCurrency(transferInsufficientMeta.fromBal)}</p>
                             <p>Valor da transferência: {formatCurrency(transferInsufficientMeta.amount)}</p>
                         </div>
-                        <p className="text-brand-red text-xs">Se continuar, o saldo ficará negativo.</p>
+
+                        <InfoCard color="red" title="Atenção!" message="Se continuar, o saldo ficará negativo." />
                     </div>
                 </DefaultModal>
 

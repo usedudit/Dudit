@@ -788,7 +788,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                             </TabsTrigger>
                                         )}
-                                        {productData.show_in_marketplace && (
+                                        {productData.show_in_marketplace && internalMode === "details" && (
                                             <TabsTrigger value="metrics" disabled={isLoadingDetails}>
                                                 <span className="inline-flex items-center gap-2">
                                                     Métricas
@@ -873,7 +873,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                         )}
                                     </FadeIn>
                                 )}
-                                {activeTab === "metrics" && productData.show_in_marketplace && (
+                                {activeTab === "metrics" && productData.show_in_marketplace && internalMode === "details" && (
                                     <FadeIn key="metrics" className="block">
                                         {metricsPlanBlocked ? (
                                             <div className="flex flex-col items-center justify-center pt-24 pb-32">

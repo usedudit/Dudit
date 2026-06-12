@@ -951,7 +951,6 @@ async function resolveOrCreateTransactionContactByName(params: {
             partner_id: params.partnerId,
             name: normalizedName,
             type: "customer",
-            description: "Contato criado automaticamente a partir de reembolso de venda.",
         })
         .select("id")
         .maybeSingle()

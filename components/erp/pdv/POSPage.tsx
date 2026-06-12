@@ -496,7 +496,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
             return prev.map((item) => (item.id === found.id ? { ...item, qty: nextQty } : item))
         })
-    }, [notifyError])
+    }, [notifyError, pdvPromotions])
 
     const handleScanBarcode = useCallback(async (code: string) => {
         const cleanCode = code.trim()
@@ -778,17 +778,18 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
     const loadPreSale = useCallback((preSale: PreSale) => {
         const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => {
-            const unit = Number((item.unit_price ?? item.price) || 0)
+            const basePrice = Number((item.list_unit_price ?? item.listUnitPrice ?? item.unit_price ?? item.price) || 0)
+            const effectivePrice = Number((item.unit_price ?? item.price) || 0)
             return {
                 id: crypto.randomUUID(),
                 productId: item.product_id ?? item.productId ?? null,
                 variantId: item.variant_id ?? item.variantId ?? null,
                 variantName: item.variant_name || item.variantName || null,
                 name: item.name,
-                listUnitPrice: unit,
+                listUnitPrice: basePrice,
                 lineDiscountType: null,
                 lineDiscountValue: null,
-                price: unit,
+                price: effectivePrice,
                 qty: Number((item.quantity ?? item.qty) || 0),
                 image: item.image || null,
             }

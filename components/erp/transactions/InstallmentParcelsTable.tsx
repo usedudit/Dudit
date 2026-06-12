@@ -36,14 +36,38 @@ function statusToTag(status: InstallmentParcelRow["status"]): { label: string; v
 
 const ITEMS_PER_PAGE = 8
 
+export function formatInstallmentPaymentMethod(label: string | null | undefined): string {
+    if (!label) return "Não informado"
+    const trimmed = label.trim()
+    const match = trimmed.match(/^(.*)\s+\(([^)]+)\)$/)
+    if (match) {
+        const part1 = match[1].trim()
+        const part2 = match[2].trim()
+        const knownTypes = [
+            "pix", "dinheiro", "cartão de crédito", "cartão de debito", "cartão de débito",
+            "cartão", "cartao de credito", "cartao de debito", "cartao", "transferência bancária",
+            "transferencia bancaria", "boleto", "outros", "caixa"
+        ]
+        const isPart1Type = knownTypes.includes(part1.toLowerCase())
+        const isPart2Type = knownTypes.includes(part2.toLowerCase())
+
+        if (isPart2Type && !isPart1Type) {
+            return `${part2} (${part1})`
+        }
+        return trimmed
+    }
+    return trimmed
+}
+
 export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowClick }: InstallmentParcelsTableProps) {
     const [page, setPage] = useState(1)
-    const hasActions = typeof getActionsSlot === "function"
 
     const totalPages = Math.ceil(rows.length / ITEMS_PER_PAGE)
     const paginatedRows = useMemo(() => {
         return rows.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
     }, [rows, page])
+
+    const hasActions = typeof getActionsSlot === "function"
 
     if (rows.length === 0) return null
 
@@ -58,14 +82,15 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                             <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body">Valor</th>
                             <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body">Status</th>
                             <th className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${hasActions ? "" : "rounded-r-lg pr-6"}`}>Data do Pagamento</th>
-                            {hasActions ? <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-r-lg pr-6 text-center">Ações</th> : null}
+                            {hasActions && (
+                                <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-r-lg pr-6 text-center w-24">Ações</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                         {paginatedRows.map((row) => {
                             const badge = statusToTag(row.status)
                             const paymentDate = row.status === "paid" ? (row.finalizationDate || "-") : "-"
-                            const actions = hasActions && getActionsSlot ? getActionsSlot(row) : null
 
                             return (
                                 <tr key={row.id} className="hover:bg-brand-gray/50 dark:hover:bg-dark-border/10 transition-colors cursor-pointer" onClick={() => onRowClick?.(row.id)}>
@@ -75,7 +100,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                                 Parcela {row.installmentNumber}/{row.totalCount}
                                             </span>
                                             <div className="mt-1 flex" onClick={(e) => e.stopPropagation()}>
-                                                <PaymentMethodIndicator label={row.paymentType} />
+                                                <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} />
                                             </div>
                                         </div>
                                     </td>
@@ -90,19 +115,11 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                     <td className="py-4 px-2 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
                                         {paymentDate}
                                     </td>
-                                    {hasActions ? (
-                                        <td className="py-4 px-2 pr-6 text-center" onClick={(e) => e.stopPropagation()}>
-                                            {actions ? (
-                                                <div className="flex justify-center">
-                                                    <ActionsDropdown>
-                                                        {actions}
-                                                    </ActionsDropdown>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-brand-inactive-text">-</span>
-                                            )}
+                                    {hasActions && (
+                                        <td className="py-4 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            {getActionsSlot?.(row)}
                                         </td>
-                                    ) : null}
+                                    )}
                                 </tr>
                             )
                         })}
@@ -115,7 +132,6 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                 {paginatedRows.map((row) => {
                     const badge = statusToTag(row.status)
                     const paymentDate = row.status === "paid" ? (row.finalizationDate || "-") : "-"
-                    const actions = hasActions && getActionsSlot ? getActionsSlot(row) : null
 
                     return (
                         <div key={row.id} className="py-4 flex flex-col gap-2 cursor-pointer" onClick={() => onRowClick?.(row.id)}>
@@ -125,7 +141,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                         Parcela {row.installmentNumber}/{row.totalCount}
                                     </span>
                                     <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                                        <PaymentMethodIndicator label={row.paymentType} />
+                                        <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} />
                                     </div>
                                 </div>
                                 <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
@@ -143,11 +159,9 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                         </span>
                                     )}
                                 </div>
-                                {actions && (
-                                    <div className="action-btn" onClick={(e) => e.stopPropagation()}>
-                                        <ActionsDropdown>
-                                            {actions}
-                                        </ActionsDropdown>
+                                {hasActions && (
+                                    <div className="action-btn shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        {getActionsSlot?.(row)}
                                     </div>
                                 )}
                             </div>
@@ -162,6 +176,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                     currentPage={page}
                     totalPages={totalPages}
                     onPageChange={setPage}
+                    inline
                 />
             )}
         </div>

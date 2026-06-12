@@ -307,7 +307,7 @@ export async function listApplicableMarketplaceCouponsAction(input: {
     for (const { coupon, result } of validationResults) {
         const isBlocked = !result.valid && (
             result.errorMessage === "Nenhum item da sacola é elegível para este cupom." ||
-            result.errorMessage === "Cupom não aplicável aos itens do carrinho."
+            result.errorMessage === "Cupom não aplicável aos itens da sacola."
         )
 
         if (!result.valid && !isBlocked) continue

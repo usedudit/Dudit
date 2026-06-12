@@ -10,6 +10,7 @@ interface PaginationProps {
   currentPage: number
   totalPages: number
   onPageChange: (page: number) => void
+  inline?: boolean
 }
 
 export type CompactPaginationModel = {
@@ -69,11 +70,18 @@ export function getCompactPaginationModel(
   }
 }
 
-const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange }) => {
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange, inline = false }) => {
   const model = getCompactPaginationModel(currentPage, totalPages, 3)
 
   return (
-    <div className="flex-none pb-4 pt-4 flex justify-center z-40 bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none">
+    <div
+      className={cn(
+        "flex-none pb-4 pt-4 flex justify-center z-40",
+        inline
+          ? "relative bg-transparent w-full"
+          : "bg-white dark:bg-dark-background md:relative md:bg-transparent fixed bottom-0 left-0 w-full border-t border-brand-border dark:border-dark-border md:border-0 shadow-lg md:shadow-none"
+      )}
+    >
       <AnimatePresence>
         {model.totalPages > 1 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="flex items-center gap-2">

@@ -74,14 +74,14 @@ const TransactionListItem = React.memo(
 
                 case "category":
                     return (
-                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-body whitespace-nowrap">
+                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-heading whitespace-nowrap">
                             {transaction.category}
                         </span>
                     )
 
                 case "originSource":
                     return (
-                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-slate text-xs font-semibold text-brand-dark dark:bg-dark-border dark:text-dark-heading whitespace-nowrap">
+                        <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand-gray dark:bg-dark-border text-xs font-medium text-brand-inactive-text dark:text-dark-heading whitespace-nowrap">
                             {transaction.originSource || "Manual"}
                         </span>
                     )

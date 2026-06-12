@@ -107,6 +107,7 @@ function toDisplayStatus(
     }
     if (s === "pending" && isOverdue) return "Atrasado"
     if (s === "pending") return "Pendente"
+    if (s === "cancelled") return "Cancelado"
     return status || "Pendente"
 }
 
@@ -1473,7 +1474,7 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: existingPayments, error: paymentsErr } = await supabase
             .from("transaction_payments")
-            .select("amount, base_amount")
+            .select("amount, base_amount, interest_amount")
             .eq("partner_id", input.partnerId)
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
@@ -1526,15 +1527,39 @@ export async function recordInstallmentPaymentAction(input: {
             throw insertPaymentErr
         }
 
-        await applyFinanceAccountBalanceDelta(supabase, input.partnerId, tx.account_id, {
-            transaction_type: tx.transaction_type,
-            amount: finalPaid,
-            refund_kind: tx.refund_kind,
-        })
+        let resolvedAccountId = tx.account_id
+        if (input.paymentMethodId) {
+            const { data: pm } = await supabase
+                .from("payment_methods")
+                .select("default_finance_account_id")
+                .eq("id", input.paymentMethodId)
+                .eq("partner_id", input.partnerId)
+                .maybeSingle()
+            if (pm?.default_finance_account_id) {
+                resolvedAccountId = pm.default_finance_account_id
+            }
+        }
+
+        if (resolvedAccountId) {
+            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
+                transaction_type: tx.transaction_type,
+                amount: finalPaid,
+                refund_kind: tx.refund_kind,
+            })
+        }
+
+        const existingInterest = (existingPayments || []).reduce(
+            (acc: number, row: any) => acc + Number(row.interest_amount ?? 0), 0
+        )
+        const totalInterest = existingInterest + interestAmount
 
         const updatePayload: Record<string, unknown> = {
             updated_at: nowIso,
             payment_date: nowIso,
+            interest_amount: totalInterest > 0 ? totalInterest : (tx.interest_amount || null),
+        }
+        if (resolvedAccountId) {
+            updatePayload.account_id = resolvedAccountId
         }
         if (input.paymentMethodId !== undefined) {
             updatePayload.payment_method_id = input.paymentMethodId || null

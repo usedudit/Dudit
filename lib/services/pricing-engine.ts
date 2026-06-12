@@ -321,13 +321,14 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
 
   const units: CartUnit[] = []
 
-  for (const item of items) {
+    for (const item of items) {
     const qty = clampMin0(Number(item.quantity) || 0)
     const unitP = clampMin0(Number(item.unitPrice) || 0)
+    const baseP = item.basePrice != null ? clampMin0(Number(item.basePrice) || 0) : unitP
     // promotionalPrice of 0 means free (will be clamped to R$0.01 minimum)
-    const promoP = item.promotionalPrice != null && item.promotionalPrice >= 0 && item.promotionalPrice < unitP
-      ? clampMin0(item.promotionalPrice)
-      : null
+    const promoP = item.promotionalPrice != null && item.promotionalPrice >= 0 && item.promotionalPrice < baseP
+        ? clampMin0(item.promotionalPrice)
+        : null
 
     // Manual effective price (promotionalPrice if valid, else unitPrice)
     const manualEffective = promoP ?? unitP
@@ -338,7 +339,7 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
         serviceId: item.serviceId || null,
         recurringPlanId: item.recurringPlanId || null,
         categoryId: item.categoryId || null,
-        originalPrice: unitP,
+        originalPrice: baseP,
         currentPrice: manualEffective, // start with manual price
       })
     }

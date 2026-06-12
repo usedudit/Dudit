@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChevronLeftIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
-import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, DropdownItem } from "@/components/reusable"
-import { getTransactionDetailsAction, getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
+import { Button, Badge, ActionsDropdown, ThreeDotsLoader, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, InfoCard, DropdownItem, FormSection } from "@/components/reusable"
+import { getTransactionHistoryAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
 import { TransactionHistoryTab } from "./TransactionHistoryTab"
 import { TransactionContactCard } from "./TransactionContactCard"
 import { TransactionGoalCard } from "./TransactionGoalCard"
@@ -14,6 +14,8 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import { ListItem } from "@/components/reusable"
 import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon } from "@/lib/icons"
+import BottomSheet from "@/components/BottomSheet"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface TransactionDetailViewProps {
     transactionId: string
@@ -36,6 +38,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
     const [historyEntries, setHistoryEntries] = useState<any[]>([])
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyLoaded, setHistoryLoaded] = useState(false)
+    const [isContactSheetOpen, setIsContactSheetOpen] = useState(false)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -128,418 +131,461 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
 
     return (
         <FadeIn>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10">
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-                            <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                </Button>
-                            </div>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1
-                                        className={`font-bold transition-all duration-500 ease-in-out flex flex-wrap items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}
-                                    >
-                                        <span className="hidden md:inline truncate">{detail.headerTitle}</span>
-                                        <Badge variant={detail.statusVariant}>{detail.statusLabel}</Badge>
-                                        {detail.isRecurring && (
-                                            <Badge variant="purple" className="whitespace-nowrap">
-                                                Recorrente
-                                            </Badge>
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">{detail.headerTitle}</span>
+                                            <Badge variant={detail.statusVariant}>{detail.statusLabel}</Badge>
+                                            {detail.isRecurring && (
+                                                <Badge variant="purple" className="whitespace-nowrap">
+                                                    Recorrente
+                                                </Badge>
+                                            )}
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            <span>{subtitleLeft}</span>
+                                            <span className="mx-2">•</span>
+                                            <span>Criado por {detail.creatorName}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <ActionsDropdown onPrint={() => window.print()} onShare={() => { }} />
+                                        {detail.canEdit && (
+                                            <Button onClick={() => onEdit(transactionId)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
+                                                Editar
+                                            </Button>
                                         )}
-                                    </h1>
-
-                                    <div
-                                        className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}
-                                    >
-                                        <span>{subtitleLeft}</span>
-                                        <span className="mx-2">•</span>
-                                        <span>Criado por {detail.creatorName}</span>
                                     </div>
                                 </div>
 
-                                <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <ActionsDropdown onPrint={() => window.print()} onShare={() => { }} />
-                                    {detail.canEdit && (
-                                        <Button onClick={() => onEdit(transactionId)} className="whitespace-nowrap">
-                                            <EditIcon className="w-[18px] h-[18px] mr-2" />
-                                            Editar
-                                        </Button>
-                                    )}
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="summary">Resumo</TabsTrigger>
+                                        <TabsTrigger value="history">Histórico</TabsTrigger>
+                                    </TabsList>
                                 </div>
                             </div>
-
-                            <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                    <TabsTrigger value="summary">Resumo</TabsTrigger>
-                                    <TabsTrigger value="history">Histórico</TabsTrigger>
-                                </TabsList>
-                            </div>
                         </div>
-                    </div>
 
-                    <div className="max-w-[1300px] mx-auto p-4 md:p-6 pt-6">
-                        <Tabs value={activeTab} onValueChange={setActiveTab}>
-                            <TabsContent value="summary" className="mt-0">
-                                <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
-                                    <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                <div className="flex justify-between items-center flex-wrap gap-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Tipo:</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{detail.typeBannerLabel}</span>
-                                                    </div>
-                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium md:text-right">
-                                                        Origem: <strong className="text-brand-dark dark:text-dark-heading">{detail.originLabel}</strong>
-                                                    </div>
+                        {/* Tab Content */}
+                        <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                <TabsContent value="summary" className="mt-0">
+                                    <div className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
+                                        <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                            {/* Mobile Contact Section at the top */}
+                                            {detail.contactCard && (detail.contactCard.name || detail.contactCard.title) && (
+                                                <div className="xl:hidden mb-6">
+                                                    <FormSection title="" hasSeparator={false} className="mt-0">
+                                                        <ListItem
+                                                            left={
+                                                                <UserProfileImage
+                                                                    fullName={detail.contactCard.name || detail.contactCard.title || "Contato"}
+                                                                    className="w-10 h-10 text-base"
+                                                                />
+                                                            }
+                                                            title={
+                                                                detail.contactCard.isCustomer
+                                                                    ? (detail.contactCard.name || "Consumidor Final")
+                                                                    : (detail.contactCard.name || "-")
+                                                            }
+                                                            description={
+                                                                detail.contactCard.isCustomer
+                                                                    ? (detail.contactCard.email || "Sem e-mail cadastrado")
+                                                                    : detail.contactCard.title
+                                                            }
+                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                            showChevron={true}
+                                                            onClick={() => setIsContactSheetOpen(true)}
+                                                        />
+                                                    </FormSection>
                                                 </div>
-                                            </div>
-
-                                            <div className="bg-white dark:bg-dark-surface px-8 md:px-12 pt-12 pb-12">
-                                                <div className="relative px-4">
-                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                        <div
-                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${detail.timeline.step2.danger ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                            style={{ width: `${progressPct}%` }}
-                                                        ></div>
-
-                                                        {timelineSteps.map((step, idx) => (
-                                                            <div key={idx} className="relative flex flex-col items-center">
-                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                    <span
-                                                                        className={`text-xs font-medium ${step.active
-                                                                            ? step.danger
-                                                                                ? "text-brand-red"
-                                                                                : "text-brand-dark dark:text-dark-heading"
-                                                                            : "text-gray-400 dark:text-dark-body"
-                                                                            }`}
-                                                                    >
-                                                                        {step.label}
-                                                                    </span>
-                                                                </div>
-                                                                <div
-                                                                    className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
-                                                                        ? step.danger
-                                                                            ? "bg-brand-red border-brand-red"
-                                                                            : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
-                                                                        : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
-                                                                        }`}
-                                                                >
-                                                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
-                                                                </div>
-                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                    {step.date ? (
-                                                                        <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
-                                                                            <span>{step.date}</span>
-                                                                            {step.time && <span>{step.time}</span>}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-8">
-                                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                                                {detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"}
-                                            </h3>
-                                            <div className="space-y-4">
-                                                {detail.installmentBreakdown?.length ? (
-                                                    <InstallmentParcelsTable
-                                                        rows={
-                                                            detail.installmentBreakdown.map(
-                                                                (row): InstallmentParcelRow => ({
-                                                                    id: row.id,
-                                                                    installmentNumber: row.installmentNumber,
-                                                                    totalCount: row.totalCount,
-                                                                    status: row.status,
-                                                                    originalAmount: row.originalAmount,
-                                                                    paidAmount: row.paidAmount,
-                                                                    interestAmount: row.interestAmount,
-                                                                    discountAmount: row.discountAmount,
-                                                                    dueDate: row.dueDate,
-                                                                    finalizationDate: row.paymentDate,
-                                                                    paymentType: row.paymentType,
-                                                                    reason: detail.categoryLine,
-                                                                    reference: detail.headerTitle,
-                                                                }),
-                                                            )
-                                                        }
-                                                        getActionsSlot={(row) => {
-                                                            if (row.status === "paid") return null;
-                                                            return (
-                                                                <>
-                                                                    {onEditInstallment && (
-                                                                        <DropdownItem onClick={() => onEditInstallment(row.id)}>Editar</DropdownItem>
-                                                                    )}
-                                                                    {onPayInstallment && (
-                                                                        <DropdownItem onClick={() => void onPayInstallment(row.id)}>Registrar pagamento</DropdownItem>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        }}
-                                                    />
-                                                ) : detail.transactionDetailKind === "transfer" && detail.transferAccounts ? (
-                                                    <div className="space-y-3">
-                                                        <div className="flex items-center gap-3">
-                                                            <ListItem
-                                                                className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
-                                                                icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.from?.type)}</div>}
-                                                                title={detail.transferAccounts.from?.name || "Conta de origem"}
-                                                                description={transferAccountTypeLabel(detail.transferAccounts.from?.type)}
-                                                                right={
-                                                                    <span className="font-bold text-sm text-brand-red shrink-0">
-                                                                        - {formatCurrency(detail.transferAccounts.amount)}
-                                                                    </span>
-                                                                }
-                                                            />
-                                                            <div className="h-10 border-r border-brand-border dark:border-dark-border" />
-                                                            <ListItem
-                                                                className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
-                                                                icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.to?.type)}</div>}
-                                                                title={detail.transferAccounts.to?.name || "Conta de destino"}
-                                                                description={transferAccountTypeLabel(detail.transferAccounts.to?.type)}
-                                                                right={
-                                                                    <span className="font-bold text-sm text-brand-green shrink-0">
-                                                                        + {formatCurrency(detail.transferAccounts.amount)}
-                                                                    </span>
-                                                                }
-                                                            />
+                                            )}
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                                                <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex justify-between items-center flex-wrap gap-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Tipo:</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{detail.typeBannerLabel}</span>
+                                                        </div>
+                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium md:text-right">
+                                                            Origem: <strong className="text-brand-dark dark:text-dark-heading">{detail.originLabel}</strong>
                                                         </div>
                                                     </div>
-                                                ) : detail.transactionDetailKind === "manual_entry" ? (
-                                                    detail.items.map((item) => (
-                                                        <ListItem
-                                                            key={item.id}
-                                                            className="cursor-default"
-                                                            icon={manualEntryIcon}
-                                                            title={item.sku || item.title}
-                                                            right={
-                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
-                                                                    {formatCurrency(item.lineTotal)}
-                                                                </span>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-dark-surface px-8 md:px-12 pt-12 pb-12">
+                                                    <div className="relative px-4">
+                                                        <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                            <div
+                                                                className={`absolute left-0 h-full rounded-full transition-all duration-500 ${detail.timeline.step2.danger ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                style={{ width: `${progressPct}%` }}
+                                                            ></div>
+
+                                                            {timelineSteps.map((step, idx) => (
+                                                                <div key={idx} className="relative flex flex-col items-center">
+                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                        <span
+                                                                            className={`text-xs font-medium ${step.active
+                                                                                ? step.danger
+                                                                                    ? "text-brand-red"
+                                                                                    : "text-brand-dark dark:text-dark-heading"
+                                                                                : "text-gray-400 dark:text-dark-body"
+                                                                                }`}
+                                                                        >
+                                                                            {step.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div
+                                                                        className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active
+                                                                            ? step.danger
+                                                                                ? "bg-brand-red border-brand-red"
+                                                                                : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading"
+                                                                            : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"
+                                                                            }`}
+                                                                    >
+                                                                        {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                    </div>
+                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                        {step.date ? (
+                                                                            <div className="flex items-center gap-1 text-xs text-brand-inactive-text">
+                                                                                <span>{step.date}</span>
+                                                                                {step.time && <span>{step.time}</span>}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-8">
+                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
+                                                    {detail.installmentBreakdown?.length ? "Parcelas da transação" : "Itens da Transação"}
+                                                </h3>
+                                                <div className="space-y-4">
+                                                    {detail.installmentBreakdown?.length ? (
+                                                        <InstallmentParcelsTable
+                                                            rows={
+                                                                detail.installmentBreakdown.map(
+                                                                    (row): InstallmentParcelRow => ({
+                                                                        id: row.id,
+                                                                        installmentNumber: row.installmentNumber,
+                                                                        totalCount: row.totalCount,
+                                                                        status: row.status,
+                                                                        originalAmount: row.originalAmount,
+                                                                        paidAmount: row.paidAmount,
+                                                                        interestAmount: row.interestAmount,
+                                                                        discountAmount: row.discountAmount,
+                                                                        dueDate: row.dueDate,
+                                                                        finalizationDate: row.paymentDate,
+                                                                        paymentType: row.paymentType,
+                                                                        reason: detail.categoryLine,
+                                                                        reference: detail.headerTitle,
+                                                                    }),
+                                                                )
                                                             }
                                                         />
-                                                    ))
-                                                ) : (
-                                                    detail.items.map((item) => (
-                                                        <div key={item.id} className="flex items-start gap-4">
-                                                            {!detail.transactionItemsCompact && (
-                                                                <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                        className="w-full h-full object-cover rounded-xl"
-                                                                        alt={item.title}
-                                                                        onError={(e: any) => {
-                                                                            e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start mb-1 gap-3">
-                                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
+                                                    ) : detail.transactionDetailKind === "transfer" && detail.transferAccounts ? (
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <ListItem
+                                                                    className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
+                                                                    icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.from?.type)}</div>}
+                                                                    title={detail.transferAccounts.from?.name || "Conta de origem"}
+                                                                    description={transferAccountTypeLabel(detail.transferAccounts.from?.type)}
+                                                                    right={
+                                                                        <span className="font-bold text-sm text-brand-red shrink-0">
+                                                                            - {formatCurrency(detail.transferAccounts.amount)}
+                                                                        </span>
+                                                                    }
+                                                                />
+                                                                <div className="h-10 border-r border-brand-border dark:border-dark-border" />
+                                                                <ListItem
+                                                                    className="border-0 px-0 py-0 rounded-none bg-transparent hover:border-transparent hover:bg-transparent flex-1 cursor-default"
+                                                                    icon={<div className="w-5 h-5">{transferAccountIcon(detail.transferAccounts.to?.type)}</div>}
+                                                                    title={detail.transferAccounts.to?.name || "Conta de destino"}
+                                                                    description={transferAccountTypeLabel(detail.transferAccounts.to?.type)}
+                                                                    right={
+                                                                        <span className="font-bold text-sm text-brand-green shrink-0">
+                                                                            + {formatCurrency(detail.transferAccounts.amount)}
+                                                                        </span>
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    ) : detail.transactionDetailKind === "manual_entry" ? (
+                                                        detail.items.map((item) => (
+                                                            <ListItem
+                                                                key={item.id}
+                                                                className="cursor-default"
+                                                                icon={manualEntryIcon}
+                                                                title={item.sku || item.title}
+                                                                right={
                                                                     <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
                                                                         {formatCurrency(item.lineTotal)}
                                                                     </span>
-                                                                </div>
+                                                                }
+                                                            />
+                                                        ))
+                                                    ) : (
+                                                        detail.items.map((item) => (
+                                                            <div key={item.id} className="flex items-start gap-4">
                                                                 {!detail.transactionItemsCompact && (
-                                                                    <>
-                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
-                                                                        <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                            <span>
-                                                                                {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
-                                                                            </span>
-                                                                        </div>
-                                                                    </>
+                                                                    <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                        <img
+                                                                            src={item.image ? getR2ImageUrl(item.image, "thumbnail") : "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                            className="w-full h-full object-cover rounded-xl"
+                                                                            alt={item.title}
+                                                                            onError={(e: any) => {
+                                                                                e.target.src = "https://img.dudit.com.br/static/Placeholder.png"
+                                                                            }}
+                                                                        />
+                                                                    </div>
                                                                 )}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-1 gap-3">
+                                                                        <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.title}</h4>
+                                                                        <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading shrink-0">
+                                                                            {formatCurrency(item.lineTotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                    {!detail.transactionItemsCompact && (
+                                                                        <>
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku}</div>
+                                                                            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                                <span>
+                                                                                    {item.quantity} un. • {formatCurrency(item.unitPrice)} / un.
+                                                                                </span>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))
-                                                )}
+                                                        ))
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="mt-8">
-                                            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes da Transação</h3>
-                                            <div className="space-y-3">
-                                                <PaymentRow label="Categoria" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.categoryLine}</span>} />
-                                                {detail.subcategoryLine && (
+                                            <div className="mt-8">
+                                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes da Transação</h3>
+                                                <div className="space-y-3">
+                                                    <PaymentRow label="Categoria" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.categoryLine}</span>} />
+                                                    {detail.subcategoryLine && (
+                                                        <PaymentRow
+                                                            label="Subcategoria"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.subcategoryLine}</span>}
+                                                        />
+                                                    )}
                                                     <PaymentRow
-                                                        label="Subcategoria"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.subcategoryLine}</span>}
-                                                    />
-                                                )}
-                                                <PaymentRow
-                                                    label="Conta"
-                                                    value={
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
-                                                    }
-                                                />
-                                                {detail.salesSummary && (
-                                                    <PaymentRow
-                                                        label="Subtotal da venda"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.subtotal)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.manualDiscount > 0 && (
-                                                    <PaymentRow
-                                                        label="Desconto"
-                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.manualDiscount)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.couponDiscount > 0 && (
-                                                    <PaymentRow
-                                                        label="Desconto por cupom"
-                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.couponDiscount)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.paymentMethodDiscount > 0 && (
-                                                    <PaymentRow
-                                                        label="Desconto por método"
-                                                        value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.paymentMethodDiscount)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.paymentMethodExtra > 0 && (
-                                                    <PaymentRow
-                                                        label="Acréscimo do método"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detail.salesSummary.paymentMethodExtra)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.deliveryFee > 0 && (
-                                                    <PaymentRow
-                                                        label="Entrega"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.deliveryFee)}</span>}
-                                                    />
-                                                )}
-                                                {detail.salesSummary && detail.salesSummary.additionalCosts > 0 && (
-                                                    <PaymentRow
-                                                        label="Outros custos"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.additionalCosts)}</span>}
-                                                    />
-                                                )}
-                                                {detail.showDueDateRow && (
-                                                    <PaymentRow
-                                                        label="Data de vencimento"
+                                                        label="Conta"
                                                         value={
-                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                {detail.dueDateLine || "-"}
-                                                            </span>
+                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.accountLine || "-"}</span>
                                                         }
                                                     />
-                                                )}
-                                                {detail.paymentDateLine && (
-                                                    <PaymentRow
-                                                        label={detail.paymentDateRowLabel || "Data de pagamento"}
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.paymentDateLine}</span>}
-                                                    />
-                                                )}
-                                                {detail.goalBonusDetails && (
-                                                    <>
+                                                    {detail.salesSummary && (
                                                         <PaymentRow
-                                                            label="Meta"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.goalName}</span>}
+                                                            label="Subtotal da venda"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.subtotal)}</span>}
                                                         />
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.manualDiscount > 0 && (
                                                         <PaymentRow
-                                                            label="Pago para"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.paidToUserNames.join(", ") || "-"}</span>}
+                                                            label="Desconto"
+                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.manualDiscount)}</span>}
                                                         />
-                                                        {detail.goalBonusDetails.achievedAt && (
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.couponDiscount > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto por cupom"
+                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.couponDiscount)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.paymentMethodDiscount > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto por método"
+                                                            value={<span className="text-brand-red font-bold text-sm">- {formatCurrency(detail.salesSummary.paymentMethodDiscount)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.paymentMethodExtra > 0 && (
+                                                        <PaymentRow
+                                                            label="Acréscimo do método"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detail.salesSummary.paymentMethodExtra)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.deliveryFee > 0 && (
+                                                        <PaymentRow
+                                                            label="Entrega"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.deliveryFee)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.salesSummary && detail.salesSummary.additionalCosts > 0 && (
+                                                        <PaymentRow
+                                                            label="Outros custos"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.salesSummary.additionalCosts)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.showDueDateRow && (
+                                                        <PaymentRow
+                                                            label="Data de vencimento"
+                                                            value={
+                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                    {detail.dueDateLine || "-"}
+                                                                </span>
+                                                            }
+                                                        />
+                                                    )}
+                                                    {detail.paymentDateLine && (
+                                                        <PaymentRow
+                                                            label={detail.paymentDateRowLabel || "Data de pagamento"}
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.paymentDateLine}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.goalBonusDetails && (
+                                                        <>
                                                             <PaymentRow
-                                                                label="Meta batida em"
-                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.achievedAt}</span>}
+                                                                label="Meta"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.goalName}</span>}
                                                             />
-                                                        )}
-                                                    </>
-                                                )}
-                                                {detail.notesLine && (
-                                                    <PaymentRow
-                                                        label="Observações"
-                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm whitespace-pre-wrap">{detail.notesLine}</span>}
-                                                    />
-                                                )}
-                                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
-                                                    <span
-                                                        className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
-                                                    >
-                                                        {detail.ledgerDirection === "in" ? "+ " : "- "}
-                                                        {formatCurrency(detail.amount)}
-                                                    </span>
+                                                            <PaymentRow
+                                                                label="Pago para"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.paidToUserNames.join(", ") || "-"}</span>}
+                                                            />
+                                                            {detail.goalBonusDetails.achievedAt && (
+                                                                <PaymentRow
+                                                                    label="Meta batida em"
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{detail.goalBonusDetails.achievedAt}</span>}
+                                                                />
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {detail.notesLine && (
+                                                        <PaymentRow
+                                                            label="Observações"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm whitespace-pre-wrap">{detail.notesLine}</span>}
+                                                        />
+                                                    )}
+                                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
+                                                        <span
+                                                            className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
+                                                        >
+                                                            {detail.ledgerDirection === "in" ? "+ " : "- "}
+                                                            {formatCurrency(detail.amount)}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        {isCancelled && (
-                                            <InfoCard
-                                                title="Transação cancelada"
-                                                message={detail.notesLine || "Esta transação foi cancelada."}
-                                                color="orange"
-                                            />
-                                        )}
-                                        {detail.goalBonusDetails ? (
-                                            <TransactionGoalCard
-                                                goalName={detail.goalBonusDetails.goalName}
-                                                paidTo={detail.goalBonusDetails.paidToUserNames}
-                                                achievedAt={detail.goalBonusDetails.achievedAt}
-                                                amount={detail.amount}
-                                            />
-                                        ) : detail.contactCard.isCustomer ? (
-                                            <CustomerCard
-                                                customer={{
-                                                    name: detail.contactCard.name,
-                                                    email: detail.contactCard.email ?? undefined,
-                                                    phone: detail.contactCard.phone ?? undefined,
-                                                }}
-                                                showMap={false}
-                                            />
-                                        ) : (
-                                            <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
-                                        )}
+                                        <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                            {isCancelled && (
+                                                <InfoCard
+                                                    title="Transação cancelada"
+                                                    message={detail.notesLine || "Esta transação foi cancelada."}
+                                                    color="orange"
+                                                />
+                                            )}
+                                            {detail.goalBonusDetails ? (
+                                                <TransactionGoalCard
+                                                    goalName={detail.goalBonusDetails.goalName}
+                                                    paidTo={detail.goalBonusDetails.paidToUserNames}
+                                                    achievedAt={detail.goalBonusDetails.achievedAt}
+                                                    amount={detail.amount}
+                                                />
+                                            ) : detail.contactCard.isCustomer ? (
+                                                <div className="hidden xl:block">
+                                                    <CustomerCard
+                                                        customer={{
+                                                            name: detail.contactCard.name,
+                                                            email: detail.contactCard.email ?? undefined,
+                                                            phone: detail.contactCard.phone ?? undefined,
+                                                        }}
+                                                        showMap={false}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="hidden xl:block">
+                                                    <TransactionContactCard title={detail.contactCard.title} name={detail.contactCard.name} />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </TabsContent>
+                                </TabsContent>
 
-                            <TabsContent value="history" className="mt-0">
-                                <TransactionHistoryTab entries={historyEntries} loading={historyLoading} />
-                            </TabsContent>
-                        </Tabs>
+                                <TabsContent value="history" className="mt-0">
+                                    <TransactionHistoryTab entries={historyEntries} loading={historyLoading} />
+                                </TabsContent>
+                            </Tabs>
+                        </div>
                     </div>
-                </div>
 
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                    <ActionsDropdown
-                        onPrint={() => window.print()}
-                        onShare={() => { }}
-                        trigger={
-                            <Button variant="outline" className="flex-1">
-                                <ThreeDotsIcon className="w-4 h-4 mr-2" />
-                                Opções
+                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                        <ActionsDropdown
+                            onPrint={() => window.print()}
+                            onShare={() => { }}
+                            trigger={
+                                <Button variant="outline" className="flex-1">
+                                    <ThreeDotsIcon className="w-4 h-4 mr-2" />
+                                    Opções
+                                </Button>
+                            }
+                        />
+                        {detail.canEdit && (
+                            <Button onClick={() => onEdit(transactionId)} className="flex-1 whitespace-nowrap">
+                                <EditIcon className="w-4 h-4 mr-2" />
+                                Editar
                             </Button>
-                        }
-                    />
-                    {detail.canEdit && (
-                        <Button onClick={() => onEdit(transactionId)} className="flex-1 whitespace-nowrap">
-                            <EditIcon className="w-4 h-4 mr-2" />
-                            Editar
-                        </Button>
-                    )}
-                </div>
-            </Tabs>
+                        )}
+                    </div>
+                </Tabs>
+                <BottomSheet
+                    isOpen={isContactSheetOpen}
+                    onClose={() => setIsContactSheetOpen(false)}
+                    title={detail.contactCard?.isCustomer ? "Detalhes do Cliente" : "Detalhes do Contato"}
+                >
+                    <div className="pt-2">
+                        {detail.contactCard?.isCustomer ? (
+                            <CustomerCard
+                                customer={{
+                                    name: detail.contactCard.name,
+                                    email: detail.contactCard.email ?? undefined,
+                                    phone: detail.contactCard.phone ?? undefined,
+                                }}
+                                showMap={false}
+                            />
+                        ) : (
+                            <TransactionContactCard title={detail.contactCard?.title} name={detail.contactCard?.name} />
+                        )}
+                    </div>
+                </BottomSheet>
+            </div>
         </FadeIn>
     )
 }
-

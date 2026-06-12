@@ -33,16 +33,23 @@ DECLARE
     v_settled       INT := 0;
     v_payments_created INT := 0;
     v_idem_key      TEXT;
-    v_tx_ids_to_mark UUID[] := '{}';
     v_account_ids   UUID[] := '{}';
     v_account_deltas NUMERIC[] := '{}';
     v_acc_idx       INT;
+    v_resolved_account_id UUID;
+    v_pm_id         UUID;
+    v_pm_name       TEXT;
+    v_pm_type       TEXT;
+    v_pm_label      TEXT;
+    v_paid_cash_so_far NUMERIC;
+    v_total_paid_cash  NUMERIC;
+    v_total_interest   NUMERIC;
 BEGIN
     -- STEP 1: Lock and fetch pending transactions for this group
     -- Using FOR UPDATE guarantees no other transaction can settle these rows concurrently
     FOR v_row IN
         SELECT
-            t.id, t.status, t.amount, t.original_amount, t.transaction_type, t.refund_kind, t.account_id,
+            t.id, t.status, t.amount, t.original_amount, t.transaction_type, t.refund_kind, t.account_id, t.payment_method_id, t.payment_type, t.interest_amount,
             COALESCE(
                 (SELECT SUM(COALESCE(tp.base_amount, tp.amount, 0))
                  FROM transaction_payments tp
@@ -62,7 +69,12 @@ BEGIN
 
         -- Extra safeguard: if remaining is 0 but it wasn't marked paid, mark it and skip payment logic
         IF v_remaining <= 0 THEN
-            v_tx_ids_to_mark := array_append(v_tx_ids_to_mark, v_row.id);
+            UPDATE transactions
+            SET status = 'paid',
+                payment_date = v_now,
+                updated_at = v_now
+            WHERE id = v_row.id AND partner_id = p_partner_id;
+            v_settled := v_settled + 1;
             CONTINUE;
         END IF;
 
@@ -90,19 +102,91 @@ BEGIN
         -- Will throw unique constraint violation if called twice for the same transaction
         v_idem_key := 'settle:' || p_installment_group_id || ':' || v_row.id;
 
+        v_pm_id := NULL;
+        IF v_custom IS NOT NULL THEN
+            v_pm_id := (v_custom->>'paymentMethodId')::UUID;
+        END IF;
+        IF v_pm_id IS NULL THEN
+            v_pm_id := v_row.payment_method_id;
+        END IF;
+
         INSERT INTO transaction_payments (
             partner_id, transaction_id, amount, base_amount,
             interest_amount, discount_amount, payment_method_id,
             created_by_user_id, created_at, idempotency_key
         ) VALUES (
             p_partner_id, v_row.id, v_final_paid, v_base_applied, v_interest, v_discount,
-            CASE WHEN v_custom IS NOT NULL THEN (v_custom->>'paymentMethodId')::UUID ELSE NULL END,
+            v_pm_id,
             p_user_id, v_now, v_idem_key
         );
         v_payments_created := v_payments_created + 1;
 
         -- STEP 3: Aggregate Balance Deltas In-Memory
-        IF v_row.account_id IS NOT NULL THEN
+        v_resolved_account_id := v_row.account_id;
+        IF v_resolved_account_id IS NULL AND v_pm_id IS NOT NULL THEN
+            SELECT default_finance_account_id INTO v_resolved_account_id
+            FROM payment_methods
+            WHERE id = v_pm_id AND partner_id = p_partner_id;
+        END IF;
+
+        -- Format display label
+        v_pm_name := NULL;
+        v_pm_type := NULL;
+        v_pm_label := NULL;
+        IF v_pm_id IS NOT NULL THEN
+            SELECT name, payment_type INTO v_pm_name, v_pm_type
+            FROM payment_methods
+            WHERE id = v_pm_id AND partner_id = p_partner_id;
+            
+            IF v_pm_name IS NOT NULL THEN
+                v_pm_name := TRIM(v_pm_name);
+                v_pm_type := TRIM(COALESCE(v_pm_type, ''));
+                
+                IF v_pm_type = '' THEN
+                    v_pm_label := INITCAP(v_pm_name);
+                ELSIF LOWER(v_pm_name) = LOWER(v_pm_type) THEN
+                    v_pm_label := INITCAP(v_pm_type);
+                ELSE
+                    v_pm_label := INITCAP(v_pm_name) || ' (' || INITCAP(v_pm_type) || ')';
+                END IF;
+            END IF;
+        END IF;
+
+        -- Calculate total cash paid and interest paid
+        SELECT COALESCE(SUM(tp.amount), 0) INTO v_total_paid_cash
+        FROM transaction_payments tp
+        WHERE tp.transaction_id = v_row.id AND tp.partner_id = p_partner_id;
+
+        SELECT COALESCE(SUM(tp.interest_amount), 0) INTO v_total_interest
+        FROM transaction_payments tp
+        WHERE tp.transaction_id = v_row.id AND tp.partner_id = p_partner_id;
+
+        IF (v_paid_so_far + v_base_applied + 0.0001) >= v_original THEN
+            -- Fully Paid
+            UPDATE transactions
+            SET status = 'paid',
+                payment_date = v_now,
+                updated_at = v_now,
+                account_id = COALESCE(v_resolved_account_id, account_id),
+                payment_method_id = COALESCE(v_pm_id, payment_method_id),
+                payment_type = COALESCE(v_pm_label, payment_type),
+                interest_amount = CASE WHEN v_total_interest > 0 THEN v_total_interest ELSE interest_amount END,
+                amount = CASE WHEN v_total_paid_cash > 0 THEN v_total_paid_cash ELSE amount END
+            WHERE id = v_row.id AND partner_id = p_partner_id;
+            
+            v_settled := v_settled + 1;
+        ELSE
+            -- Partially Paid
+            UPDATE transactions
+            SET account_id = COALESCE(v_resolved_account_id, account_id),
+                payment_method_id = COALESCE(v_pm_id, payment_method_id),
+                payment_type = COALESCE(v_pm_label, payment_type),
+                interest_amount = CASE WHEN v_total_interest > 0 THEN v_total_interest ELSE interest_amount END,
+                updated_at = v_now
+            WHERE id = v_row.id AND partner_id = p_partner_id;
+        END IF;
+
+        IF v_resolved_account_id IS NOT NULL THEN
             v_delta := 0;
             IF v_row.transaction_type = 'income' THEN v_delta := ABS(v_final_paid);
             ELSIF v_row.transaction_type = 'expense' THEN v_delta := -ABS(v_final_paid);
@@ -115,19 +199,14 @@ BEGIN
 
             v_delta := ROUND(v_delta, 2);
             IF v_delta <> 0 THEN
-                v_acc_idx := array_position(v_account_ids, v_row.account_id);
+                v_acc_idx := array_position(v_account_ids, v_resolved_account_id);
                 IF v_acc_idx IS NULL THEN
-                    v_account_ids := array_append(v_account_ids, v_row.account_id);
+                    v_account_ids := array_append(v_account_ids, v_resolved_account_id);
                     v_account_deltas := array_append(v_account_deltas, v_delta);
                 ELSE
                     v_account_deltas[v_acc_idx] := v_account_deltas[v_acc_idx] + v_delta;
                 END IF;
             END IF;
-        END IF;
-
-        -- Check if transaction is fully paid after this payment
-        IF (v_paid_so_far + v_base_applied + 0.0001) >= v_original THEN
-            v_tx_ids_to_mark := array_append(v_tx_ids_to_mark, v_row.id);
         END IF;
         
         v_affected := v_affected + 1;
@@ -149,18 +228,6 @@ BEGIN
                 END IF;
             END IF;
         END LOOP;
-    END IF;
-
-    -- STEP 5: Update Statuses
-    IF array_length(v_tx_ids_to_mark, 1) > 0 THEN
-        UPDATE transactions
-        SET status = 'paid', 
-            payment_date = v_now, 
-            updated_at = v_now
-        WHERE partner_id = p_partner_id 
-          AND id = ANY(v_tx_ids_to_mark);
-          
-        v_settled := array_length(v_tx_ids_to_mark, 1);
     END IF;
 
     RETURN jsonb_build_object(

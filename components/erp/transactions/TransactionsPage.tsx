@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Checkbox, IconPlaceholder, Badge, DropdownItem, FormDropdown, MoneyInput, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown, DropdownItem, SavingStatusModal } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -11,30 +11,14 @@ import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency } from "@/lib/utils"
 import { diffCalendarDaysInSaoPaulo, formatBrazilDateFromDbInput } from "@/lib/utils/formatters"
-import {
-    PlusIcon,
-    ExportFileIcon,
-    ArrowUpDownIcon,
-    CreditCardIcon,
-    FileIcon,
-    MoneyIcon,
-    EditIcon,
-    ClockIcon,
-    InstallmentIcon,
-    CheckCircleIcon,
-    CashierIcon,
-} from "@/lib/icons"
+import { PlusIcon, ExportFileIcon, ArrowUpDownIcon, CreditCardIcon, FileIcon, MoneyIcon, EditIcon, ClockIcon, InstallmentIcon, CheckCircleIcon, CashierIcon, SaveIcon, AlertTriangleIcon, } from "@/lib/icons"
 import TransactionPageControls from "./TransactionPageControls"
 import TransactionListItem from "./TransactionListRow"
 import TransactionGridCard from "./TransactionGridCard"
 import CreateTransactionPage, { type CategoryItem, type AccountItem } from "./CreateTransactionPage"
 import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
-import type {
-    ERPTransaction,
-    FinancialTransactionCursor,
-    TransactionTab,
-} from "@/lib/services/transactions.types"
+import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
 import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
@@ -44,7 +28,6 @@ import { getFinancialTransactionsAction, getTransactionDetailsAction, type Trans
 import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
-
 import { useNotification } from "@/hooks/use-notification"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -120,10 +103,10 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "category", label: "Categoria", align: "left", width: "170px" },
     { id: "originSource", label: "Origem", align: "left", width: "150px" },
     { id: "contact", label: "Contato", align: "left", width: "220px" },
-    { id: "date", label: "Data", align: "left", width: "170px" },
-    { id: "dueDate", label: "Vencimento", align: "left", width: "170px" },
-    { id: "amount", label: "Valor", align: "right", width: "160px" },
-    { id: "status", label: "Status", align: "center", width: "150px" },
+    { id: "date", label: "Data", align: "left", width: "130px" },
+    { id: "dueDate", label: "Vencimento", align: "left", width: "130px" },
+    { id: "amount", label: "Valor", align: "right", width: "100px" },
+    { id: "status", label: "Status", align: "center", width: "100px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -204,6 +187,7 @@ export default function TransactionsPage({
     const [settlingGroup, setSettlingGroup] = useState(false)
     const [confirmRegularMarkAsPaid, setConfirmRegularMarkAsPaid] = useState<ERPTransaction | null>(null)
     const [markingRegularAsPaid, setMarkingRegularAsPaid] = useState(false)
+    const isScrolled = false
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const entityPage = useEntityPage<ERPTransaction, TransactionDetailPayload, FinancialTransactionCursor>({
@@ -312,6 +296,9 @@ export default function TransactionsPage({
         }
         return Math.round(acc * 100) / 100
     }, [confirmSettleGroup, installmentDetail, settlePaymentsByInstallment, settleSummary?.totalToSettle])
+
+    const SETTLE_PAGE_SIZE = 10
+    const [settleInstallmentPage, setSettleInstallmentPage] = useState(1)
 
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -931,9 +918,10 @@ export default function TransactionsPage({
                 }
             }
             setSettlePaymentsByInstallment(nextState)
+            setSettleInstallmentPage(1)
             setConfirmSettleGroup(transaction)
         },
-        [installmentDetail, resolvedPaymentMethods, partnerId, notifyError],
+        [installmentDetail, resolvedPaymentMethods, partnerId, notifyError, setSettleInstallmentPage],
     )
 
     const handleConfirmSettleInstallmentGroup = useCallback(async () => {
@@ -1098,12 +1086,11 @@ export default function TransactionsPage({
                             <p className="text-sm text-brand-inactive-text">
                                 Esta ação marca a transação como cancelada e salva o histórico automaticamente.
                             </p>
-                            <div className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-3 text-sm">
-                                <p className="font-semibold text-brand-dark dark:text-dark-heading">{confirmCancelTransaction.description}</p>
-                                <p className="text-brand-inactive-text mt-1">
-                                    Valor: {formatCurrency(confirmCancelTransaction.amount)} • Status atual: {confirmCancelTransaction.status}
-                                </p>
-                            </div>
+                            <InfoCard
+                                title={confirmCancelTransaction.description}
+                                message={`Valor: ${formatCurrency(confirmCancelTransaction.amount)} • Status atual: ${confirmCancelTransaction.status}`}
+                                color="red"
+                            />
                             <div className="space-y-1">
                                 <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo (opcional)</label>
                                 <textarea
@@ -1288,6 +1275,27 @@ export default function TransactionsPage({
                         </div>
                     ) : null}
                 </DefaultModal>
+
+                <SavingStatusModal
+                    isOpen={
+                        settlingGroup ||
+                        payingInstallment ||
+                        markingAsPaid ||
+                        markingRegularAsPaid ||
+                        cancellingTransaction
+                    }
+                    text={
+                        settlingGroup
+                            ? "Quitando parcelas..."
+                            : payingInstallment
+                            ? "Registrando pagamento da parcela..."
+                            : markingAsPaid || markingRegularAsPaid
+                            ? "Registrando pagamento..."
+                            : cancellingTransaction
+                            ? "Cancelando transação..."
+                            : "Salvando..."
+                    }
+                />
             </>
         )
     }
@@ -1331,30 +1339,67 @@ export default function TransactionsPage({
         const pending = Math.max(0, total - paid)
         const pendingInstallments = rows.filter((row: any) => row.status !== "paid")
         const pendingCount = pendingInstallments.length
+        const settleTotalPages = Math.max(1, Math.ceil(pendingCount / SETTLE_PAGE_SIZE))
+        const settlePageClamped = Math.min(settleInstallmentPage, settleTotalPages)
+        const paginatedPendingInstallments = pendingInstallments.slice(
+            (settlePageClamped - 1) * SETTLE_PAGE_SIZE,
+            settlePageClamped * SETTLE_PAGE_SIZE
+        )
 
         return (
             <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
                 {/* Sticky Header */}
                 <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out px-4 md:px-6">
-                    <div className="max-w-[1300px] mx-auto flex items-center justify-between py-4">
-                        <div className="flex items-center gap-3">
-                            <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                    <div className="max-w-[1300px] mx-auto relative md:pt-4">
+
+                        {/* Back button - desktop only */}
+                        <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 scale-100">
+                            <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
+                        </div>
+
+                        {/* Title row */}
+                        <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1 className="font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 text-xl md:text-3xl">
+                                <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     <span className="truncate">Quitar todas as parcelas</span>
                                 </h1>
-                                <div className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden max-h-20">
+                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                     Grupo: {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
                                 </div>
+                            </div>
+
+                            {/* Desktop action buttons */}
+                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />}>
+                                    Confirmar quitação
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Mobile Title row */}
+                        <div className="flex md:hidden items-center gap-3 py-3">
+                            <Button variant="filled" onClick={() => setConfirmSettleGroup(null)} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
+                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                            </Button>
+                            <div className="flex flex-col gap-0.5 overflow-hidden min-w-0">
+                                <h1 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                                    Quitar todas as parcelas
+                                </h1>
+                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                    {confirmSettleGroup.installmentGroupDescription || confirmSettleGroup.installmentGroupId}
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Scrollable Body */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-[1300px] mx-auto w-full custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-[1300px] mx-auto w-full custom-scrollbar pb-24 md:pb-6">
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
@@ -1429,121 +1474,130 @@ export default function TransactionsPage({
                     </div>
 
                     {/* Table / List Container */}
-                    <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 md:p-6">
-                        <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Parcelas pendentes</h2>
-
+                    <FormSection hasSeparator title="Parcelas pendentes">
                         {pendingInstallments.length === 0 ? (
-                            <p className="text-sm text-brand-inactive-text">Nenhuma parcela pendente encontrada neste grupo.</p>
+                            <IconPlaceholder
+                                icon={InstallmentIcon}
+                                title="Nenhuma parcela pendente encontrada neste grupo."
+                                subtitle="Nenhuma parcela pendente encontrada neste grupo. Verifique se as parcelas não foram pagas ou canceladas." />
                         ) : (
                             <>
                                 {/* Desktop Table */}
-                                <div className="hidden md:block overflow-x-auto">
-                                    <table className="w-full text-left border-separate border-spacing-0">
-                                        <thead>
-                                            <tr className="bg-brand-gray dark:bg-dark-border/30 text-brand-inactive-text uppercase text-[10px] font-bold tracking-wider">
-                                                <th className="py-3 px-4 rounded-l-lg">Parcela</th>
-                                                <th className="py-3 px-4">Vencimento</th>
-                                                <th className="py-3 px-4">Restante</th>
-                                                <th className="py-3 px-4 w-40">Valor Pagamento</th>
-                                                <th className="py-3 px-4 w-44">Meio de Pagamento</th>
-                                                <th className="py-3 px-4 w-28">Juros</th>
-                                                <th className="py-3 px-4 w-28">Desconto</th>
-                                                <th className="py-3 px-4 rounded-r-lg text-right">Total a Pagar</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                            {pendingInstallments.map((row: any) => {
-                                                const values = settlePaymentsByInstallment[row.id] || {
-                                                    paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
-                                                    interestAmount: "0",
-                                                    discountAmount: "0",
-                                                    paymentMethodId: paymentMethods?.[0]?.id || "",
-                                                }
-                                                const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
-                                                return (
-                                                    <tr key={row.id} className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors">
-                                                        <td className="py-4 px-4 align-middle">
-                                                            <div className="font-semibold text-brand-dark dark:text-dark-heading text-sm">
-                                                                {row.description}
-                                                            </div>
-                                                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase tracking-wide mt-1 inline-block">
-                                                                Parcela {row.installmentNumber}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle text-sm text-brand-inactive-text">
-                                                            {row.dueDate || "-"}
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(Number(row.remainingAmount || 0))}
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={values.paymentAmount}
-                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, paymentAmount: e.target.value }
-                                                                }))}
-                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold transition-all focus:border-brand-primary outline-none"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle">
-                                                            <select
-                                                                value={values.paymentMethodId}
-                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, paymentMethodId: e.target.value }
-                                                                }))}
-                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
-                                                            >
-                                                                {(resolvedPaymentMethods || []).map((pm: any) => (
-                                                                    <option key={pm.id} value={pm.id}>{pm.name}</option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={values.interestAmount}
-                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, interestAmount: e.target.value }
-                                                                }))}
-                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle">
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={values.discountAmount}
-                                                                onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                    ...prev,
-                                                                    [row.id]: { ...values, discountAmount: e.target.value }
-                                                                }))}
-                                                                className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm transition-all focus:border-brand-primary outline-none"
-                                                            />
-                                                        </td>
-                                                        <td className="py-4 px-4 align-middle text-right">
-                                                            <span className="text-sm font-bold text-brand-green bg-brand-green/5 px-3 py-1 rounded-full border border-brand-green/10">
-                                                                {formatCurrency(finalPaid)}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
+                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1100px]">
+                                            <thead>
+                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                    <th className="py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Parcela</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Vencimento</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Restante</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "160px" }}>Valor Pagamento</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "176px" }}>Meio de Pagamento</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Juros</th>
+                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50" style={{ width: "112px" }}>Desconto</th>
+                                                    <th className="py-3 px-2 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-r-lg text-right">Total a Pagar</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {paginatedPendingInstallments.map((row: any) => {
+                                                    const values = settlePaymentsByInstallment[row.id] || {
+                                                        paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
+                                                        interestAmount: "0",
+                                                        discountAmount: "0",
+                                                        paymentMethodId: paymentMethods?.[0]?.id || "",
+                                                    }
+                                                    const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
+                                                    return (
+                                                        <motion.tr
+                                                            key={row.id}
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors bg-white dark:bg-dark-background"
+                                                        >
+                                                            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex flex-col text-left min-w-0">
+                                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate leading-tight">
+                                                                            {row.description}
+                                                                        </span>
+                                                                        <Badge variant="gray" className="whitespace-nowrap scale-90 shrink-0">
+                                                                            {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                                        </Badge>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                    {row.dueDate || "-"}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(Number(row.remainingAmount || 0))}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "160px" }}>
+                                                                <MoneyInput
+                                                                    value={Number(values.paymentAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, paymentAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "176px" }}>
+                                                                <FormDropdown
+                                                                    value={values.paymentMethodId}
+                                                                    setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, paymentMethodId: val }
+                                                                    }))}
+                                                                    options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                        value: pm.id,
+                                                                        label: pm.name,
+                                                                    }))}
+                                                                    placeholder="Selecione"
+                                                                />
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                <MoneyInput
+                                                                    value={Number(values.interestAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, interestAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border" style={{ width: "112px" }}>
+                                                                <MoneyInput
+                                                                    value={Number(values.discountAmount || 0)}
+                                                                    onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                        ...prev,
+                                                                        [row.id]: { ...values, discountAmount: String(value) }
+                                                                    }))}
+                                                                    min={0}
+                                                                />
+                                                            </td>
+                                                            <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-right">
+                                                                <div className="flex items-center justify-end">
+                                                                    <span className="text-[13px] font-bold whitespace-nowrap text-brand-green">
+                                                                        {formatCurrency(finalPaid)}
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                        </motion.tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
 
                                 {/* Mobile Stacked View */}
-                                <div className="md:hidden space-y-4 divide-y divide-brand-border dark:divide-dark-border">
-                                    {pendingInstallments.map((row: any) => {
+                                <div className="md:hidden space-y-3 pb-24">
+                                    {paginatedPendingInstallments.map((row: any) => {
                                         const values = settlePaymentsByInstallment[row.id] || {
                                             paymentAmount: String(Number(row.remainingAmount || 0).toFixed(2)),
                                             interestAmount: "0",
@@ -1552,110 +1606,120 @@ export default function TransactionsPage({
                                         }
                                         const finalPaid = Math.max(0, Number(values.paymentAmount || 0) + Number(values.interestAmount || 0) - Number(values.discountAmount || 0))
                                         return (
-                                            <div key={row.id} className="pt-4 first:pt-0 space-y-3">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <div className="font-semibold text-brand-dark dark:text-dark-heading text-sm">
-                                                            {row.description}
+                                            <motion.div
+                                                key={row.id}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 flex flex-col"
+                                            >
+                                                {/* Card Header */}
+                                                <div className="flex gap-3 mb-3">
+                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                        <InstallmentIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink">
+                                                                {row.description}
+                                                            </h3>
+                                                            <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90 shrink-0">
+                                                                {row.installmentNumber}/{row.totalCount || pendingInstallments.length}
+                                                            </Badge>
                                                         </div>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading uppercase">
-                                                                Parcela {row.installmentNumber}
-                                                            </span>
-                                                            <span className="text-[11px] text-brand-inactive-text">
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
                                                                 Venc: {row.dueDate || "-"}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase tracking-wider block">Restante</span>
-                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">{formatCurrency(Number(row.remainingAmount || 0))}</span>
-                                                    </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Valor Pagamento</label>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={values.paymentAmount}
-                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                ...prev,
-                                                                [row.id]: { ...values, paymentAmount: e.target.value }
-                                                            }))}
-                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm font-semibold focus:border-brand-primary outline-none"
-                                                        />
+                                                {/* Value section */}
+                                                <div className="border-t border-brand-border dark:border-dark-border pt-3 flex flex-col gap-3">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
+                                                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(Number(row.remainingAmount || 0))}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Meio</label>
-                                                        <select
+
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <MoneyInput
+                                                            label="Valor Pagamento"
+                                                            value={Number(values.paymentAmount || 0)}
+                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, paymentAmount: String(value) }
+                                                            }))}
+                                                            min={0}
+                                                        />
+                                                        <FormDropdown
+                                                            label="Meio de Pagamento"
                                                             value={values.paymentMethodId}
-                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                            setValue={(val: string) => setSettlePaymentsByInstallment((prev) => ({
                                                                 ...prev,
-                                                                [row.id]: { ...values, paymentMethodId: e.target.value }
+                                                                [row.id]: { ...values, paymentMethodId: val }
                                                             }))}
-                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-2 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
-                                                        >
-                                                            {(resolvedPaymentMethods || []).map((pm: any) => (
-                                                                <option key={pm.id} value={pm.id}>{pm.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Juros</label>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={values.interestAmount}
-                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
+                                                            options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                                value: pm.id,
+                                                                label: pm.name,
+                                                            }))}
+                                                            placeholder="Selecione"
+                                                        />
+                                                        <MoneyInput
+                                                            label="Juros"
+                                                            value={Number(values.interestAmount || 0)}
+                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
                                                                 ...prev,
-                                                                [row.id]: { ...values, interestAmount: e.target.value }
+                                                                [row.id]: { ...values, interestAmount: String(value) }
                                                             }))}
-                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
+                                                            min={0}
+                                                        />
+                                                        <MoneyInput
+                                                            label="Desconto"
+                                                            value={Number(values.discountAmount || 0)}
+                                                            onChange={(value) => setSettlePaymentsByInstallment((prev) => ({
+                                                                ...prev,
+                                                                [row.id]: { ...values, discountAmount: String(value) }
+                                                            }))}
+                                                            min={0}
                                                         />
                                                     </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[10px] font-bold text-brand-inactive-text uppercase">Desconto</label>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={values.discountAmount}
-                                                            onChange={(e) => setSettlePaymentsByInstallment((prev) => ({
-                                                                ...prev,
-                                                                [row.id]: { ...values, discountAmount: e.target.value }
-                                                            }))}
-                                                            className="w-full rounded-lg h-9 border border-brand-border dark:border-dark-border px-3 bg-white dark:bg-dark-surface/50 text-sm focus:border-brand-primary outline-none"
-                                                        />
-                                                    </div>
-                                                </div>
 
-                                                <div className="flex justify-between items-center bg-brand-green/5 px-3 py-2 rounded-lg border border-brand-green/10">
-                                                    <span className="text-xs font-semibold text-brand-inactive-text uppercase">Total a Pagar</span>
-                                                    <span className="text-sm font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
+                                                    <div className="flex justify-between items-center bg-brand-green/5 px-4 py-3 rounded-xl border border-brand-green/10">
+                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total a Pagar</span>
+                                                        <span className="text-[15px] font-bold text-brand-green">{formatCurrency(finalPaid)}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            </motion.div>
                                         )
                                     })}
                                 </div>
+
+                                {/* Pagination */}
+                                {pendingCount > SETTLE_PAGE_SIZE && (
+                                    <Pagination
+                                        currentPage={settlePageClamped}
+                                        totalPages={settleTotalPages}
+                                        onPageChange={setSettleInstallmentPage}
+                                        inline
+                                    />
+                                )}
                             </>
                         )}
-                    </div>
+                    </FormSection>
                 </div>
 
-                {/* Footer Action Buttons */}
-                <div className="border-t border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface px-4 py-3 md:px-6 md:py-4">
-                    <div className="max-w-[1300px] mx-auto flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup}>
-                            Confirmar quitação
-                        </Button>
-                    </div>
+                {/* Mobile Bottom Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                    <Button variant="outline" onClick={() => setConfirmSettleGroup(null)} disabled={settlingGroup} className="flex-1 h-12">
+                        Cancelar
+                    </Button>
+                    <Button onClick={() => void handleConfirmSettleInstallmentGroup()} disabled={settlingGroup} leftIcon={<SaveIcon size={18} />} className="flex-1 h-12">
+                        Confirmar quitação
+                    </Button>
                 </div>
 
                 {renderSharedModals()}
@@ -1699,7 +1763,7 @@ export default function TransactionsPage({
                             <p className="text-sm text-brand-inactive-text">Carregando parcelas...</p>
                         ) : installmentDetail ? (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {(() => {
                                         const total = Number(installmentDetail.group?.total_amount || 0)
                                         const rows = installmentDetail.installments || []
@@ -1708,18 +1772,54 @@ export default function TransactionsPage({
                                             .filter((row: any) => row.status === "overdue")
                                             .reduce((acc: number, row: any) => acc + Number(row.remainingAmount || 0), 0)
                                         const pending = Math.max(0, total - paid)
-                                        const cells = [
-                                            { label: "Total", value: total },
-                                            { label: "Pago", value: paid },
-                                            { label: "Restante", value: pending },
-                                            { label: "Vencido", value: overdue },
+                                        const cards = [
+                                            {
+                                                label: "Total",
+                                                value: total,
+                                                icon: FileIcon,
+                                                bg: "bg-indigo-50 dark:bg-indigo-950/20",
+                                                text: "text-indigo-600 dark:text-indigo-400",
+                                            },
+                                            {
+                                                label: "Pago",
+                                                value: paid,
+                                                icon: CheckCircleIcon,
+                                                bg: "bg-emerald-50 dark:bg-emerald-950/20",
+                                                text: "text-emerald-600 dark:text-emerald-400",
+                                            },
+                                            {
+                                                label: "Restante",
+                                                value: pending,
+                                                icon: ClockIcon,
+                                                bg: "bg-amber-50 dark:bg-amber-950/20",
+                                                text: "text-amber-600 dark:text-amber-400",
+                                            },
+                                            {
+                                                label: "Vencido",
+                                                value: overdue,
+                                                icon: AlertTriangleIcon,
+                                                bg: "bg-rose-50 dark:bg-rose-950/20",
+                                                text: "text-rose-600 dark:text-rose-400",
+                                            },
                                         ]
-                                        return cells.map((cell) => (
-                                            <div key={cell.label} className="rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                <p className="text-xs text-brand-inactive-text">{cell.label}</p>
-                                                <p className="text-base font-bold">{formatCurrency(cell.value)}</p>
-                                            </div>
-                                        ))
+                                        return cards.map((card) => {
+                                            const Icon = card.icon
+                                            return (
+                                                <div key={card.label} className="relative flex flex-col p-5 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl">
+                                                    <div className="flex items-center gap-3 mb-6">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${card.bg} ${card.text} shrink-0`}>
+                                                            <Icon className="w-5 h-5" />
+                                                        </div>
+                                                        <span className="text-[15px] font-medium text-brand-dark dark:text-dark-heading">
+                                                            {card.label}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+                                                        {formatCurrency(card.value)}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })
                                     })()}
                                 </div>
                                 <div className="mt-4 border-t border-brand-border dark:border-dark-border pt-2">
@@ -1745,10 +1845,11 @@ export default function TransactionsPage({
                                         }
                                         getActionsSlot={(row) =>
                                             row.status === "paid" ? null : (
-                                                <>
-                                                    <DropdownItem onClick={() => handleEditInstallment(row.id)}>Editar</DropdownItem>
-                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>Registrar pagamento</DropdownItem>
-                                                </>
+                                                <ActionsDropdown>
+                                                    <DropdownItem onClick={() => void handlePayInstallment(row.id)}>
+                                                        <MoneyIcon className="w-4 h-4" /> Registrar pagamento
+                                                    </DropdownItem>
+                                                </ActionsDropdown>
                                             )
                                         }
                                     />

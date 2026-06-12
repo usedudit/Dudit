@@ -4,14 +4,12 @@ import type React from "react"
 import { useState, useMemo, useEffect } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, Barcode, FormSection } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
-import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { RichTextEditor } from "@/components/reusable"
-import { MarketplaceMetricsReadOnly } from "@/components/erp/marketplace/MarketplaceMetricsReadOnly"
 
 const FormCombobox = ({
     label,
@@ -162,10 +160,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 />
                             </div>
                         </div>
-
-                        {productData.id && showInMarketplaceValue === "true" && (
-                            <MarketplaceMetricsReadOnly entityType="product" metrics={productData} />
-                        )}
                     </div>
                 </FormSection>
 
@@ -214,17 +208,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </div>
                     )}
 
-                    {showPrice && !isQuickMode && (
-                        <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 md:p-6 mb-6 bg-white dark:bg-dark-surface">
-                            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-brand-border dark:divide-dark-border gap-6 sm:gap-0">
-                                <div className="flex-1 px-4 first:pl-0"><span className="block text-sm text-brand-inactive-text mb-1">Preço final</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(salesPrice)}</span></div>
-                                <div className="flex-1 px-4"><span className="block text-sm text-brand-inactive-text mb-1">Lucro estimado</span><span className="text-xl font-bold text-emerald-600">{formatCurrency(profit)}</span></div>
-                                <div className="flex-1 px-4 last:pr-0"><span className="block text-sm text-brand-inactive-text mb-1">Margem bruta</span><span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{margin}%</span></div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
+                    <div className="flex items-center gap-2 cursor-pointer w-fit mt-2 mb-8">
                         <Checkbox
                             checked={showPrice}
                             label="Exibir o preço na vitrine online"
@@ -371,23 +355,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         value={productData.gtin || ""}
                                         onChange={handleFieldChange}
                                         disabled={!isEditing}
+                                        suffix={
+                                            <div
+                                                onClick={onGenerateBarcode}
+                                                className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                            >
+                                                <DiceIcon size={20} />
+                                            </div>
+                                        }
                                     />
-                                    {isEditing && onGenerateBarcode && (
-                                        <button
-                                            type="button"
-                                            onClick={onGenerateBarcode}
-                                            className="text-xs font-bold text-brand-primary hover:underline"
-                                        >
-                                            Gerar código automaticamente
-                                        </button>
-                                    )}
-                                    {productData.gtin && (
-                                        <div className="mt-3 flex justify-start">
-                                            <Barcode value={productData.gtin} className="max-w-[200px]" />
-                                        </div>
-                                    )}
                                 </div>
-
 
                                 <FormCombobox
                                     label="Categoria"

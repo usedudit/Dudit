@@ -302,6 +302,7 @@ async function syncPosSaleToOrders(params: {
         productId: item.product_id || null,
         unitPrice: Number(item.unit_price || 0),
         quantity: Number(item.quantity || 0),
+        basePrice: item.original_price != null ? Number(item.original_price) : Number(item.unit_price || 0),
     }))
     const pricingResult = calculateOrderPricing({
         items: pricingItems,
@@ -549,6 +550,7 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
             productId: item.product_id || null,
             unitPrice: Number(item.unit_price || 0),
             quantity: Number(item.quantity || 0),
+            basePrice: item.list_unit_price != null ? Number(item.list_unit_price) : Number(item.unit_price || 0),
         })),
         shippingCost: shippingFee,
         additionalCosts: otherCosts,
