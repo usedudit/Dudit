@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, XIcon, CheckCircleIcon, TagIcon, ArrowUpDownIcon, UserIcon } from "@/lib/icons"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, IconPlaceholder, ActionsDropdown, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SelectionBanner, Pagination, Separator, MoneyInput, PercentageInput } from "@/components/reusable"
+import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon } from "@/lib/icons"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -11,23 +11,16 @@ import {
     updateCampaignAction,
     createPromotionAction,
     updatePromotionAction,
-    deletePromotionAction,
-    listPromotionsAction,
 } from "@/app/actions/shared/promotions"
 import SelectPromotionProductsSheet from "./SelectPromotionProductsSheet"
 import SelectPromotionCategoriesSheet from "./SelectPromotionCategoriesSheet"
 import SelectPromotionServicesSheet from "./SelectPromotionServicesSheet"
 import SelectPromotionGiftSheet from "./SelectPromotionGiftSheet"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
-import { Switch } from "@/components/reusable/Switch"
-import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { AnimatePresence } from "framer-motion"
-
-const Div = (props: any) => React.createElement("div", props)
-const P = (props: any) => React.createElement("p", props)
-const Span = (props: any) => React.createElement("span", props)
 
 const parseNumberField = (val: any): number | null => {
     if (val === undefined || val === null || val === "") return null;
@@ -96,9 +89,6 @@ export default function PromotionFormPage({
     const [campCustIds, setCampCustIds] = useState<string[]>([])
     const [custSearch, setCustSearch] = useState("")
 
-    // Promotions for this campaign (either in DB or temporary in memory)
-    const [localPromotions, setLocalPromotions] = useState<any[]>([])
-
     // Subform Rule State (for adding/editing a promotion inside the tab)
     const [editingRule, setEditingRule] = useState<any | null>(null)
 
@@ -116,14 +106,6 @@ export default function PromotionFormPage({
     const [scopeSearch, setScopeSearch] = useState("")
     const [scopePage, setScopePage] = useState(1)
 
-    // Rules listing pagination, search & bulk selection states
-    const [ruleSearch, setRuleSearch] = useState("")
-    const [ruleStatusFilter, setRuleStatusFilter] = useState<"all" | "active" | "inactive">("all")
-    const [ruleTypeFilter, setRuleTypeFilter] = useState<"all" | string>("all")
-    const [rulePage, setRulePage] = useState(1)
-    const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set())
-    const [ruleSortConfig, setRuleSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
-
     const pageTitle = useMemo(() => {
         return currentMode === "add" ? "Nova Campanha de Marketing"
             : currentMode === "duplicate" ? "Duplicar Campanha"
@@ -131,12 +113,8 @@ export default function PromotionFormPage({
     }, [currentMode, campName])
 
     const handleBack = useCallback(() => {
-        if (editingRule) {
-            setEditingRule(null)
-        } else {
-            onClose()
-        }
-    }, [editingRule, onClose])
+        onClose()
+    }, [onClose])
 
     useEffect(() => {
         setHeaderOverride({
@@ -173,17 +151,23 @@ export default function PromotionFormPage({
                 setCampCustIds((campaign.campaign_customers || []).map((cc: any) => cc.customer_id))
 
                 const campPromos = promotions.filter(p => p.campaign_id === campaign.id)
+                let initialPromos = []
                 if (currentMode === "duplicate") {
-                    setLocalPromotions(campPromos.map(p => ({
+                    initialPromos = campPromos.map(p => ({
                         ...p,
                         id: `temp_${Math.random()}`,
                         campaign_id: undefined,
                         promotion_products: (p.promotion_products || []).map((prod: any) => prod.product_id || prod),
                         promotion_categories: (p.promotion_categories || []).map((cat: any) => cat.category_id || cat),
                         promotion_services: (p.promotion_services || []).map((serv: any) => serv.service_id || serv),
-                    })))
+                    }))
                 } else {
-                    setLocalPromotions(campPromos)
+                    initialPromos = campPromos
+                }
+                if (initialPromos.length > 0) {
+                    setEditingRule(initialPromos[0])
+                } else {
+                    setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })
                 }
             } else if (currentMode === "add") {
                 setCampName("")
@@ -193,7 +177,7 @@ export default function PromotionFormPage({
                 setCampEnds("")
                 setCampActive(true)
                 setCampCustIds([])
-                setLocalPromotions([])
+                setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })
             }
         }
     }, [currentMode, campaign, promotions])
@@ -203,11 +187,6 @@ export default function PromotionFormPage({
         setScopeSearch("")
         setScopePage(1)
     }, [editingRule?.apply_scope, editingRule?.id])
-
-    // Reset bulk selection when filters or campaign rules change
-    useEffect(() => {
-        setSelectedRuleIds(new Set())
-    }, [ruleSearch, ruleStatusFilter, ruleTypeFilter, localPromotions])
 
     // Update product/category/services selection sheets state when subform opens
     useEffect(() => {
@@ -236,34 +215,32 @@ export default function PromotionFormPage({
             return
         }
 
+        // Validate the promotion rule (since there is only one rule, it's always editingRule)
+        if (editingRule) {
+            if (editingRule.promotion_type === "buy_x_pay_y") {
+                if (!editingRule.buy_quantity || !editingRule.pay_quantity || Number(editingRule.buy_quantity) <= Number(editingRule.pay_quantity)) {
+                    toast({ title: "Erro", description: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga.", variant: "destructive" })
+                    return
+                }
+            } else if (editingRule.promotion_type === "gift") {
+                if (!editingRule.gift_product_id && !editingRule.gift_service_id) {
+                    toast({ title: "Erro", description: "Selecione o brinde.", variant: "destructive" })
+                    return
+                }
+            } else if (editingRule.promotion_type === "discount") {
+                if (!editingRule.discount_type || !editingRule.discount_value) {
+                    toast({ title: "Erro", description: "Informe o tipo e valor de desconto.", variant: "destructive" })
+                    return
+                }
+                if (editingRule.discount_type === "fixed" && !editingRule.min_spend_amount) {
+                    toast({ title: "Erro", description: "Para desconto de valor fixo (R$), informe o valor mínimo de compra.", variant: "destructive" })
+                    return
+                }
+            }
+        }
+
         setIsSaving(true)
         try {
-            // Auto-save current editing rule if it has data
-            if (editingRule) {
-                const ruleToSave = {
-                    ...editingRule,
-                    name: editingRule.name || getAutoPromotionName(
-                        campName,
-                        editingRule.promotion_type,
-                        editingRule.discount_type,
-                        editingRule.discount_value,
-                        editingRule.buy_quantity,
-                        editingRule.pay_quantity
-                    ),
-                    description: null,
-                    promotion_products: editingRuleProductIds,
-                    promotion_categories: editingRuleCategoryIds,
-                    promotion_services: editingRuleServiceIds,
-                    id: editingRule.id || `temp_${Math.random()}`,
-                }
-                if (localPromotions.some(p => p.id === ruleToSave.id)) {
-                    setLocalPromotions(localPromotions.map(p => p.id === ruleToSave.id ? ruleToSave : p))
-                } else {
-                    setLocalPromotions([...localPromotions, ruleToSave])
-                }
-                setEditingRule(null)
-            }
-
             const payload = {
                 partnerId,
                 name: campName,
@@ -276,256 +253,123 @@ export default function PromotionFormPage({
             }
 
             if (currentMode === "edit") {
+                // 1. Save Campaign details
                 const res = await updateCampaignAction(campaign.id, payload)
-                if (res.success) {
-                    toast({ title: "Campanha atualizada com sucesso." })
-                    onClose()
-                } else {
+                if (!res.success) {
                     toast({ title: "Erro ao salvar campanha.", description: res.error, variant: "destructive" })
+                    setIsSaving(false)
+                    return
                 }
+
+                // 2. Save Rule details
+                if (editingRule) {
+                    const generatedName = getAutoPromotionName(
+                        campName,
+                        editingRule.promotion_type,
+                        editingRule.discount_type,
+                        editingRule.discount_value,
+                        editingRule.buy_quantity,
+                        editingRule.pay_quantity
+                    )
+                    const promoPayload = {
+                        partnerId,
+                        campaignId: campaign.id,
+                        name: generatedName,
+                        description: null,
+                        promotionType: editingRule.promotion_type,
+                        discountType: editingRule.promotion_type === "discount" ? editingRule.discount_type : null,
+                        discountValue: editingRule.promotion_type === "discount" ? parseNumberField(editingRule.discount_value) : null,
+                        maxDiscountAmount: parseNumberField(editingRule.max_discount_amount),
+                        minSpendAmount: parseNumberField(editingRule.min_spend_amount),
+                        giftProductId: editingRule.promotion_type === "gift" && editingRule.gift_product_id ? editingRule.gift_product_id : null,
+                        giftServiceId: editingRule.promotion_type === "gift" && editingRule.gift_service_id ? editingRule.gift_service_id : null,
+                        buyQuantity: editingRule.promotion_type === "buy_x_pay_y" ? parseNumberField(editingRule.buy_quantity) : null,
+                        payQuantity: editingRule.promotion_type === "buy_x_pay_y" ? parseNumberField(editingRule.pay_quantity) : null,
+                        priority: Number(editingRule.priority || 0),
+                        applyScope: editingRule.apply_scope,
+                        allowCouponCombination: !!editingRule.allow_coupon_combination,
+                        usageLimit: parseNumberField(editingRule.usage_limit),
+                        usageLimitPerCustomer: parseNumberField(editingRule.usage_limit_per_customer),
+                        isActive: editingRule.is_active ?? true,
+                        productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
+                        categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
+                        serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
+                    }
+
+                    let promoRes
+                    if (editingRule.id && !editingRule.id.toString().startsWith("temp_")) {
+                        promoRes = await updatePromotionAction(editingRule.id, promoPayload)
+                    } else {
+                        promoRes = await createPromotionAction(promoPayload)
+                    }
+
+                    if (!promoRes.success) {
+                        toast({ title: "Campanha salva, mas erro ao salvar a regra de promoção.", description: promoRes.error, variant: "destructive" })
+                        setIsSaving(false)
+                        return
+                    }
+                }
+
+                toast({ title: "Campanha e regra salvas com sucesso." })
+                onClose()
             } else {
                 // Mode is "add" or "duplicate"
                 const res = await createCampaignAction(payload)
                 if (res.success) {
                     const newCampaignId = res.id
 
-                    // Save pending promotions (rules) in memory
-                    if (localPromotions.length > 0) {
-                        const results = await Promise.all(localPromotions.map(promo => {
-                            const generatedName = getAutoPromotionName(
-                                campName,
-                                promo.promotion_type,
-                                promo.discount_type,
-                                promo.discount_value,
-                                promo.buy_quantity,
-                                promo.pay_quantity
-                            )
-                            const promoPayload = {
-                                partnerId,
-                                campaignId: newCampaignId,
-                                name: generatedName,
-                                description: null,
-                                promotionType: promo.promotion_type,
-                                discountType: promo.promotion_type === "discount" ? promo.discount_type : null,
-                                discountValue: promo.promotion_type === "discount" ? parseNumberField(promo.discount_value) : null,
-                                maxDiscountAmount: parseNumberField(promo.max_discount_amount),
-                                minSpendAmount: parseNumberField(promo.min_spend_amount),
-                                giftProductId: promo.promotion_type === "gift" && promo.gift_product_id ? promo.gift_product_id : null,
-                                giftServiceId: promo.promotion_type === "gift" && promo.gift_service_id ? promo.gift_service_id : null,
-                                buyQuantity: promo.promotion_type === "buy_x_pay_y" ? parseNumberField(promo.buy_quantity) : null,
-                                payQuantity: promo.promotion_type === "buy_x_pay_y" ? parseNumberField(promo.pay_quantity) : null,
-                                priority: Number(promo.priority || 0),
-                                applyScope: promo.apply_scope,
-                                allowCouponCombination: !!promo.allow_coupon_combination,
-                                usageLimit: parseNumberField(promo.usage_limit),
-                                usageLimitPerCustomer: parseNumberField(promo.usage_limit_per_customer),
-                                isActive: promo.is_active ?? true,
-                                productIds: promo.apply_scope === "specific_products" ? (promo.promotion_products || []) : [],
-                                categoryIds: promo.apply_scope === "category" ? (promo.promotion_categories || []) : [],
-                                serviceIds: promo.apply_scope === "specific_services" ? (promo.promotion_services || []) : [],
-                            }
-                            return createPromotionAction(promoPayload)
-                        }))
-
-                        const failures = results.filter(r => !r.success)
-                        if (failures.length > 0) {
-                            console.error("Failed to save some promotion rules:", failures)
+                    // Create Rule details
+                    if (editingRule) {
+                        const generatedName = getAutoPromotionName(
+                            campName,
+                            editingRule.promotion_type,
+                            editingRule.discount_type,
+                            editingRule.discount_value,
+                            editingRule.buy_quantity,
+                            editingRule.pay_quantity
+                        )
+                        const promoPayload = {
+                            partnerId,
+                            campaignId: newCampaignId,
+                            name: generatedName,
+                            description: null,
+                            promotionType: editingRule.promotion_type,
+                            discountType: editingRule.promotion_type === "discount" ? editingRule.discount_type : null,
+                            discountValue: editingRule.promotion_type === "discount" ? parseNumberField(editingRule.discount_value) : null,
+                            maxDiscountAmount: parseNumberField(editingRule.max_discount_amount),
+                            minSpendAmount: parseNumberField(editingRule.min_spend_amount),
+                            giftProductId: editingRule.promotion_type === "gift" && editingRule.gift_product_id ? editingRule.gift_product_id : null,
+                            giftServiceId: editingRule.promotion_type === "gift" && editingRule.gift_service_id ? editingRule.gift_service_id : null,
+                            buyQuantity: editingRule.promotion_type === "buy_x_pay_y" ? parseNumberField(editingRule.buy_quantity) : null,
+                            payQuantity: editingRule.promotion_type === "buy_x_pay_y" ? parseNumberField(editingRule.pay_quantity) : null,
+                            priority: Number(editingRule.priority || 0),
+                            applyScope: editingRule.apply_scope,
+                            allowCouponCombination: !!editingRule.allow_coupon_combination,
+                            usageLimit: parseNumberField(editingRule.usage_limit),
+                            usageLimitPerCustomer: parseNumberField(editingRule.usage_limit_per_customer),
+                            isActive: editingRule.is_active ?? true,
+                            productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
+                            categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
+                            serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
+                        }
+                        const promoRes = await createPromotionAction(promoPayload)
+                        if (!promoRes.success) {
+                            console.error("Failed to save promotion rule:", promoRes.error)
                             toast({
-                                title: "Campanha criada, mas algumas regras falharam ao salvar.",
-                                description: failures.map(f => f.error).join(", "),
+                                title: "Campanha criada, mas a regra falhou ao salvar.",
+                                description: promoRes.error,
                                 variant: "destructive"
                             })
-                        } else {
-                            toast({ title: "Campanha e regras salvas com sucesso." })
+                            setIsSaving(false)
+                            return
                         }
-                    } else {
-                        toast({ title: "Campanha salva com sucesso." })
                     }
+
+                    toast({ title: "Campanha e regra salvas com sucesso." })
                     onClose()
                 } else {
                     toast({ title: "Erro ao salvar campanha.", description: res.error, variant: "destructive" })
                 }
-            }
-        } catch (err: any) {
-            console.error(err)
-            toast({ title: "Erro inesperado.", description: err.message, variant: "destructive" })
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    // Handle saving a single rule in the subform
-    const handleSaveRule = async (e: React.FormEvent) => {
-        e.preventDefault()
-
-        // Logic constraints
-        if (editingRule.promotion_type === "buy_x_pay_y") {
-            if (!editingRule.buy_quantity || !editingRule.pay_quantity || Number(editingRule.buy_quantity) <= Number(editingRule.pay_quantity)) {
-                toast({ title: "Erro", description: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga.", variant: "destructive" })
-                return
-            }
-        } else if (editingRule.promotion_type === "gift") {
-            if (!editingRule.gift_product_id && !editingRule.gift_service_id) {
-                toast({ title: "Erro", description: "Selecione o brinde.", variant: "destructive" })
-                return
-            }
-        } else if (editingRule.promotion_type === "discount") {
-            if (!editingRule.discount_type || !editingRule.discount_value) {
-                toast({ title: "Erro", description: "Informe o tipo e valor de desconto.", variant: "destructive" })
-                return
-            }
-            if (editingRule.discount_type === "fixed" && !editingRule.min_spend_amount) {
-                toast({ title: "Erro", description: "Para desconto de valor fixo (R$), informe o valor mínimo de compra.", variant: "destructive" })
-                return
-            }
-        }
-
-        const generatedName = getAutoPromotionName(
-            campName,
-            editingRule.promotion_type,
-            editingRule.discount_type,
-            editingRule.discount_value,
-            editingRule.buy_quantity,
-            editingRule.pay_quantity
-        )
-
-        const ruleData = {
-            ...editingRule,
-            name: generatedName,
-            description: null,
-            promotion_products: editingRuleProductIds,
-            promotion_categories: editingRuleCategoryIds,
-            promotion_services: editingRuleServiceIds,
-        }
-
-        if (currentMode === "edit") {
-            // Direct Save to DB
-            setIsSaving(true)
-            const payload = {
-                partnerId,
-                campaignId: campaign.id,
-                name: ruleData.name,
-                description: null,
-                promotionType: ruleData.promotion_type,
-                discountType: ruleData.promotion_type === "discount" ? ruleData.discount_type : null,
-                discountValue: ruleData.promotion_type === "discount" ? parseNumberField(ruleData.discount_value) : null,
-                maxDiscountAmount: parseNumberField(ruleData.max_discount_amount),
-                minSpendAmount: parseNumberField(ruleData.min_spend_amount),
-                giftProductId: ruleData.promotion_type === "gift" && ruleData.gift_product_id ? ruleData.gift_product_id : null,
-                giftServiceId: ruleData.promotion_type === "gift" && ruleData.gift_service_id ? ruleData.gift_service_id : null,
-                buyQuantity: ruleData.promotion_type === "buy_x_pay_y" ? parseNumberField(ruleData.buy_quantity) : null,
-                payQuantity: ruleData.promotion_type === "buy_x_pay_y" ? parseNumberField(ruleData.pay_quantity) : null,
-                priority: Number(ruleData.priority || 0),
-                applyScope: ruleData.apply_scope,
-                allowCouponCombination: !!ruleData.allow_coupon_combination,
-                usageLimit: parseNumberField(ruleData.usage_limit),
-                usageLimitPerCustomer: parseNumberField(ruleData.usage_limit_per_customer),
-                isActive: ruleData.is_active ?? true,
-                productIds: editingRuleProductIds,
-                categoryIds: editingRuleCategoryIds,
-                serviceIds: editingRuleServiceIds,
-            }
-
-            let res
-            if (ruleData.id && !ruleData.id.startsWith?.("temp_")) {
-                res = await updatePromotionAction(ruleData.id, payload)
-            } else {
-                res = await createPromotionAction(payload)
-            }
-
-            setIsSaving(false)
-            if (res.success) {
-                toast({ title: "Regra salva com sucesso no banco." })
-                // Reload promotions
-                const { listPromotionsAction } = await import("@/app/actions/shared/promotions")
-                const listRes = await listPromotionsAction(partnerId, campaign.id)
-                if (listRes.success) {
-                    setLocalPromotions(listRes.data || [])
-                }
-                setEditingRule(null)
-            } else {
-                toast({ title: "Erro ao salvar regra.", description: res.error, variant: "destructive" })
-            }
-        } else {
-            // Save locally in memory (creation or duplicate mode)
-            const ruleToSave = {
-                ...ruleData,
-                id: ruleData.id || `temp_${Math.random()}`,
-            }
-
-            if (localPromotions.some(p => p.id === ruleToSave.id)) {
-                setLocalPromotions(localPromotions.map(p => p.id === ruleToSave.id ? ruleToSave : p))
-            } else {
-                setLocalPromotions([...localPromotions, ruleToSave])
-            }
-            setEditingRule(null)
-        }
-    }
-
-    const handleDeleteRule = async (rule: any) => {
-        if (!confirm("Tem certeza que deseja excluir esta regra de promoção?")) return
-
-        if (currentMode === "edit" && rule.id && !rule.id.startsWith?.("temp_")) {
-            setIsSaving(true)
-            const res = await deletePromotionAction(partnerId, rule.id)
-            setIsSaving(false)
-            if (res.success) {
-                toast({ title: "Regra excluída com sucesso." })
-                setLocalPromotions(localPromotions.filter((p) => p.id !== rule.id))
-            } else {
-                toast({ title: "Erro ao excluir regra.", description: res.error, variant: "destructive" })
-            }
-        } else {
-            setLocalPromotions(localPromotions.filter((p) => p.id !== rule.id))
-        }
-    }
-
-    const handleToggleRuleStatus = async (id: string, active: boolean) => {
-        setIsSaving(true)
-        try {
-            if (currentMode === "edit") {
-                const promo = localPromotions.find(p => p.id === id)
-                if (promo && !id.startsWith("temp_")) {
-                    const payload = {
-                        partnerId,
-                        campaignId: campaign.id,
-                        name: promo.name,
-                        description: promo.description,
-                        promotionType: promo.promotion_type,
-                        discountType: promo.discount_type,
-                        discountValue: parseNumberField(promo.discount_value),
-                        maxDiscountAmount: parseNumberField(promo.max_discount_amount),
-                        minSpendAmount: parseNumberField(promo.min_spend_amount),
-                        giftProductId: promo.gift_product_id || null,
-                        giftServiceId: promo.gift_service_id || null,
-                        buyQuantity: parseNumberField(promo.buy_quantity),
-                        payQuantity: parseNumberField(promo.buy_quantity) && parseNumberField(promo.pay_quantity),
-                        priority: Number(promo.priority || 0),
-                        applyScope: promo.apply_scope,
-                        allowCouponCombination: !!promo.allow_coupon_combination,
-                        usageLimit: parseNumberField(promo.usage_limit),
-                        usageLimitPerCustomer: parseNumberField(promo.usage_limit_per_customer),
-                        isActive: active,
-                        productIds: (promo.promotion_products || []).map((p: any) => p.product_id || p),
-                        categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id || c),
-                        serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id || s),
-                    }
-                    const res = await updatePromotionAction(id, payload)
-                    if (res.success) {
-                        toast({ title: "Status da regra atualizado com sucesso." })
-                    } else {
-                        toast({ title: "Erro ao atualizar status.", description: res.error, variant: "destructive" })
-                    }
-                    const listRes = await listPromotionsAction(partnerId, campaign.id)
-                    if (listRes.success) {
-                        setLocalPromotions(listRes.data || [])
-                    }
-                }
-            } else {
-                setLocalPromotions(localPromotions.map(promo =>
-                    promo.id === id ? { ...promo, is_active: active } : promo
-                ))
-                toast({ title: "Status da regra atualizado localmente." })
             }
         } catch (err: any) {
             console.error(err)
@@ -543,7 +387,7 @@ export default function PromotionFormPage({
     const filteredSelectedProducts = useMemo(() => {
         const term = scopeSearch.toLowerCase().trim()
         if (!term) return selectedProducts
-        return selectedProducts.filter(p =>
+        return selectedProducts.filter((p: any) =>
             p.name.toLowerCase().includes(term) ||
             (p.sku && p.sku.toLowerCase().includes(term))
         )
@@ -558,13 +402,14 @@ export default function PromotionFormPage({
 
     // Selected categories selectors & filters
     const selectedCategories = useMemo(() => {
-        return scopeData.categories.filter(c => editingRuleCategoryIds.includes(c.id))
-    }, [scopeData.categories, editingRuleCategoryIds])
+        const allCats = [...scopeData.categories, ...(scopeData.serviceCategories || [])]
+        return allCats.filter(c => editingRuleCategoryIds.includes(c.id))
+    }, [scopeData.categories, scopeData.serviceCategories, editingRuleCategoryIds])
 
     const filteredSelectedCategories = useMemo(() => {
         const term = scopeSearch.toLowerCase().trim()
         if (!term) return selectedCategories
-        return selectedCategories.filter(c => c.name.toLowerCase().includes(term))
+        return selectedCategories.filter((c: any) => c.name.toLowerCase().includes(term))
     }, [selectedCategories, scopeSearch])
 
     const paginatedSelectedCategories = useMemo(() => {
@@ -582,7 +427,7 @@ export default function PromotionFormPage({
     const filteredSelectedServices = useMemo(() => {
         const term = scopeSearch.toLowerCase().trim()
         if (!term) return selectedServices
-        return selectedServices.filter(s =>
+        return selectedServices.filter((s: any) =>
             s.name.toLowerCase().includes(term) ||
             (s.sku && s.sku.toLowerCase().includes(term))
         )
@@ -595,191 +440,6 @@ export default function PromotionFormPage({
 
     const totalServicePages = Math.ceil(filteredSelectedServices.length / 5)
 
-    // Rules filtering & pagination logic
-    const filteredRules = useMemo(() => {
-        const list = localPromotions.filter(promo => {
-            const term = ruleSearch.toLowerCase().trim()
-            if (term) {
-                const nameMatch = promo.name?.toLowerCase().includes(term)
-                const descMatch = promo.description?.toLowerCase().includes(term)
-                if (!nameMatch && !descMatch) return false
-            }
-            if (ruleStatusFilter === "active" && !promo.is_active) return false
-            if (ruleStatusFilter === "inactive" && promo.is_active) return false
-            if (ruleTypeFilter !== "all" && promo.promotion_type !== ruleTypeFilter) return false
-            return true
-        })
-
-        if (ruleSortConfig) {
-            list.sort((a, b) => {
-                let aVal = a[ruleSortConfig.key]
-                let bVal = b[ruleSortConfig.key]
-
-                if (ruleSortConfig.key === "priority") {
-                    aVal = Number(aVal) || 0
-                    bVal = Number(bVal) || 0
-                } else if (ruleSortConfig.key === "is_active") {
-                    aVal = aVal ? 1 : 0
-                    bVal = bVal ? 1 : 0
-                } else {
-                    aVal = String(aVal || "").toLowerCase()
-                    bVal = String(bVal || "").toLowerCase()
-                }
-
-                if (aVal === bVal) return 0
-                const comp = aVal < bVal ? -1 : 1
-                return ruleSortConfig.direction === "asc" ? comp : -comp
-            })
-        }
-
-        return list
-    }, [localPromotions, ruleSearch, ruleStatusFilter, ruleTypeFilter, ruleSortConfig])
-
-    const handleSortRule = (key: string) => {
-        setRuleSortConfig(prev => {
-            if (prev?.key === key) {
-                return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-            }
-            return { key, direction: "asc" }
-        })
-    }
-
-    const rulesPerPage = 8
-    const paginatedRules = useMemo(() => {
-        const start = (rulePage - 1) * rulesPerPage
-        return filteredRules.slice(start, start + rulesPerPage)
-    }, [filteredRules, rulePage])
-
-    const totalRulePages = Math.ceil(filteredRules.length / rulesPerPage)
-
-    const handleSelectAllRules = (checked: boolean) => {
-        if (checked) {
-            setSelectedRuleIds(new Set(paginatedRules.map(r => r.id)))
-        } else {
-            setSelectedRuleIds(new Set())
-        }
-    }
-
-    const handleSelectRuleRow = (id: string) => {
-        setSelectedRuleIds(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) {
-                next.delete(id)
-            } else {
-                next.add(id)
-            }
-            return next
-        })
-    }
-
-    const handleBulkToggleStatus = async (activate: boolean) => {
-        const ids = Array.from(selectedRuleIds)
-        if (ids.length === 0) return
-
-        setIsSaving(true)
-        try {
-            if (currentMode === "edit") {
-                let hasError = false
-                let lastError = ""
-                for (const id of ids) {
-                    const promo = localPromotions.find(p => p.id === id)
-                    if (promo && !id.startsWith("temp_")) {
-                        const payload = {
-                            partnerId,
-                            campaignId: campaign.id,
-                            name: promo.name,
-                            description: promo.description,
-                            promotionType: promo.promotion_type,
-                            discountType: promo.discount_type,
-                            discountValue: parseNumberField(promo.discount_value),
-                            maxDiscountAmount: parseNumberField(promo.max_discount_amount),
-                            minSpendAmount: parseNumberField(promo.min_spend_amount),
-                            giftProductId: promo.gift_product_id || null,
-                            giftServiceId: promo.gift_service_id || null,
-                            buyQuantity: parseNumberField(promo.buy_quantity),
-                            payQuantity: parseNumberField(promo.pay_quantity),
-                            priority: Number(promo.priority || 0),
-                            applyScope: promo.apply_scope,
-                            allowCouponCombination: !!promo.allow_coupon_combination,
-                            usageLimit: parseNumberField(promo.usage_limit),
-                            usageLimitPerCustomer: parseNumberField(promo.usage_limit_per_customer),
-                            isActive: activate,
-                            productIds: (promo.promotion_products || []).map((p: any) => p.product_id || p),
-                            categoryIds: (promo.promotion_categories || []).map((c: any) => c.category_id || c),
-                            serviceIds: (promo.promotion_services || []).map((s: any) => s.service_id || s),
-                        }
-                        const res = await updatePromotionAction(id, payload)
-                        if (!res.success) {
-                            hasError = true
-                            lastError = res.error || ""
-                        }
-                    }
-                }
-                if (hasError) {
-                    toast({ title: "Erro ao atualizar status de algumas regras.", description: lastError, variant: "destructive" })
-                } else {
-                    toast({ title: `Regras ${activate ? "ativadas" : "desativadas"} com sucesso.` })
-                }
-                const listRes = await listPromotionsAction(partnerId, campaign.id)
-                if (listRes.success) {
-                    setLocalPromotions(listRes.data || [])
-                }
-            } else {
-                setLocalPromotions(localPromotions.map(promo =>
-                    ids.includes(promo.id) ? { ...promo, is_active: activate } : promo
-                ))
-                toast({ title: `Regras ${activate ? "ativadas" : "desativadas"} localmente.` })
-            }
-            setSelectedRuleIds(new Set())
-        } catch (err: any) {
-            console.error(err)
-            toast({ title: "Erro inesperado.", description: err.message, variant: "destructive" })
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const handleBulkDelete = async () => {
-        const ids = Array.from(selectedRuleIds)
-        if (ids.length === 0) return
-        if (!confirm(`Deseja excluir as ${ids.length} regras selecionadas?`)) return
-
-        setIsSaving(true)
-        try {
-            if (currentMode === "edit") {
-                let hasError = false
-                let lastError = ""
-                for (const id of ids) {
-                    if (!id.startsWith("temp_")) {
-                        const res = await deletePromotionAction(partnerId, id)
-                        if (!res.success) {
-                            hasError = true
-                            lastError = res.error || ""
-                        }
-                    }
-                }
-                if (hasError) {
-                    toast({ title: "Algumas regras não puderam ser excluídas.", description: lastError, variant: "destructive" })
-                } else {
-                    toast({ title: "Regras excluídas com sucesso." })
-                }
-                const listRes = await listPromotionsAction(partnerId, campaign.id)
-                if (listRes.success) {
-                    setLocalPromotions(listRes.data || [])
-                }
-            } else {
-                setLocalPromotions(localPromotions.filter(p => !ids.includes(p.id)))
-                toast({ title: "Regras excluídas localmente." })
-            }
-            setSelectedRuleIds(new Set())
-        } catch (err: any) {
-            console.error(err)
-            toast({ title: "Erro inesperado.", description: err.message, variant: "destructive" })
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
     const SidebarCard = ({ children, className = "", hasTopStrip = false }: { children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
         <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
             {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
@@ -789,7 +449,7 @@ export default function PromotionFormPage({
 
     const renderSelectedProductsList = () => {
         return (
-            <FormSection title="Produtos Específicos Elegíveis">
+            <FormSection hasSeparator title="Produtos Específicos Elegíveis">
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
                         <div className="w-full sm:w-72">
@@ -807,23 +467,20 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="outline" type="button" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                            Selecionar Produtos
-                        </Button>
                     </div>
 
                     {filteredSelectedProducts.length > 0 ? (
                         <>
                             {/* Desktop Table */}
-                            <div className="hidden md:block overflow-hidden rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                            <div className="hidden md:block overflow-hidden bg-white dark:bg-dark-surface">
                                 <table className="w-full text-left border-collapse text-sm">
                                     <thead>
-                                        <tr className="bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border">
-                                            <th className="p-3 pl-6 font-semibold text-gray-500 dark:text-dark-body">Produto</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">SKU</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Categoria</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body">Preço</th>
-                                            <th className="p-3 font-semibold text-gray-500 dark:text-dark-body text-center pr-6 w-20">Ações</th>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Produto</th>
+                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">SKU</th>
+                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Categoria</th>
+                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Preço</th>
+                                            <th className="p-3 font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center pr-6 w-20 rounded-r-lg">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -833,7 +490,7 @@ export default function PromotionFormPage({
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
-                                                                src={prod.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                src={getR2ImageUrl(prod.image, "thumbnail")}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -846,10 +503,10 @@ export default function PromotionFormPage({
                                                 <td className="p-3 font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(prod.price)}</td>
                                                 <td className="p-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
                                                     <Button
-                                                        variant="outline"
+                                                        variant="outlinered"
                                                         size="icon"
                                                         onClick={() => setEditingRuleProductIds(editingRuleProductIds.filter(id => id !== prod.id))}
-                                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 border-0 h-8 w-8"
+                                                        className="h-8 w-8"
                                                     >
                                                         <TrashIcon size={16} />
                                                     </Button>
@@ -869,7 +526,7 @@ export default function PromotionFormPage({
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
-                                                        src={prod.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                        src={getR2ImageUrl(prod.image, "thumbnail")}
                                                         alt=""
                                                         className="w-full h-full object-cover"
                                                     />
@@ -906,9 +563,17 @@ export default function PromotionFormPage({
                             )}
                         </>
                     ) : (
-                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum produto selecionado ou correspondente à busca.</p>
-                        </div>
+                        <IconPlaceholder
+                            icon={Package}
+                            title="Nenhum produto selecionado"
+                            subtitle="Selecione produtos para a promoção."
+                            itemButton={{
+                                text: "Selecionar Produtos",
+                                action: () => setIsProductsSheetOpen(true),
+                                variant: "outline",
+                                className: "h-9 text-sm"
+                            }}
+                        />
                     )}
                 </div>
             </FormSection>
@@ -935,9 +600,6 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="outline" type="button" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                            Selecionar Categorias
-                        </Button>
                     </div>
 
                     {filteredSelectedCategories.length > 0 ? (
@@ -1003,9 +665,17 @@ export default function PromotionFormPage({
                             )}
                         </>
                     ) : (
-                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhuma categoria selecionada ou correspondente à busca.</p>
-                        </div>
+                        <IconPlaceholder
+                            icon={Package}
+                            title="Nenhuma categoria selecionada"
+                            subtitle="Selecione categorias para a promoção."
+                            itemButton={{
+                                text: "Selecionar Categorias",
+                                action: () => setIsCategoriesSheetOpen(true),
+                                variant: "outline",
+                                className: "h-9 text-sm"
+                            }}
+                        />
                     )}
                 </div>
             </FormSection>
@@ -1032,9 +702,6 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="outline" type="button" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
-                            Selecionar Serviços
-                        </Button>
                     </div>
 
                     {filteredSelectedServices.length > 0 ? (
@@ -1058,7 +725,7 @@ export default function PromotionFormPage({
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                             <img
-                                                                src={serv.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                src={getR2ImageUrl(serv.image, "thumbnail")}
                                                                 alt=""
                                                                 className="w-full h-full object-cover"
                                                             />
@@ -1094,7 +761,7 @@ export default function PromotionFormPage({
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                     <img
-                                                        src={serv.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                        src={getR2ImageUrl(serv.image, "thumbnail")}
                                                         alt=""
                                                         className="w-full h-full object-cover"
                                                     />
@@ -1131,9 +798,17 @@ export default function PromotionFormPage({
                             )}
                         </>
                     ) : (
-                        <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum serviço selecionado ou correspondente à busca.</p>
-                        </div>
+                        <IconPlaceholder
+                            icon={WrenchIcon}
+                            title="Nenhum serviço selecionado"
+                            subtitle="Selecione serviços para a promoção."
+                            itemButton={{
+                                text: "Selecionar Serviços",
+                                action: () => setIsServicesSheetOpen(true),
+                                variant: "outline",
+                                className: "h-9 text-sm"
+                            }}
+                        />
                     )}
                 </div>
             </FormSection>
@@ -1267,7 +942,7 @@ export default function PromotionFormPage({
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="general">Dados gerais</TabsTrigger>
-                                        <TabsTrigger value="rules">Regras de promoção ({localPromotions.length})</TabsTrigger>
+                                        <TabsTrigger value="rules">Regra de promoção</TabsTrigger>
                                     </TabsList>
                                 </div>
 
@@ -1354,9 +1029,9 @@ export default function PromotionFormPage({
                                 {activeTab === "rules" && (
                                     <FadeIn key="rules" className="block">
                                         <div className="space-y-6">
-                                            {editingRule ? (
-                                                /* Rule Sub-Form in Two Columns */
-                                                <form onSubmit={handleSaveRule} className="grid grid-cols-12 gap-y-8 lg:gap-y-0 animate-fadeIn">
+                                            {editingRule && (
+                                                /* Rule Form in Two Columns */
+                                                <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 animate-fadeIn">
 
                                                     {/* Left Column: Rule configuration */}
                                                     <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
@@ -1473,7 +1148,7 @@ export default function PromotionFormPage({
                                                                                         <div className="flex items-center gap-3 min-w-0">
                                                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border overflow-hidden">
                                                                                                 <img
-                                                                                                    src={selectedItem.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                                    src={getR2ImageUrl(selectedItem.image, "thumbnail")}
                                                                                                     alt=""
                                                                                                     className="w-full h-full object-cover"
                                                                                                 />
@@ -1586,354 +1261,7 @@ export default function PromotionFormPage({
                                                                 />
                                                             </div>
                                                         </div>
-
-                                                        {/* Desktop sub-form Actions */}
-                                                        <div className="hidden md:flex items-center justify-end gap-3 border-t border-brand-border dark:border-dark-border pt-4">
-                                                            <Button variant="outline" type="button" onClick={() => setEditingRule(null)}>
-                                                                Voltar para lista
-                                                            </Button>
-                                                            <Button variant="filled" type="submit" disabled={isSaving}>
-                                                                Salvar Regra
-                                                            </Button>
-                                                        </div>
                                                     </div>
-                                                </form>
-                                            ) : (
-                                                /* Redesigned Rules List View */
-                                                <div className="space-y-4">
-                                                    {localPromotions.length === 0 ? (
-                                                        <div className="space-y-6">
-                                                            <div className="flex flex-col items-center justify-center text-center">
-                                                                <IconPlaceholder
-                                                                    icon={TagIcon}
-                                                                    title="Não há regras de promoção"
-                                                                    subtitle="Adicione descontos, brindes ou entrega grátis a esta campanha."
-                                                                    itemButton={!isReadOnly ? {
-                                                                        text: "Adicionar regra",
-                                                                        action: () => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' }),
-                                                                        variant: "outline"
-                                                                    } : undefined}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="max-w-[1300px] mx-auto pb-20 relative">
-                                                            {/* Header Section */}
-                                                            <div className="flex justify-between items-center mb-4">
-                                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                                    Regras de Promoção ({filteredRules.length})
-                                                                </h3>
-                                                                {!isReadOnly && (
-                                                                    <Button variant="link" onClick={() => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })} className="flex items-center hidden md:flex">
-                                                                        + Nova Regra
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Search & Actions Control Bar */}
-                                                            {/* Mobile Header Row */}
-                                                            <div className="md:hidden flex flex-col gap-2 w-full mb-4">
-                                                                <div className="flex items-center gap-2 w-full">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <Input
-                                                                            name="ruleSearch"
-                                                                            placeholder="Buscar regras..."
-                                                                            value={ruleSearch}
-                                                                            onChange={(e) => {
-                                                                                setRuleSearch(e.target.value)
-                                                                                setRulePage(1)
-                                                                            }}
-                                                                            className="h-[42px] w-full"
-                                                                            variant="full-rounded"
-                                                                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                                                                        />
-                                                                    </div>
-                                                                    {!isReadOnly && (
-                                                                        <div className="flex-none">
-                                                                            <Button
-                                                                                onClick={() => setEditingRule({ is_active: true, priority: 0, promotion_type: 'discount', discount_type: 'percentage', apply_scope: 'entire_cart' })}
-                                                                                className="w-[42px] h-[42px] p-0 flex items-center justify-center rounded-full bg-brand-green hover:bg-brand-green/90 text-white shadow-sm"
-                                                                            >
-                                                                                <PlusIcon className="w-5 h-5" strokeWidth={3} />
-                                                                            </Button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <div className="flex-1">
-                                                                        <FormDropdown
-                                                                            label=""
-                                                                            value={ruleStatusFilter}
-                                                                            setValue={(val) => {
-                                                                                setRuleStatusFilter(val as any)
-                                                                                setRulePage(1)
-                                                                            }}
-                                                                            options={[
-                                                                                { value: "all", label: "Todos os status" },
-                                                                                { value: "active", label: "Ativos" },
-                                                                                { value: "inactive", label: "Inativos" }
-                                                                            ]}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <FormDropdown
-                                                                            label=""
-                                                                            value={ruleTypeFilter}
-                                                                            setValue={(val) => {
-                                                                                setRuleTypeFilter(val)
-                                                                                setRulePage(1)
-                                                                            }}
-                                                                            options={[
-                                                                                { value: "all", label: "Todos os tipos" },
-                                                                                { value: "discount", label: "Desconto Direto" },
-                                                                                { value: "buy_x_pay_y", label: "Leve X Pague Y" },
-                                                                                { value: "gift", label: "Ganhar Brinde" },
-                                                                                { value: "free_shipping", label: "Entrega Grátis" }
-                                                                            ]}
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Desktop Search Bar */}
-                                                            <div className="hidden md:flex items-center w-full gap-4 mb-4">
-                                                                <div className="w-80">
-                                                                    <Input
-                                                                        name="ruleSearch"
-                                                                        placeholder="Buscar regras..."
-                                                                        prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
-                                                                        value={ruleSearch}
-                                                                        onChange={(e) => {
-                                                                            setRuleSearch(e.target.value)
-                                                                            setRulePage(1)
-                                                                        }}
-                                                                        className="h-[42px]"
-                                                                        variant="full-rounded"
-                                                                    />
-                                                                </div>
-                                                                <div className="w-48">
-                                                                    <FormDropdown
-                                                                        label=""
-                                                                        value={ruleStatusFilter}
-                                                                        setValue={(val) => {
-                                                                            setRuleStatusFilter(val as any)
-                                                                            setRulePage(1)
-                                                                        }}
-                                                                        options={[
-                                                                            { value: "all", label: "Todos os status" },
-                                                                            { value: "active", label: "Ativos" },
-                                                                            { value: "inactive", label: "Inativos" }
-                                                                        ]}
-                                                                    />
-                                                                </div>
-                                                                <div className="w-52">
-                                                                    <FormDropdown
-                                                                        label=""
-                                                                        value={ruleTypeFilter}
-                                                                        setValue={(val) => {
-                                                                            setRuleTypeFilter(val)
-                                                                            setRulePage(1)
-                                                                        }}
-                                                                        options={[
-                                                                            { value: "all", label: "Todos os tipos" },
-                                                                            { value: "discount", label: "Desconto Direto" },
-                                                                            { value: "buy_x_pay_y", label: "Leve X Pague Y" },
-                                                                            { value: "gift", label: "Ganhar Brinde" },
-                                                                            { value: "free_shipping", label: "Entrega Grátis" }
-                                                                        ]}
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Selection Banner */}
-                                                            <SelectionBanner
-                                                                selectedCount={selectedRuleIds.size}
-                                                                totalCount={filteredRules.length}
-                                                                onSelectAll={() => setSelectedRuleIds(new Set(filteredRules.map(v => v.id)))}
-                                                                onClearSelection={() => setSelectedRuleIds(new Set())}
-                                                                itemName="regras"
-                                                                singularItemName="regra"
-                                                            />
-
-                                                            {/* Table / Grid Container */}
-                                                            <div className="w-full bg-white dark:bg-dark-surface rounded-xl border border-transparent dark:border-dark-border/20 overflow-hidden">
-                                                                {/* Mobile Layout */}
-                                                                <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
-                                                                    {paginatedRules.map((promo, idx) => (
-                                                                        <div key={promo.id} className="p-4 flex items-center gap-3">
-                                                                            {!isReadOnly && (
-                                                                                <div className="shrink-0">
-                                                                                    <Checkbox
-                                                                                        checked={selectedRuleIds.has(promo.id)}
-                                                                                        onChange={() => handleSelectRuleRow(promo.id)}
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                <TagIcon size={18} className="text-brand-primary" />
-                                                                            </div>
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <span className="block truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                                    {promo.promotion_type === "gift" && "Ganhar Brinde"}
-                                                                                    {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
-                                                                                    {promo.promotion_type === "discount" && (
-                                                                                        promo.discount_type === "percentage" ? `${promo.discount_value}% Desconto` : `${formatCurrency(promo.discount_value)} Desconto`
-                                                                                    )}
-                                                                                    {promo.promotion_type === "free_shipping" && "Entrega Grátis"}
-                                                                                </span>
-                                                                                <span className="block text-xs font-semibold text-brand-primary dark:text-dark-body truncate">
-                                                                                    {promo.name || "Regra sem nome"} • Prioridade {promo.priority || 0}
-                                                                                </span>
-                                                                                <span className="block text-[11px] text-brand-inactive-text dark:text-dark-body truncate">
-                                                                                    Escopo: {promo.apply_scope === "entire_cart" && "Toda a Sacola"}
-                                                                                    {promo.apply_scope === "specific_products" && "Produtos Específicos"}
-                                                                                    {promo.apply_scope === "category" && "Categorias Específicas"}
-                                                                                    {promo.apply_scope === "specific_services" && "Serviços Específicos"}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="shrink-0 flex items-center gap-2">
-                                                                                {!isReadOnly && (
-                                                                                    <ActionsDropdown
-                                                                                        onEdit={() => setEditingRule(promo)}
-                                                                                        onDelete={() => handleDeleteRule(promo)}
-                                                                                    />
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-
-                                                                {/* Desktop Table View */}
-                                                                <div className="hidden md:block">
-                                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                                        <thead>
-                                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                                {!isReadOnly && (
-                                                                                    <th className="py-3 px-6 w-12 bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border sticky left-0 z-20">
-                                                                                        <Checkbox
-                                                                                            checked={selectedRuleIds.size === paginatedRules.length && paginatedRules.length > 0}
-                                                                                            onChange={handleSelectAllRules}
-                                                                                            className="bg-white dark:bg-dark-background"
-                                                                                        />
-                                                                                    </th>
-                                                                                )}
-                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortRule("promotion_type")}>
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        <span>Regra</span>
-                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
-                                                                                    </div>
-                                                                                </th>
-                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => handleSortRule("apply_scope")}>
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        <span>Escopo</span>
-                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
-                                                                                    </div>
-                                                                                </th>
-                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors text-center" onClick={() => handleSortRule("priority")}>
-                                                                                    <div className="flex items-center justify-center gap-1">
-                                                                                        <span>Prioridade</span>
-                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
-                                                                                    </div>
-                                                                                </th>
-                                                                                <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-200 transition-colors text-center" onClick={() => handleSortRule("is_active")}>
-                                                                                    <div className="flex items-center justify-center gap-1">
-                                                                                        <span>Status</span>
-                                                                                        <ArrowUpDownIcon className="w-3.5 h-3.5" />
-                                                                                    </div>
-                                                                                </th>
-                                                                                {!isReadOnly && (
-                                                                                    <th className="py-3 px-6 text-[13px] font-semibold text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 border-b border-brand-border dark:border-dark-border text-center w-28">
-                                                                                        Ações
-                                                                                    </th>
-                                                                                )}
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {paginatedRules.map((promo) => (
-                                                                                <tr key={promo.id} className="group hover:bg-brand-gray/30 transition-colors bg-white dark:bg-dark-background border-b border-brand-border last:border-0">
-                                                                                    {!isReadOnly && (
-                                                                                        <td className="py-4 px-6 border-b border-brand-border w-12">
-                                                                                            <Checkbox
-                                                                                                checked={selectedRuleIds.has(promo.id)}
-                                                                                                onChange={() => handleSelectRuleRow(promo.id)}
-                                                                                            />
-                                                                                        </td>
-                                                                                    )}
-                                                                                    <td className="py-4 px-6 border-b border-brand-border">
-                                                                                        <div className="flex items-center gap-3">
-                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                                <TagIcon size={18} className="text-brand-primary" />
-                                                                                            </div>
-                                                                                            <div className="flex flex-col text-left">
-                                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5">
-                                                                                                    {promo.promotion_type === "gift" && "Ganhar Brinde"}
-                                                                                                    {promo.promotion_type === "buy_x_pay_y" && `Leve ${promo.buy_quantity} Pague ${promo.pay_quantity}`}
-                                                                                                    {promo.promotion_type === "discount" && (
-                                                                                                        promo.discount_type === "percentage" ? `${promo.discount_value}% de Desconto` : `${formatCurrency(promo.discount_value)} de Desconto`
-                                                                                                    )}
-                                                                                                    {promo.promotion_type === "free_shipping" && "Entrega Grátis"}
-                                                                                                </span>
-                                                                                                <span className="text-xs text-brand-inactive-text">
-                                                                                                    {promo.name || "Regra sem nome"}
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="py-4 px-6 border-b border-brand-border">
-                                                                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                                                                                            {promo.apply_scope === "entire_cart" && "Toda a Sacola"}
-                                                                                            {promo.apply_scope === "specific_products" && "Produtos Específicos"}
-                                                                                            {promo.apply_scope === "category" && "Categorias Específicas"}
-                                                                                            {promo.apply_scope === "specific_services" && "Serviços Específicos"}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="py-4 px-6 border-b border-brand-border text-center">
-                                                                                        <Badge variant="blue">{promo.priority || 0}</Badge>
-                                                                                    </td>
-                                                                                    <td className="py-4 px-6 border-b border-brand-border text-center">
-                                                                                        <div className="flex justify-center">
-                                                                                            {isReadOnly ? (
-                                                                                                <Badge variant={promo.is_active ? "green" : "gray"}>
-                                                                                                    {promo.is_active ? "Ativo" : "Inativo"}
-                                                                                                </Badge>
-                                                                                            ) : (
-                                                                                                <Switch
-                                                                                                    checked={!!promo.is_active}
-                                                                                                    onCheckedChange={(checked) => !isSaving && handleToggleRuleStatus(promo.id, checked)}
-                                                                                                    className={isSaving ? "opacity-50 pointer-events-none" : ""}
-                                                                                                />
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    {!isReadOnly && (
-                                                                                        <td className="py-4 px-6 border-b border-brand-border text-center">
-                                                                                            <div className="flex justify-center">
-                                                                                                <ActionsDropdown
-                                                                                                    onEdit={() => setEditingRule(promo)}
-                                                                                                    onDelete={() => handleDeleteRule(promo)}
-                                                                                                />
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    )}
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Pagination */}
-                                                            {totalRulePages > 1 && (
-                                                                <div className="flex justify-center pt-4">
-                                                                    <Pagination
-                                                                        currentPage={rulePage}
-                                                                        totalPages={totalRulePages}
-                                                                        onPageChange={setRulePage}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1945,26 +1273,7 @@ export default function PromotionFormPage({
 
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                        {editingRule ? (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setEditingRule(null)}
-                                    disabled={isSaving}
-                                    className="flex-1 h-12"
-                                >
-                                    Voltar
-                                </Button>
-                                <Button
-                                    onClick={handleSaveRule}
-                                    disabled={isSaving}
-                                    className="flex-1 h-12"
-                                    leftIcon={<SaveIcon size={16} />}
-                                >
-                                    Salvar Regra
-                                </Button>
-                            </>
-                        ) : isReadOnly ? (
+                        {isReadOnly ? (
                             <Button
                                 onClick={() => setCurrentMode("edit")}
                                 className="flex-1 h-12"
@@ -2069,31 +1378,6 @@ export default function PromotionFormPage({
                     }}
                 />
 
-                {!isReadOnly && (
-                    <FloatingActionBar
-                        selectedCount={selectedRuleIds.size}
-                        onClearSelection={() => setSelectedRuleIds(new Set())}
-                    >
-                        <Button
-                            variant="ghost"
-                            onClick={() => handleBulkToggleStatus(
-                                !localPromotions.filter(p => selectedRuleIds.has(p.id)).every(p => p.is_active)
-                            )}
-                            leftIcon={<CheckCircleIcon className="w-4 h-4" />}
-                            className="h-10 px-3"
-                        >
-                            {localPromotions.filter(p => selectedRuleIds.has(p.id)).every(p => p.is_active) ? "Desativar" : "Ativar"}
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            onClick={handleBulkDelete}
-                            leftIcon={<TrashIcon className="w-4 h-4" />}
-                            className="h-10 px-3 text-brand-red"
-                        >
-                            Excluir
-                        </Button>
-                    </FloatingActionBar>
-                )}
             </div >
         </FadeIn >
     )

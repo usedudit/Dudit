@@ -170,17 +170,15 @@ async function loadMovementsForSession(
   return enriched
 }
 
-async function getOpenSessionForUser(
+async function getActiveSessionForPartner(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
   partnerId: string,
-  userId: string,
 ) {
   const { data } = await supabase
     .from("cash_sessions")
     .select("*")
     .eq("partner_id", partnerId)
     .eq("status", "open")
-    .eq("opened_by_user_id", userId)
     .order("opened_at", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -460,11 +458,27 @@ async function reverseCashMovementFallback(
 }
 
 export async function getActiveCashSessionAction(partnerId: string) {
-  const user = await requireUser()
+  await requireUser()
   await requirePartnerAccessWithPermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load session data.
   const supabase = createAdminClient()
-  const session = await getOpenSessionForUser(supabase, partnerId, user.id)
+  const session = await getActiveSessionForPartner(supabase, partnerId)
+
+  // Enrich with opener name when a session exists
+  if (session) {
+    const openerUserId = session.opened_by_user_id || session.user_id
+    if (openerUserId) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("user_id", openerUserId)
+        .maybeSingle()
+      session.opener_name = profile?.full_name || "Usuário"
+    } else {
+      session.opener_name = "Usuário"
+    }
+  }
+
   return { success: true as const, data: session || null }
 }
 
@@ -486,9 +500,9 @@ export async function openCashSessionAction(input: {
   if (!Number.isFinite(raw)) return { success: false as const, error: "Valor inicial inválido." }
   const initialAmount = money(Math.max(0, raw))
 
-  const existing = await getOpenSessionForUser(supabase, input.partnerId, user.id)
+  const existing = await getActiveSessionForPartner(supabase, input.partnerId)
   if (existing?.id) {
-    return { success: false as const, error: "Você já possui um caixa aberto." }
+    return { success: false as const, error: "Já existe um caixa aberto para este estabelecimento. Utilize o caixa atual ou feche-o primeiro." }
   }
 
   const { data, error } = await supabase
@@ -505,7 +519,7 @@ export async function openCashSessionAction(input: {
 
   if (error) {
     if (error.code === "23505") {
-      return { success: false as const, error: "Você já possui um caixa aberto." }
+      return { success: false as const, error: "Já existe um caixa aberto para este estabelecimento. Utilize o caixa atual ou feche-o primeiro." }
     }
     return { success: false as const, error: error.message }
   }
@@ -545,7 +559,7 @@ export async function createCashMovementAction(input: {
 
   let sessionId = input.cashSessionId || null
   if (!sessionId) {
-    const s = await getOpenSessionForUser(supabase, input.partnerId, user.id)
+    const s = await getActiveSessionForPartner(supabase, input.partnerId)
     sessionId = s?.id || null
   } else {
     const { data: s } = await supabase
@@ -802,10 +816,6 @@ export async function closeCashSessionAction(input: {
   notes?: string
 }) {
   const user = await requireUser()
-  const access = await requirePartnerAccessWithPermission(input.partnerId, "pdv", "close_pdv")
-
-  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
   const supabase = createAdminClient()
 
@@ -817,11 +827,16 @@ export async function closeCashSessionAction(input: {
     return { success: false as const, error: "Este caixa já foi fechado." }
   }
 
-  const isAdminRole = isManagementRole(access.roleId)
+  // The opener needs basic pdv access; non-openers need close_pdv permission.
   const openedBy = session.opened_by_user_id || session.user_id
-  if (openedBy !== user.id && !isAdminRole) {
-    return { success: false as const, error: "Apenas o operador que abriu o caixa ou um administrador podem fechar." }
+  if (openedBy !== user.id) {
+    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "close_pdv")
+  } else {
+    await requirePartnerAccessWithPermission(input.partnerId, "pdv", "view")
   }
+
+  const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+  if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
   const countedRows = (input.countedByMethod || []).map((row) => ({
     paymentMethodId: row.paymentMethodId ?? null,
@@ -901,6 +916,40 @@ export async function closeCashSessionAction(input: {
   revalidatePath("/erp/cash-register")
   revalidatePath("/erp/pdv")
 
+  // Build operator-grouped summary for the close response
+  const opGroups = new Map<string, { operatorName: string; byMethod: Map<string, { label: string; amount: number }> }>()
+  const nameById = new Map<string, string>()
+  const allUserIds = new Set((summary.data.movements || []).map((m: any) => m.created_by_user_id).filter(Boolean))
+  if (allUserIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name")
+      .in("user_id", Array.from(allUserIds))
+    for (const p of profiles || []) nameById.set(p.user_id, p.full_name || "Usuário")
+  }
+  for (const m of summary.data.movements || []) {
+    if (m.reversed_at || m.type !== "sale") continue
+    const opUserId = m.created_by_user_id || "unknown"
+    if (!opGroups.has(opUserId)) {
+      opGroups.set(opUserId, { operatorName: nameById.get(opUserId) || "Usuário", byMethod: new Map() })
+    }
+    const group = opGroups.get(opUserId)!
+    const pmKey = m.payment_method_id || "__cash__"
+    const amt = money(Number(m.amount || 0))
+    const cur = group.byMethod.get(pmKey)
+    if (cur) cur.amount = money(cur.amount + amt)
+    else group.byMethod.set(pmKey, { label: m.payment_method_name || "Dinheiro", amount: amt })
+  }
+  const groupedByOperator = Array.from(opGroups.entries()).map(([userId, g]) => ({
+    userId,
+    operatorName: g.operatorName,
+    byMethod: Array.from(g.byMethod.entries()).map(([pmKey, row]) => ({
+      paymentMethodId: pmKey === "__cash__" ? null : pmKey,
+      label: row.label,
+      amount: row.amount,
+    })),
+  }))
+
   return {
     success: true as const,
     data: {
@@ -909,6 +958,7 @@ export async function closeCashSessionAction(input: {
       closing_amount: informedTotal,
       difference_amount: difference,
       groupedByMethod: summary.data.groupedByMethod,
+      groupedByOperator,
     },
   }
 }
@@ -1221,6 +1271,32 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
       },
       drawer,
       summaryByPaymentMethod,
+      groupedByOperator: (() => {
+        const opGroups = new Map<string, { operatorName: string; byMethod: Map<string, { label: string; amount: number }> }>()
+        for (const m of movements) {
+          if (!isMovementActive(m) || m.type !== "sale") continue
+          const opUserId = m.created_by_user_id || "unknown"
+          if (!opGroups.has(opUserId)) {
+            opGroups.set(opUserId, { operatorName: nameById.get(opUserId) || "Usuário", byMethod: new Map() })
+          }
+          const group = opGroups.get(opUserId)!
+          const pmKey = m.payment_method_id || "__cash__"
+          const pmLabel = m.payment_method_name || "Dinheiro"
+          const amt = money(Number(m.amount || 0))
+          const cur = group.byMethod.get(pmKey)
+          if (cur) cur.amount = money(cur.amount + amt)
+          else group.byMethod.set(pmKey, { label: pmLabel, amount: amt })
+        }
+        return Array.from(opGroups.entries()).map(([userId, g]) => ({
+          userId,
+          operatorName: g.operatorName,
+          byMethod: Array.from(g.byMethod.entries()).map(([pmKey, row]) => ({
+            paymentMethodId: pmKey === "__cash__" ? null : pmKey,
+            label: row.label,
+            amount: row.amount,
+          })),
+        }))
+      })(),
       totals: {
         initial,
         totalCashSales: drawer.cashSales,

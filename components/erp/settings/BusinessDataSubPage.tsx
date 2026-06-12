@@ -325,8 +325,7 @@ export const BusinessDataSubPage = ({
                                         <Button variant="outline" onClick={handleBack} disabled={isLoading}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSubmit} disabled={isLoading}>
-                                            <SaveIcon className="w-5 h-5 mr-2" />
+                                        <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
                                             {isLoading ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>

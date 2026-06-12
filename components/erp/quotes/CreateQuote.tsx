@@ -243,7 +243,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
         if (!partnerId) return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setQuotePromotions(res)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [partnerId])
 
     // Pre-populate immediately from existingQuote (basic data from list) before background fetch
@@ -1012,8 +1012,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                                 <Button variant="outline" onClick={handleBackWithSafety} disabled={isSaving || isEditLoadingLocked}>
                                                     Cancelar
                                                 </Button>
-                                                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving}>
-                                                    {!isSaving && <SaveIcon className="w-5 h-5 mr-2" />}
+                                                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving} leftIcon={<SaveIcon size={18} />}>
                                                     {mode === 'edit' ? "Salvar" : "Salvar"}
                                                 </Button>
                                             </div>

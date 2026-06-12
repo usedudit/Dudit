@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection } from "@/components/reusable"
 import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
@@ -88,8 +88,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
 
                 {/* Dados Básicos (Movido para o topo da esquerda) */}
-                <div>
-                    <h3 className="text-lg font-bold mb-5 text-brand-dark dark:text-dark-heading">Dados básicos</h3>
+                <FormSection title="Dados básicos">
                     <div className="space-y-6">
                         <RichTextEditor
                             label="Descrição Detalhada"
@@ -98,7 +97,11 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
+
                     <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
+                </FormSection>
+
+                {/*
                     {!isDigital && (
                         <FulfillmentModesEditor
                             label="Formas de entrega (vitrine)"
@@ -108,12 +111,15 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     )}
-                </div>
+                </FormSection> */}
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}
                 <div className="mt-8">
                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <Accordion title="Especificações" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
+                    <Accordion title={
+                        <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                            Especificações
+                        </span>} defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-left">
                         <div className="pt-2">
                             {attributes.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center text-center py-8">
@@ -131,7 +137,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 </div>
                             ) : (
                                 <>
-                                    <div className="w-full overflow-hidden rounded-t-xl bg-brand-gray dark:bg-dark-border/50">
+                                    <div className="w-full overflow-hidden rounded-t-lg rounded-b-lg bg-brand-gray dark:bg-dark-border/50">
                                         <div className="flex">
                                             <div className="flex-1 py-3 px-4 relative">
                                                 <span className="text-[13px] font-medium text-gray-500 dark:text-dark-body">Atributo</span>
@@ -387,6 +393,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 </div>
 
             </div>
-        </div>
+        </div >
     )
 }

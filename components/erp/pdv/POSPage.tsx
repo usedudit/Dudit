@@ -465,9 +465,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
                 const prodAny = product as any
                 const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
-                const effectiveUnit = selectedVariant
-                    ? listUnit
-                    : computeItemDisplayPrice(Number(product.price || 0), promoPrice > 0 && promoPrice < Number(product.price || 0) ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
+                const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
                 if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
                     return prev
@@ -1265,6 +1263,15 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 </FadeIn>
             ) : (
                 <FadeIn key="open" className="flex h-full flex-col gap-4">
+                    {activeCashSession?.opener_name && (() => {
+                        const sessionDate = activeCashSession.opened_at ? new Date(activeCashSession.opened_at).toLocaleString("pt-BR") : ""
+                        return (
+                            <div className="flex items-center gap-2 rounded-xl bg-brand-primary/10 px-4 py-2 text-sm text-brand-primary-dark dark:bg-brand-primary/20 dark:text-blue-300">
+                                <span className="font-medium">Caixa aberto por {activeCashSession.opener_name}</span>
+                                {sessionDate && <span className="text-brand-inactive-text">às {sessionDate}</span>}
+                            </div>
+                        )
+                    })()}
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
                         <div className="flex min-h-0 flex-col xl:col-span-8 xl:px-6">
                             <POSHeader

@@ -35,13 +35,13 @@ export function ServiceCheckoutSettingsSubPage({
 }) {
   const { openPlanUpgrade } = usePlanUpgrade()
   const { success: notifySuccess, error: notifyError } = useNotification()
-  
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [depositFeatureAllowed, setDepositFeatureAllowed] = useState(false)
   const [depositEnabled, setDepositEnabled] = useState(false)
   const [depositPercentage, setDepositPercentage] = useState("50")
-  
+
   const [depositManualEnabled, setDepositManualEnabled] = useState(false)
   const [depositMpEnabled, setDepositMpEnabled] = useState(false)
   const [mpConnected, setMpConnected] = useState(false)
@@ -105,9 +105,9 @@ export function ServiceCheckoutSettingsSubPage({
 
   return (
     <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-      <div 
-        ref={scrollContainerRef} 
-        onScroll={handleScroll} 
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar"
       >
         {/* Sticky Header */}
@@ -136,11 +136,7 @@ export function ServiceCheckoutSettingsSubPage({
                 <Button variant="outline" onClick={onBack} disabled={saving}>
                   Cancelar
                 </Button>
-                <Button
-                  disabled={saving}
-                  onClick={handleSave}
-                >
-                  <SaveIcon className="w-5 h-5 mr-2" />
+                <Button disabled={saving} onClick={handleSave} leftIcon={<SaveIcon size={18} />}>
                   {saving ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
@@ -198,7 +194,7 @@ export function ServiceCheckoutSettingsSubPage({
                       disabled={!depositFeatureAllowed}
                     />
                   </div>
-                  
+
                   {depositEnabled && (
                     <FormDropdown
                       label="Percentual da entrada"
@@ -219,7 +215,7 @@ export function ServiceCheckoutSettingsSubPage({
                 <p className="text-xs text-brand-inactive-text mb-6">
                   Selecione as formas de pagamento disponíveis para o sinal dos agendamentos.
                 </p>
-                
+
                 <div className="space-y-6">
                   {/* Mercado Pago (Online) */}
                   <div className="flex items-center justify-between">

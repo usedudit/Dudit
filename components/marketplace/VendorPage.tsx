@@ -488,7 +488,7 @@ function ItemsCarousel({ title, items, partner, onSeeAll, sectionId, promotions 
                 <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
                 <CarouselNav targetRef={ref} showSeeAll={!!onSeeAll} onSeeAll={onSeeAll} />
             </div>
-            <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-3">
+            <div ref={ref} className="flex gap-4 lg:gap-5 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-3">
                 {items.slice(0, 20).map(item => (
                     <div key={item.id} className="snap-start">
                         <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={promotions} />
@@ -508,7 +508,7 @@ function CouponsCarousel({ coupons, onCouponClick }: { coupons: any[]; onCouponC
                 <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">Cupons do vendedor</h2>
                 <CarouselNav targetRef={ref} />
             </div>
-            <div ref={ref} className="flex gap-3 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-2">
+            <div ref={ref} className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2">
                 {coupons.map(coupon => (
                     <div key={coupon.id} className="w-[280px] lg:w-[340px] shrink-0 snap-start">
                         <ListItem
@@ -555,6 +555,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [selectedCoupon, setSelectedCoupon] = useState<any>(null)
     const [isMounted, setIsMounted] = useState(false)
     const [isStickyVisible, setIsStickyVisible] = useState(false)
+    const [isMobileScrolled, setIsMobileScrolled] = useState(false)
     const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
     const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
     const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
@@ -632,6 +633,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             window.requestAnimationFrame(() => {
                 const bottom = topRef.current?.getBoundingClientRect().bottom ?? 0
                 setIsStickyVisible(bottom < 0)
+                setIsMobileScrolled(window.scrollY > 10)
                 ticking = false
             })
             ticking = true
@@ -779,32 +781,33 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
-                    <div className="flex items-center justify-between gap-4">
+                    {/* Desktop Layout */}
+                    <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] lg:w-[80px] lg:h-[80px] border border-brand-border shrink-0 bg-gray-50" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                                    <h1 className="text-[20px] lg:text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    <h1 className="text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
                                     {displayReviewsCount > 0 && (
-                                        <div className="flex items-center gap-1 text-[11px] lg:text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
+                                        <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
                                             <StarIcon size={11} className="fill-brand-green text-brand-green" />
                                             <span className="font-bold">{formatNumber(displayRating || 0, 1, 1)}</span>
                                         </div>
                                     )}
-                                    <button onClick={() => setShowShareModal(true)} className="hidden lg:flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
+                                    <button onClick={() => setShowShareModal(true)} className="flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
                                         <ShareIcon size={14} />
                                     </button>
                                 </div>
-                                <p className="text-[13px] lg:text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
-                                <div className="hidden lg:block mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
+                                <p className="text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
+                                <div className="mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
 
-                        <div className="hidden lg:block w-[360px]">
+                        <div className="w-[360px]">
                             <Input variant="full-rounded" value={searchValue} onChange={e => setSearchValue(e.target.value)} placeholder={`Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                         </div>
 
-                        <div className="hidden lg:flex items-start gap-3">
+                        <div className="flex items-start gap-3">
                             <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
                                 <HeartIcon size={20} />
                             </button>
@@ -814,26 +817,55 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 </button>
                             )}
                         </div>
+                    </div>
 
-                        <div className="lg:hidden flex items-center gap-2">
-                            {!isStoreOwner && (
+                    {/* Mobile/Tablet Layout (lg:hidden) */}
+                    <div className="lg:hidden flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50" />
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                    <h1 className="text-[18px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    {displayReviewsCount > 0 && (
+                                        <div className="flex items-center gap-1 text-[11px] lg:text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-1.5 py-0.5 rounded-full shrink-0">
+                                            <StarIcon size={10} className="fill-brand-green text-brand-green" />
+                                            <span className="font-bold text-brand-green">{formatNumber(displayRating || 0, 1, 1)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-[12px] text-brand-inactive-text font-normal leading-tight">{partner.city}, {partner.state}</p>
+                            </div>
+                        </div>
+
+                        {/* Mobile stats and actions on the right */}
+                        <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right flex flex-col justify-center">
+                                <span className="text-[13px] font-bold text-brand-dark leading-tight">{stats.salesCount} {stats.salesCount === 1 ? "venda" : "vendas"}</span>
+                                <span className="text-[10px] text-brand-inactive-text font-normal mt-0.5 leading-tight">{formatJoinDate(partner.createdAt)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                {!isStoreOwner && (
+                                    <button
+                                        onClick={() => setShowReportModal(true)}
+                                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-red-600 active:bg-gray-200 transition-colors"
+                                        title="Denunciar vendedor"
+                                    >
+                                        <FlagIcon size={14} />
+                                    </button>
+                                )}
                                 <button
-                                    onClick={() => setShowReportModal(true)}
-                                    className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-red-600 hover:text-red-700 active:bg-gray-200 transition-colors"
-                                    title="Denunciar vendedor"
+                                    onClick={() => setIsAboutPageOpen(true)}
+                                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors"
                                 >
-                                    <FlagIcon size={16} />
+                                    <InfoIcon size={14} />
                                 </button>
-                            )}
-                            <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
-                                <InfoIcon size={18} />
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark border-b border-white/10 shadow-md transition-all duration-200 ${isStickyVisible && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
+            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark border-b border-white/10 shadow-md transition-all duration-200 ${isMobileScrolled && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
                 <div className="flex items-center gap-4 px-3 h-full">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
@@ -852,7 +884,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </button>
                     )}
 
-                    <div ref={tabsScrollRef} className="flex-1 h-full overflow-x-auto hide-scrollbar">
+                    <div ref={tabsScrollRef} className="flex-1 h-full overflow-x-auto scrollbar-hide">
                         <Tabs value={activeTag} onValueChange={selectTab} className="h-full">
                             <TabsList className="border-0 p-0 h-full gap-5 bg-transparent flex items-center">
                                 {allTabs.map(tab => (
@@ -947,54 +979,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <main id="vendor-products" className="flex-1 px-5 lg:px-0 scroll-mt-[170px]">
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
-                            {/* Inline mobile/tablet catalog & categories bar */}
-                            {!categoryView && (
-                                <div className="lg:hidden mb-6 space-y-3 pt-4">
-                                    {/* Catalog Selector: Produtos, Serviços, Assinaturas */}
-                                    {(services.length > 0 || hasPlans) && (
-                                        <div className="flex gap-2 border-b border-brand-border pb-2 overflow-x-auto hide-scrollbar">
-                                            <button
-                                                onClick={() => { setActiveContext("Produtos"); setCategoryView(null); setActiveTag("todos") }}
-                                                className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Produtos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
-                                            >
-                                                Produtos
-                                            </button>
-                                            {services.length > 0 && (
-                                                <button
-                                                    onClick={() => { setActiveContext("Servicos"); setCategoryView(null); setActiveTag("todos") }}
-                                                    className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Servicos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
-                                                >
-                                                    Serviços
-                                                </button>
-                                            )}
-                                            {hasPlans && (
-                                                <button
-                                                    onClick={() => { setActiveContext("Planos"); setCategoryView(null); setActiveTag("todos") }}
-                                                    className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Planos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
-                                                >
-                                                    Assinaturas
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Categories horizontal list */}
-                                    {allTabs.length > 1 && (
-                                        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-1">
-                                            {allTabs.map(tab => (
-                                                <button
-                                                    key={tab.id}
-                                                    onClick={() => selectTab(tab.id)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${activeTag === tab.id ? "bg-[#ecfdf5] border-brand-green text-brand-green font-semibold" : "bg-white border-brand-border text-brand-inactive-text hover:bg-brand-gray"}`}
-                                                >
-                                                    {tab.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
                             {categoryView ? (
                                 <section data-category-section={categoryView} className="scroll-mt-[150px] pt-4 lg:pt-0">
                                     <div className="flex items-center gap-2 mb-6 pt-4 lg:pt-0">

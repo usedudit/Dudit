@@ -254,8 +254,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                 <Button variant="outline" onClick={handleBack} disabled={saving}>
                   Cancelar
                 </Button>
-                <Button onClick={save} disabled={saving}>
-                  <SaveIcon className="w-5 h-5 mr-2" />
+                <Button onClick={save} disabled={saving} leftIcon={<SaveIcon size={18} />}>
                   {saving ? "Salvando..." : "Salvar"}
                 </Button>
               </div>

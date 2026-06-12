@@ -12,6 +12,7 @@ import {
     upsertDeliveryFeeRuleAction,
     upsertPartnerDeliveryConfigAction,
 } from "@/app/actions/shared/delivery"
+import { getPickupPaymentPolicyAction, updatePickupPaymentPolicyAction } from "@/app/actions/partners/pickup-payment"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useNotification } from "@/hooks/use-notification"
 
@@ -64,6 +65,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
         isDeliveryEnabled: true,
         isPickupEnabled: true,
         freeDeliveryThreshold: "",
+        pickupPaymentPolicy: "require_online_payment" as "require_online_payment" | "allow_pickup_payment",
     })
     const [rules, setRules] = useState<any[]>([])
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false)
@@ -92,9 +94,14 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                 isDeliveryEnabled: Boolean(res.settings.isDeliveryEnabled),
                 isPickupEnabled: Boolean(res.settings.isPickupEnabled ?? true),
                 freeDeliveryThreshold: res.settings.freeDeliveryThreshold == null ? "" : String(res.settings.freeDeliveryThreshold),
+                pickupPaymentPolicy: "require_online_payment",
             })
             setChargeByDistance(Number(res.settings.extraKmPrice || 0) > 0 || res.settings.maxDeliveryKm != null)
             setRules(res.rules || [])
+            const pickupRes = await getPickupPaymentPolicyAction()
+            if (pickupRes.pickupPaymentPolicy) {
+                setSettings(s => ({ ...s, pickupPaymentPolicy: (pickupRes.pickupPaymentPolicy as "require_online_payment" | "allow_pickup_payment") }))
+            }
         }
         setLoading(false)
     }
@@ -161,15 +168,20 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                             },
                                         })
                                         if (res.success) {
-                                            notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
+                                            const pickupRes = await updatePickupPaymentPolicyAction(settings.pickupPaymentPolicy)
+                                            if (!pickupRes.success) {
+                                                notifyError("Erro ao salvar", pickupRes.error || "Ocorreu um erro ao salvar política de pagamento na retirada.")
+                                            } else {
+                                                notifySuccess("Configurações salvas", "As configurações de entrega foram salvas com sucesso.")
+                                            }
                                             await reload()
                                         } else {
                                             notifyError("Erro ao salvar", res.error || "Ocorreu um erro ao salvar as configurações.")
                                         }
                                         setSaving(false)
                                     }}
+                                    leftIcon={<SaveIcon size={18} />}
                                 >
-                                    <SaveIcon className="w-5 h-5 mr-2" />
                                     {saving ? "Salvando..." : "Salvar"}
                                 </Button>
                             </div>
@@ -233,7 +245,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="flex items-center gap-2">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
                                                 Distância e Entrega
                                             </span>
                                         }
@@ -314,7 +326,7 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="flex items-center gap-2">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
                                                 Regras por Horário
                                                 {!advancedEnabled && (
                                                     <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
@@ -350,16 +362,16 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                                     subtitle="Adicione regras para alterar o valor da entrega em horários específicos."
                                                 />
                                             ) : (
-                                                <div className="w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-background">
+                                                <div className="w-full overflow-hidden bg-white dark:bg-dark-background">
                                                     <div className="overflow-x-auto">
-                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                        <table className="w-full border-separate border-spacing-0">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">Início</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Fim</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Tipo</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Valor</th>
-                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center w-20 rounded-r-lg">Ações</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-l-lg">Início</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Fim</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Tipo</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Valor</th>
+                                                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -415,9 +427,31 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Dica Dudit</h3>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                    Configure corretamente o preço por KM extra para garantir que entregas mais distantes cubram seus custos de combustível e tempo.
-                                </p>
+                                <div className="space-y-4">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                                        Configure corretamente o preço por KM extra para garantir que entregas mais distantes cubram seus custos de combustível e tempo.
+                                    </p>
+
+                                    {settings.isPickupEnabled && (
+                                        <>
+                                            <div className="border-t border-brand-border dark:border-dark-border" />
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="font-bold text-md text-brand-dark dark:text-dark-heading">Pagamento na retirada</span>
+                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente pode pagar ao retirar o pedido</span>
+                                                    </div>
+                                                    <Switch
+                                                        checked={settings.pickupPaymentPolicy === "allow_pickup_payment"}
+                                                        onCheckedChange={(checked) => {
+                                                            setSettings(s => ({ ...s, pickupPaymentPolicy: checked ? "allow_pickup_payment" : "require_online_payment" }))
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

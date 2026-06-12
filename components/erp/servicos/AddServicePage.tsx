@@ -480,8 +480,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                 <Button variant="outline" onClick={handleCancelEdit} disabled={isSavingService || isLoadingDetails}>
                                                     Cancelar
                                                 </Button>
-                                                <Button onClick={handleSaveService} disabled={isSavingService || isLoadingDetails}>
-                                                    <SaveIcon className="w-5 h-5 mr-2" />
+                                                <Button onClick={handleSaveService} disabled={isSavingService || isLoadingDetails} leftIcon={<SaveIcon size={18} />}>
                                                     {isSavingService ? "Salvando..." : "Salvar"}
                                                 </Button>
                                             </>

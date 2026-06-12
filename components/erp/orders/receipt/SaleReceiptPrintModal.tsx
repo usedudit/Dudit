@@ -152,9 +152,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
             <div className="sale-receipt-no-print fixed inset-0 z-[130] flex flex-col bg-black/60">
                 <div
-                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${
-                        isAnimating ? "opacity-100" : "opacity-0"
-                    }`}
+                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
+                        }`}
                 >
                     {/* Header */}
                     <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
@@ -191,9 +190,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
                             {/* Left — options */}
                             <div
-                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${
-                                    activeTab === "Visualização" ? "hidden lg:flex" : "flex"
-                                }`}
+                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
+                                    }`}
                             >
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
                                     <div>
@@ -206,11 +204,10 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                                                     key={opt.id}
                                                     type="button"
                                                     onClick={() => setFormat(opt.id)}
-                                                    className={`h-12 rounded-xl border text-sm font-bold transition-colors ${
-                                                        format === opt.id
-                                                            ? "border-brand-dark dark:border-dark-heading bg-brand-dark dark:bg-dark-heading text-white"
-                                                            : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30"
-                                                    }`}
+                                                    className={`h-12 rounded-xl border text-sm font-bold transition-colors ${format === opt.id
+                                                        ? "border-brand-dark dark:border-dark-heading bg-brand-dark dark:bg-dark-heading text-white"
+                                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/30"
+                                                        }`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -242,12 +239,10 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                                     />
 
                                     <div className="hidden lg:flex gap-3 pt-2">
-                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf}>
-                                            <PrinterIcon className="w-5 h-5 mr-2" />
+                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf}>
-                                            <DownloadIcon className="w-5 h-5 mr-2" />
+                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf} leftIcon={<DownloadIcon size={18} />}>
                                             {format === "a4" ? "Salvar PDF" : "Imprimir"}
                                         </Button>
                                     </div>
@@ -255,12 +250,10 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
                                 {/* Mobile footer actions */}
                                 <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf}>
-                                        <PrinterIcon className="w-5 h-5 mr-2" />
+                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf}>
-                                        <DownloadIcon className="w-5 h-5 mr-2" />
+                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf} leftIcon={<DownloadIcon size={18} />}>
                                         PDF
                                     </Button>
                                 </div>
@@ -268,9 +261,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
                             {/* Right — preview */}
                             <div
-                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${
-                                    activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
-                                }`}
+                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
+                                    }`}
                             >
                                 <TabsContent
                                     value="Visualização"

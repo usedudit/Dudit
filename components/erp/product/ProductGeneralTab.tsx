@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, Barcode } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, Barcode, FormSection } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { PlusIcon, ShoppingBagIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
@@ -120,63 +120,57 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Informações básicas</h3>
-
-                <div className="mb-10">
-                    <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
-                </div>
-
-                <div className="space-y-6">
-                    <div className="grid grid-cols-12 gap-6">
-                        <div className="col-span-12">
-                            <Input
-                                label="Nome do Produto"
-                                name="name"
-                                value={productData.name}
-                                onChange={handleFieldChange}
-                                disabled={!isEditing}
-                                required
-                                error={fieldErrors?.has("name")}
-                                errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
-                            />
-                        </div>
-
-                        <div className={`col-span-12 sm:col-span-6`}>
-                            <FormDropdown
-                                label="Status"
-                                options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
-                                value={String(productData.is_active)}
-                                setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
-
-                        <div className="col-span-12 sm:col-span-6">
-                            <FormDropdown
-                                label="Exibir na Vitrine"
-                                options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
-                                value={showInMarketplaceValue}
-                                setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                            />
-                        </div>
+                <FormSection title="Informações Básicas">
+                    <div className="mb-10">
+                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
                     </div>
 
-                    {productData.id && showInMarketplaceValue === "true" && (
-                        <MarketplaceMetricsReadOnly entityType="product" metrics={productData} />
-                    )}
-                </div>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-12 gap-6">
+                            <div className="col-span-12">
+                                <Input
+                                    label="Nome do Produto"
+                                    name="name"
+                                    value={productData.name}
+                                    onChange={handleFieldChange}
+                                    disabled={!isEditing}
+                                    required
+                                    error={fieldErrors?.has("name")}
+                                    errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                />
+                            </div>
+
+                            <div className={`col-span-12 sm:col-span-6`}>
+                                <FormDropdown
+                                    label="Status"
+                                    options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
+                                    value={String(productData.is_active)}
+                                    setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <div className="col-span-12 sm:col-span-6">
+                                <FormDropdown
+                                    label="Exibir na Vitrine"
+                                    options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
+                                    value={showInMarketplaceValue}
+                                    setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+                        </div>
+
+                        {productData.id && showInMarketplaceValue === "true" && (
+                            <MarketplaceMetricsReadOnly entityType="product" metrics={productData} />
+                        )}
+                    </div>
+                </FormSection>
 
                 {/* PREÇO */}
-                <div className="mt-8">
-                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">
-                        {isQuickMode ? "Preço e Estoque" : "Preço"}
-                    </h3>
-
+                <FormSection hasSeparator title={isQuickMode ? "Preço e Estoque" : "Preço"}>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                         {!isQuickMode && (
                             <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
@@ -230,8 +224,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </div>
                     )}
 
-
-
                     <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
                         <Checkbox
                             checked={showPrice}
@@ -261,13 +253,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             />
                         </div>
                     )}
-                </div>
+                </FormSection>
 
                 {/* ESTOQUE */}
                 {!isQuickMode && (
-                    <div className="mt-8">
-                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Estoque</h3>
+                    <FormSection hasSeparator title="Estoque">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                             <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
@@ -296,7 +286,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 label="Permitir vender sem estoque"
                             />
                         </div>
-                    </div>
+                    </FormSection>
                 )}
 
                 {/* ENVIO - Agora com estilo corrigido */}
@@ -304,7 +294,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     <div className="mt-8">
                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
 
-                        <Accordion title="Envio e Dimensões" defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
+                        <Accordion title={
+                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                                Envio e Dimensões
+                            </span>
+                        } defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
                             <div className="pb-4">
                                 <div className="space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">

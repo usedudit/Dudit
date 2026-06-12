@@ -348,8 +348,7 @@ export default function CouponFormPage({
                                     <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                         Cancelar
                                     </Button>
-                                    <Button onClick={onSave} disabled={isSaving}>
-                                        <SaveIcon className="w-5 h-5 mr-2" />
+                                    <Button onClick={onSave} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
                                         {isSaving ? "Salvando..." : "Salvar"}
                                     </Button>
                                 </div>

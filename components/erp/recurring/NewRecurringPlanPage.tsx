@@ -501,8 +501,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving || isEditLoadingLocked}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked}>
-                                            <SaveIcon className="w-5 h-5 mr-2" />
+                                        <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} leftIcon={<SaveIcon size={18} />}>
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -907,8 +906,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                 <Button variant="outline" className="flex-1" onClick={handleBack} disabled={isSaving || isEditLoadingLocked}>
                     Cancelar
                 </Button>
-                <Button className="flex-1" onClick={handleSave} disabled={isSaving || isEditLoadingLocked}>
-                    <SaveIcon className="w-5 h-5 mr-2" />
+                <Button className="flex-1" onClick={handleSave} disabled={isSaving || isEditLoadingLocked} leftIcon={<SaveIcon size={18} />}>
                     Salvar
                 </Button>
             </div>
