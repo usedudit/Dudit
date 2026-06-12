@@ -7,6 +7,7 @@ export type PaymentStatusValue =
   | "in_process"
   | "shipped"
   | "delivered"
+  | "awaiting_pickup_payment"
 
 export type DeliveryStatusValue =
   | "pending"
@@ -29,6 +30,7 @@ const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant
   in_process: { label: "Em análise", variant: "orange" },
   shipped: { label: "Enviado", variant: "blue" },
   delivered: { label: "Entregue", variant: "green" },
+  awaiting_pickup_payment: { label: "Aguardando pagamento na retirada", variant: "orange" },
 }
 
 const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {

@@ -22,6 +22,7 @@ import { formatCurrency } from "@/lib/utils";
 import { QUOTE_DEFAULT_CUSTOMER_LABEL, type QuoteEditCaps } from "@/lib/quotes/quote-edit-rules";
 import { FadeIn } from '@/components/animations/FadeIn';
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine";
+import { Switch } from '@/components/reusable/Switch';
 
 
 
@@ -262,7 +263,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                                         <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-1 shrink-0">
-                                                         {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                                        {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, props.quotePromotions || [], { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}
                                                         <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                             {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                         </div>
@@ -745,7 +746,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <div>
                                     <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-2">Cor Primária</label>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg border border-brand-border dark:border-dark-border overflow-hidden relative shadow-sm">
+                                        <div className="w-10 h-10 rounded-full border border-brand-border dark:border-dark-border overflow-hidden relative">
                                             <input
                                                 type="color"
                                                 value={props.primaryColor}
@@ -760,7 +761,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                 <div>
                                     <label className="block text-[13px] font-bold text-brand-dark dark:text-dark-heading mb-2">Cor Secundária</label>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg border border-brand-border dark:border-dark-border overflow-hidden relative shadow-sm">
+                                        <div className="w-10 h-10 rounded-full border border-brand-border dark:border-dark-border overflow-hidden relative">
                                             <input
                                                 type="color"
                                                 value={props.secondaryColor}
@@ -797,13 +798,8 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">Detalhes decorativos</span>
                                     <span className="text-xs text-brand-inactive-text">Mostrar círculos e enfeites no cabeçalho</span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => props.setShowDecoration(!props.showDecoration)}
-                                    className={`relative w-11 h-6 rounded-full transition-colors ${props.showDecoration ? 'bg-brand-dark dark:bg-dark-heading' : 'bg-gray-300 dark:bg-dark-border'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${props.showDecoration ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-                                </button>
+
+                                <Switch checked={props.showDecoration} onCheckedChange={() => props.setShowDecoration(!props.showDecoration)} />
                             </div>
                         </div>
                     </div>

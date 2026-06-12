@@ -419,3 +419,28 @@ export async function createPublicAppointment(data: {
     return { success: false, error: error?.message || "Erro ao criar agendamento" }
   }
 }
+
+export async function validateServiceBookingAvailabilityAction(
+  items: Array<{
+    partnerId: string
+    staffId: string
+    date: string
+    time: string
+    durationMinutes: number
+  }>,
+) {
+  const { isStaffSlotAvailable } = await import("@/lib/commerce/scheduling-availability")
+  const supabase = getAdminClient()
+  const results: Array<{ available: boolean; staffId: string; date: string; time: string }> = []
+  for (const item of items) {
+    const ok = await isStaffSlotAvailable(supabase, {
+      partnerId: item.partnerId,
+      staffId: item.staffId,
+      date: item.date,
+      startTime: item.time,
+      durationMinutes: item.durationMinutes,
+    })
+    results.push({ available: ok, staffId: item.staffId, date: item.date, time: item.time })
+  }
+  return results
+}

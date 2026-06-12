@@ -14,7 +14,7 @@ import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { getPOSCustomerDetailsAction, createPOSCustomerAddressAction } from "@/app/actions/erp/pdv"
 import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
-import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
+import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
 import { useRouter } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
@@ -276,8 +276,30 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     // items
     const [items, setItems] = useState<any[]>([])
 
-    // Instant product search (client-side bucket)
-    const productBucket = useProductBucket(fetchPartnerProductsBucket, { pageSize: 10 })
+    // Instant product+services search (client-side bucket)
+    const fetchCombinedBucket = useCallback(async () => {
+        const [products, services] = await Promise.all([
+            fetchPartnerProductsBucket(),
+            fetchPartnerServicesBucket()
+        ]);
+        const mappedServices = services.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            sku: 'SERVIÇO',
+            gtin: null,
+            price: s.price,
+            promotional_price: s.promotional_price,
+            category_id: s.category_id,
+            stock: 0,
+            allow_sell_without_stock: true,
+            image: null,
+            has_variants: false,
+            unit: null,
+            isService: true,
+        }));
+        return [...products, ...mappedServices];
+    }, []);
+    const productBucket = useProductBucket(fetchCombinedBucket, { pageSize: 10 })
     const [isProductSearchOpen, setIsProductSearchOpen] = useState(false)
 
     const [orderPromotions, setOrderPromotions] = useState<any[]>([])
@@ -286,7 +308,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (!partnerId) return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setOrderPromotions(res)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [partnerId])
 
     // Financial
@@ -1329,7 +1351,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     </Button>
                                 </div>
 
-                                {/* Title and Actions */}
+                                {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
@@ -1340,12 +1362,12 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                         </div>
                                     </div>
 
+                                    {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSaveOrder} disabled={isSaving}>
-                                            <SaveIcon className="w-5 h-5 mr-2" />
+                                        <Button onClick={handleSaveOrder} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
                                             {isSaving ? "Salvando..." : primaryActionLabel}
                                         </Button>
                                     </div>

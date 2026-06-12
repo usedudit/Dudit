@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // 1. Fetch all orders matching the IDs and user
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id")
+      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at")
       .in("id", orderIds)
       .eq("buyer_id", user.id)
 
@@ -111,6 +111,20 @@ export async function POST(request: NextRequest) {
       for (const chunk of orderChunks) {
         const promises = chunk.map(async (order: any) => {
           try {
+            // Zombie protection: check if order is expired before syncing
+            if (order.payment_expires_at && new Date() > new Date(order.payment_expires_at)) {
+              const { checkAndExpireOrder } = await import("@/lib/services/order-expiration")
+              await checkAndExpireOrder(supabaseAdmin, order.id)
+              return {
+                orderId: order.id,
+                orderNumber: order.order_number,
+                previousStatus: order.situation,
+                newStatus: "cancelled",
+                updated: true,
+                reason: "expired",
+              }
+            }
+
             const mpResponse = await fetch(
               `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
               {

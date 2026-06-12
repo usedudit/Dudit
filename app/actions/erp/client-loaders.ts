@@ -237,10 +237,12 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
   if (!context) throw new Error("No context")
   const partnerId = context.partnerId
 
-  const supabase = await getSupabaseServerClient()
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = getAdminClient()
+
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active, service_categories!category_id(name)")
+    .select("id, name, price, promotional_price, category_id, duration_minutes, buffer_minutes, billing_unit, is_active")
     .eq("partner_id", partnerId)
     .eq("is_active", true)
     .order("name")
@@ -259,7 +261,7 @@ export async function fetchPartnerServicesBucket(): Promise<PartnerServiceBucket
     category_id: s.category_id || null,
     duration: Number(s.duration_minutes || 60),
     bufferMinutes: Number(s.buffer_minutes || 0),
-    category: s.service_categories?.name || null,
+    category: null,
     billingUnit: String(s.billing_unit || "per_service"),
   }))
 }

@@ -68,6 +68,27 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
 
+    // Validate payment method against partner's accepted MP methods
+    {
+      const { data: partnerMethods } = await adminClient
+        .from("partners")
+        .select("mp_accepted_payment_methods")
+        .eq("id", partnerId)
+        .single()
+
+      const accepted = (partnerMethods?.mp_accepted_payment_methods || {}) as Record<string, boolean>
+      const methodId = String(paymentFormData.payment_method_id || "").toLowerCase()
+
+      const methodAllowed = methodId === "pix" ? accepted.pix !== false
+        : methodId === "bolbradesco" ? accepted.boleto !== false
+        : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
+        : true
+
+      if (!methodAllowed) {
+        return NextResponse.json({ error: "Método de pagamento não habilitado pelo vendedor" }, { status: 400 })
+      }
+    }
+
     // Verificar se o usuário é dono do parceiro ou membro da equipe
     let hasAccess = partner.user_id === user.id
     if (!hasAccess) {

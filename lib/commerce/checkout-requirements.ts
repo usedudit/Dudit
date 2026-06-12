@@ -27,6 +27,7 @@ export type CheckoutRequirements = {
   allowPayOnDelivery: boolean
   hasPayOnService: boolean
   showDepositOption: boolean
+  hasIncompatiblePaymentRestrictions: boolean
   lineFlags: Record<string, DerivedLineFlags>
 }
 
@@ -85,6 +86,8 @@ export function aggregateCheckoutRequirements(
   const showRecurringDisclosure = lines.some((l) => l.lineKind === "subscription")
   const allowPayOnDelivery =
     hasProductLines && !hasServiceLines && !hasSubscriptionLines && showDeliverySection
+  const hasIncompatiblePaymentRestrictions =
+    hasProductLines && (hasServiceLines || hasSubscriptionLines)
 
   return {
     showProductFulfillmentOptions,
@@ -100,6 +103,7 @@ export function aggregateCheckoutRequirements(
     allowPayOnDelivery,
     hasPayOnService,
     showDepositOption,
+    hasIncompatiblePaymentRestrictions,
     lineFlags,
   }
 }

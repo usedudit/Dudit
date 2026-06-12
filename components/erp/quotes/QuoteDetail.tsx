@@ -56,24 +56,44 @@ const getStatusInfo = (s: string) => {
     }
 };
 
-const QuoteItem = ({ image, name, sku, qty, price, total }: any) => (
-    <div className="flex items-start gap-4 p-4 border-b border-brand-border dark:border-dark-border last:border-0 hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+const formatProductQuantity = (qty: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return `${qty} un.`;
+    }
+    return `${qty} ${unit}`;
+};
+
+const formatProductUnitPrice = (price: number, unit?: string | null) => {
+    const cleanUnit = String(unit || "").trim().toLowerCase();
+    if (!cleanUnit || cleanUnit === "un" || cleanUnit === "unidade") {
+        return formatCurrency(price);
+    }
+    return `${formatCurrency(price)}/${unit}`;
+};
+
+const QuoteItem = ({ image, name, sku, qty, price, total, unit }: any) => (
+    <div className="flex items-start gap-4">
         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
             <img
                 src={image}
-                className="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal rounded-lg transition-transform"
+                className="w-full h-full object-cover rounded-xl"
                 alt={name}
                 onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }}
             />
         </div>
         <div className="flex-1 min-w-0">
             <div className="flex justify-between items-start mb-1">
-                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{name}</h4>
+                </div>
                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(total)}</span>
             </div>
-            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">{sku}</div>
-            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                <span>{qty} un. • {formatCurrency(price)} / un.</span>
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {sku}</div>
+            <div className="flex items-center gap-2 text-xs mt-1">
+                <span className="text-brand-inactive-text">{formatProductQuantity(qty, unit)}</span>
+                <span className="text-brand-border dark:text-dark-border">|</span>
+                <span className="font-medium text-brand-dark dark:text-dark-heading">{formatProductUnitPrice(price, unit)}</span>
             </div>
         </div>
     </div>
@@ -447,6 +467,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
@@ -467,13 +488,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                 {statusInfo.label}
                                             </Badge>
                                         </h1>
-                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             Criado em {formattedIssueDate} • Válido até {formattedExpiryDate}
                                         </div>
                                     </div>
 
                                     {/* Desktop action buttons */}
-                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3 pb-4">
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
                                             onPrint={() => window.open(`/print/orcamento/${quoteId}`, "_blank")}
                                             onShare={() => setShowShareModal(true)}
@@ -486,6 +507,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         </Button>
                                     </div>
                                 </div>
+
+                                {/* Tabs Navigation */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
@@ -606,8 +629,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                         </div>
 
                                         {/* Items List */}
-                                        <FormSection hasSeparator title="Itens do orçamento">
-                                            <div className="space-y-0">
+                                        <FormSection hasSeparator title="Itens do Orçamento">
+                                            <div className="space-y-4">
                                                 {isLoadingQuoteItems ? (
                                                     <div className="flex items-center justify-center py-14">
                                                         <ThreeDotsLoader />
@@ -616,19 +639,20 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     quote.items?.map((item: any) => (
                                                         <QuoteItem
                                                             key={item.id}
-                                                            image={getR2ImageUrl(item.products?.images?.[0] || item.product?.image, "thumbnail")}
+                                                            image={getR2ImageUrl(item.image || item.products?.images || null, "thumbnail")}
                                                             name={item.custom_name || item.products?.name || "Produto sem nome"}
-                                                            sku={item.products?.sku || "N/A"}
+                                                            sku={item.products?.sku || item.sku || "N/A"}
                                                             qty={item.quantity}
                                                             price={item.unit_price}
                                                             total={item.quantity * item.unit_price}
+                                                            unit={item.products?.unit}
                                                         />
                                                     ))
                                                 )}
                                             </div>
                                         </FormSection>
 
-                                        <FormSection hasSeparator title="Resumo do orçamento">
+                                        <FormSection hasSeparator title="Resumo do Orçamento">
                                             <div className="space-y-3">
                                                 <div className="flex justify-between items-center text-[14px]">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Subtotal ({quote.items?.length || 0} itens)</span>

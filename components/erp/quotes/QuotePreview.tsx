@@ -222,7 +222,7 @@ const QuotePreview = ({
                                 {page.type === 'first' && (
                                     <>
                                         <div className="px-8 py-6">
-                                            <div className="grid grid-cols-4 gap-4 border-b border-brand-border pb-6 w-full">
+                                            <div className="grid grid-cols-3 gap-4 border-b border-brand-border pb-6 w-full">
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium uppercase tracking-wide mb-0.5">Número</span>
                                                     <span className="font-bold text-sm text-brand-dark">{invoiceNumber}</span>

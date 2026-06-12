@@ -119,7 +119,7 @@ const INITIAL_FILTERS: FilterState = {
 
 // --- CONFIGURAÇÃO DE COLUNAS ---
 const FIXED_COLUMNS: ColumnDef[] = [
-    { id: "name", label: "Produto", align: "left", width: "280px", minWidth: "280px" },
+    { id: "name", label: "Produto", align: "left", width: "300px" },
     { id: "category", label: "Categoria", align: "left", width: "130px", minWidth: "120px" },
     { id: "brand", label: "Marca", align: "left", width: "110px", minWidth: "100px" },
     { id: "stock", label: "Estoque", align: "left", width: "160px", minWidth: "140px" },

@@ -4,7 +4,7 @@ import { useState, useRef, Fragment } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getPartnerUrl, getProductUrl } from "@/lib/utils/url-generator"
+import { getPartnerUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
 import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
@@ -83,16 +83,21 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         setIsVendorExpanded(prev => ({ ...prev, [partnerId]: !prev[partnerId] }))
 
     const getItemPricingContext = (item: any, promotions: any[]) => {
-        const basePrice = Number(item.products?.price || 0)
-        const unitPrice = (item.variant_id && item.product_variants)
+        const isService = item.item_type === "service_booking"
+        const basePrice = isService ? Number(item.services?.price || 0) : Number(item.products?.price || 0)
+        const unitPrice = (!isService && item.variant_id && item.product_variants)
             ? Number(item.product_variants.price_adjustment) || basePrice
             : basePrice
-        const promoPrice = item.products?.promotional_price ? Number(item.products.promotional_price) : 0
-        const individualPromo = (!item.variant_id && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice : null
+        const promoPrice = isService
+            ? (item.services?.promotional_price ? Number(item.services.promotional_price) : 0)
+            : (item.products?.promotional_price ? Number(item.products.promotional_price) : 0)
+        const individualPromo = (!isService && !item.variant_id && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice
+            : (isService && promoPrice > 0 && promoPrice < unitPrice) ? promoPrice
+            : null
         return computeItemDisplayPrice(unitPrice, individualPromo, promotions || [], {
-            productId: item.product_id,
-            serviceId: (item.item_type || "product") !== "product" ? item.product_id : undefined,
-            categoryId: item.products?.category_id || undefined,
+            productId: isService ? undefined : item.product_id,
+            serviceId: isService ? item.service_id : undefined,
+            categoryId: isService ? undefined : item.products?.category_id || undefined,
         })
     }
 
@@ -121,11 +126,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const getItemName = (item: any) => {
         const type = item.item_type || "product"
         if (type === "service_booking") {
-            const meta = item.booking_metadata
-            if (meta?.date && meta?.time) {
-                return `${item.services?.name || meta.serviceName} — ${formatDateToBR(meta.date)} ${meta.time}`
-            }
-            return item.services?.name || meta?.serviceName || "Serviço"
+            return item.services?.name || item.booking_metadata?.serviceName || "Serviço"
         }
         if (type === "subscription") {
             return item.recurring_plans?.name || "Assinatura"
@@ -133,6 +134,23 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         return item.variant_id && item.product_variants
             ? `${item.products.name} - ${item.product_variants.variant_name}`
             : item.products?.name || "Item"
+    }
+
+    const getItemBooking = (item: any) => {
+        if (item.item_type !== "service_booking") return null
+        const meta = item.booking_metadata || {}
+        if (!meta.date && !meta.time) return null
+        return `${formatDateToBR(meta.date)} • ${meta.time}`
+    }
+
+    const getItemUrl = (item: any, partner: any) => {
+        if (item.item_type === "service_booking") {
+            return getServiceUrl({ ...item.services, id: item.service_id }, partner)
+        }
+        if (item.item_type === "subscription") {
+            return getProductUrl({ ...item.recurring_plans, id: item.recurring_plan_id }, partner)
+        }
+        return getProductUrl({ ...item.products, id: item.product_id }, partner)
     }
 
     const isItemOutOfStock = (item: any): boolean => {
@@ -500,7 +518,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                             </div>
 
                                                                                             <Link
-                                                                                                href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                href={getItemUrl(item, data.partner)}
                                                                                                 prefetch={false}
                                                                                                 className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
                                                                                             >
@@ -510,7 +528,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                             <div className="flex-1 min-w-0">
                                                                                                 <div className="flex items-start justify-between gap-2">
                                                                                                     <Link
-                                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                        href={getItemUrl(item, data.partner)}
                                                                                                         prefetch={false}
                                                                                                         className="text-[14px] font-medium text-brand-dark dark:text-dark-heading line-clamp-2 cursor-pointer hover:text-brand-green leading-snug"
                                                                                                     >
@@ -531,19 +549,23 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     </p>
                                                                                                 )}
 
+                                                                                                {item.item_type === "service_booking" && getItemBooking(item) && (
+                                                                                                    <p className="text-[12px] text-brand-inactive-text mt-0.5">{getItemBooking(item)}</p>
+                                                                                                )}
+
                                                                                                 <div className="flex items-center justify-between mt-2">
                                                                                                     {isOutOfStock ? (
                                                                                                         <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50">
                                                                                                             Esgotado
                                                                                                         </span>
-                                                                                                    ) : (
+                                                                                                    ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
                                                                                                             onChange={(val) => updateQty(item.id, val, itemQty)}
                                                                                                             disabled={loading === item.id}
                                                                                                             size="sm"
                                                                                                         />
-                                                                                                    )}
+                                                                                                    ) : null}
                                                                                                     {(() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty
@@ -617,7 +639,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                                                                             <div className={`flex-1 flex md:justify-between md:items-center gap-4 ${isOutOfStock ? "opacity-75" : ""}`}>
                                                                                                 <Link
-                                                                                                    href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                    href={getItemUrl(item, data.partner)}
                                                                                                     prefetch={false}
                                                                                                     className="w-[68px] h-[68px] rounded-[8px] overflow-hidden border border-brand-border dark:border-dark-border shrink-0 cursor-pointer block"
                                                                                                 >
@@ -626,7 +648,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
                                                                                                 <div className="flex-1">
                                                                                                     <Link
-                                                                                                        href={getProductUrl({ ...item.products, id: item.product_id }, data.partner)}
+                                                                                                        href={getItemUrl(item, data.partner)}
                                                                                                         prefetch={false}
                                                                                                         className="text-[16px] font-medium text-brand-dark dark:text-dark-heading mb-1 line-clamp-2 cursor-pointer hover:text-brand-green block"
                                                                                                     >
@@ -636,6 +658,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         <p className="text-[13px] text-brand-inactive-text mb-1">
                                                                                                             {item.product_variants.variant_type}: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.product_variants.variant_name}</span>
                                                                                                         </p>
+                                                                                                    )}
+                                                                                                    {item.item_type === "service_booking" && getItemBooking(item) && (
+                                                                                                        <p className="text-[13px] text-brand-inactive-text mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
                                                                                                     {(() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
@@ -652,13 +677,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                         <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-semibold bg-red-150 text-red-700 border border-red-255 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50">
                                                                                                             Esgotado
                                                                                                         </span>
-                                                                                                    ) : (
+                                                                                                    ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
                                                                                                             onChange={(val) => updateQty(item.id, val, itemQty)}
                                                                                                             disabled={loading === item.id}
                                                                                                         />
-                                                                                                    )}
+                                                                                                    ) : null}
                                                                                                     {(() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         const total = isOutOfStock ? ctx.bestPrice : ctx.bestPrice * itemQty

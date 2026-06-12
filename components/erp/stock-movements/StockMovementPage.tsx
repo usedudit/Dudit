@@ -350,11 +350,11 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
     };
 
     const columns: { id: string; label: string; align: "left" | "center" | "right"; width?: string }[] = [
-        { id: "movement", label: "Movimentação", align: "left", width: "200px" },
-        { id: "reason", label: "Motivo", align: "left" },
-        { id: "reference", label: "Referência", align: "left" },
+        { id: "movement", label: "Movimentação", align: "left", width: "250px" },
+        { id: "reason", label: "Motivo", align: "left", width: "250px" },
+        { id: "reference", label: "Referência", align: "left", width: "250px" },
         { id: "date", label: "Data", align: "left", width: "160px" },
-        { id: "type", label: "Tipo", align: "center", width: "160px" },
+        { id: "type", label: "Tipo", align: "center", width: "80px" },
         { id: "actions", label: "Ações", align: "center", width: "80px" },
     ];
 

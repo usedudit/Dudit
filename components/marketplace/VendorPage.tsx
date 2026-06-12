@@ -783,14 +783,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div className="flex items-center gap-4 min-w-0 flex-1">
                             <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] lg:w-[80px] lg:h-[80px] border border-brand-border shrink-0 bg-gray-50" />
                             <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-3 mb-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <h1 className="text-[20px] lg:text-[24px] font-semibold text-brand-dark leading-tight truncate">{partner.storeName}</h1>
+                                    {displayReviewsCount > 0 && (
+                                        <div className="flex items-center gap-1 text-[11px] lg:text-[12px] text-brand-green bg-[#ecfdf5] border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
+                                            <StarIcon size={11} className="fill-brand-green text-brand-green" />
+                                            <span className="font-bold">{formatNumber(displayRating || 0, 1, 1)}</span>
+                                        </div>
+                                    )}
                                     <button onClick={() => setShowShareModal(true)} className="hidden lg:flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text hover:text-brand-green hover:border-brand-green transition-colors">
                                         <ShareIcon size={14} />
                                     </button>
                                 </div>
                                 <p className="text-[13px] lg:text-[14px] text-brand-inactive-text font-normal">{partner.city}, {partner.state}</p>
-                                <div className="mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
+                                <div className="hidden lg:block mt-1.5"><RatingInline rating={displayRating} reviewsCount={displayReviewsCount} /></div>
                             </div>
                         </div>
 
@@ -809,7 +815,16 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             )}
                         </div>
 
-                        <div className="lg:hidden flex items-center gap-3">
+                        <div className="lg:hidden flex items-center gap-2">
+                            {!isStoreOwner && (
+                                <button
+                                    onClick={() => setShowReportModal(true)}
+                                    className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-red-600 hover:text-red-700 active:bg-gray-200 transition-colors"
+                                    title="Denunciar vendedor"
+                                >
+                                    <FlagIcon size={16} />
+                                </button>
+                            )}
                             <button onClick={() => setIsAboutPageOpen(true)} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-brand-dark active:bg-gray-200 transition-colors">
                                 <InfoIcon size={18} />
                             </button>
@@ -932,15 +947,63 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <main id="vendor-products" className="flex-1 px-5 lg:px-0 scroll-mt-[170px]">
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
+                            {/* Inline mobile/tablet catalog & categories bar */}
+                            {!categoryView && (
+                                <div className="lg:hidden mb-6 space-y-3 pt-4">
+                                    {/* Catalog Selector: Produtos, Serviços, Assinaturas */}
+                                    {(services.length > 0 || hasPlans) && (
+                                        <div className="flex gap-2 border-b border-brand-border pb-2 overflow-x-auto hide-scrollbar">
+                                            <button
+                                                onClick={() => { setActiveContext("Produtos"); setCategoryView(null); setActiveTag("todos") }}
+                                                className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Produtos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
+                                            >
+                                                Produtos
+                                            </button>
+                                            {services.length > 0 && (
+                                                <button
+                                                    onClick={() => { setActiveContext("Servicos"); setCategoryView(null); setActiveTag("todos") }}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Servicos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
+                                                >
+                                                    Serviços
+                                                </button>
+                                            )}
+                                            {hasPlans && (
+                                                <button
+                                                    onClick={() => { setActiveContext("Planos"); setCategoryView(null); setActiveTag("todos") }}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${activeContext === "Planos" ? "bg-brand-green text-white" : "bg-brand-gray text-brand-inactive-text hover:text-brand-dark"}`}
+                                                >
+                                                    Assinaturas
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Categories horizontal list */}
+                                    {allTabs.length > 1 && (
+                                        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-1">
+                                            {allTabs.map(tab => (
+                                                <button
+                                                    key={tab.id}
+                                                    onClick={() => selectTab(tab.id)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${activeTag === tab.id ? "bg-[#ecfdf5] border-brand-green text-brand-green font-semibold" : "bg-white border-brand-border text-brand-inactive-text hover:bg-brand-gray"}`}
+                                                >
+                                                    {tab.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {categoryView ? (
                                 <section data-category-section={categoryView} className="scroll-mt-[150px] pt-4 lg:pt-0">
-                                    <div className="hidden lg:flex items-center gap-2 mb-6">
+                                    <div className="flex items-center gap-2 mb-6 pt-4 lg:pt-0">
                                         <button onClick={() => openCategory(null)} className="w-9 h-9 rounded-full bg-brand-gray flex items-center justify-center text-brand-dark">
                                             <ArrowLeftIcon size={18} />
                                         </button>
                                         <div>
                                             <p className="text-[13px] text-brand-inactive-text">Vitrine</p>
-                                            <h2 className="text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
+                                            <h2 className="text-xl lg:text-[24px] font-semibold text-brand-dark">{groupedItems.find(group => group.id === categoryView)?.name}</h2>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 md:gap-x-5 md:gap-y-10">

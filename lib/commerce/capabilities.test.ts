@@ -57,4 +57,58 @@ describe("capabilities", () => {
   it("rejects invalid selected mode", () => {
     expect(isFulfillmentModeAllowed(["on_site"], "delivery")).toBe(false)
   })
+
+  it("detects incompatible payment restrictions in mixed product+service carts", () => {
+    const productCaps = productCatalogCapabilities({ product_type: "Físico" })
+    const serviceCaps = serviceCatalogCapabilities({
+      fulfillment_modes: ["on_site"],
+      scheduling_enabled: true,
+    })
+    const requirements = aggregateCheckoutRequirements([
+      {
+        lineId: "p1",
+        lineKind: "product",
+        catalog: productCaps,
+        fulfillmentMode: "delivery",
+      },
+      {
+        lineId: "s1",
+        lineKind: "service_booking",
+        catalog: serviceCaps,
+        fulfillmentMode: "on_site",
+        schedulingMetadataComplete: true,
+      },
+    ])
+    expect(requirements.hasIncompatiblePaymentRestrictions).toBe(true)
+  })
+
+  it("does not flag incompatible restrictions for product-only carts", () => {
+    const caps = productCatalogCapabilities({ product_type: "Físico" })
+    const requirements = aggregateCheckoutRequirements([
+      {
+        lineId: "p1",
+        lineKind: "product",
+        catalog: caps,
+        fulfillmentMode: "delivery",
+      },
+    ])
+    expect(requirements.hasIncompatiblePaymentRestrictions).toBe(false)
+  })
+
+  it("does not flag incompatible restrictions for service-only carts", () => {
+    const caps = serviceCatalogCapabilities({
+      fulfillment_modes: ["on_site"],
+      scheduling_enabled: true,
+    })
+    const requirements = aggregateCheckoutRequirements([
+      {
+        lineId: "s1",
+        lineKind: "service_booking",
+        catalog: caps,
+        fulfillmentMode: "on_site",
+        schedulingMetadataComplete: true,
+      },
+    ])
+    expect(requirements.hasIncompatiblePaymentRestrictions).toBe(false)
+  })
 })

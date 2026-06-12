@@ -3,7 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import {
     ChevronLeftIcon,
     ThreeDotsIcon,
-    UserIcon
+    UserIcon,
+    CheckCircleIcon,
+    AlertCircleIcon,
+    XIcon,
+    ClockIcon
 } from "@/lib/icons"
 import {
     Button,
@@ -228,12 +232,86 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             <img src={`https://img.dudit.com.br/static/icons/payments/${icon}`} alt={getPaymentTypeLabel()} className="w-5 h-5 object-contain" />
         ) : null;
     }
+
+    const getPaymentStatusDisplay = (situation: string) => {
+        switch (situation) {
+            case "paid":
+                return {
+                    label: "Pago",
+                    color: "text-green-700 dark:text-green-400",
+                    Icon: CheckCircleIcon,
+                };
+            case "partially_paid":
+                return {
+                    label: "Parcialmente Pago",
+                    color: "text-brand-orange dark:text-orange-400",
+                    Icon: ClockIcon,
+                };
+            case "pending":
+            case "unpaid":
+                return {
+                    label: "Pendente",
+                    color: "text-brand-orange dark:text-orange-400",
+                    Icon: ClockIcon,
+                };
+            case "cancelled":
+                return {
+                    label: "Cancelado",
+                    color: "text-red-700 dark:text-red-400",
+                    Icon: XIcon,
+                };
+            case "awaiting_pickup_payment":
+                return {
+                    label: "Aguardando pagamento na retirada",
+                    color: "text-brand-orange dark:text-orange-400",
+                    Icon: ClockIcon,
+                };
+            default:
+                const meta = getPaymentStatusMeta(situation);
+                return {
+                    label: meta.label,
+                    color: "text-gray-700 dark:text-gray-400",
+                    Icon: AlertCircleIcon,
+                };
+        }
+    };
+
+    const renderPaymentMethodValue = () => {
+        const statusDisplay = getPaymentStatusDisplay(order.situation);
+        const StatusIcon = statusDisplay.Icon;
+        const methodType = getPaymentTypeLabel();
+        const methodName = order.payment_method ? ` (${order.payment_method})` : "";
+
+        return (
+            <div className="flex items-center gap-2 flex-wrap text-sm">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
+                        {getPaymentIcon()}
+                    </div>
+                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                        {methodType}{methodName}
+                    </span>
+                </div>
+                <span className="text-brand-border dark:text-dark-border">|</span>
+                <span className={`inline-flex items-center gap-1 font-bold ${statusDisplay.color}`}>
+                    <StatusIcon size={14} className="shrink-0" />
+                    <span>{statusDisplay.label}</span>
+                </span>
+            </div>
+        );
+    };
+
     const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
         ? order.payment_breakdown.filter((entry: any) => entry?.method)
         : Number(order.paid_amount || 0) > 0 && order.payment_method
             ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
             : []
     const itemCount = Number(order.order_items?.length || 0)
+    const sortedOrderItems = [...(order.order_items || [])].sort((a: any, b: any) => {
+        if (a.is_gift && !b.is_gift) return 1;
+        if (!a.is_gift && b.is_gift) return -1;
+        return (a.sort_order || 0) - (b.sort_order || 0);
+    });
     const itemsLabel = itemCount === 1 ? "1 item" : `${itemCount} itens`
     const subtotalValue = Number(order.subtotal_value || 0) > 0
         ? Number(order.subtotal_value || 0)
@@ -547,70 +625,68 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
                                                         <div className="space-y-4">
-                                                            {(order.order_items || []).map((item: any) => {
-                                                                const isService = !!item.service_id || item.line_type === "service_booking";
-                                                                const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
-                                                                return (
-                                                                    <div key={item.id} className="flex items-start gap-4">
-                                                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                            <img
-                                                                                src={getR2ImageUrl(item.image, "thumbnail")}
-                                                                                className="w-full h-full object-cover rounded-xl"
-                                                                                alt={item.product_name}
-                                                                                onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex justify-between items-start mb-1">
-                                                                                <div className="flex flex-col gap-1 min-w-0">
-                                                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
-                                                                                    {item.is_gift && (
-                                                                                        <div className="mt-0.5">
-                                                                                            <Badge variant="green">Brinde</Badge>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
-                                                                                    {item.is_gift ? (
-                                                                                        <div className="flex items-center gap-1.5">
-                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        formatCurrency(item.subtotal || item.product_price * item.quantity)
-                                                                                    )}
-                                                                                </span>
-                                                                            </div>
-                                                                    {isService ? (
-                                                                        scheduleInfo ? (
-                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                SKU: {item.sku || "N/A"}
-                                                                            </div>
-                                                                        )
-                                                                    ) : (
-                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
-                                                                    )}
-                                                                            <div className="flex items-center gap-2 text-xs mt-1">
-                                                                                <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
-                                                                                <span className="text-brand-border dark:text-dark-border">|</span>
-                                                                                <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                                    {item.is_gift ? (
-                                                                                        <span className="flex items-center gap-1.5 inline-flex">
-                                                                                            <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        formatProductUnitPrice(item.product_price, item.products?.unit)
-                                                                                    )}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                             {sortedOrderItems.map((item: any) => {
+                                                                 const isService = !!item.service_id || item.line_type === "service_booking";
+                                                                 const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
+                                                                 return (
+                                                                     <div key={item.id} className="flex items-start gap-4">
+                                                                         <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                             <img
+                                                                                 src={getR2ImageUrl(item.image || item.products?.images || item.services?.images || null, "thumbnail")}
+                                                                                 className="w-full h-full object-cover rounded-xl"
+                                                                                 alt={item.product_name}
+                                                                                 onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
+                                                                         </div>
+                                                                         <div className="flex-1 min-w-0">
+                                                                             <div className="flex justify-between items-start mb-1">
+                                                                                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                                                                     <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
+                                                                                     {item.is_gift && (
+                                                                                         <Badge variant="blue" icon={null}>Brinde</Badge>
+                                                                                     )}
+                                                                                 </div>
+                                                                                 <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
+                                                                                     {item.is_gift ? (
+                                                                                         <div className="flex items-center gap-1.5">
+                                                                                             <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                             <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                         </div>
+                                                                                     ) : (
+                                                                                         formatCurrency(item.subtotal || item.product_price * item.quantity)
+                                                                                     )}
+                                                                                 </span>
+                                                                             </div>
+                                                                             {isService ? (
+                                                                                 scheduleInfo ? (
+                                                                                     <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                         Data do agendamento: {formatServiceSchedule(scheduleInfo.date, scheduleInfo.time)}
+                                                                                     </div>
+                                                                                 ) : (
+                                                                                     <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
+                                                                                         SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}
+                                                                                     </div>
+                                                                                 )
+                                                                             ) : (
+                                                                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}</div>
+                                                                             )}
+                                                                             <div className="flex items-center gap-2 text-xs mt-1">
+                                                                                 <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                                 <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                                 <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                                     {item.is_gift ? (
+                                                                                         <span className="flex items-center gap-1.5 inline-flex">
+                                                                                             <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                         </span>
+                                                                                     ) : (
+                                                                                         formatProductUnitPrice(item.product_price, item.products?.unit)
+                                                                                     )}
+                                                                                 </span>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
+                                                                 );
+                                                             })}
                                                         </div>
                                                     </div>
 
@@ -623,16 +699,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         <div className="space-y-3">
                                                             <PaymentRow
                                                                 label="Método de Pagamento"
-                                                                value={
-                                                                     <div className="flex items-center gap-2">
-                                                                         <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                             {getPaymentIcon()}
-                                                                         </div>
-                                                                         <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                             {paymentMethodLabel}
-                                                                         </span>
-                                                                     </div>
-                                                                } />
+                                                                value={renderPaymentMethodValue()} />
 
                                                             {paymentBreakdown.length > 1 && (
                                                                 <PaymentRow
@@ -821,26 +888,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 {/* 4. Itens do Pedido */}
                                                 <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
                                                     <div className="space-y-4">
-                                                        {(order.order_items || []).map((item: any) => {
+                                                        {sortedOrderItems.map((item: any) => {
                                                             const isService = !!item.service_id || item.line_type === "service_booking";
                                                             const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                             return (
                                                             <div key={item.id} className="flex items-start gap-4">
                                                                 <div className="w-16 h-16 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
                                                                     <img
-                                                                        src={getR2ImageUrl(item.image, "thumbnail")}
+                                                                        src={getR2ImageUrl(item.image || item.products?.images || item.services?.images || null, "thumbnail")}
                                                                         className="w-full h-full object-cover rounded-xl"
                                                                         alt={item.product_name}
                                                                         onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex justify-between items-start mb-1">
-                                                                        <div className="flex flex-col gap-1 min-w-0">
+                                                                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                                                             <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.product_name || "Produto sem nome"}</h4>
                                                                             {item.is_gift && (
-                                                                                <div className="mt-0.5">
-                                                                                    <Badge variant="green">Brinde</Badge>
-                                                                                </div>
+                                                                                <Badge variant="blue" icon={null}>Brinde</Badge>
                                                                             )}
                                                                         </div>
                                                                         <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">
@@ -861,22 +926,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             </div>
                                                                         ) : (
                                                                             <div className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                                                                                SKU: {item.sku || "N/A"}
+                                                                                SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}
                                                                             </div>
                                                                         )
                                                                     ) : (
-                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.product_variants?.sku || item.products?.sku || item.sku || "N/A"}</div>
                                                                     )}
-                                                                    <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                        {item.is_gift ? (
-                                                                            <span className="flex items-center gap-1.5">
-                                                                                <span>{item.quantity} un. •</span>
-                                                                                <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
-                                                                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span>{item.quantity} un. • {formatCurrency(item.product_price)} / un.</span>
-                                                                        )}
+                                                                    <div className="flex items-center gap-2 text-xs mt-1">
+                                                                        <span className="text-brand-inactive-text">{formatProductQuantity(item.quantity, item.products?.unit)}</span>
+                                                                        <span className="text-brand-border dark:text-dark-border">|</span>
+                                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                                                            {item.is_gift ? (
+                                                                                <span className="flex items-center gap-1.5 inline-flex">
+                                                                                    <span className="text-xs text-brand-inactive-text line-through font-normal">{formatCurrency(item.original_price || 0)}</span>
+                                                                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Grátis</span>
+                                                                                </span>
+                                                                            ) : (
+                                                                                formatProductUnitPrice(item.product_price, item.products?.unit)
+                                                                            )}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -890,16 +958,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <div className="space-y-3">
                                                         <PaymentRow
                                                             label="Método de Pagamento"
-                                                            value={
-                                                                 <div className="flex items-center gap-2">
-                                                                     <div className="w-8 h-8 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
-                                                                         {getPaymentIcon()}
-                                                                     </div>
-                                                                     <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                         {paymentMethodLabel}
-                                                                     </span>
-                                                                 </div>
-                                                            } />
+                                                            value={renderPaymentMethodValue()} />
 
                                                         {paymentBreakdown.length > 1 && (
                                                             <PaymentRow

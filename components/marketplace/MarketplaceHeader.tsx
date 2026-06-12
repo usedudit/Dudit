@@ -478,7 +478,7 @@ const Header: React.FC<HeaderProps> = ({
         }
 
         const isVendorPage = !!storeSearchPlaceholder && !vendorCategoryTitle
-        const isTransparentHeader = (isProductDetail || isVendorPage) && !isScrolled
+        const isTransparentHeader = (isProductDetail || isVendorPage) && !isScrolled && !vendorCategoryTitle
 
         return (
             <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark"}`}>

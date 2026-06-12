@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id")
+      .select("id, order_number, situation, total_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at")
       .eq("id", orderId)
       .eq("buyer_id", user.id)
       .single()
@@ -44,6 +44,23 @@ export async function POST(request: NextRequest) {
         skipped: true,
         reason: "non_mercado_pago_order",
       })
+    }
+
+    // Zombie protection: check if order is expired
+    if (order.situation === "pending" && order.payment_expires_at) {
+      if (new Date() > new Date(order.payment_expires_at)) {
+        const { checkAndExpireOrder } = await import("@/lib/services/order-expiration")
+        await checkAndExpireOrder(supabaseAdmin, orderId)
+        return NextResponse.json({
+          success: true,
+          orderId: order.id,
+          orderNumber: order.order_number,
+          previousStatus: order.situation,
+          newStatus: "cancelled",
+          updated: true,
+          reason: "expired",
+        })
+      }
     }
 
     if (!order.mp_payment_id) {

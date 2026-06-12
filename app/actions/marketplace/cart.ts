@@ -99,7 +99,7 @@ export async function getCachedCart(userId: string) {
       created_at,
       products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
-      services(id, name, price, duration_minutes, scheduling_enabled),
+      services(id, name, price, promotional_price, duration_minutes, scheduling_enabled),
       recurring_plans(
         id, name, status,
         recurring_plan_items(unit_price, quantity)
@@ -633,6 +633,7 @@ export async function checkoutCartAction(
   payWithAmount?: number,
   payDepositOnly?: boolean,
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null,
+  isPickupPayment?: boolean,
 ) {
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
@@ -1043,7 +1044,7 @@ export async function checkoutCartAction(
           } : {})
         }],
       payment_provider: useMercadoPago ? "Mercado Pago" : null,
-      situation: "pending",
+      situation: isPickupPayment && orderDelivery === "pickup" ? "awaiting_pickup_payment" : "pending",
       notes,
       finance_account_id: financeAccountId,
       coupon_id: couponIdToSave,
@@ -1060,6 +1061,18 @@ export async function checkoutCartAction(
     .single()
 
   if (orderError || !order) return { error: orderError?.message || "Erro ao criar pedido" }
+
+  // Set payment expiration
+  {
+    const { computePaymentExpiresAt, computePickupPaymentExpiresAt } = await import("@/lib/services/order-expiration")
+    const expiresAt = isPickupPayment
+      ? computePickupPaymentExpiresAt()
+      : computePaymentExpiresAt(paymentMethodName)
+    await supabase
+      .from("orders")
+      .update({ payment_expires_at: expiresAt.toISOString() })
+      .eq("id", order.id)
+  }
 
   // Increment usage counter
   increment_usage_counter(partnerId, "orders_month_count").catch(console.error)

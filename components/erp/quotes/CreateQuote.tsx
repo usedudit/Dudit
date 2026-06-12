@@ -146,10 +146,13 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
             sku: 'SERVIÇO',
             gtin: null,
             price: s.price,
+            promotional_price: s.promotional_price,
+            category_id: s.category_id,
             stock: 0,
             allow_sell_without_stock: true,
             image: null,
             has_variants: false,
+            unit: null,
             isService: true,
         }));
         return [...products, ...mappedServices];

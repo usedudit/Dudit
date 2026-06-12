@@ -31,6 +31,7 @@ import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-
 import { validateMarketplaceCheckoutPayment } from "@/lib/commerce/validate-marketplace-checkout-payment"
 import { CheckoutFulfillmentPanel } from "@/components/marketplace/checkout/CheckoutFulfillmentPanel"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
+import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 
 interface ProductItem {
     id: string
@@ -332,6 +333,8 @@ const [showCouponModal, setShowCouponModal] = useState(false)
 const [selectedCouponId, setSelectedCouponId] = useState<string>("")
 const [couponError, setCouponError] = useState<string | null>(null)
 const [couponPartialWarning, setCouponPartialWarning] = useState(false)
+const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
+const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
 
 const displayableCoupons = availableCoupons
 
@@ -456,6 +459,13 @@ const displayableCoupons = availableCoupons
             setPayDepositOnly(false)
         }
     }, [paymentOption, checkoutContext?.deposit.available])
+
+    // Show incompatible payment restrictions warning
+    useEffect(() => {
+        if (requirements?.hasIncompatiblePaymentRestrictions) {
+            setPaymentError("Alguns itens deste pedido possuem restrições incompatíveis de pagamento. Finalize-os separadamente.")
+        }
+    }, [requirements?.hasIncompatiblePaymentRestrictions])
 
     // Sync all data from checkout context when it loads
     useEffect(() => {
@@ -692,9 +702,29 @@ const displayableCoupons = availableCoupons
         () =>
             (checkoutContext?.lines || [])
                 .filter((l) => l.lineKind === "service_booking" && l.bookingSummary)
-                .map((l) => ({ name: l.displayName, summary: l.bookingSummary ?? null })),
+                .map((l) => ({ name: l.displayName, summary: l.bookingSummary ?? null, lineId: l.lineId })),
         [checkoutContext?.lines],
     )
+
+    useEffect(() => {
+        const serviceLines = (checkoutContext?.lines || []).filter((l) => l.lineKind === "service_booking" && l.bookingMetadata)
+        if (serviceLines.length === 0) return
+        setServiceAvailLoading(true)
+        const items = serviceLines.map((l) => ({
+            partnerId: checkoutContext!.partner!.id,
+            staffId: l.bookingMetadata!.staffId,
+            date: l.bookingMetadata!.date,
+            time: l.bookingMetadata!.time,
+            durationMinutes: l.bookingMetadata!.durationMinutes,
+        }))
+        validateServiceBookingAvailabilityAction(items).then((results) => {
+            const map: Record<string, { available: boolean; checked: boolean }> = {}
+            serviceLines.forEach((l, i) => {
+                map[l.lineId] = { available: results[i]?.available ?? true, checked: true }
+            })
+            setServiceAvailability(map)
+        }).finally(() => setServiceAvailLoading(false))
+    }, [checkoutContext?.lines])
 
     const partnerAddressLabel = formatPartnerAddress(
         checkoutContext?.partner?.address || partnerInfo.address,
@@ -1043,7 +1073,8 @@ const displayableCoupons = availableCoupons
     const shouldShowInstallments = paymentOption === "traditional"
         && selectedStorefrontMethod?.type === "credit_card"
         && (Number(paymentPreview?.maxInstallments || selectedStorefrontMethod?.maxInstallments || 1) > 1)
-    const disableCheckoutSubmit = isLoading
+    const hasUnavailableService = Object.values(serviceAvailability).some((s) => s.checked && !s.available)
+    const disableCheckoutSubmit = isLoading || hasUnavailableService
         || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
         || (productDeliveryQuoteActive && (deliveryQuoteLoading || !!deliveryError))
 
@@ -1128,6 +1159,33 @@ const displayableCoupons = availableCoupons
                                         {line.bookingSummary && (
                                             <div className="text-xs text-brand-inactive-text mt-0.5">
                                                 {line.bookingSummary}
+                                            </div>
+                                        )}
+                                        {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-900/30">
+                                                    ⚠ Este horário não está mais disponível
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const p = checkoutContext?.partner
+                                                        if (p) window.location.href = getPartnerUrl(p)
+                                                    }}
+                                                    className="text-xs font-semibold text-brand-blue hover:text-blue-700 underline"
+                                                >
+                                                    Remarcar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        await fetch("/api/cart/remove", { method: "POST", body: JSON.stringify({ cartItemId: line.lineId }) })
+                                                        window.location.reload()
+                                                    }}
+                                                    className="text-xs font-semibold text-brand-red hover:text-red-700 underline"
+                                                >
+                                                    Remover
+                                                </button>
                                             </div>
                                         )}
                                         <div className="text-xs text-brand-inactive-text mt-0.5">
@@ -1511,6 +1569,34 @@ const displayableCoupons = availableCoupons
             return
         }
 
+        if (requirements?.hasIncompatiblePaymentRestrictions) {
+            setPaymentError("Alguns itens deste pedido possuem restrições incompatíveis de pagamento. Finalize-os separadamente.")
+            setIsLoading(false)
+            return
+        }
+
+        // Check service booking availability before submitting
+        const serviceLines = (checkoutContext?.lines || []).filter((l) => l.lineKind === "service_booking" && l.bookingMetadata)
+        if (serviceLines.length > 0) {
+            const availItems = serviceLines.map((l) => ({
+                partnerId: checkoutContext!.partner!.id,
+                staffId: l.bookingMetadata!.staffId,
+                date: l.bookingMetadata!.date,
+                time: l.bookingMetadata!.time,
+                durationMinutes: l.bookingMetadata!.durationMinutes,
+            }))
+            const availResults = await validateServiceBookingAvailabilityAction(availItems)
+            const map: Record<string, { available: boolean; checked: boolean }> = {}
+            serviceLines.forEach((l, i) => { map[l.lineId] = { available: availResults[i]?.available ?? true, checked: true } })
+            setServiceAvailability(map)
+            const anyUnavailable = availResults.some((r) => !r.available)
+            if (anyUnavailable) {
+                setPaymentError("Um ou mais serviços não estão mais disponíveis no horário selecionado. Remova ou remarque antes de continuar.")
+                setIsLoading(false)
+                return
+            }
+        }
+
         if (productDeliveryQuoteActive) {
             if (showAddressForm) {
                 setDeliveryError("Por favor, salve o endereço antes de finalizar o pedido")
@@ -1595,6 +1681,7 @@ const displayableCoupons = availableCoupons
                     setIsLoading(false)
                     return
                 }
+                const isPickupPayment = isPickup && checkoutContext?.partner?.pickupPaymentPolicy === "allow_pickup_payment" && paymentOption === "traditional"
                 const token = csrfToken || await fetch("/api/csrf-token").then((r) => r.json()).then((d) => d.token || "")
                 if (sessionData?.source === "cart") {
                     const items = sessionData.cartItems || []
@@ -1624,6 +1711,7 @@ const displayableCoupons = availableCoupons
                         payWithAmount || undefined,
                         payDepositOnly,
                         checkoutPricingSnapshot,
+                        isPickupPayment,
                     )
                     if (result.error) throw new Error(result.error)
                     invalidateCartCache()
@@ -2261,7 +2349,15 @@ const displayableCoupons = availableCoupons
                                             <ListItem
                                                 icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
                                                 title="Mercado Pago"
-                                                description="Cartão, Pix ou saldo MP."
+                                                description={(() => {
+                                                    const mp = mpAcceptedPaymentMethods
+                                                    const enabled = []
+                                                    if (mp?.pix !== false) enabled.push("Pix")
+                                                    if (mp?.credit_card !== false) enabled.push("Cartão")
+                                                    if (mp?.boleto !== false) enabled.push("Boleto")
+                                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                                    return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
+                                                })()}
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                 onClick={() => setPaymentOption("mercadopago")}
                                                 right={
@@ -2670,7 +2766,15 @@ const displayableCoupons = availableCoupons
                             }
                             title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                             description={
-                                paymentOption === "mercadopago" ? "Cartão, Pix ou saldo MP" :
+                                paymentOption === "mercadopago" ? (() => {
+                                    const mp = mpAcceptedPaymentMethods
+                                    const enabled = []
+                                    if (mp?.pix !== false) enabled.push("Pix")
+                                    if (mp?.credit_card !== false) enabled.push("Cartão")
+                                    if (mp?.boleto !== false) enabled.push("Boleto")
+                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                    return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
+                                })() :
                                     selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
                                         selectedStorefrontMethod?.type.includes("card") ? `${formData.installments}x no Cartão` :
                                             wantsChange ? `Dinheiro (Troco para R$ ${payWithAmount?.toFixed(2).replace('.', ',')})` :
@@ -3011,43 +3115,74 @@ const displayableCoupons = availableCoupons
                 maxWidth="md"
             >
                 <div className="pb-4">
-                    {partnerInfo.mpConnected ? (
-                        <Tabs defaultValue={paymentOption || "mercadopago"} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago")}>
-                            <TabsList className="mb-4">
-                                <TabsTrigger value="mercadopago">Pagar Online</TabsTrigger>
-                                <TabsTrigger value="traditional">{isPickup ? "Pagar na Retirada" : "Pagar na Entrega"}</TabsTrigger>
-                            </TabsList>
+                    {(() => {
+                        const pickupPolicy = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+                        const canPayUponPickup = isPickup && pickupPolicy === "allow_pickup_payment"
+                        const mustPayOnline = isPickup && pickupPolicy === "require_online_payment"
+                        const showTraditionalTab = !isPickup || canPayUponPickup
 
-                            <TabsContent value="mercadopago" className="pt-2">
-                                <div
-                                    onClick={() => {
-                                        setPaymentOption("mercadopago")
-                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
-                                        setShowPaymentModal(false)
-                                    }}
-                                    className={`group rounded-2xl border p-4 transition-all cursor-pointer flex items-center gap-3 ${formData.paymentMethod === "mercadopago" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"}`}
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
-                                        <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Mercado Pago</h3>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">Cartão, Pix ou saldo MP</p>
-                                    </div>
-                                    <div className="shrink-0 ml-4">
-                                        <RadioButton
-                                            name="paymentSelect"
-                                            value="mercadopago"
-                                            checked={formData.paymentMethod === "mercadopago"}
-                                            onChange={() => {
+                        if (mustPayOnline && !partnerInfo.mpConnected) {
+                            return (
+                                <div className="p-6 text-center">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                        Retirada requer uma integração de pagamento online ativa.
+                                    </p>
+                                </div>
+                            )
+                        }
+
+                        const traditionalTabLabel = canPayUponPickup ? "Pagar na Retirada" : "Pagar na Entrega"
+                        const showMercadoPagoTab = partnerInfo.mpConnected
+
+                        return (
+                            <Tabs defaultValue={paymentOption || (showMercadoPagoTab ? "mercadopago" : "traditional")} onValueChange={(val) => setPaymentOption(val as "traditional" | "mercadopago")}>
+                                {showMercadoPagoTab || showTraditionalTab ? (
+                                    <TabsList className="mb-4">
+                                        {showMercadoPagoTab && <TabsTrigger value="mercadopago">Pagar Online</TabsTrigger>}
+                                        {showTraditionalTab && <TabsTrigger value="traditional">{traditionalTabLabel}</TabsTrigger>}
+                                    </TabsList>
+                                ) : null}
+
+                                {showMercadoPagoTab && (
+                                    <TabsContent value="mercadopago" className="pt-2">
+                                        <div
+                                            onClick={() => {
                                                 setPaymentOption("mercadopago")
                                                 setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
                                                 setShowPaymentModal(false)
                                             }}
-                                        />
-                                    </div>
-                                </div>
-                            </TabsContent>
+                                            className={`group rounded-2xl border p-4 transition-all cursor-pointer flex items-center gap-3 ${formData.paymentMethod === "mercadopago" ? "border-brand-green bg-green-50/30 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"}`}
+                                        >
+                                            <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0">
+                                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">Mercado Pago</h3>
+                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{(() => {
+                                                    const mp = mpAcceptedPaymentMethods
+                                                    const enabled = []
+                                                    if (mp?.pix !== false) enabled.push("Pix")
+                                                    if (mp?.credit_card !== false) enabled.push("Cartão")
+                                                    if (mp?.boleto !== false) enabled.push("Boleto")
+                                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                                    return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
+                                                })()}</p>
+                                            </div>
+                                            <div className="shrink-0 ml-4">
+                                                <RadioButton
+                                                    name="paymentSelect"
+                                                    value="mercadopago"
+                                                    checked={formData.paymentMethod === "mercadopago"}
+                                                    onChange={() => {
+                                                        setPaymentOption("mercadopago")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                        setShowPaymentModal(false)
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                )}
 
                             <TabsContent value="traditional" className="pt-2">
                                 <div className="space-y-3">
@@ -3125,85 +3260,8 @@ const displayableCoupons = availableCoupons
                                 </div>
                             </TabsContent>
                         </Tabs>
-                    ) : (
-                        <div className="space-y-3 pt-2">
-                            <div className="flex gap-3 mb-2 px-1">
-                                <div className="w-1 rounded-full bg-brand-border dark:bg-dark-border shrink-0" />
-                                <p className="text-sm text-brand-inactive-text">Pagamento direto com o vendedor (na entrega ou retirada).</p>
-                            </div>
-                            {storefrontMethods.map((m) => {
-                                const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                    m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                        m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                            <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
-
-                                const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
-
-                                return (
-                                    <div
-                                        key={m.id}
-                                        onClick={() => {
-                                            setPaymentOption("traditional")
-                                            setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                            setShowPaymentModal(false)
-                                            if (m.type === "cash" && !isPickup && wantsChange === null) {
-                                                setTempWantsChange(null)
-                                                setTempPayWithAmount("")
-                                                setShowChangeModal(true)
-                                            }
-                                        }}
-                                        className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
-                                            ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3 p-4">
-                                            <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
-                                                {icon}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
-                                            </div>
-                                            <div className="shrink-0 ml-4">
-                                                <RadioButton
-                                                    name="paymentSelect"
-                                                    value={m.id}
-                                                    checked={formData.paymentMethod === m.id}
-                                                    onChange={() => {
-                                                        setPaymentOption("traditional")
-                                                        setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                                        setShowPaymentModal(false)
-                                                        if (m.type === "cash" && !isPickup && wantsChange === null) {
-                                                            setTempWantsChange(null)
-                                                            setTempPayWithAmount("")
-                                                            setShowChangeModal(true)
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        {m.type.includes("card") && m.cardBrand && (
-                                            <>
-                                                <Separator className="mx-4 my-0" />
-                                                <div className="px-4 py-3 flex flex-wrap gap-2">
-                                                    {m.cardBrand.split(/[;,]/).map(b => {
-                                                        const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
-                                                        if (!brand) return null
-                                                        return (
-                                                            <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
-                                                                <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )}
+                    )
+                })()}
                 </div>
             </DefaultModal>
 

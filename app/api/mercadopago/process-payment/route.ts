@@ -143,6 +143,27 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Vendedor não encontrado" }, { status: 400 })
     }
 
+    // Validate payment method against partner's accepted MP methods
+    {
+      const { data: partnerMethods } = await adminClient
+        .from("partners")
+        .select("mp_accepted_payment_methods")
+        .eq("id", partnerId)
+        .single()
+
+      const accepted = (partnerMethods?.mp_accepted_payment_methods || {}) as Record<string, boolean>
+      const methodId = String(paymentFormData.payment_method_id || "").toLowerCase()
+
+      const methodAllowed = methodId === "pix" ? accepted.pix !== false
+        : methodId === "bolbradesco" ? accepted.boleto !== false
+        : ["account_money", "mercado_pago_wallet"].includes(methodId) ? accepted.mercado_pago_wallet !== false
+        : true
+
+      if (!methodAllowed) {
+        return NextResponse.json({ error: "Método de pagamento não habilitado pelo vendedor" }, { status: 400 })
+      }
+    }
+
     let mpAccessToken: string
     try {
       mpAccessToken = await getValidMercadoPagoAccessToken(partnerId)
@@ -678,6 +699,12 @@ async function handler(request: NextRequest) {
       console.error("Error ensuring marketplace customer in process-payment route:", e)
     }
 
+    // Compute payment_expires_at
+    const { computePaymentExpiresAt } = await import("@/lib/services/order-expiration")
+    const paymentExpiresAt = paymentStatus === "approved"
+      ? null
+      : computePaymentExpiresAt(paymentFormData.payment_method_id ?? paymentMethodDisplayName).toISOString()
+
     // CRIAR ORDER NO BANCO
     if (isDev) console.log("Creating order with data:", {
       partner_id: partnerId,
@@ -726,6 +753,8 @@ async function handler(request: NextRequest) {
         pricing_version: "2.0",
         amount_paid: paymentStatus === "approved" ? totalAmount : 0,
         paid_amount: paymentStatus === "approved" ? totalAmount : 0,
+        paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
+        payment_expires_at: paymentExpiresAt,
       })
       .select()
       .single()

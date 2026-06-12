@@ -88,7 +88,7 @@ async function handler(request: NextRequest) {
     const adminClient = createAdminClient()
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
-      .select("id, store_name")
+      .select("id, store_name, mp_accepted_payment_methods")
       .eq("id", partnerId)
       .single()
 
@@ -329,6 +329,20 @@ async function handler(request: NextRequest) {
         pending: `${process.env.NEXT_PUBLIC_APP_URL}/payment/pending`,
       },
       auto_return: "approved",
+    }
+
+    // Filter payment methods based on partner's MP accepted payment methods
+    const acceptedMethods = (partner as any)?.mp_accepted_payment_methods || {}
+    const excludedPaymentTypes: Array<{ id: string }> = []
+    if (acceptedMethods.pix === false) excludedPaymentTypes.push({ id: "pix" })
+    if (acceptedMethods.credit_card === false) excludedPaymentTypes.push({ id: "credit_card" })
+    if (acceptedMethods.debit_card === false) excludedPaymentTypes.push({ id: "debit_card" })
+    if (acceptedMethods.boleto === false) excludedPaymentTypes.push({ id: "ticket" })
+    if (acceptedMethods.mercado_pago_wallet === false) excludedPaymentTypes.push({ id: "account_money" })
+    if (excludedPaymentTypes.length > 0) {
+      preferencePayload.payment_methods = {
+        excluded_payment_types: excludedPaymentTypes,
+      }
     }
 
     // Adicionar expiração de 30 minutos (1800 segundos) para PIX

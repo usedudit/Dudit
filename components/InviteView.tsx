@@ -132,7 +132,6 @@ export default function InviteView(props: InviteViewProps) {
 
                 <div className={`w-full p-4 rounded-xl border text-left ${isMismatch ? "bg-red-50 border-red-200" : "bg-gray-50 border-brand-border"}`}>
                     <div className="flex items-center gap-2 mb-1">
-                        <UserIcon size={16} className="text-gray-400" />
                         <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
                     </div>
                     <p className={`font-semibold break-all text-sm ${isMismatch ? "text-brand-red" : "text-brand-dark"}`}>
@@ -186,7 +185,6 @@ export default function InviteView(props: InviteViewProps) {
                 <>
                     <div className="w-full p-4 rounded-xl bg-gray-50 border border-brand-border text-left">
                         <div className="flex items-center gap-2 mb-1">
-                            <UserIcon size={16} className="text-brand-inactive-text" />
                             <span className="text-xs text-brand-inactive-text font-medium">Conectado como:</span>
                         </div>
                         <p className="font-semibold text-brand-dark break-all text-sm">{userEmail}</p>

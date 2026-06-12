@@ -157,7 +157,7 @@ async function processWebhookWithRetry(
     // ── Idempotency check: has this payment already been processed? ──
     const { data: existingOrderData, error: checkError } = await supabase
       .from("orders")
-      .select("id, situation, total_amount, partner_id")
+      .select("id, situation, total_amount, partner_id, payment_expires_at, cancelled_at")
       .eq("mp_payment_id", paymentId.toString())
       .limit(1)
       .single()
@@ -170,6 +170,22 @@ async function processWebhookWithRetry(
     if (existingOrderData?.situation === "paid") {
       console.log(`[WEBHOOK] Order ${existingOrderData.id} already marked as paid, skipping (idempotent)`)
       return
+    }
+
+    // Zombie protection: if order is already cancelled, do not reactivate
+    if (existingOrderData?.cancelled_at || existingOrderData?.situation === "cancelled") {
+      console.log(`[WEBHOOK] Order ${existingOrderData.id} is cancelled, skipping payment approval`)
+      return
+    }
+
+    // Zombie protection: if order is pending and expired, cancel it
+    if (existingOrderData?.situation === "pending" && existingOrderData?.payment_expires_at) {
+      if (new Date() > new Date(existingOrderData.payment_expires_at)) {
+        console.log(`[WEBHOOK] Order ${existingOrderData.id} payment expired, cancelling`)
+        const { checkAndExpireOrder } = await import("@/lib/services/order-expiration")
+        await checkAndExpireOrder(supabase, existingOrderData.id)
+        return
+      }
     }
 
     // Wait before processing to avoid race conditions with sync-payment-status

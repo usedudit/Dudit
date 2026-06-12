@@ -46,6 +46,7 @@ export type MarketplaceCheckoutContextResult =
         phone: string | null
         pixKey: string | null
         pixKeyType: string | null
+        pickupPaymentPolicy: string
       }
       delivery: {
         planEnabled: boolean
@@ -113,7 +114,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -337,6 +338,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
       phone: partnerRow?.phone || null,
       pixKey: pixMethodResult?.data?.pix_key || null,
       pixKeyType: pixMethodResult?.data?.pix_key_type || null,
+      pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
     },
     delivery: {
       planEnabled: deliveryConfig.success ? deliveryConfig.capability.deliveryEnabled : false,
