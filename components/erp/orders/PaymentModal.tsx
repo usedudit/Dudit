@@ -20,15 +20,13 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input, Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, InfoCard, FormDropdown } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
 import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
-
-import { formatDateTime } from '@/lib/utils';
 
 const PAYMENT_METHODS_VERSION_PREFIX = "payment-methods-version:";
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
@@ -922,6 +920,11 @@ const PaymentModal = ({
                 if (res.installmentOptions) {
                     setInstallmentOptions(res.installmentOptions);
                 }
+                if (res.finalAmount != null && Number.isFinite(res.finalAmount)) {
+                    setPaymentBaseAmount(res.finalAmount);
+                    const nextInput = res.finalAmount > 0 ? String(Math.round(res.finalAmount * 100)) : "";
+                    setCashCalculatorInput(nextInput);
+                }
             } else {
                 setPaymentCalculation(null);
                 setInstallmentOptions([]);
@@ -977,13 +980,13 @@ const PaymentModal = ({
         return paymentBaseAmount;
     }, [view, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount]);
 
+    const finalTotalWithMethodPricing = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
+
     const finalDueForLeg = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
 
-    // Compara o valor base que o operador digitou contra o valor total base do pedido
-    const isAllocationUnderpaid = paymentBaseAmount < chargeTarget - 0.005;
+    // Compara o valor base que o operador digitou contra o valor total com a precificação do método aplicado
+    const isAllocationUnderpaid = paymentBaseAmount < finalTotalWithMethodPricing - 0.005;
     const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
-
-    const finalTotalWithMethodPricing = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
 
     const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
     const changeAmount = isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0;
@@ -2283,7 +2286,6 @@ const PaymentModal = ({
                     )}
                 </AnimatePresence>
             </motion.div>
-
         </div>
     );
 };

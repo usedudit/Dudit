@@ -43,7 +43,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         const pendingPromos = promos.filter((p: any) =>
             p.minSpendAmount &&
             p.minSpendAmount > partnerItemsTotal &&
-            (p.promotionType === "gift" || p.promotionType === "free_shipping")
+            p.promotionType === "gift"
         )
 
         if (pendingPromos.length === 0) return null
@@ -53,10 +53,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 {pendingPromos.map((promo: any) => {
                     const diff = promo.minSpendAmount - partnerItemsTotal
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
-                    const isFreeShipping = promo.promotionType === "free_shipping"
-                    const label = isFreeShipping
-                        ? `Falta ${formatCurrency(diff)} para você ganhar Entrega Grátis nesta loja!`
-                        : `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
+                    const label = `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
 
                     return (
                         <div key={promo.id} className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 dark:from-emerald-950/10 dark:to-emerald-900/10 p-4 rounded-xl border border-emerald-500/15 dark:border-emerald-500/20 space-y-2">

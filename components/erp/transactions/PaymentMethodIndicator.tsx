@@ -11,8 +11,23 @@ const PixIcon = ({ className }: { className?: string }) => (
 
 export function PaymentMethodIndicator({ label }: { label?: string | null }) {
     if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
-    const normalized = label.toLowerCase()
+    
+    const parts = label.split(",").map(p => p.trim()).filter(Boolean)
+    if (parts.length > 1) {
+        return (
+            <div className="flex flex-wrap gap-2 items-center">
+                {parts.map((part, index) => (
+                    <PaymentMethodIndicatorKeyed key={index} part={part} />
+                ))}
+            </div>
+        )
+    }
+    
+    return <PaymentMethodIndicatorKeyed part={parts[0] || label} />
+}
 
+function PaymentMethodIndicatorKeyed({ part }: { part: string }) {
+    const normalized = part.toLowerCase()
     let icon: React.ReactNode = null
     let colorClass = "text-brand-inactive-text dark:text-dark-body"
 
@@ -33,7 +48,7 @@ export function PaymentMethodIndicator({ label }: { label?: string | null }) {
     return (
         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${colorClass}`}>
             {icon}
-            <span>{label}</span>
+            <span>{part}</span>
         </span>
     )
 }

@@ -226,23 +226,7 @@ describe("calculateOrderPricing", () => {
     expect(r.appliedPromotionIds).toContain("gift-promo")
   })
 
-  // ── FREE SHIPPING ──────────────────────────────────────────────────────
-  it("zeros shipping from free_shipping campaign promotion", () => {
-    const r = calculateOrderPricing({
-      items: [{ unitPrice: 100, quantity: 1 }],
-      shippingCost: 25,
-      promotions: [
-        discountPromotion({
-          id: "free-ship-promo",
-          promotionType: PromotionType.FREE_SHIPPING,
-          discountType: null,
-          discountValue: null,
-        }),
-      ],
-    })
-    expect(r.shipping).toBe(0)
-    expect(r.freeShippingApplied).toBe(true)
-  })
+
 
   // ── Step 3: Coupon stacking (allowCombination = true) ──────────────────
   it("stacks coupon on top of item discounts when allowCombination = true", () => {
@@ -1037,15 +1021,16 @@ describe("computeItemCampaignPricing", () => {
           discountPromotion({
             id: "benefit-promo",
             priority: 1,
-            promotionType: PromotionType.FREE_SHIPPING,
+            promotionType: PromotionType.GIFT,
+            giftProductId: "gift-123",
             discountType: null,
             discountValue: null,
-          }), // Free shipping (BENEFIT)
+          }), // Gift (BENEFIT)
         ],
       })
       // Both the winning price campaign and the benefit campaign are applied
       expect(r.subtotal).toBe(90)
-      expect(r.shipping).toBe(0) // Free shipping applied
+      expect(r.appliedGiftProductIds).toContain("gift-123")
       expect(r.appliedPromotionIds).toContain("price-promo")
       expect(r.appliedPromotionIds).toContain("benefit-promo")
     })

@@ -540,9 +540,6 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
           appliedPromotionIds.push(promo.id)
         }
       }
-    } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
-      freeShippingAppliedCampaign = true
-      appliedPromotionIds.push(promo.id)
     }
   }
 

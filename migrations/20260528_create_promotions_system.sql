@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS public.promotions (
   partner_id uuid NOT NULL REFERENCES public.partners(id) ON DELETE CASCADE,
   name text NOT NULL,
   description text NULL,
-  promotion_type text NOT NULL CHECK (promotion_type IN ('gift', 'buy_x_pay_y', 'discount', 'free_shipping')),
+  promotion_type text NOT NULL CHECK (promotion_type IN ('gift', 'buy_x_pay_y', 'discount')),
   discount_type text NULL CHECK (discount_type IS NULL OR discount_type IN ('percentage', 'fixed')),
   discount_value numeric(14,2) NULL CHECK (discount_value IS NULL OR discount_value > 0),
   max_discount_amount numeric(14,2) NULL CHECK (max_discount_amount IS NULL OR max_discount_amount >= 0),

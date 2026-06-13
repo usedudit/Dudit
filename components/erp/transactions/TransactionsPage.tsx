@@ -535,10 +535,18 @@ export default function TransactionsPage({
             const latestPaidAt = latestPaidItem?.paymentDateRaw || latestPaidItem?.createdAtRaw || first.createdAtRaw || null
             const fullStats = fullGroupStats.get(groupId)
             const totalCount = fullStats?.total || first.installmentTotalCount || sorted.length
-            const gAmt =
-                first.installmentGroupTotalAmount && first.installmentGroupTotalAmount > 0
-                    ? first.installmentGroupTotalAmount
-                    : Math.round(sorted.reduce((acc, r) => acc + Number(r.amount || 0), 0) * 100) / 100
+            
+            const uniquePaymentTypes = [...new Set(
+                sorted
+                    .map(r => r.paymentType)
+                    .filter(Boolean)
+                    .filter(t => t !== "Não informado")
+            )]
+            const combinedPaymentType = uniquePaymentTypes.length > 0
+                ? uniquePaymentTypes.join(", ")
+                : "Não informado"
+
+            const gAmt = Math.round(sorted.reduce((acc, r) => acc + Number(r.paidAmount ?? r.amount ?? 0), 0) * 100) / 100
             const paidRow: ERPTransaction = {
                 ...first,
                 id: `group-${groupId}`,
@@ -554,6 +562,8 @@ export default function TransactionsPage({
                 createdAtTime: latestPaidAt ? formatTimeFromRaw(latestPaidAt) || first.createdAtTime : first.createdAtTime,
                 paymentDateRaw: latestPaidAt,
                 amount: gAmt,
+                paidAmount: gAmt,
+                paymentType: combinedPaymentType,
                 status: first.transactionType === "income" ? "Recebido" : "Pago",
                 statusVariant: "green",
             }
@@ -569,12 +579,31 @@ export default function TransactionsPage({
             const paidCount = fullStats?.paid ?? 0
             const pendingCount = Math.max(0, totalCount - paidCount)
             if (pendingCount <= 0) continue
-
+ 
+            const allItems = [
+                ...(items || []),
+                ...(paidInstallmentByGroup.get(groupId) || [])
+            ]
+            const uniquePaymentTypes = [...new Set(
+                allItems
+                    .map(r => r.paymentType)
+                    .filter(Boolean)
+                    .filter(t => t !== "Não informado")
+            )]
+            const combinedPaymentType = uniquePaymentTypes.length > 0
+                ? uniquePaymentTypes.join(", ")
+                : "Não informado"
+ 
             const groupRemainingAmount =
                 Math.round(
                     sortedPending.reduce((acc, row) => acc + Number(row.installmentRemainingAmount ?? row.amount ?? 0), 0) * 100,
                 ) / 100
 
+            const groupPaidAmount =
+                Math.round(
+                    allItems.reduce((acc, row) => acc + Number(row.paidAmount ?? 0), 0) * 100,
+                ) / 100
+ 
             collapsedGroups.push({
                 ...nextPending,
                 id: `group-${groupId}`,
@@ -585,6 +614,8 @@ export default function TransactionsPage({
                 installmentPendingCount: pendingCount,
                 isInstallmentGroup: true,
                 amount: groupRemainingAmount,
+                paidAmount: groupPaidAmount,
+                paymentType: combinedPaymentType,
                 status: `${pendingCount}/${totalCount} pendentes`,
                 statusVariant: "orange",
             })

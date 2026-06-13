@@ -414,7 +414,7 @@ export async function getFinancialTransactionsAction(
         const installmentPaymentsPromise = installmentTxIds.length > 0
             ? supabase
                 .from("transaction_payments")
-                .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
+                .select("transaction_id, amount, base_amount, interest_amount, discount_amount, payment_method_id")
                 .eq("partner_id", partnerId)
                 .in("transaction_id", installmentTxIds)
                 .then((r: any) => {
@@ -506,6 +506,7 @@ export async function getFinancialTransactionsAction(
             let installmentInterestAmount: number | null = null
             let installmentDiscountAmount: number | null = null
             let installmentPaidAmount: number | null = null
+            let installmentPaymentType: string | undefined = undefined
 
             if (t.installment_group_id) {
                 const agg = installmentPaymentsMap.get(t.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
@@ -517,6 +518,23 @@ export async function getFinancialTransactionsAction(
                 installmentInterestAmount = Math.round(agg.interest * 100) / 100
                 installmentDiscountAmount = Math.round(agg.discount * 100) / 100
                 installmentPaidAmount = Math.max(0, Math.round((agg.cash + fallbackPaid) * 100) / 100)
+
+                // Resolve all unique payment methods for this installment
+                const txPayments = (installmentPayRows || []).filter((p: any) => p.transaction_id === t.id)
+                const pmLabels = txPayments
+                    .map((p: any) => p.payment_method_id ? paymentMethodLabelById.get(p.payment_method_id) : null)
+                    .filter(Boolean) as string[]
+                
+                // Add the transaction's own payment method / payment type as fallback
+                const ownLabel = t.payment_method_id
+                    ? paymentMethodLabelById.get(t.payment_method_id)
+                    : (t.payment_type && t.payment_type !== "Agendamento" ? formatPaymentMethodLabel(t.payment_type, null) : null)
+                if (ownLabel) pmLabels.push(ownLabel)
+
+                const uniqueLabels = [...new Set(pmLabels)]
+                if (uniqueLabels.length > 0) {
+                    installmentPaymentType = uniqueLabels.join(", ")
+                }
             }
 
             const descTrim = t.category === "Vendas" ? String(t.description || "").trim() : ""
@@ -583,15 +601,17 @@ export async function getFinancialTransactionsAction(
                     if (o === "gateway") return "Gateway";
                     return "Manual";
                 })(),
-                paymentType: (() => {
-                    if (t.payment_method_id) {
-                        return paymentMethodLabelById.get(t.payment_method_id) || "Não informado";
-                    }
-                    if (t.payment_type && t.payment_type !== "Agendamento") {
-                        return formatPaymentMethodLabel(t.payment_type, null) || "Não informado";
-                    }
-                    return "Não informado";
-                })(),
+                paymentType: t.installment_group_id && installmentPaymentType
+                    ? installmentPaymentType
+                    : (() => {
+                        if (t.payment_method_id) {
+                            return paymentMethodLabelById.get(t.payment_method_id) || "Não informado";
+                        }
+                        if (t.payment_type && t.payment_type !== "Agendamento") {
+                            return formatPaymentMethodLabel(t.payment_type, null) || "Não informado";
+                        }
+                        return "Não informado";
+                    })(),
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
                 amount: Math.abs(Number(t.amount || 0)),
@@ -2232,6 +2252,7 @@ export async function getTransactionDetailsAction(
                 : Promise.resolve(null as string | null),
         ])
         const accountLine = accountData?.name || null
+        let finalPaymentSubtitle = paymentSubtitle
 
         const headerTitle = String(row.description || "").trim() || "Transação"
 
@@ -2295,13 +2316,15 @@ export async function getTransactionDetailsAction(
             }
             const txIds = (groupRows || []).map((g: any) => g.id)
             const paymentByTx = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
+            let paymentRows: any[] = []
             if (txIds.length > 0) {
-                const { data: paymentRows } = await supabase
+                const res = await supabase
                     .from("transaction_payments")
-                    .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
+                    .select("transaction_id, amount, base_amount, interest_amount, discount_amount, payment_method_id")
                     .eq("partner_id", partnerId)
                     .in("transaction_id", txIds)
-                for (const p of paymentRows || []) {
+                paymentRows = res.data || []
+                for (const p of paymentRows) {
                     const tid = String((p as any).transaction_id || "")
                     const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
                     const pCash = Number((p as any).amount || 0)
@@ -2316,6 +2339,32 @@ export async function getTransactionDetailsAction(
                     })
                 }
             }
+
+            const pmIds = [...new Set(paymentRows.map((p: any) => p.payment_method_id).filter(Boolean) || [])]
+            const pmMap = new Map<string, string>()
+            if (pmIds.length > 0) {
+                const { data: pmData } = await supabase
+                    .from("payment_methods")
+                    .select("id, name, payment_type")
+                    .eq("partner_id", partnerId)
+                    .in("id", pmIds)
+                for (const pm of pmData || []) {
+                    pmMap.set(pm.id, formatPaymentMethodLabel(pm.name, pm.payment_type) || "Não informado")
+                }
+            }
+
+            const mainTxPayments = paymentRows.filter((p: any) => p.transaction_id === row.id)
+            const mainPmLabels = mainTxPayments
+                .map((p: any) => p.payment_method_id ? pmMap.get(p.payment_method_id) : null)
+                .filter(Boolean) as string[]
+            if (paymentSubtitle && paymentSubtitle !== "Não informado") {
+                paymentSubtitle.split(",").forEach(s => mainPmLabels.push(s.trim()))
+            }
+            const uniqueMainLabels = [...new Set(mainPmLabels)].filter(Boolean)
+            if (uniqueMainLabels.length > 0) {
+                finalPaymentSubtitle = uniqueMainLabels.join(", ")
+            }
+
             currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
             installmentBreakdown = (groupRows || []).map((g: any) => {
@@ -2325,6 +2374,16 @@ export async function getTransactionDetailsAction(
                 const fallbackPaid = paidFlagFromStatus && agg.base <= 0 ? original : 0
                 const principalCleared = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
                 const remainingAmount = Math.max(0, Math.round((original - principalCleared) * 100) / 100)
+                
+                const txPayments = (paymentRows || []).filter((p: any) => p.transaction_id === g.id)
+                const pmLabels = txPayments
+                    .map((p: any) => p.payment_method_id ? pmMap.get(p.payment_method_id) : null)
+                    .filter(Boolean) as string[]
+                const ownLabel = g.payment_type ? formatPaymentMethodLabel(g.payment_type, null) : null
+                if (ownLabel) pmLabels.push(ownLabel)
+                const uniqueLabels = [...new Set(pmLabels)]
+                const paymentTypeLabel = uniqueLabels.length > 0 ? uniqueLabels.join(", ") : "Não informado"
+
                 const dueYmdInstallment = g.due_date ? String(g.due_date).slice(0, 10) : ""
                 const overdue =
                     !paidFlagFromStatus &&
@@ -2345,7 +2404,7 @@ export async function getTransactionDetailsAction(
                     discountAmount: Math.round(agg.discount * 100) / 100,
                     principalCleared,
                     remainingAmount,
-                    paymentType: g.payment_type ? formatPaymentMethodLabel(g.payment_type, null) : "Não informado",
+                    paymentType: paymentTypeLabel,
                     status: (paidFlag ? "paid" : overdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
                 }
             })
@@ -2731,6 +2790,19 @@ export async function getTransactionDetailsAction(
             }
         }
 
+        let groupOriginalAmount: number | null = null
+        let groupInterestAmount: number | null = null
+        let groupDiscountAmount: number | null = null
+        let groupPaidAmount: number | null = null
+        let groupRemainingAmount = 0
+        if (row.installment_group_id && installmentBreakdown) {
+            groupOriginalAmount = installmentBreakdown.reduce((sum, item) => sum + item.originalAmount, 0)
+            groupInterestAmount = installmentBreakdown.reduce((sum, item) => sum + (item.interestAmount || 0), 0)
+            groupDiscountAmount = installmentBreakdown.reduce((sum, item) => sum + (item.discountAmount || 0), 0)
+            groupPaidAmount = installmentBreakdown.reduce((sum, item) => sum + item.paidAmount, 0)
+            groupRemainingAmount = installmentBreakdown.reduce((sum, item) => sum + (item.remainingAmount || 0), 0)
+        }
+
         const showDueDateRow =
             !installmentBreakdown?.length &&
             (String(row.category || "").trim() !== "Vendas" || !!row.due_date) &&
@@ -2749,7 +2821,7 @@ export async function getTransactionDetailsAction(
             statusVariant,
             transactionType: row.transaction_type,
             isRecurring: !!row.recurring_id,
-            paymentMethodSubtitle: paymentSubtitle,
+            paymentMethodSubtitle: finalPaymentSubtitle,
             paymentDateSubtitle,
             creatorName,
             originLabel: originLabel(row.origin),
@@ -2767,17 +2839,27 @@ export async function getTransactionDetailsAction(
             paymentDateLine: formatDateTime(row.created_at),
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
             goalBonusDetails,
-            originalAmount: row.original_amount ? Math.abs(Number(row.original_amount)) : null,
-            interestAmount: currentTxPaymentAgg
-                ? Math.round(currentTxPaymentAgg.interest * 100) / 100
-                : (row.interest_amount ? Math.abs(Number(row.interest_amount)) : null),
-            discountAmount: currentTxPaymentAgg
-                ? Math.round(currentTxPaymentAgg.discount * 100) / 100
-                : (row.discount_amount ? Math.abs(Number(row.discount_amount)) : null),
-            paidAmount: currentTxPaymentAgg
-                ? Math.max(0, Math.round((currentTxPaymentAgg.cash + (paid && currentTxPaymentAgg.base <= 0 ? Math.abs(Number(row.original_amount ?? row.amount ?? 0)) : 0)) * 100) / 100)
-                : (row.paid_amount ? Math.abs(Number(row.paid_amount)) : null),
-            amount: detailAmount,
+            originalAmount: groupOriginalAmount !== null
+                ? groupOriginalAmount
+                : (row.original_amount ? Math.abs(Number(row.original_amount)) : null),
+            interestAmount: groupInterestAmount !== null
+                ? groupInterestAmount
+                : (currentTxPaymentAgg
+                    ? Math.round(currentTxPaymentAgg.interest * 100) / 100
+                    : (row.interest_amount ? Math.abs(Number(row.interest_amount)) : null)),
+            discountAmount: groupDiscountAmount !== null
+                ? groupDiscountAmount
+                : (currentTxPaymentAgg
+                    ? Math.round(currentTxPaymentAgg.discount * 100) / 100
+                    : (row.discount_amount ? Math.abs(Number(row.discount_amount)) : null)),
+            paidAmount: groupPaidAmount !== null
+                ? groupPaidAmount
+                : (currentTxPaymentAgg
+                    ? Math.max(0, Math.round((currentTxPaymentAgg.cash + (paid && currentTxPaymentAgg.base <= 0 ? Math.abs(Number(row.original_amount ?? row.amount ?? 0)) : 0)) * 100) / 100)
+                    : (row.paid_amount ? Math.abs(Number(row.paid_amount)) : null)),
+            amount: groupOriginalAmount !== null
+                ? (groupPaidAmount! + groupRemainingAmount)
+                : detailAmount,
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,
             canEdit,

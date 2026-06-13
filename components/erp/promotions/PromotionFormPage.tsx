@@ -39,7 +39,6 @@ function getAutoPromotionName(
     const base = campName || "Promoção";
     if (type === "gift") return `${base} - Brinde`;
     if (type === "buy_x_pay_y") return `${base} - Leve ${buyQuantity || 0} Pague ${payQuantity || 0}`;
-    if (type === "free_shipping") return `${base} - Entrega Grátis`;
     if (type === "discount") {
         const valStr = discountType === "percentage" ? `${discountValue || 0}%` : `R$ ${discountValue || 0}`;
         return `${base} - Desconto de ${valStr}`;
@@ -1044,8 +1043,7 @@ export default function PromotionFormPage({
                                                                 options={[
                                                                     { value: "discount", label: "Desconto Direto (Fixo ou %)" },
                                                                     { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
-                                                                    { value: "gift", label: "Ganhar Brinde (Freebie)" },
-                                                                    { value: "free_shipping", label: "Entrega Grátis" }
+                                                                    { value: "gift", label: "Ganhar Brinde (Freebie)" }
                                                                 ]}
                                                             />
 
@@ -1178,12 +1176,6 @@ export default function PromotionFormPage({
                                                                         })()}
                                                                     </div>
                                                                 </FormSection>
-                                                            )}
-
-                                                            {editingRule.promotion_type === "free_shipping" && (
-                                                                <div className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                    Configure o valor mínimo de compra na seção "Limitações" ao lado.
-                                                                </div>
                                                             )}
 
                                                             {/* Escopo de Aplicação */}

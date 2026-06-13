@@ -125,10 +125,14 @@ const TransactionListItem = React.memo(
                     )
 
                 case "amount":
+                    const isPaidRow = transaction.status === "Pago" || transaction.status === "Recebido" || String(transaction.rawStatus || "").toLowerCase() === "paid";
+                    const displayAmount = isPaidRow
+                        ? (transaction.paidAmount && transaction.paidAmount > 0 ? transaction.paidAmount : transaction.amount)
+                        : transaction.amount;
                     return (
                         <span className={`text-[13px] font-bold whitespace-nowrap ${transaction.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}>
                             {transaction.ledgerDirection === "in" ? "+ " : "- "}
-                            {formatCurrency(transaction.amount)}
+                            {formatCurrency(displayAmount)}
                         </span>
                     )
 

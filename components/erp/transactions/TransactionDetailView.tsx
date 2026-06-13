@@ -492,33 +492,50 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                             value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm whitespace-pre-wrap">{detail.notesLine}</span>}
                                                         />
                                                     )}
-                                                    {detail.originalAmount !== undefined && detail.originalAmount !== null && detail.originalAmount > 0 && ((detail.interestAmount || 0) > 0 || (detail.discountAmount || 0) > 0) && (
-                                                        <PaymentRow
-                                                            label="Valor original"
-                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.originalAmount)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.interestAmount !== undefined && detail.interestAmount !== null && detail.interestAmount > 0 && (
-                                                        <PaymentRow
-                                                            label="Juros"
-                                                            value={<span className="text-brand-red font-bold text-sm">+ {formatCurrency(detail.interestAmount)}</span>}
-                                                        />
-                                                    )}
-                                                    {detail.discountAmount !== undefined && detail.discountAmount !== null && detail.discountAmount > 0 && (
-                                                        <PaymentRow
-                                                            label="Desconto"
-                                                            value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
-                                                        />
-                                                    )}
-                                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total</span>
-                                                        <span
-                                                            className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
-                                                        >
-                                                            {detail.ledgerDirection === "in" ? "+ " : "- "}
-                                                            {formatCurrency(detail.amount)}
-                                                        </span>
-                                                    </div>
+                                                    {(() => {
+                                                        const isPaid = String(detail.statusLabel || "").toLowerCase() === "pago" || String(detail.statusLabel || "").toLowerCase() === "recebido" || detail.timeline.step2.active;
+                                                        const showOriginalAmount = detail.originalAmount !== undefined && detail.originalAmount !== null && detail.originalAmount > 0 && (
+                                                            detail.isRecurring ||
+                                                            !!detail.installmentBreakdown?.length ||
+                                                            (detail.interestAmount || 0) > 0 ||
+                                                            (detail.discountAmount || 0) > 0 ||
+                                                            Math.abs(detail.originalAmount - detail.amount) > 0.01
+                                                        );
+
+                                                        return (
+                                                            <>
+                                                                {showOriginalAmount && (
+                                                                    <PaymentRow
+                                                                        label="Valor original"
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.originalAmount!)}</span>}
+                                                                    />
+                                                                )}
+                                                                {detail.interestAmount !== undefined && detail.interestAmount !== null && detail.interestAmount > 0 && (
+                                                                    <PaymentRow
+                                                                        label="Juros"
+                                                                        value={<span className="text-brand-red font-bold text-sm">+ {formatCurrency(detail.interestAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                                {detail.discountAmount !== undefined && detail.discountAmount !== null && detail.discountAmount > 0 && (
+                                                                    <PaymentRow
+                                                                        label="Desconto"
+                                                                        value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
+                                                                    />
+                                                                )}
+                                                                <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">
+                                                                        {isPaid ? "Total pago" : "Total"}
+                                                                    </span>
+                                                                    <span
+                                                                        className={`font-bold text-2xl tracking-tight ${detail.ledgerDirection === "in" ? "text-brand-green" : "text-brand-red"}`}
+                                                                    >
+                                                                        {detail.ledgerDirection === "in" ? "+ " : "- "}
+                                                                        {formatCurrency(detail.amount)}
+                                                                    </span>
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         </div>

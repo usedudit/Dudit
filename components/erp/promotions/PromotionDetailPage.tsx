@@ -67,7 +67,6 @@ export default function PromotionDetailPage({
                                 {promotion.promotion_type === "gift" && "Brinde"}
                                 {promotion.promotion_type === "buy_x_pay_y" && "Leve X Pague Y"}
                                 {promotion.promotion_type === "discount" && "Desconto Direto"}
-                                {promotion.promotion_type === "free_shipping" && "Entrega Grátis"}
                             </Span>
                         </Div>
 

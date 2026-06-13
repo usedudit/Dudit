@@ -29,7 +29,7 @@ const PromotionSchema = z.object({
   campaignId: z.string().uuid(),
   name: z.string().min(1, "O nome da promoção é obrigatório."),
   description: z.string().nullable().optional(),
-  promotionType: z.enum(["gift", "buy_x_pay_y", "discount", "free_shipping"]),
+  promotionType: z.enum(["gift", "buy_x_pay_y", "discount"]),
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
   discountValue: z.number().min(0.01).nullable().optional(),
   maxDiscountAmount: z.number().min(0).nullable().optional(),
