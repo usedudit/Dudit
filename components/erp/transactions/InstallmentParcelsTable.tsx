@@ -20,6 +20,7 @@ export type InstallmentParcelRow = {
     paymentType?: string | null
     reason: string
     reference: string
+    remainingAmount?: number
 }
 
 type InstallmentParcelsTableProps = {
@@ -104,8 +105,19 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-2 font-semibold text-[13px] text-brand-dark dark:text-dark-heading">
-                                        {formatCurrency(row.originalAmount)}
+                                    <td className="py-4 px-2 text-[13px] text-brand-dark dark:text-dark-heading">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-brand-inactive-text dark:text-dark-body text-xs">Original: {formatCurrency(row.originalAmount)}</span>
+                                            {row.interestAmount && row.interestAmount > 0 ? (
+                                                <span className="text-brand-red text-xs">+ Juros: {formatCurrency(row.interestAmount)}</span>
+                                            ) : null}
+                                            {row.discountAmount && row.discountAmount > 0 ? (
+                                                <span className="text-brand-green text-xs">- Desconto: {formatCurrency(row.discountAmount)}</span>
+                                            ) : null}
+                                            <span className="font-bold mt-0.5">
+                                                {row.status === "paid" ? `Pago: ${formatCurrency(row.paidAmount)}` : `Restante: ${formatCurrency(row.remainingAmount ?? row.originalAmount)}`}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td className="py-4 px-2">
                                         <Badge variant={badge.variant}>
@@ -144,9 +156,20 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                         <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} />
                                     </div>
                                 </div>
-                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(row.originalAmount)}
-                                </span>
+                                <div className="text-right">
+                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                        {row.status === "paid" ? formatCurrency(row.paidAmount) : formatCurrency(row.originalAmount)}
+                                    </span>
+                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body flex flex-col items-end mt-0.5">
+                                        <span>Orig: {formatCurrency(row.originalAmount)}</span>
+                                        {row.interestAmount && row.interestAmount > 0 ? (
+                                            <span className="text-brand-red">+ Juros: {formatCurrency(row.interestAmount)}</span>
+                                        ) : null}
+                                        {row.discountAmount && row.discountAmount > 0 ? (
+                                            <span className="text-brand-green">- Desc: {formatCurrency(row.discountAmount)}</span>
+                                        ) : null}
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex justify-between items-center mt-1">
                                 <div className="flex items-center gap-2">

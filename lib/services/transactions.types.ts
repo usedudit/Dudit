@@ -29,6 +29,10 @@ export interface ERPTransaction {
   status: string
   statusVariant: TransactionStatusVariant
   amount: number
+  originalAmount?: number | null
+  interestAmount?: number | null
+  discountAmount?: number | null
+  paidAmount?: number | null
   transactionType: "income" | "expense" | "transfer" | "adjustment" | "refund"
   /** Fluxo de caixa para exibição (+ verde / − vermelho) */
   ledgerDirection: LedgerDirection

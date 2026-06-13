@@ -307,6 +307,7 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                                         paymentType: row.paymentType,
                                                                         reason: detail.categoryLine,
                                                                         reference: detail.headerTitle,
+                                                                        remainingAmount: row.remainingAmount,
                                                                     }),
                                                                 )
                                                             }
@@ -489,6 +490,24 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         <PaymentRow
                                                             label="Observações"
                                                             value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm whitespace-pre-wrap">{detail.notesLine}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.originalAmount !== undefined && detail.originalAmount !== null && detail.originalAmount > 0 && ((detail.interestAmount || 0) > 0 || (detail.discountAmount || 0) > 0) && (
+                                                        <PaymentRow
+                                                            label="Valor original"
+                                                            value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(detail.originalAmount)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.interestAmount !== undefined && detail.interestAmount !== null && detail.interestAmount > 0 && (
+                                                        <PaymentRow
+                                                            label="Juros"
+                                                            value={<span className="text-brand-red font-bold text-sm">+ {formatCurrency(detail.interestAmount)}</span>}
+                                                        />
+                                                    )}
+                                                    {detail.discountAmount !== undefined && detail.discountAmount !== null && detail.discountAmount > 0 && (
+                                                        <PaymentRow
+                                                            label="Desconto"
+                                                            value={<span className="text-brand-green font-bold text-sm">- {formatCurrency(detail.discountAmount)}</span>}
                                                         />
                                                     )}
                                                     <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">

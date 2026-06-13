@@ -27,6 +27,9 @@ type DbTransaction = {
     categoryLabel?: string
     category?: string | null
     original_amount?: number | string | null
+    interest_amount?: number | string | null
+    discount_amount?: number | string | null
+    paid_amount?: number | string | null
     amount: number
     due_date: string | null
     payment_date: string | null
@@ -289,7 +292,7 @@ async function applyFinanceAccountBalanceDelta(
 }
 
 const FINANCIAL_TX_LIST_SELECT = `
-        id, description, category, amount, original_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, status, notes, payment_type, transaction_type, contact_id, customer_id, contact_type,
         transfer_group_id, refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id, payment_method_id, installment_group_id, installment_number,
         transaction_contacts(name, type)
       `
@@ -404,16 +407,16 @@ export async function getFinancialTransactionsAction(
                 .then((r: any) => r.data || [])
             : Promise.resolve([] as InstallmentGroupRow[])
 
-        // PERF: Compute installment IDs early (only depends on txs, not on batch results)
-        const pendingInstallmentTxIds = txs
-            .filter((t) => t.installment_group_id && isStatusPending(t.status))
+        // Compute installment IDs early (only depends on txs, not on batch results)
+        const installmentTxIds = txs
+            .filter((t) => !!t.installment_group_id)
             .map((t) => t.id)
-        const installmentPaymentsPromise = pendingInstallmentTxIds.length > 0
+        const installmentPaymentsPromise = installmentTxIds.length > 0
             ? supabase
                 .from("transaction_payments")
-                .select("transaction_id, amount, base_amount")
+                .select("transaction_id, amount, base_amount, interest_amount, discount_amount")
                 .eq("partner_id", partnerId)
-                .in("transaction_id", pendingInstallmentTxIds)
+                .in("transaction_id", installmentTxIds)
                 .then((r: any) => {
                     if (r.error) throw r.error
                     return r.data || []
@@ -428,16 +431,21 @@ export async function getFinancialTransactionsAction(
             installmentPaymentsPromise,
         ])
 
-        const installmentPaidSumByTxId = new Map<string, number>()
+        const installmentPaymentsMap = new Map<string, { base: number; cash: number; interest: number; discount: number }>()
         for (const p of installmentPayRows) {
-            const tid = String((p as { transaction_id?: string }).transaction_id || "")
-            const pBase = Number(
-                (p as { base_amount?: number | string | null; amount?: number | string | null }).base_amount ??
-                (p as { amount?: number | string | null }).amount ??
-                0,
-            )
+            const tid = String((p as any).transaction_id || "")
             if (!tid) continue
-            installmentPaidSumByTxId.set(tid, (installmentPaidSumByTxId.get(tid) || 0) + pBase)
+            const pBase = Number((p as any).base_amount ?? (p as any).amount ?? 0)
+            const pCash = Number((p as any).amount || 0)
+            const pInt = Number((p as any).interest_amount || 0)
+            const pDisc = Number((p as any).discount_amount || 0)
+            const cur = installmentPaymentsMap.get(tid) || { base: 0, cash: 0, interest: 0, discount: 0 }
+            installmentPaymentsMap.set(tid, {
+                base: cur.base + pBase,
+                cash: cur.cash + pCash,
+                interest: cur.interest + pInt,
+                discount: cur.discount + pDisc,
+            })
         }
 
         // Build order lookup and collect buyer IDs into the customer set
@@ -495,9 +503,20 @@ export async function getFinancialTransactionsAction(
 
             const originalParcel = Math.abs(Number(t.original_amount ?? t.amount ?? 0))
             let installmentRemainingAmount: number | undefined
-            if (t.installment_group_id && isStatusPending(t.status)) {
-                const paidToward = installmentPaidSumByTxId.get(t.id) || 0
-                installmentRemainingAmount = Math.max(0, Math.round((originalParcel - paidToward) * 100) / 100)
+            let installmentInterestAmount: number | null = null
+            let installmentDiscountAmount: number | null = null
+            let installmentPaidAmount: number | null = null
+
+            if (t.installment_group_id) {
+                const agg = installmentPaymentsMap.get(t.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
+                const paidFlagFromStatus = isStatusPaid(t.status)
+                const fallbackPaid = paidFlagFromStatus && agg.base <= 0 ? originalParcel : 0
+                const principalCleared = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
+
+                installmentRemainingAmount = Math.max(0, Math.round((originalParcel - principalCleared) * 100) / 100)
+                installmentInterestAmount = Math.round(agg.interest * 100) / 100
+                installmentDiscountAmount = Math.round(agg.discount * 100) / 100
+                installmentPaidAmount = Math.max(0, Math.round((agg.cash + fallbackPaid) * 100) / 100)
             }
 
             const descTrim = t.category === "Vendas" ? String(t.description || "").trim() : ""
@@ -576,6 +595,16 @@ export async function getFinancialTransactionsAction(
                 status: toDisplayStatus(t.status, t.transaction_type, t.refund_kind, isOverdue),
                 statusVariant: toStatusVariant(t.status, isOverdue),
                 amount: Math.abs(Number(t.amount || 0)),
+                originalAmount: t.original_amount !== undefined && t.original_amount !== null ? Math.abs(Number(t.original_amount)) : null,
+                interestAmount: t.installment_group_id
+                    ? installmentInterestAmount
+                    : (t.interest_amount !== undefined && t.interest_amount !== null ? Math.abs(Number(t.interest_amount)) : null),
+                discountAmount: t.installment_group_id
+                    ? installmentDiscountAmount
+                    : (t.discount_amount !== undefined && t.discount_amount !== null ? Math.abs(Number(t.discount_amount)) : null),
+                paidAmount: t.installment_group_id
+                    ? installmentPaidAmount
+                    : (t.paid_amount !== undefined && t.paid_amount !== null ? Math.abs(Number(t.paid_amount)) : null),
                 transactionType: t.transaction_type,
                 ledgerDirection: ledgerDirectionFromRow(t),
                 refundKind: t.refund_kind ?? undefined,
@@ -1474,7 +1503,7 @@ export async function recordInstallmentPaymentAction(input: {
 
         const { data: existingPayments, error: paymentsErr } = await supabase
             .from("transaction_payments")
-            .select("amount, base_amount, interest_amount")
+            .select("amount, base_amount, interest_amount, discount_amount")
             .eq("partner_id", input.partnerId)
             .eq("transaction_id", input.transactionId)
         if (paymentsErr) throw paymentsErr
@@ -1553,10 +1582,22 @@ export async function recordInstallmentPaymentAction(input: {
         )
         const totalInterest = existingInterest + interestAmount
 
+        const existingDiscount = (existingPayments || []).reduce(
+            (acc: number, row: any) => acc + Number(row.discount_amount ?? 0), 0
+        )
+        const totalDiscount = existingDiscount + discountAmount
+
+        const existingTotalPaid = (existingPayments || []).reduce(
+            (acc: number, row: any) => acc + Number(row.amount ?? 0), 0
+        )
+        const totalPaidAmount = existingTotalPaid + finalPaid
+
         const updatePayload: Record<string, unknown> = {
             updated_at: nowIso,
             payment_date: nowIso,
             interest_amount: totalInterest > 0 ? totalInterest : (tx.interest_amount || null),
+            discount_amount: totalDiscount > 0 ? totalDiscount : (tx.discount_amount || null),
+            paid_amount: totalPaidAmount > 0 ? totalPaidAmount : (tx.paid_amount || null),
         }
         if (resolvedAccountId) {
             updatePayload.account_id = resolvedAccountId
@@ -1706,6 +1747,9 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
     occurrenceDate: string // yyyy-MM-dd
     accountId?: string | null
     paymentMethodId?: string | null
+    paymentAmount?: number
+    interestAmount?: number
+    discountAmount?: number
 }) {
     try {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1738,6 +1782,14 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
 
         if (existing) {
             return { success: true, data: existing, alreadyPaid: true }
+        }
+
+        const paymentAmount = input.paymentAmount !== undefined ? Number(input.paymentAmount) : Number(rec.amount || 0)
+        const interestAmount = Number(input.interestAmount || 0)
+        const discountAmount = Number(input.discountAmount || 0)
+        const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
+        if (finalPaid <= 0) {
+            throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
         }
 
         let categoryName: string | null = null
@@ -1775,6 +1827,11 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                     account_id: accountId,
                     payment_method_id: resolvedPmId,
                     payment_type: paymentTypeLabel,
+                    amount: finalPaid,
+                    original_amount: paymentAmount,
+                    interest_amount: interestAmount,
+                    discount_amount: discountAmount,
+                    paid_amount: finalPaid,
                     updated_at: nowIso,
                 })
                 .eq("id", pendingTx.id)
@@ -1783,9 +1840,26 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
                 .single()
             if (updErr) throw updErr
 
+            // Insert a payment record for history consistency
+            const tpIdempotencyKey = `recurring:${pendingTx.id}:${nowIso}:${finalPaid}`
+            await supabase
+                .from("transaction_payments")
+                .insert({
+                    partner_id: input.partnerId,
+                    transaction_id: pendingTx.id,
+                    amount: finalPaid,
+                    base_amount: paymentAmount,
+                    interest_amount: interestAmount,
+                    discount_amount: discountAmount,
+                    payment_method_id: resolvedPmId,
+                    created_by_user_id: userId,
+                    created_at: nowIso,
+                    idempotency_key: tpIdempotencyKey,
+                })
+
             await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
                 transaction_type: rec.type,
-                amount: rec.amount,
+                amount: finalPaid,
                 status: "paid",
             })
             console.info(
@@ -1817,14 +1891,16 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             contact_id: rec.contact_id,
             contact_type: rec.contact_type,
             customer_id: rec.customer_id,
-            amount: rec.amount,
+            amount: finalPaid,
             due_date: dueDateValue,
             payment_date: nowIso,
             transaction_date: transactionTs,
             status: "paid",
             notes: null,
-            original_amount: rec.amount,
-            interest_amount: 0,
+            original_amount: paymentAmount,
+            interest_amount: interestAmount,
+            discount_amount: discountAmount,
+            paid_amount: finalPaid,
             fee_amount: 0,
             payment_type: paymentTypeLabel,
             transaction_type: rec.type,
@@ -1847,9 +1923,28 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
             throw insertErr
         }
 
+        if (newTx?.id) {
+            // Insert a payment record for history consistency
+            const tpIdempotencyKey = `recurring:${newTx.id}:${nowIso}:${finalPaid}`
+            await supabase
+                .from("transaction_payments")
+                .insert({
+                    partner_id: input.partnerId,
+                    transaction_id: newTx.id,
+                    amount: finalPaid,
+                    base_amount: paymentAmount,
+                    interest_amount: interestAmount,
+                    discount_amount: discountAmount,
+                    payment_method_id: resolvedPmId,
+                    created_by_user_id: userId,
+                    created_at: nowIso,
+                    idempotency_key: tpIdempotencyKey,
+                })
+        }
+
         await applyFinanceAccountBalanceAfterInsert(supabase, input.partnerId, accountId, {
             transaction_type: rec.type,
-            amount: rec.amount,
+            amount: finalPaid,
             status: "paid",
         })
 
@@ -1989,6 +2084,7 @@ export type TransactionDetailPayload = {
         discountAmount: number
         /** Soma de base_amount (abatimento do principal). */
         principalCleared: number
+        remainingAmount?: number
         paymentType: string
         status: "paid" | "pending" | "overdue"
     }>
@@ -2009,6 +2105,10 @@ export type TransactionDetailPayload = {
         paidToUserNames: string[]
         achievedAt: string | null
     } | null
+    originalAmount?: number | null
+    interestAmount?: number | null
+    discountAmount?: number | null
+    paidAmount?: number | null
     amount: number
     ledgerDirection: ERPTransaction["ledgerDirection"]
     contactCard: { title: string; name: string; email: string | null; phone: string | null; isCustomer?: boolean }
@@ -2044,7 +2144,7 @@ export async function getTransactionDetailsAction(
             .from("transactions")
             .select(
                 `
-        id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, created_by_user_id, installment_group_id,
@@ -2059,7 +2159,7 @@ export async function getTransactionDetailsAction(
                 .from("transactions")
                 .select(
                     `
-        id, description, category, amount, due_date, payment_date, created_at, updated_at, status, notes,
+        id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, installment_group_id,
@@ -2172,6 +2272,7 @@ export async function getTransactionDetailsAction(
         let installmentBreakdown: TransactionDetailPayload["installmentBreakdown"] | undefined = undefined
         let installmentGroupTotalAmount: number | null = null
         let paymentDateRowLabel: TransactionDetailPayload["paymentDateRowLabel"] = "Data da transação"
+        let currentTxPaymentAgg: { base: number; cash: number; interest: number; discount: number } | null = null
         if (row.installment_group_id) {
             paymentDateRowLabel = "Data de finalização"
             // PERF: Parallelize group metadata + group transactions (independent reads)
@@ -2215,6 +2316,7 @@ export async function getTransactionDetailsAction(
                     })
                 }
             }
+            currentTxPaymentAgg = paymentByTx.get(row.id) || { base: 0, cash: 0, interest: 0, discount: 0 }
             const totalCount = groupRows?.length || 0
             installmentBreakdown = (groupRows || []).map((g: any) => {
                 const original = Math.abs(Number(g.original_amount ?? g.amount ?? 0))
@@ -2222,6 +2324,7 @@ export async function getTransactionDetailsAction(
                 const paidFlagFromStatus = String(g.status || "").toLowerCase() === "paid"
                 const fallbackPaid = paidFlagFromStatus && agg.base <= 0 ? original : 0
                 const principalCleared = Math.max(0, Math.round((agg.base + fallbackPaid) * 100) / 100)
+                const remainingAmount = Math.max(0, Math.round((original - principalCleared) * 100) / 100)
                 const dueYmdInstallment = g.due_date ? String(g.due_date).slice(0, 10) : ""
                 const overdue =
                     !paidFlagFromStatus &&
@@ -2241,6 +2344,7 @@ export async function getTransactionDetailsAction(
                     interestAmount: Math.round(agg.interest * 100) / 100,
                     discountAmount: Math.round(agg.discount * 100) / 100,
                     principalCleared,
+                    remainingAmount,
                     paymentType: g.payment_type ? formatPaymentMethodLabel(g.payment_type, null) : "Não informado",
                     status: (paidFlag ? "paid" : overdue ? "overdue" : "pending") as "paid" | "overdue" | "pending",
                 }
@@ -2663,6 +2767,16 @@ export async function getTransactionDetailsAction(
             paymentDateLine: formatDateTime(row.created_at),
             notesLine: transactionItemsCompact ? null : row.notes ? String(row.notes) : null,
             goalBonusDetails,
+            originalAmount: row.original_amount ? Math.abs(Number(row.original_amount)) : null,
+            interestAmount: currentTxPaymentAgg
+                ? Math.round(currentTxPaymentAgg.interest * 100) / 100
+                : (row.interest_amount ? Math.abs(Number(row.interest_amount)) : null),
+            discountAmount: currentTxPaymentAgg
+                ? Math.round(currentTxPaymentAgg.discount * 100) / 100
+                : (row.discount_amount ? Math.abs(Number(row.discount_amount)) : null),
+            paidAmount: currentTxPaymentAgg
+                ? Math.max(0, Math.round((currentTxPaymentAgg.cash + (paid && currentTxPaymentAgg.base <= 0 ? Math.abs(Number(row.original_amount ?? row.amount ?? 0)) : 0)) * 100) / 100)
+                : (row.paid_amount ? Math.abs(Number(row.paid_amount)) : null),
             amount: detailAmount,
             ledgerDirection: ledgerDirectionFromRow(row as DbTransaction),
             contactCard,

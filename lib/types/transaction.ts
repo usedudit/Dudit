@@ -26,6 +26,8 @@ export interface Transaction {
     total_installments: number | null
     original_amount: number | null
     interest_amount: number
+    discount_amount: number
+    paid_amount: number
     fee_amount: number
     payment_type: string | null
     transaction_type: "income" | "expense" | "transfer" | "adjustment" | "refund"
@@ -46,6 +48,8 @@ export interface TransactionInput {
     total_installments?: number | null
     original_amount?: number | null
     interest_amount?: number
+    discount_amount?: number
+    paid_amount?: number
     fee_amount?: number
     payment_type?: string | null
     transaction_type: "income" | "expense" | "transfer" | "adjustment" | "refund"

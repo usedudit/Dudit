@@ -788,11 +788,16 @@ export default function TransactionsPage({
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
         if (transaction.isRecurringOccurrence) {
-            setConfirmRecurringPayment(transaction)
+            setSelectedInstallmentForPayment(transaction as any)
+            setPaymentAmount(String(Number(transaction.amount || 0).toFixed(2)))
+            setInterestAmount("0")
+            setDiscountAmount("0")
+            setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
+            setPaymentModalOpen(true)
         } else {
             setConfirmRegularMarkAsPaid(transaction)
         }
-    }, [])
+    }, [resolvedPaymentMethods])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
         const status = String(transaction.rawStatus || "").toLowerCase()
@@ -830,36 +835,7 @@ export default function TransactionsPage({
         }
     }, [confirmCancelTransaction, cancellingTransaction, partnerId, cancelReason, notifyError, notifySuccess, refreshTransactionsNow])
 
-    const handleConfirmRecurringMarkAsPaid = useCallback(async () => {
-        const transaction = confirmRecurringPayment
-        if (!transaction || !transaction.recurringTemplateId || !transaction.occurrenceDate) return
-        if (markingAsPaid) return
-        setMarkingAsPaid(true)
-        try {
-            const res = await markRecurringOccurrenceAsPaidAction({
-                partnerId,
-                recurringId: transaction.recurringTemplateId,
-                occurrenceDate: transaction.occurrenceDate,
-                accountId: transaction.accountId,
-                paymentMethodId: transaction.paymentMethodId ?? null,
-            })
-            if (!res.success) {
-                notifyError(res.error || "Erro ao marcar como pago")
-                return
-            }
-            if ((res as any).alreadyPaid) {
-                notifySuccess("Esta ocorrência já foi paga.")
-            } else {
-                notifySuccess("Ocorrência marcada como paga!")
-            }
-            void refreshTransactionsNow()
-        } catch {
-            notifyError("Erro ao marcar como pago")
-        } finally {
-            setMarkingAsPaid(false)
-            setConfirmRecurringPayment(null)
-        }
-    }, [partnerId, markingAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRecurringPayment])
+
 
     const handleConfirmRegularMarkAsPaid = useCallback(async () => {
         const transaction = confirmRegularMarkAsPaid
@@ -1036,19 +1012,37 @@ export default function TransactionsPage({
         }
         setPayingInstallment(true)
         try {
-            const res = await recordInstallmentPaymentAction({
-                partnerId,
-                transactionId: selectedInstallmentForPayment.id,
-                paymentAmount: paid,
-                interestAmount: interest,
-                discountAmount: discount,
-                paymentMethodId: paymentMethodId || null,
-            })
-            if (!res.success) {
-                notifyError(res.error || "Erro ao registrar pagamento")
-                return
+            if (selectedInstallmentForPayment.isRecurringOccurrence) {
+                const res = await markRecurringOccurrenceAsPaidAction({
+                    partnerId,
+                    recurringId: selectedInstallmentForPayment.recurringTemplateId as string,
+                    occurrenceDate: selectedInstallmentForPayment.occurrenceDate as string,
+                    accountId: selectedInstallmentForPayment.accountId,
+                    paymentMethodId: paymentMethodId || null,
+                    paymentAmount: paid,
+                    interestAmount: interest,
+                    discountAmount: discount,
+                })
+                if (!res.success) {
+                    notifyError(res.error || "Erro ao registrar pagamento")
+                    return
+                }
+                notifySuccess("Pagamento da ocorrência registrado.")
+            } else {
+                const res = await recordInstallmentPaymentAction({
+                    partnerId,
+                    transactionId: selectedInstallmentForPayment.id,
+                    paymentAmount: paid,
+                    interestAmount: interest,
+                    discountAmount: discount,
+                    paymentMethodId: paymentMethodId || null,
+                })
+                if (!res.success) {
+                    notifyError(res.error || "Erro ao registrar pagamento")
+                    return
+                }
+                notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
             }
-            notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
             setPaymentModalOpen(false)
             setSelectedInstallmentForPayment(null)
             void refreshTransactionsNow()
@@ -1147,45 +1141,13 @@ export default function TransactionsPage({
                 </DefaultModal>
 
                 <DefaultModal
-                    isOpen={!!confirmRecurringPayment}
-                    onClose={() => {
-                        if (markingAsPaid) return
-                        setConfirmRecurringPayment(null)
-                    }}
-                    title="Confirmar pagamento da ocorrência"
-                    maxWidth="md"
-                >
-                    {confirmRecurringPayment ? (
-                        <div className="space-y-4">
-                            <p className="text-sm text-brand-inactive-text">
-                                Deseja marcar esta ocorrência recorrente como paga/recebida?
-                            </p>
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                                <p className="font-semibold">{confirmRecurringPayment.description}</p>
-                                <p className="text-brand-inactive-text mt-1">
-                                    Valor: {formatCurrency(confirmRecurringPayment.amount)} • Data: {confirmRecurringPayment.occurrenceDate}
-                                </p>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setConfirmRecurringPayment(null)} disabled={markingAsPaid}>
-                                    Cancelar
-                                </Button>
-                                <Button onClick={() => void handleConfirmRecurringMarkAsPaid()} disabled={markingAsPaid}>
-                                    Confirmar
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                </DefaultModal>
-
-                <DefaultModal
                     isOpen={paymentModalOpen}
                     onClose={() => {
                         if (payingInstallment) return
                         setPaymentModalOpen(false)
                         setSelectedInstallmentForPayment(null)
                     }}
-                    title="Registrar pagamento da parcela"
+                    title={selectedInstallmentForPayment?.isRecurringOccurrence ? "Registrar pagamento da ocorrência" : "Registrar pagamento da parcela"}
                     maxWidth="md"
                 >
                     {selectedInstallmentForPayment ? (
@@ -1197,18 +1159,24 @@ export default function TransactionsPage({
                                             {selectedInstallmentForPayment.description}
                                         </h3>
                                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                            <Badge variant="gray">
-                                                Parcela {selectedInstallmentForPayment.installmentNumber}
-                                            </Badge>
+                                            {selectedInstallmentForPayment.isRecurringOccurrence ? (
+                                                <Badge variant="purple">
+                                                    Recorrente
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="gray">
+                                                    Parcela {selectedInstallmentForPayment.installmentNumber}
+                                                </Badge>
+                                            )}
                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Vence em {selectedInstallmentForPayment.dueDate || "-"}
+                                                Vence em {selectedInstallmentForPayment.dueDate || (selectedInstallmentForPayment.occurrenceDate ? formatBrazilDateFromDbInput(selectedInstallmentForPayment.occurrenceDate, 'dayMonthYear') : '-')}
                                             </span>
                                         </div>
                                     </div>
                                     <div className="text-right shrink-0">
                                         <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
                                         <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount || 0))}
+                                            {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0))}
                                         </p>
                                     </div>
                                 </div>
@@ -1840,6 +1808,7 @@ export default function TransactionsPage({
                                                     paymentType: row.paymentType ? String(row.paymentType) : null,
                                                     reason: String(installmentDetail.group?.description || "Parcela"),
                                                     reference: String(row.description || "-"),
+                                                    remainingAmount: row.remainingAmount !== undefined ? Number(row.remainingAmount) : undefined,
                                                 }),
                                             )
                                         }
