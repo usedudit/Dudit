@@ -20,7 +20,7 @@ export type SplitInputRow = {
     installmentNumber: number
 }
 
-type MethodRow = {
+export type MethodRow = {
     id: string
     fee_percent: number
     fee_fixed: number
@@ -29,7 +29,7 @@ type MethodRow = {
     max_installments: number
 }
 
-type InstallmentFee = { installmentNumber: number; feePercent: number }
+export type InstallmentFee = { installmentNumber: number; feePercent: number }
 
 /**
  * Sums the user-defined base amounts (before per-method discount / interest / fee).
@@ -120,16 +120,14 @@ export function recalculateSplitPaymentFromBaseAmounts(
 
         const row = rows[0]!
         const declared = safeSplitMoney(Number(row.amount || 0))
-        // One line in the payload: if it fully covers the order (including cash over-tender), anchor fees to
-        // the order total. If it is a partial, fees apply only to the amount declared for that line.
-        const baseForThisLeg = declared + SPLIT_BASE_SUM_TOLERANCE >= safeBase ? safeBase : declared
-        if (baseForThisLeg <= 0) {
-            return { ok: false, error: "Valor de pagamento inválido." }
-        }
+        // For a single payment row, discount/fees must ALWAYS be calculated on the full order total (safeBase).
+        const baseForThisLeg = safeBase
+        const isPartial = declared < safeBase - 0.005
 
         const mId = row.paymentMethodId ? String(row.paymentMethodId) : ""
         const method = mId ? methodById.get(mId) : null
         if (!method?.id) {
+            const finalAmt = isPartial ? declared : baseForThisLeg
             return {
                 ok: true,
                 finalTotal: baseForThisLeg,
@@ -139,7 +137,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
                 adjustedRows: [
                     {
                         ...row,
-                        finalAmount: baseForThisLeg,
+                        finalAmount: finalAmt,
                         interestAmount: 0,
                         feeAmount: 0,
                         paymentMethodDiscountAmount: 0,
@@ -155,6 +153,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
         })
 
         const finalAmt = round2(Number(calc.finalAmount || 0))
+        const rowFinalAmt = isPartial ? declared : finalAmt
         return {
             ok: true,
             finalTotal: finalAmt,
@@ -164,7 +163,7 @@ export function recalculateSplitPaymentFromBaseAmounts(
             adjustedRows: [
                 {
                     ...row,
-                    finalAmount: finalAmt,
+                    finalAmount: rowFinalAmt,
                     interestAmount: Number(calc.interestAmount || 0),
                     feeAmount: Number(calc.feeAmount || 0),
                     paymentMethodDiscountAmount: Number(calc.paymentMethodDiscountAmount || 0),

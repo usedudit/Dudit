@@ -968,13 +968,32 @@ export const AppointmentSheet = ({
                 return { success: true, orderNumber };
             }
 
-            const items = selectedServices.map((s, idx) => ({
-                productId: null as string | null,
-                customName: s.name,
-                quantity: 1,
-                unitPrice: s.price,
-                sortOrder: idx,
-            }));
+            const items = selectedServices.map((s, idx) => {
+                const effectivePrice = getEffectiveServicePrice(s);
+                let finalPrice = effectivePrice;
+                if (s.pricingUnit === 'Por Dia') {
+                    const start = new Date(`${startDateRange}T${startTimeRange}`);
+                    const end = new Date(`${endDateRange}T${endTimeRange}`);
+                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const chargeableDays = Math.max(1, diffDays);
+                    finalPrice = effectivePrice * chargeableDays;
+                } else if (s.pricingUnit === 'Por Hora') {
+                    const start = new Date(`${startDateRange}T${startTimeRange}`);
+                    const end = new Date(`${endDateRange}T${endTimeRange}`);
+                    const diffTime = Math.abs(end.getTime() - start.getTime());
+                    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+                    const chargeableHours = Math.max(1, diffHours);
+                    finalPrice = effectivePrice * chargeableHours;
+                }
+                return {
+                    productId: null as string | null,
+                    customName: s.name,
+                    quantity: 1,
+                    unitPrice: finalPrice,
+                    sortOrder: idx,
+                };
+            });
 
             const payload = {
                 partnerId: partnerId || '',
@@ -2693,15 +2712,34 @@ export const AppointmentSheet = ({
                         }}
                         partnerId={partnerId || ''}
                         onConfirm={handleConfirmPayment}
-                        cart={selectedServices.map(s => ({
-                            ...s,
-                            qty: 1,
-                            quantity: 1,
-                            productId: s.id || null,
-                            unitPrice: s.price,
-                            price: s.price,
-                            name: s.name,
-                        }))}
+                        cart={selectedServices.map(s => {
+                            const effectivePrice = getEffectiveServicePrice(s);
+                            let finalPrice = effectivePrice;
+                            if (s.pricingUnit === 'Por Dia') {
+                                const start = new Date(`${startDateRange}T${startTimeRange}`);
+                                const end = new Date(`${endDateRange}T${endTimeRange}`);
+                                const diffTime = Math.abs(end.getTime() - start.getTime());
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                const chargeableDays = Math.max(1, diffDays);
+                                finalPrice = effectivePrice * chargeableDays;
+                            } else if (s.pricingUnit === 'Por Hora') {
+                                const start = new Date(`${startDateRange}T${startTimeRange}`);
+                                const end = new Date(`${endDateRange}T${endTimeRange}`);
+                                const diffTime = Math.abs(end.getTime() - start.getTime());
+                                const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+                                const chargeableHours = Math.max(1, diffHours);
+                                finalPrice = effectivePrice * chargeableHours;
+                            }
+                            return {
+                                ...s,
+                                qty: 1,
+                                quantity: 1,
+                                productId: s.id || null,
+                                unitPrice: finalPrice,
+                                price: finalPrice,
+                                name: s.name,
+                            };
+                        })}
                         amountDue={calculatedPrice}
                         existingPaidAmount={Number(linkedOrder?.paid_amount ?? appointment?.paidAmount ?? 0)}
                         existingPaymentBreakdown={linkedOrder?.payment_breakdown || []}

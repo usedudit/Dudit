@@ -3,8 +3,8 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, TruckIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, StoreIcon, CheckCircleIcon, LockIcon } from "@/lib/icons"
-import { Button, Spinner, IconPlaceholder, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, Checkbox } from "@/components/reusable"
+import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon } from "@/lib/icons"
+import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
 import { Textarea } from "@/components/ui/textarea"
@@ -325,18 +325,18 @@ export function CheckoutPageClient() {
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showOutsideRadiusModal, setShowOutsideRadiusModal] = useState(false)
 
-const [couponCode, setCouponCode] = useState("")
-const [couponDiscount, setCouponDiscount] = useState(0)
-const [availableCoupons, setAvailableCoupons] = useState<MarketplaceAvailableCoupon[]>([])
-const [couponListLoading, setCouponListLoading] = useState(false)
-const [showCouponModal, setShowCouponModal] = useState(false)
-const [selectedCouponId, setSelectedCouponId] = useState<string>("")
-const [couponError, setCouponError] = useState<string | null>(null)
-const [couponPartialWarning, setCouponPartialWarning] = useState(false)
-const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
-const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
+    const [couponCode, setCouponCode] = useState("")
+    const [couponDiscount, setCouponDiscount] = useState(0)
+    const [availableCoupons, setAvailableCoupons] = useState<MarketplaceAvailableCoupon[]>([])
+    const [couponListLoading, setCouponListLoading] = useState(false)
+    const [showCouponModal, setShowCouponModal] = useState(false)
+    const [selectedCouponId, setSelectedCouponId] = useState<string>("")
+    const [couponError, setCouponError] = useState<string | null>(null)
+    const [couponPartialWarning, setCouponPartialWarning] = useState(false)
+    const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
+    const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
 
-const displayableCoupons = availableCoupons
+    const displayableCoupons = availableCoupons
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -443,12 +443,14 @@ const displayableCoupons = availableCoupons
         }
     }, [storefrontMethods, formData.paymentMethod])
 
-    // Auto-set paymentOption to "traditional" for non-MP stores
+    // Auto-set paymentOption to "traditional" for non-MP stores (only if pickup payment is allowed or not in pickup mode)
+    const pickupPolicyFromContext = checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment"
+    const isPickupRequiringOnline = formData.deliveryType === "pickup" && pickupPolicyFromContext === "require_online_payment"
     useEffect(() => {
-        if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null) {
+        if (!contextLoading && storefrontMethods.length > 0 && !partnerInfo.mpConnected && paymentOption === null && !isPickupRequiringOnline) {
             setPaymentOption("traditional")
         }
-    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption])
+    }, [contextLoading, storefrontMethods, partnerInfo.mpConnected, paymentOption, isPickupRequiringOnline])
 
     useEffect(() => {
         if (checkoutContext?.deposit.available) {
@@ -691,7 +693,8 @@ const displayableCoupons = availableCoupons
             ? "Pagar na Retirada"
             : "Pagar na Entrega"
 
-    const showTraditionalPaymentOption = Boolean(
+    const pickupRequiresOnlinePayment = isPickup && (checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment") === "require_online_payment"
+    const showTraditionalPaymentOption = !pickupRequiresOnlinePayment && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
         requirements?.hasServiceLines ||
@@ -1970,7 +1973,15 @@ const displayableCoupons = availableCoupons
                                     deliveryType={formData.deliveryType}
                                     onDeliveryTypeChange={(type) => {
                                         setFormData((prev) => ({ ...prev, deliveryType: type }))
-                                        if (type === "pickup" && partnerInfo.mpConnected) {
+                                        if (type === "pickup" && pickupPolicyFromContext === "require_online_payment") {
+                                            if (partnerInfo.mpConnected) {
+                                                setPaymentOption("mercadopago")
+                                                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                            } else {
+                                                setPaymentOption(null)
+                                                setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                            }
+                                        } else if (type === "pickup" && partnerInfo.mpConnected) {
                                             setPaymentOption("mercadopago")
                                         }
                                     }}
@@ -1992,8 +2003,6 @@ const displayableCoupons = availableCoupons
                                 />
                             )}
 
-
-
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
@@ -2003,7 +2012,15 @@ const displayableCoupons = availableCoupons
                                                 <ListItem
                                                     icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />}
                                                     title="Mercado Pago"
-                                                    description="Pague com cartão, Pix ou saldo MP."
+                                                    description={(() => {
+                                                        const mp = mpAcceptedPaymentMethods
+                                                        const enabled = []
+                                                        if (mp?.pix === true) enabled.push("Pix")
+                                                        if (mp?.credit_card === true) enabled.push("Cartão")
+                                                        if (mp?.boleto === true) enabled.push("Boleto")
+                                                        if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
+                                                        return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
+                                                    })()}
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                     onClick={() => setPaymentOption("mercadopago")}
                                                     right={
@@ -2293,7 +2310,15 @@ const displayableCoupons = availableCoupons
                                             deliveryType={formData.deliveryType}
                                             onDeliveryTypeChange={(type) => {
                                                 setFormData((prev) => ({ ...prev, deliveryType: type }))
-                                                if (type === "pickup" && partnerInfo.mpConnected) {
+                                                if (type === "pickup" && pickupPolicyFromContext === "require_online_payment") {
+                                                    if (partnerInfo.mpConnected) {
+                                                        setPaymentOption("mercadopago")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                    } else {
+                                                        setPaymentOption(null)
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                    }
+                                                } else if (type === "pickup" && partnerInfo.mpConnected) {
                                                     setPaymentOption("mercadopago")
                                                 }
                                             }}
@@ -2352,10 +2377,10 @@ const displayableCoupons = availableCoupons
                                                 description={(() => {
                                                     const mp = mpAcceptedPaymentMethods
                                                     const enabled = []
-                                                    if (mp?.pix !== false) enabled.push("Pix")
-                                                    if (mp?.credit_card !== false) enabled.push("Cartão")
-                                                    if (mp?.boleto !== false) enabled.push("Boleto")
-                                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                                    if (mp?.pix === true) enabled.push("Pix")
+                                                    if (mp?.credit_card === true) enabled.push("Cartão")
+                                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                                    if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                                     return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
                                                 })()}
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
@@ -2769,10 +2794,10 @@ const displayableCoupons = availableCoupons
                                 paymentOption === "mercadopago" ? (() => {
                                     const mp = mpAcceptedPaymentMethods
                                     const enabled = []
-                                    if (mp?.pix !== false) enabled.push("Pix")
-                                    if (mp?.credit_card !== false) enabled.push("Cartão")
-                                    if (mp?.boleto !== false) enabled.push("Boleto")
-                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                    if (mp?.pix === true) enabled.push("Pix")
+                                    if (mp?.credit_card === true) enabled.push("Cartão")
+                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                    if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                     return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
                                 })() :
                                     selectedStorefrontMethod?.type === "pix" ? "Pagamento instantâneo via Pix" :
@@ -2833,13 +2858,12 @@ const displayableCoupons = availableCoupons
                                         ? "Não aplicável aos itens atuais do pedido."
                                         : `${getCouponSubtitle(coupon)}${coupon.partialApplicabilityWarning ? " • Válido apenas para alguns itens do pedido." : " • Aplicável a todo o pedido."}`
                                 }
-                                className={`px-4 py-3 gap-4 border rounded-xl ${
-                                    coupon.blocked
-                                        ? "opacity-50 cursor-not-allowed border-brand-border dark:border-dark-border"
-                                        : selectedCouponId === coupon.id
+                                className={`px-4 py-3 gap-4 border rounded-xl ${coupon.blocked
+                                    ? "opacity-50 cursor-not-allowed border-brand-border dark:border-dark-border"
+                                    : selectedCouponId === coupon.id
                                         ? "border-brand-green bg-green-50/30 dark:bg-green-900/10 cursor-pointer"
                                         : "border-brand-border dark:border-dark-border cursor-pointer"
-                                }`}
+                                    }`}
                                 onClick={() => {
                                     if (!coupon.blocked) {
                                         setSelectedCouponId(coupon.id)
@@ -3161,10 +3185,10 @@ const displayableCoupons = availableCoupons
                                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{(() => {
                                                     const mp = mpAcceptedPaymentMethods
                                                     const enabled = []
-                                                    if (mp?.pix !== false) enabled.push("Pix")
-                                                    if (mp?.credit_card !== false) enabled.push("Cartão")
-                                                    if (mp?.boleto !== false) enabled.push("Boleto")
-                                                    if (mp?.mercado_pago_wallet !== false) enabled.push("Saldo MP")
+                                                    if (mp?.pix === true) enabled.push("Pix")
+                                                    if (mp?.credit_card === true) enabled.push("Cartão")
+                                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                                    if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                                     return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
                                                 })()}</p>
                                             </div>
@@ -3184,84 +3208,84 @@ const displayableCoupons = availableCoupons
                                     </TabsContent>
                                 )}
 
-                            <TabsContent value="traditional" className="pt-2">
-                                <div className="space-y-3">
-                                    {storefrontMethods.map((m) => {
-                                        const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
-                                            m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                    <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+                                <TabsContent value="traditional" className="pt-2">
+                                    <div className="space-y-3">
+                                        {storefrontMethods.map((m) => {
+                                            const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
+                                                m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                    m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
+                                                        <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
 
-                                        const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
+                                            const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
 
-                                        return (
-                                            <div
-                                                key={m.id}
-                                                onClick={() => {
-                                                    setPaymentOption("traditional")
-                                                    setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                                    setShowPaymentModal(false)
-                                                    if (m.type === "cash" && !isPickup && wantsChange === null) {
-                                                        setTempWantsChange(null)
-                                                        setTempPayWithAmount("")
-                                                        setShowChangeModal(true)
-                                                    }
-                                                }}
-                                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
-                                                    ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
-                                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3 p-4">
-                                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
-                                                        {icon}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
-                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
-                                                    </div>
-                                                    <div className="shrink-0 ml-4">
-                                                        <RadioButton
-                                                            name="paymentSelect"
-                                                            value={m.id}
-                                                            checked={formData.paymentMethod === m.id}
-                                                            onChange={() => {
-                                                                setPaymentOption("traditional")
-                                                                setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
-                                                                setShowPaymentModal(false)
-                                                                if (m.type === "cash" && !isPickup && wantsChange === null) {
-                                                                    setTempWantsChange(null)
-                                                                    setTempPayWithAmount("")
-                                                                    setShowChangeModal(true)
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                                {m.type.includes("card") && m.cardBrand && (
-                                                    <>
-                                                        <Separator className="mx-4 my-0" />
-                                                        <div className="px-4 py-3 flex flex-wrap gap-2">
-                                                            {m.cardBrand.split(/[;,]/).map(b => {
-                                                                const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
-                                                                if (!brand) return null
-                                                                return (
-                                                                    <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
-                                                                        <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
-                                                                    </div>
-                                                                )
-                                                            })}
+                                            return (
+                                                <div
+                                                    key={m.id}
+                                                    onClick={() => {
+                                                        setPaymentOption("traditional")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                        setShowPaymentModal(false)
+                                                        if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                            setTempWantsChange(null)
+                                                            setTempPayWithAmount("")
+                                                            setShowChangeModal(true)
+                                                        }
+                                                    }}
+                                                    className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${formData.paymentMethod === m.id
+                                                        ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                                                        : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3 p-4">
+                                                        <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
+                                                            {icon}
                                                         </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                    )
-                })()}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading truncate">{paymentTypeLabelMap[m.type] || m.type}</h3>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-tight truncate">{description}</p>
+                                                        </div>
+                                                        <div className="shrink-0 ml-4">
+                                                            <RadioButton
+                                                                name="paymentSelect"
+                                                                value={m.id}
+                                                                checked={formData.paymentMethod === m.id}
+                                                                onChange={() => {
+                                                                    setPaymentOption("traditional")
+                                                                    setFormData(prev => ({ ...prev, paymentMethod: m.id, installments: 1 }))
+                                                                    setShowPaymentModal(false)
+                                                                    if (m.type === "cash" && !isPickup && wantsChange === null) {
+                                                                        setTempWantsChange(null)
+                                                                        setTempPayWithAmount("")
+                                                                        setShowChangeModal(true)
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {m.type.includes("card") && m.cardBrand && (
+                                                        <>
+                                                            <Separator className="mx-4 my-0" />
+                                                            <div className="px-4 py-3 flex flex-wrap gap-2">
+                                                                {m.cardBrand.split(/[;,]/).map(b => {
+                                                                    const brand = AVAILABLE_BRANDS.find(ab => ab.id === b.trim())
+                                                                    if (!brand) return null
+                                                                    return (
+                                                                        <div key={brand.id} className="flex items-center justify-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border px-2 py-1 rounded-md">
+                                                                            <img src={brand.image} alt={brand.name} className="h-4 w-auto object-contain opacity-90" />
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+                        )
+                    })()}
                 </div>
             </DefaultModal>
 

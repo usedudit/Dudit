@@ -909,7 +909,7 @@ const PaymentModal = ({
             return;
         }
         const installmentNumber = Math.max(1, Number(installments || 1));
-        const base = calcBaseAmount;
+        const base = chargeTarget; // Always use the full order total for payment method discount/fee calculation
         setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
@@ -931,7 +931,7 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
-    }, [selectedMethodId, installments, chargeTarget, view, calcBaseAmount]);
+    }, [selectedMethodId, installments, chargeTarget, view]); // Decoupled from calcBaseAmount to prevent recalculation on partial inputs
 
 
     const handleQuickDenomination = (val: number) => {
@@ -964,7 +964,7 @@ const PaymentModal = ({
     );
 
     const legFinalCharged =
-        paymentCalculation?.success && calcBaseAmount > 0.009
+        paymentCalculation?.success && chargeTarget > 0.009
             ? Number(paymentCalculation.finalAmount || 0)
             : null;
 
@@ -979,22 +979,14 @@ const PaymentModal = ({
 
     const finalDueForLeg = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
 
-    const { compactAlertPaid, compactAlertNeed } = useMemo(() => {
-        if (view === 'split') {
-            return { compactAlertPaid: splitBaseSum, compactAlertNeed: chargeTarget };
-        }
-        if (editingPaymentIndex !== null) {
-            return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
-        }
-        // Para pagamento único: compara o que o operador digitou vs o valor total base do pedido
-        return { compactAlertPaid: paymentBaseAmount, compactAlertNeed: chargeTarget };
-    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount]);
-
-    // Compara o valor base que o operador digitou contra o valor total base
+    // Compara o valor base que o operador digitou contra o valor total base do pedido
     const isAllocationUnderpaid = paymentBaseAmount < chargeTarget - 0.005;
     const isUnderpaid = view === 'split' ? splitBaseSum < chargeTarget - 0.005 : isAllocationUnderpaid;
-    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > chargeTarget + 0.005;
-    const changeAmount = isOverpaid ? paymentBaseAmount - chargeTarget : 0;
+
+    const finalTotalWithMethodPricing = legFinalCharged != null && Number.isFinite(legFinalCharged) ? legFinalCharged : chargeTarget;
+
+    const isOverpaid = view === 'money' && !isAllocationUnderpaid && paymentBaseAmount > finalTotalWithMethodPricing + 0.005;
+    const changeAmount = isOverpaid ? paymentBaseAmount - finalTotalWithMethodPricing : 0;
 
     /** Valor efetivo pago / a registrar (líquido do método quando houver cálculo). */
     const totalPaidCalculated = useMemo(() => {
@@ -1009,11 +1001,27 @@ const PaymentModal = ({
             return other + paymentBaseAmount;
         }
         if (view === 'money' || view === 'pix' || view === 'card') {
-            return paymentBaseAmount;
+            if (isAllocationUnderpaid) {
+                return paymentBaseAmount;
+            } else {
+                return finalTotalWithMethodPricing;
+            }
         }
-        if (legFinalCharged != null) return legFinalCharged;
         return paymentBaseAmount;
-    }, [view, splitPreview, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount, legFinalCharged]);
+    }, [view, splitPreview, splitBaseSum, editingPaymentIndex, payments, paymentBaseAmount, isAllocationUnderpaid, finalTotalWithMethodPricing]);
+
+    const { compactAlertPaid, compactAlertNeed } = useMemo(() => {
+        if (view === 'split') {
+            return { compactAlertPaid: splitBaseSum, compactAlertNeed: chargeTarget };
+        }
+        if (editingPaymentIndex !== null) {
+            return { compactAlertPaid: allocationTotal, compactAlertNeed: chargeTarget };
+        }
+        // Para pagamento único: compara o que o operador digitou vs o total calculado do método
+        const need = finalTotalWithMethodPricing;
+        const paid = isAllocationUnderpaid ? paymentBaseAmount : Math.max(paymentBaseAmount, need);
+        return { compactAlertPaid: paid, compactAlertNeed: need };
+    }, [view, splitBaseSum, chargeTarget, editingPaymentIndex, allocationTotal, paymentBaseAmount, finalTotalWithMethodPricing, isAllocationUnderpaid]);
 
     const currentPricingTotals = useMemo(() => {
         if (view === 'split' && splitPreview && 'success' in splitPreview && splitPreview.success) {
@@ -1256,7 +1264,7 @@ const PaymentModal = ({
                         }
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
-                    amount: Number(paymentBaseAmount || 0),
+                    amount: Number(totalPaidCalculated || 0),
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -1271,11 +1279,7 @@ const PaymentModal = ({
             : Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => normalizePaymentMethodLabel(entry.method)))).join(', ');
 
         const singleRegisterAmount =
-            view !== 'split' && paymentCalculation?.success && legFinalCharged != null && Number.isFinite(legFinalCharged)
-                ? legFinalCharged
-                : view !== 'split'
-                    ? Number(paymentBaseAmount || 0)
-                    : 0;
+            view !== 'split' ? totalPaidCalculated : 0;
 
         const paidToRegister =
             isPendingPayment
