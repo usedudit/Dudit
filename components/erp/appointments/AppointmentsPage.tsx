@@ -72,7 +72,7 @@ function computeVisibleDateRange(date: Date, view: ViewType): { startDate: strin
 }
 
 const AppointmentsPage = ({
-    partnerId: initialPartnerId,
+    partnerId:    initialPartnerId,
     initialTeam = [],
     initialCustomers = [],
     initialServices = [],
@@ -81,7 +81,7 @@ const AppointmentsPage = ({
 }: {
     partnerId: string;
     initialTeam?: Array<{ id: string; name: string; role: string }>;
-    initialCustomers?: Array<{ id: string; name: string; email?: string; avatar_url?: string | null }>;
+    initialCustomers?: Array<{ id: string; name: string; email?: string; phone?: string; avatar_url?: string | null }>;
     initialServices?: Array<{ id: string; name: string; price: number; promotional_price?: number | null; category_id?: string | null; duration: string; bufferMinutes: number; category: string; billingUnit: string }>;
     initialUnavailableTypes?: any[];
     openingHours?: any;
@@ -112,7 +112,7 @@ const AppointmentsPage = ({
         initialTeam.map(m => ({ id: m.id, name: m.name, role: m.role }))
     );
     const [realClients, setRealClients] = useState<any[]>(() =>
-        initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email, avatar_url: c.avatar_url }))
+        initialCustomers.map(c => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, avatar_url: c.avatar_url }))
     );
     const [realServices, setRealServices] = useState<any[]>(() =>
         initialServices.map(s => ({ id: s.id, name: s.name, price: s.price, promotional_price: s.promotional_price, category_id: s.category_id, duration: s.duration, category: s.category, bufferMinutes: s.bufferMinutes, billingUnit: s.billingUnit }))
@@ -122,6 +122,7 @@ const AppointmentsPage = ({
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [appointmentFilters, setAppointmentFilters] = useState<{ teamIds: string[] }>({ teamIds: [] });
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Interaction State
     const [hoverTime, setHoverTime] = useState<{ hour: number, minutes: number, top: number } | null>(null);
@@ -595,65 +596,25 @@ const AppointmentsPage = ({
     }, [realStaffMembers, appointmentFilters.teamIds]);
 
     const visibleAppointments = useMemo(() => {
-        if (appointmentFilters.teamIds.length === 0) return appointments;
-        const selected = new Set(appointmentFilters.teamIds);
-        return appointments.filter((appointment) => selected.has(appointment.staffId));
-    }, [appointments, appointmentFilters.teamIds]);
-
-    const sortedAppointments = useMemo(() => {
-        if (!sortConfig) {
-            return [...visibleAppointments].sort((a, b) => {
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                return a.time.localeCompare(b.time);
-            });
+        let items = appointments;
+        if (appointmentFilters.teamIds.length > 0) {
+            const selected = new Set(appointmentFilters.teamIds);
+            items = items.filter((appointment) => selected.has(appointment.staffId));
         }
-        return [...visibleAppointments].sort((a, b) => {
-            let comparison = 0;
-            switch (sortConfig.key) {
-                case 'customer':
-                    comparison = (a.customer || '').localeCompare(b.customer || '');
-                    break;
-                case 'datetime':
-                    const dateA = (a.date || '') + 'T' + (a.time || '');
-                    const dateB = (b.date || '') + 'T' + (b.time || '');
-                    comparison = dateA.localeCompare(dateB);
-                    break;
-                case 'staff':
-                    comparison = (a.staff || '').localeCompare(b.staff || '');
-                    break;
-                case 'price':
-                    comparison = (a.price || 0) - (b.price || 0);
-                    break;
-                case 'status':
-                    comparison = (a.status || '').localeCompare(b.status || '');
-                    break;
-                default:
-                    break;
-            }
-            return sortConfig.direction === 'asc' ? comparison : -comparison;
-        });
-    }, [visibleAppointments, sortConfig]);
+        if (searchTerm.trim() !== '') {
+            const query = searchTerm.toLowerCase();
+            items = items.filter((appointment) =>
+                (appointment.customer || '').toLowerCase().includes(query) ||
+                (appointment.service || '').toLowerCase().includes(query)
+            );
+        }
+        return items;
+    }, [appointments, appointmentFilters.teamIds, searchTerm]);
 
     useEffect(() => {
         setCurrentPage(1);
         setSelectedIds(new Set());
     }, [viewMode, calendarView, currentDate, appointmentFilters]);
-
-    const paginatedAppointments = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return sortedAppointments.slice(startIndex, startIndex + itemsPerPage);
-    }, [sortedAppointments, currentPage, itemsPerPage]);
-
-    const totalPages = Math.ceil(sortedAppointments.length / itemsPerPage);
-
-    const handleSelectRow = useCallback((id: string) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    }, []);
 
     const handleGridMouseMove = (e: React.MouseEvent, colIndex: number) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -807,7 +768,6 @@ const AppointmentsPage = ({
                                     </Button>
                                 </div>
                             </div>
-
                             <AppointmentsPageControls
                                 currentLabel={getViewLabel()}
                                 onToday={() => setCurrentDate(new Date())}
@@ -823,6 +783,8 @@ const AppointmentsPage = ({
                                 calendarView={calendarView}
                                 onCalendarViewChange={(view) => setCalendarView(view)}
                                 onOpenCreate={() => handleOpenCreate()}
+                                searchTerm={searchTerm}
+                                setSearchTerm={setSearchTerm}
                             />
 
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full">
@@ -844,169 +806,73 @@ const AppointmentsPage = ({
                                         />
                                     </div>
 
-                                    {/* Desktop view switcher */}
+                                    {/* Desktop view switcher (Calendar Only) */}
                                     <div className="hidden md:flex flex-1 flex-col overflow-y-auto no-scrollbar">
-                                        {viewMode === 'calendar' ? (
-                                            <div className="flex flex-col h-full">
-                                                {calendarView === 'month' && (
-                                                    <>
-                                                        <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
-                                                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                                                                <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text">
-                                                                    {day}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <MonthView
-                                                            appointments={visibleAppointments}
-                                                            currentDate={currentDate}
-                                                            handleGenericCellClick={handleGenericCellClick}
-                                                            activePopover={activePopover}
-                                                            handleOpenCreate={handleOpenCreate}
-                                                            handleOpenUnavailable={handleOpenUnavailable}
-                                                            setActivePopover={setActivePopover}
-                                                            handleOpenView={handleOpenView}
-                                                            handleOpenMore={handleOpenMore}
-                                                            openingHours={openingHours}
-                                                        />
-                                                    </>
-                                                )}
-
-                                                {calendarView === 'week' && (
-                                                    <TimelineView
-                                                        appointments={visibleAppointments}
-                                                        allAppointments={appointments}
-                                                        currentDate={currentDate}
-                                                        staffMembers={visibleStaffMembers}
-                                                        onOpenView={handleOpenView}
-                                                        handleTimelineMouseMove={handleTimelineMouseMove}
-                                                        handleGridMouseLeave={handleGridMouseLeave}
-                                                        handleGridClick={handleGridClick}
-                                                        hoverStaffId={hoverStaffId}
-                                                        hoverTime={hoverTime}
-                                                        activePopover={activePopover}
-                                                        setActivePopover={setActivePopover}
-                                                        handleOpenCreate={handleOpenCreate}
-                                                        handleOpenUnavailable={handleOpenUnavailable}
-                                                        openingHours={openingHours}
-                                                    />
-                                                )}
-
-                                                {calendarView === 'day' && (
-                                                    <DayView
-                                                        appointments={visibleAppointments}
-                                                        allAppointments={appointments}
-                                                        currentDate={currentDate}
-                                                        staffMembers={visibleStaffMembers}
-                                                        onOpenView={handleOpenView}
-                                                        handleGridMouseMove={handleGridMouseMove}
-                                                        handleGridMouseLeave={handleGridMouseLeave}
-                                                        handleGridClick={handleGridClick}
-                                                        hoverColIndex={hoverColIndex}
-                                                        hoverTime={hoverTime}
-                                                        activePopover={activePopover}
-                                                        setActivePopover={setActivePopover}
-                                                        handleOpenCreate={handleOpenCreate}
-                                                        handleOpenUnavailable={handleOpenUnavailable}
-                                                        openingHours={openingHours}
-                                                    />
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col h-full bg-white dark:bg-dark-surface rounded-2xl overflow-hidden pb-20 md:pb-0">
-                                                <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                        <thead>
-                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                                                    <Checkbox
-                                                                        checked={paginatedAppointments.length > 0 && paginatedAppointments.every((appointment) => selectedIds.has(appointment.id))}
-                                                                        onChange={(checked: boolean) => {
-                                                                            if (checked) {
-                                                                                setSelectedIds(new Set(paginatedAppointments.map((appointment) => appointment.id)));
-                                                                            } else {
-                                                                                setSelectedIds(new Set());
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                </th>
-                                                                {APPOINTMENT_COLUMNS.map((column) => {
-                                                                    const isSorted = sortConfig?.key === column.id;
-                                                                    return (
-                                                                        <th
-                                                                            key={column.id}
-                                                                            className={`py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${column.id === "actions" ? "rounded-r-lg" : ""}`}
-                                                                            style={{ width: column.width, minWidth: column.minWidth }}
-                                                                            onClick={() => {
-                                                                                if (column.id === "actions") return;
-                                                                                setSortConfig((prev) => ({
-                                                                                    key: column.id,
-                                                                                    direction: prev?.key === column.id && prev.direction === "asc" ? "desc" : "asc",
-                                                                                }));
-                                                                            }}
-                                                                        >
-                                                                            <div className={`relative flex items-center ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : "justify-start"}`}>
-                                                                                <span>{column.label}</span>
-                                                                                {column.id !== "actions" && (
-                                                                                    <div className={`flex items-center ${column.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
-                                                                                        <ArrowUpDown
-                                                                                            size={14}
-                                                                                            className={`transition-all duration-200 ${isSorted ? "text-brand-dark dark:text-dark-heading opacity-100 block" : "text-brand-inactive-text hidden group-hover:block opacity-40"} ${isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </th>
-                                                                    );
-                                                                })}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginatedAppointments.length > 0 ? (
-                                                                paginatedAppointments.map((appointment) => (
-                                                                    <AppointmentListRow
-                                                                        key={appointment.id}
-                                                                        appointment={appointment}
-                                                                        appointments={appointments}
-                                                                        openingHours={openingHours}
-                                                                        columns={APPOINTMENT_COLUMNS}
-                                                                        selected={selectedIds.has(appointment.id)}
-                                                                        onSelect={handleSelectRow}
-                                                                        onView={handleOpenView}
-                                                                    />
-                                                                ))
-                                                            ) : (
-                                                                <tr>
-                                                                    <td colSpan={APPOINTMENT_COLUMNS.length + 1}>
-                                                                        <IconPlaceholder
-                                                                            placeholderType="image"
-                                                                            imageSrc="https://img.dudit.com.br/static/mascots/Agendamentos.png"
-                                                                            imageAlt="Nenhum agendamento encontrado"
-                                                                            title="Nenhum agendamento encontrado"
-                                                                            subtitle="Não há agendamentos para este período"
-                                                                            itemButton={{
-                                                                                text: "Novo agendamento",
-                                                                                action: () => handleOpenCreate(),
-                                                                            }}
-                                                                        />
-                                                                    </td>
-                                                                </tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                                {totalPages > 1 && (
-                                                    <div className="mt-4 pb-6">
-                                                        <Pagination
-                                                            currentPage={currentPage}
-                                                            totalPages={totalPages}
-                                                            onPageChange={setCurrentPage}
-                                                        />
+                                        <div className="flex flex-col h-full">
+                                            {calendarView === 'month' && (
+                                                <>
+                                                    <div className="grid grid-cols-7 border-b border-brand-border dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50 flex-shrink-0">
+                                                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                                                            <div key={day} className="py-2 text-center text-xs font-bold text-brand-inactive-text">
+                                                                {day}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                    <MonthView
+                                                        appointments={visibleAppointments}
+                                                        currentDate={currentDate}
+                                                        handleGenericCellClick={handleGenericCellClick}
+                                                        activePopover={activePopover}
+                                                        handleOpenCreate={handleOpenCreate}
+                                                        handleOpenUnavailable={handleOpenUnavailable}
+                                                        setActivePopover={setActivePopover}
+                                                        handleOpenView={handleOpenView}
+                                                        handleOpenMore={handleOpenMore}
+                                                        openingHours={openingHours}
+                                                    />
+                                                </>
+                                            )}
+
+                                            {calendarView === 'week' && (
+                                                <TimelineView
+                                                    appointments={visibleAppointments}
+                                                    allAppointments={appointments}
+                                                    currentDate={currentDate}
+                                                    staffMembers={visibleStaffMembers}
+                                                    onOpenView={handleOpenView}
+                                                    handleTimelineMouseMove={handleTimelineMouseMove}
+                                                    handleGridMouseLeave={handleGridMouseLeave}
+                                                    handleGridClick={handleGridClick}
+                                                    hoverStaffId={hoverStaffId}
+                                                    hoverTime={hoverTime}
+                                                    activePopover={activePopover}
+                                                    setActivePopover={setActivePopover}
+                                                    handleOpenCreate={handleOpenCreate}
+                                                    handleOpenUnavailable={handleOpenUnavailable}
+                                                    openingHours={openingHours}
+                                                />
+                                            )}
+
+                                            {calendarView === 'day' && (
+                                                <DayView
+                                                    appointments={visibleAppointments}
+                                                    allAppointments={appointments}
+                                                    currentDate={currentDate}
+                                                    staffMembers={visibleStaffMembers}
+                                                    onOpenView={handleOpenView}
+                                                    handleGridMouseMove={handleGridMouseMove}
+                                                    handleGridMouseLeave={handleGridMouseLeave}
+                                                    handleGridClick={handleGridClick}
+                                                    hoverColIndex={hoverColIndex}
+                                                    hoverTime={hoverTime}
+                                                    activePopover={activePopover}
+                                                    setActivePopover={setActivePopover}
+                                                    handleOpenCreate={handleOpenCreate}
+                                                    handleOpenUnavailable={handleOpenUnavailable}
+                                                    openingHours={openingHours}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
                                 </AnimatePresence>
                             </div>

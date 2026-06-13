@@ -593,8 +593,8 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                             }}
                                         >
                                             {isClosed && (
-                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                                                    <span className="text-[9px] font-bold text-red-500/20 uppercase tracking-widest">Fechado</span>
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                                                    <span className="text-sm font-bold text-brand-red uppercase tracking-widest">Fechado</span>
                                                 </div>
                                             )}
                                             <div className="flex flex-col gap-1.5 h-full overflow-hidden relative z-10">
@@ -635,7 +635,7 @@ export const TimelineView = ({ appointments, allAppointments = [], currentDate, 
                                                         className="text-[10px] text-brand-inactive-text font-medium pl-1 cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading"
                                                         onClick={(e) => { e.stopPropagation(); if (handleOpenMore) handleOpenMore(dateStr, cellApps); }}
                                                     >
-                                                        + {remainingCount} more
+                                                        + {remainingCount} agendamentos
                                                     </div>
                                                 )}
                                             </div>
@@ -733,7 +733,7 @@ export const MonthView = ({ appointments, currentDate, handleGenericCellClick, a
                             }
                         })}
                     </AnimatePresence>
-                    {cellApps.length > 4 && <div className="text-[10px] text-brand-inactive-text font-medium pl-1 cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading" onClick={(e) => { e.stopPropagation(); handleOpenMore(dateStr, cellApps); }}>+ {cellApps.length - 4} more</div>}
+                    {cellApps.length > 4 && <div className="text-[10px] text-brand-inactive-text font-medium pl-1 cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading" onClick={(e) => { e.stopPropagation(); handleOpenMore(dateStr, cellApps); }}>+ {cellApps.length - 4} mais</div>}
                 </div>
             </div>
         );

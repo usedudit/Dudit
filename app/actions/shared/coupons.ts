@@ -371,7 +371,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
             .order("name"),
         supabase
             .from("customers")
-            .select("id, name, email, phone, avatar_url, status")
+            .select("id, name, email, phone, status")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(300),
@@ -405,7 +405,7 @@ export async function getCouponScopeDataAction(partnerId: string) {
             name: c.name,
             email: c.email,
             phone: c.phone,
-            avatarUrl: c.avatar_url,
+            avatarUrl: null,
             status: c.status,
         })),
     }

@@ -298,7 +298,7 @@ export const BusinessDataSubPage = ({
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                         {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                                 {/* Back button - desktop only */}

@@ -31,7 +31,7 @@ async function loadCatalogs(partnerId: string) {
       .single(),
     supabase
       .from("customers")
-      .select("id, name, email, avatar_url")
+      .select("id, name, email, phone")
       .eq("partner_id", partnerId)
       .eq("status", "ativo")
       .order("name", { ascending: true })
@@ -99,7 +99,8 @@ async function loadCatalogs(partnerId: string) {
       id: c.id,
       name: c.name,
       email: c.email || undefined,
-      avatar_url: c.avatar_url || null,
+      phone: c.phone || undefined,
+      avatar_url: null,
     })),
     services: (servicesRes.data || []).map((s: any) => ({
       id: String(s.id),

@@ -95,32 +95,47 @@ const FinancialAccountCard = React.memo(
 
                         <div className="flex flex-col gap-0.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-1">
                             <span>{TYPE_LABELS[item.type] || item.type}</span>
-                            <span className="text-[13px]">
-                                Saldo inicial:{" "}
-                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(initial)}</span>
-                            </span>
-                            <span className="text-[13px]">
-                                Saldo atual:{" "}
-                                <span className="font-bold text-brand-green">
-                                    {current === null ? "-" : formatCurrency(current)}
-                                </span>
-                            </span>
                         </div>
                     </div>
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-brand-border dark:border-dark-border flex gap-3 items-end justify-between">
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Criado em</span>
-                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                            {new Date(item.created_at).toLocaleDateString()}
-                        </span>
+                    <div className="flex gap-6 items-end">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Criado em</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                {new Date(item.created_at).toLocaleDateString()}
+                            </span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo inicial</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                {formatCurrency(initial)}
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
-                            <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
-                        </ActionsDropdown>
+                    <div className="flex items-end gap-3">
+                        <div className="flex flex-col gap-0.5 text-right">
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Saldo atual</span>
+                            <span className={`text-[13px] font-bold ${
+                                current === null
+                                    ? "text-brand-dark dark:text-dark-heading"
+                                    : current > 0
+                                    ? "text-brand-green"
+                                    : current < 0
+                                    ? "text-brand-red"
+                                    : "text-brand-dark dark:text-dark-heading"
+                            }`}>
+                                {current === null ? "-" : formatCurrency(current)}
+                            </span>
+                        </div>
+
+                        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <ActionsDropdown onEdit={onEdit} onDelete={onDelete}>
+                                <DropdownItem onClick={onAdjustBalance}>Ajustar saldo</DropdownItem>
+                            </ActionsDropdown>
+                        </div>
                     </div>
                 </div>
             </motion.div>

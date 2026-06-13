@@ -259,18 +259,15 @@ const SelectCustomerSheet = ({
                     />
                 </div>
                 <Button
-                    variant="filled"
                     onClick={() => {
                         setNameError(null)
                         setEmailError(null)
                         setPhoneError(null)
                         setIsNewCustomerSheetOpen(true)
                     }}
-                    className="h-11 w-11 shrink-0 rounded-full p-0 flex items-center justify-center bg-brand-primary hover:bg-brand-primary/95 text-white"
-                    type="button"
-                >
-                    <PlusIcon className="h-5 w-5" />
-                </Button>
+                    className="h-11 w-11 shrink-0"
+                    leftIcon={<PlusIcon size={18} />}
+                />
             </div>
 
             <div

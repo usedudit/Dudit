@@ -926,6 +926,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 isPendingDelivery: paymentData.isPendingDelivery,
                 paymentProvider: paymentData.paymentProvider,
                 mpPaymentId: paymentData.mpPaymentId,
+                sellerId: selectedSellerId || null,
             })
 
             if (!result.success) {

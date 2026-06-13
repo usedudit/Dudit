@@ -3,7 +3,7 @@ import { toast } from '@/hooks/use-notification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { MoreHorizontal, AlertTriangle } from 'lucide-react';
-import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon } from '@/lib/icons';
+import { ChevronLeftIcon, XIcon, SearchIcon, CheckCircleIcon, ChevronRightIcon, PlusIcon, CalendarIcon, CheckIcon, ClockIcon, RepeatIcon, ArrowRightIcon, ChevronDownIcon, UserIcon } from '@/lib/icons';
 import { Button, Input, Dropdown, DropdownItem, AlertModal, DatePicker, TimePicker, FormTextarea, ThreeDotsLoader, IconPlaceholder, Spinner, EmailInput, PhoneInput, Checkbox, MoneyInput, RadioButton, InfoCard, Badge } from '@/components/reusable';
 import { getAvailableTimeSlotsAction } from '@/app/actions/erp/appointments';
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -23,6 +23,7 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import PaymentModal from '@/components/erp/orders/PaymentModal';
 import SelectCustomerSheet from '@/components/erp/clientes/SelectCustomerSheet';
 import { createPOSCustomerQuickAction } from '@/app/actions/erp/pdv';
+import { fetchPartnerCustomersBucket } from '@/app/actions/erp/client-loaders';
 import { createServiceAction } from '@/app/actions/erp/servicos';
 import { confirmAppointmentOrderPaymentAction, createERPOrderAction, getOrderDetailsAction } from '@/app/actions/erp/orders';
 import { getFulfillmentModeLabel, getPaymentStatusLabel, getSalesChannelLabel } from '@/lib/orders/status';
@@ -136,16 +137,6 @@ export const AppointmentSheet = ({
         return aptStartMin < fromMin || aptEndMin > toMin;
     };
 
-    const filteredClients = useMemo(() => {
-        if (!clientSearch) return clientsSource;
-        const q = clientSearch.toLowerCase();
-        return clientsSource.filter(c =>
-            (c.name || '').toLowerCase().includes(q) ||
-            (c.email || '').toLowerCase().includes(q) ||
-            (c.phone || '').toLowerCase().includes(q)
-        );
-    }, [clientSearch, clientsSource]);
-
 
     const router = useRouter();
     const csrfToken = useCSRFToken();
@@ -168,7 +159,7 @@ export const AppointmentSheet = ({
         if (!partnerId) return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setAptPromotions(res)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [partnerId])
 
     // Status & Notes State
@@ -252,8 +243,32 @@ export const AppointmentSheet = ({
     const [localClients, setLocalClients] = useState<any[]>(() => clientsCatalog || []);
 
     useEffect(() => {
-        setLocalClients(clientsCatalog || []);
+        if (clientsCatalog && clientsCatalog.length > 0) {
+            setLocalClients(clientsCatalog);
+        }
     }, [clientsCatalog]);
+
+    useEffect(() => {
+        if (partnerId) {
+            fetchPartnerCustomersBucket(partnerId).then(res => {
+                if (res && res.length > 0) {
+                    setLocalClients(res);
+                }
+            }).catch(err => {
+                console.error("Error fetching customers client-side:", err);
+            });
+        }
+    }, [partnerId]);
+
+    const filteredClients = useMemo(() => {
+        if (!clientSearch) return localClients;
+        const q = clientSearch.toLowerCase();
+        return localClients.filter(c =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.phone || '').toLowerCase().includes(q)
+        );
+    }, [clientSearch, localClients]);
 
     // Client change came from Summary view tracking
     const [cameFromSummary, setCameFromSummary] = useState(false);
@@ -1315,7 +1330,7 @@ export const AppointmentSheet = ({
                                                                     />
                                                                 </div>
                                                             )}
-                                                             {(() => { const pr = computeItemDisplayPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                                            {(() => { const pr = computeItemDisplayPrice(Number(item.price || 0), item.promotional_price && Number(item.promotional_price) < Number(item.price || 0) ? Number(item.promotional_price) : null, aptPromotions, { serviceId: item.id }); return (<div className="flex items-center gap-1.5 mt-2">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}
                                                         </div>
                                                     </div>
                                                 );
@@ -1504,25 +1519,24 @@ export const AppointmentSheet = ({
                                     />
                                 </div>
                                 <Button
-                                    variant="outline"
                                     onClick={() => {
                                         setNewCustomerName("");
                                         setNewCustomerEmail("");
                                         setNewCustomerPhone("");
                                         setIsNewClientOpen(true);
                                     }}
-                                    className="h-11 px-3 shrink-0 rounded-xl"
-                                    type="button"
-                                >
-                                    <PlusIcon size={16} /> Novo
-                                </Button>
+                                    className="h-11 w-11 shrink-0"
+                                    leftIcon={<PlusIcon size={18} />}
+                                />
                             </div>
 
                             <div className="space-y-2 max-h-[350px] overflow-y-auto custom-scrollbar">
                                 {filteredClients.length === 0 ? (
-                                    <div className="text-center py-8 text-brand-inactive-text">
-                                        Nenhum cliente encontrado.
-                                    </div>
+                                    <IconPlaceholder
+                                        icon={UserIcon}
+                                        title="Nenhum cliente encontrado"
+                                        subtitle="Tente outra busca."
+                                    />
                                 ) : (
                                     filteredClients.map((client) => {
                                         const isSelected = selectedClient?.id === client.id;
@@ -2302,9 +2316,11 @@ export const AppointmentSheet = ({
 
                 <div className="space-y-2">
                     {filteredClients.length === 0 ? (
-                        <div className="text-center py-8 text-brand-inactive-text">
-                            Nenhum cliente encontrado.
-                        </div>
+                        <IconPlaceholder
+                            icon={UserIcon}
+                            title="Nenhum cliente encontrado"
+                            subtitle="Tente outra busca."
+                        />
                     ) : (
                         filteredClients.map((client) => {
                             const isSelected = selectedClient?.id === client.id;
@@ -2409,6 +2425,8 @@ export const AppointmentSheet = ({
         </div>
     );
 
+    const isNestedSheetOpen = isNewClientOpen || isNewServiceSheetOpen || isEditServiceOpen || isClientOverlayOpen || isHistoryOverlayOpen || isNotesOverlayOpen || isRecurrenceOverlayOpen;
+
     return (
         <>
             <AlertModal
@@ -2469,7 +2487,11 @@ export const AppointmentSheet = ({
                         >
                             <motion.div
                                 initial={{ x: '100%', opacity: 1 }}
-                                animate={{ x: 0, opacity: 1 }}
+                                animate={{
+                                    x: isNestedSheetOpen ? "-40px" : 0,
+                                    scale: isNestedSheetOpen ? 0.97 : 1,
+                                    opacity: isNestedSheetOpen ? 0.7 : 1
+                                }}
                                 exit={{ x: '100%', opacity: 1 }}
                                 transition={{ type: "spring", stiffness: 400, damping: 40 }}
                                 className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"

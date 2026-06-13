@@ -308,7 +308,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
                                                 ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                                 : "https://img.dudit.com.br/static/mascots/CadastrosProdutos.png"
                                     }
-                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhum cadastro realizado")}
+                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhum cadastro encontrado")}
                                     subtitle={
                                         planGate
                                             ? planGate.message

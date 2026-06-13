@@ -87,7 +87,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const userIds = partnerUsers.map((pu: any) => pu.user_id)
         const { data: profiles } = await admin
             .from("user_profiles")
-            .select("user_id, full_name, avatar_url")
+            .select("user_id, full_name")
             .in("user_id", userIds)
 
         // Get auth emails
@@ -117,7 +117,7 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {}
         if (profiles) {
             for (const p of profiles) {
-                profileMap[p.user_id] = { full_name: p.full_name, avatar_url: p.avatar_url }
+                profileMap[p.user_id] = { full_name: p.full_name, avatar_url: null }
             }
         }
 

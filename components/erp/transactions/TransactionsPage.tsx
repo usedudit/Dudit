@@ -535,7 +535,7 @@ export default function TransactionsPage({
             const latestPaidAt = latestPaidItem?.paymentDateRaw || latestPaidItem?.createdAtRaw || first.createdAtRaw || null
             const fullStats = fullGroupStats.get(groupId)
             const totalCount = fullStats?.total || first.installmentTotalCount || sorted.length
-            
+
             const uniquePaymentTypes = [...new Set(
                 sorted
                     .map(r => r.paymentType)
@@ -579,7 +579,7 @@ export default function TransactionsPage({
             const paidCount = fullStats?.paid ?? 0
             const pendingCount = Math.max(0, totalCount - paidCount)
             if (pendingCount <= 0) continue
- 
+
             const allItems = [
                 ...(items || []),
                 ...(paidInstallmentByGroup.get(groupId) || [])
@@ -593,7 +593,7 @@ export default function TransactionsPage({
             const combinedPaymentType = uniquePaymentTypes.length > 0
                 ? uniquePaymentTypes.join(", ")
                 : "Não informado"
- 
+
             const groupRemainingAmount =
                 Math.round(
                     sortedPending.reduce((acc, row) => acc + Number(row.installmentRemainingAmount ?? row.amount ?? 0), 0) * 100,
@@ -603,7 +603,7 @@ export default function TransactionsPage({
                 Math.round(
                     allItems.reduce((acc, row) => acc + Number(row.paidAmount ?? 0), 0) * 100,
                 ) / 100
- 
+
             collapsedGroups.push({
                 ...nextPending,
                 id: `group-${groupId}`,
@@ -1287,12 +1287,12 @@ export default function TransactionsPage({
                         settlingGroup
                             ? "Quitando parcelas..."
                             : payingInstallment
-                            ? "Registrando pagamento da parcela..."
-                            : markingAsPaid || markingRegularAsPaid
-                            ? "Registrando pagamento..."
-                            : cancellingTransaction
-                            ? "Cancelando transação..."
-                            : "Salvando..."
+                                ? "Registrando pagamento da parcela..."
+                                : markingAsPaid || markingRegularAsPaid
+                                    ? "Registrando pagamento..."
+                                    : cancellingTransaction
+                                        ? "Cancelando transação..."
+                                        : "Salvando..."
                     }
                 />
             </>
@@ -1348,7 +1348,7 @@ export default function TransactionsPage({
         return (
             <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out px-4 md:px-6">
+                <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out px-4 md:px-6">
                     <div className="max-w-[1300px] mx-auto relative md:pt-4">
 
                         {/* Back button - desktop only */}
@@ -1730,7 +1730,7 @@ export default function TransactionsPage({
         return (
             <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                     <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
                         <div className="flex items-center gap-3">
 

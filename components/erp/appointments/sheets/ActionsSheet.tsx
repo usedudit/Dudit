@@ -15,7 +15,7 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import BottomSheet from '@/components/BottomSheet';
 import { useMediaQuery } from '@/components/erp/hooks';
 import { formatCurrency } from '@/lib/utils/formatters';
-import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon } from '@/lib/icons';
+import { XIcon, EditIcon, PlusIcon, ChevronDownIcon, InfoIcon, AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, SearchIcon } from '@/lib/icons';
 import { useRef } from 'react';
 
 const EmojiPicker = ({ onSelect, onClose }: { onSelect: (emoji: string) => void, onClose: () => void }) => {
@@ -568,23 +568,85 @@ export const AddUnavailableSheet = ({
 };
 
 export const MoreAppointmentsSheet = ({ date, appointments, onClose, onViewAppointment }: { date: string, appointments: Appointment[], onClose: () => void, onViewAppointment: (apt: Appointment) => void }) => {
-    // ... existing MoreAppointmentsSheet implementation
+    const isMobile = useMediaQuery("(max-width: 768px)");
+    const [searchQuery, setSearchQuery] = useState('');
     const dateObj = new Date(date + 'T00:00:00');
-    return (
-        <div className="fixed inset-0 z-[60] flex justify-end">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }} className="relative w-full md:w-[400px] h-full bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-5 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface z-10">
-                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading capitalize">{dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-                    <button onClick={onClose} className="text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"><XIcon size={24} /></button>
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
-                    {appointments.length === 0 ? <div className="text-center text-brand-inactive-text py-10">No appointments.</div> : appointments.map(apt => <AppointmentListCard key={apt.id} appointment={apt} onClick={onViewAppointment} />)}
-                </div>
-            </motion.div>
+
+    const filteredAppointments = appointments.filter(apt =>
+        (apt.customer || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (apt.service || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const sheetContent = (
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface overflow-hidden">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading capitalize">
+                    {dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </h2>
+                <Button variant="filled" onClick={onClose} size="icon">
+                    <XIcon className="h-5 w-5" />
+                </Button>
+            </header>
+
+            {/* Search Input bar */}
+            <div className="z-10 shrink-0 border-b border-brand-border bg-white px-6 py-4 dark:border-dark-border dark:bg-dark-surface">
+                <FormInput
+                    label=""
+                    name="sheetSearch"
+                    placeholder="Buscar cliente ou serviço..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                    className="mb-0"
+                    variant="full-rounded"
+                />
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
+                {filteredAppointments.length === 0 ? (
+                    <div className="text-center text-brand-inactive-text py-10">
+                        Nenhum agendamento encontrado.
+                    </div>
+                ) : (
+                    filteredAppointments.map(apt => (
+                        <AppointmentListCard key={apt.id} appointment={apt} onClick={onViewAppointment} />
+                    ))
+                )}
+            </div>
         </div>
-    )
-}
+    );
+
+    if (isMobile) {
+        return (
+            <BottomSheet isOpen={true} onClose={onClose}>
+                {sheetContent}
+            </BottomSheet>
+        );
+    }
+
+    return (
+        <Portal>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/50"
+                onClick={onClose}
+            >
+                <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: "spring", stiffness: 400, damping: 40 }}
+                    className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface flex flex-col"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {sheetContent}
+                </motion.div>
+            </motion.div>
+        </Portal>
+    );
+};
 
 export const StatusActionSheet = ({ type, appointment, onClose, onConfirm }: { type: 'cancel' | 'absence', appointment: Appointment, onClose: () => void, onConfirm: () => void }) => {
     // ... existing StatusActionSheet implementation

@@ -114,7 +114,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, slug, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, store_name, service_deposit_enabled, service_deposit_percentage, service_deposit_manual_enabled, service_deposit_mp_enabled, mp_user_id, mp_accepted_payment_methods, phone, pickup_payment_policy, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -330,7 +330,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     },
     partner: {
       id: resolved.partnerId,
-      slug: partnerRow?.slug || null,
+      slug: null,
       address: (partnerAddress as Record<string, unknown>) || null,
       storeName: partnerRow?.store_name || null,
       store_name: partnerRow?.store_name || null,

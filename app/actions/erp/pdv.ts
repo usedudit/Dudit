@@ -75,6 +75,7 @@ type FinalizePreSaleInput = {
     isPendingDelivery?: boolean
     paymentProvider?: string
     mpPaymentId?: string | null
+    sellerId?: string | null
 }
 
 type PosPaymentResolveResult =
@@ -239,16 +240,6 @@ async function syncPosSaleToOrders(params: {
     mpPaymentId?: string | null
 }): Promise<string | null> {
     const admin = createAdminClient()
-    const { data: existingOrder } = await admin
-        .from("orders")
-        .select("id")
-        .eq("partner_id", params.partnerId)
-        .eq("sale_id", params.saleId)
-        .limit(1)
-        .maybeSingle()
-
-    if (existingOrder?.id) return existingOrder.id
-
     const [{ data: sale }, { data: saleItems }, { data: draft }] = await Promise.all([
         admin
             .from("sales")
@@ -262,7 +253,7 @@ async function syncPosSaleToOrders(params: {
             .eq("sale_id", params.saleId),
         admin
             .from("pre_sales")
-            .select("id, seller_id, shipping_fee, distance_km, delivery_breakdown, other_costs, discount_amount, coupon_discount_amount, coupon_id")
+            .select("id, shipping_fee, distance_km, delivery_breakdown, other_costs, discount_amount, coupon_discount_amount, coupon_id")
             .eq("id", params.preSaleId)
             .maybeSingle(),
     ])
@@ -273,6 +264,16 @@ async function syncPosSaleToOrders(params: {
 
     // Use the pre-generated DDT number instead of creating a PDV- prefix
     const finalOrderNumber = sale.sale_number || `DDT-${String(params.saleId).substring(0, 8).toUpperCase()}`
+
+    const { data: existingOrder } = await admin
+        .from("orders")
+        .select("id")
+        .eq("partner_id", params.partnerId)
+        .eq("order_number", finalOrderNumber)
+        .limit(1)
+        .maybeSingle()
+
+    if (existingOrder?.id) return existingOrder.id
 
     let customerName: string | null = null
     if (sale.customer_id) {
@@ -481,7 +482,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
             .limit(150),
         supabase
             .from("customers")
-            .select("id, name, avatar_url")
+            .select("id, name")
             .eq("partner_id", partnerId)
             .order("name")
             .limit(120),
@@ -515,7 +516,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
         success: true as const,
         data: {
             products: productsRes.data || [],
-            customers: customersRes.error ? [] : (customersRes.data || []),
+            customers: customersRes.error ? [] : (customersRes.data || []).map((c: any) => ({ id: c.id, name: c.name, avatar_url: null })),
             financeAccounts: accountsRes.error ? [] : (accountsRes.data || []),
             preSales: draftsRes.error ? [] : (draftsRes.data || []),
             paymentMethods: paymentMethodsRes.error ? [] : (paymentMethodsRes.data || []),
@@ -808,7 +809,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
 
     const { data: finalizedPreSale } = await supabase
         .from("pre_sales")
-        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id, seller_id")
+        .select("shipping_fee, distance_km, delivery_breakdown, coupon_id, coupon_code, coupon_discount_amount, customer_id")
         .eq("id", input.preSaleId)
         .eq("partner_id", input.partnerId)
         .limit(1)
@@ -853,7 +854,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         .eq("id", saleId)
         .eq("partner_id", input.partnerId)
 
-    const sellerPartnerUserId = finalizedPreSale?.seller_id ? String(finalizedPreSale.seller_id) : null
+    const sellerPartnerUserId = input.sellerId || null
     const { data: sellerPartnerUser } = sellerPartnerUserId
         ? await supabase
             .from("partner_users")

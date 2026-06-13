@@ -286,7 +286,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
                                                 ? "https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
                                                 : "https://img.dudit.com.br/static/mascots/CadastrosServicos.png"
                                     }
-                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhuma categoria realizada")}
+                                    title={planGate ? "Plano necessário" : (debouncedSearch.trim().length > 0 ? "Nenhum item encontrado" : "Nenhuma categoria encontrada")}
                                     subtitle={
                                         planGate
                                             ? planGate.message
