@@ -167,17 +167,17 @@ export const ActionsDropdown: React.FC<ActionsDropdownProps> = ({
       </DropdownItem>
     )}
     {onArchive && (
-      <DropdownItem onClick={onArchive} className="text-brand-orange dark:text-brand-orange">
+      <DropdownItem onClick={onArchive} className="text-brand-orange">
         <ArchiveIcon className="w-4 h-4" /> Arquivar
       </DropdownItem>
     )}
     {onDelete && (
-      <DropdownItem onClick={onDelete} className="text-brand-red dark:text-brand-red">
+      <DropdownItem onClick={onDelete} className="text-brand-red">
         <TrashIcon className="w-4 h-4" /> Excluir
       </DropdownItem>
     )}
     {onCancel && (
-      <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red dark:text-brand-red" : ""}>
+      <DropdownItem onClick={onCancel} className={cancelLabel === "Cancelar" ? "text-brand-red" : ""}>
         <BlockedIcon className="w-4 h-4" /> {cancelLabel}
       </DropdownItem>
     )}

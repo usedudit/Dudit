@@ -1,11 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-
-type PaymentBreakdownEntry = {
-    method?: string
-    amount?: number
-    paymentMethodId?: string | null
-    installmentNumber?: number
-}
+import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 
 interface OrderDataForTransaction {
     order_number: string
@@ -13,7 +7,7 @@ interface OrderDataForTransaction {
     total_amount: number
     payment_method: string | null
     payment_provider?: string | null
-    payment_breakdown?: PaymentBreakdownEntry[] | null
+    payment_breakdown?: Partial<PaymentBreakdownEntry>[] | null
     payment_date?: string | null
     customer_name?: string | null
     customer_contact_id?: string | null

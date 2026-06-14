@@ -121,9 +121,25 @@ const ProductGridCard = React.memo(
 
                         {/* Linha 3: Preço */}
                         <div className="mt-1.5">
-                            <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(product.price)}
-                            </span>
+                            {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                                <div className="flex flex-col items-start">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-brand-orange font-semibold">
+                                            -{Math.round(((product.price - product.promotional_price) / product.price) * 100)}%
+                                        </span>
+                                        <span className="text-xs text-brand-inactive-text line-through">
+                                            {formatCurrency(product.price)}
+                                        </span>
+                                    </div>
+                                    <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading mt-0.5">
+                                        {formatCurrency(product.promotional_price)}
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
+                                    {formatCurrency(product.price)}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

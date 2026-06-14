@@ -180,8 +180,7 @@ export default function NcmSelectionModal({
                     )}
                   </div>
                 </div>
-                <Button onClick={() => handleSelect(suggestion)} className="w-full mt-3">
-                  <CheckIcon className="w-4 h-4 mr-2" />
+                <Button onClick={() => handleSelect(suggestion)} className="w-full mt-3" leftIcon={<CheckIcon size={18} />}>
                   Selecionar
                 </Button>
               </div>
@@ -292,8 +291,7 @@ export default function NcmSelectionModal({
                       </div>
                     )}
                   </div>
-                  <Button size="sm" onClick={() => handleSelect(suggestion)} className="ml-4 shrink-0">
-                    <CheckIcon className="w-4 h-4 mr-1" />
+                  <Button size="sm" onClick={() => handleSelect(suggestion)} className="ml-4 shrink-0" leftIcon={<CheckIcon size={18} />}>
                     Selecionar
                   </Button>
                 </div>

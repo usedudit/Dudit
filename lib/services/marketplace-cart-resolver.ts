@@ -90,7 +90,7 @@ export async function resolveCheckoutCartLines(
       recurring_plan_id, quantity, booking_metadata, pay_deposit_only, fulfillment_mode,
       products(id, name, price, promotional_price, is_active, stock_available, category_id, product_type, fulfillment_modes, images),
       product_variants(id, variant_name, price_adjustment, stock_available, is_active),
-      services(id, name, price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images),
+      services(id, name, price, promotional_price, is_active, scheduling_enabled, fulfillment_modes, payment_requirement, buffer_minutes, images, category_id),
       recurring_plans(
         id, name, status, show_in_marketplace,
         recurring_plan_items(
@@ -244,6 +244,11 @@ export async function resolveCheckoutCartLines(
       ) as LineFulfillmentMode
       if (fulfillmentMode === "customer_location") hasDeliveryLines = true
 
+      const basePrice = Number(service.price || 0)
+      const promoPrice = service.promotional_price != null && Number(service.promotional_price) >= 0 && Number(service.promotional_price) < basePrice
+        ? Number(service.promotional_price)
+        : null
+
       const fullPrice = Number(meta.price || service.price || 0)
       let unitPrice = fullPrice
       let payDepositOnly = Boolean(row.pay_deposit_only)
@@ -294,6 +299,9 @@ export async function resolveCheckoutCartLines(
           serviceId: row.service_id,
           unitPrice,
           quantity: qty,
+          promotionalPrice: promoPrice,
+          basePrice,
+          categoryId: service.category_id || null,
         },
         orderItemRow: {
           product_id: null,

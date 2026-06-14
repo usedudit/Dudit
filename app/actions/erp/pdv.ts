@@ -140,6 +140,7 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     const splitRows: SplitInputRow[] = rawRows.map((row) => ({
         method: String(row.method || "PDV").trim() || "PDV",
         amount: safeMoney(Number(row.amount || 0)),
+        amountReceived: safeMoney(Number(row.amount || 0)),
         paymentMethodId: row.paymentMethodId || null,
         installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
     }))
@@ -158,6 +159,13 @@ async function resolvePosFinalTotalWithPaymentMethod(params: {
     const adjustedBreakdown = stored.map((s, i) => ({
         method: splitRows[i]?.method ?? "PDV",
         amount: s.amount,
+        amountReceived: s.amountReceived,
+        adjustmentType: s.adjustmentType,
+        adjustmentPercent: s.adjustmentPercent,
+        adjustmentAmount: s.adjustmentAmount,
+        effectiveAmount: s.effectiveAmount,
+        netAmount: s.netAmount,
+        feeBearer: s.feeBearer,
         paymentMethodId: s.paymentMethodId,
         installmentNumber: recalculated.adjustedRows[i]?.installmentNumber ?? splitRows[i]?.installmentNumber ?? 1,
     }))
@@ -235,6 +243,7 @@ async function syncPosSaleToOrders(params: {
     financeAccountId?: string | null
     defaultPaymentMethod: string
     actorUserId: string
+    sellerPartnerUserId?: string | null
     isPendingDelivery?: boolean
     paymentProvider?: string
     mpPaymentId?: string | null
@@ -383,6 +392,7 @@ async function syncPosSaleToOrders(params: {
         mp_payment_id: params.mpPaymentId || null,
         finance_account_id: params.financeAccountId || null,
         created_by: params.actorUserId,
+        seller_partner_user_id: params.sellerPartnerUserId || null,
         inventory_deducted: true,
         order_number: finalOrderNumber,
         pricing_version: pricingResult.pricingVersion,
@@ -475,7 +485,7 @@ export async function getPOSInitialDataAction(partnerId: string) {
     const [productsRes, customersRes, accountsRes, draftsRes, paymentMethodsRes] = await Promise.all([
         supabase
             .from("products")
-            .select("id, name, sku, price, promotional_price, category:category_id, stock_available, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
+            .select("id, name, sku, price, promotional_price, category:product_categories!category_id(id, name), stock_available, min_stock, allow_sell_without_stock, images, product_type, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .order("created_at", { ascending: false })
@@ -769,9 +779,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         return { success: false as const, error: paymentAware.error }
     }
     if ((paymentAware.adjustedBreakdown || []).length > 0) {
-        breakdownForRpc = paymentAware.adjustedBreakdown.map((row) => ({
+        breakdownForRpc = paymentAware.adjustedBreakdown.map((row: any) => ({
             method: row.method,
             amount: safeMoney(Number(row.amount || 0)),
+            amountReceived: safeMoney(Number(row.amountReceived ?? row.amount ?? 0)),
+            adjustmentType: row.adjustmentType || 'none',
+            adjustmentPercent: Math.max(0, Number(row.adjustmentPercent || 0)),
+            adjustmentAmount: Math.max(0, Number(row.adjustmentAmount || 0)),
+            effectiveAmount: safeMoney(Number(row.effectiveAmount ?? row.amount ?? 0)),
+            netAmount: safeMoney(Number(row.netAmount ?? row.effectiveAmount ?? row.amount ?? 0)),
+            feeBearer: row.feeBearer || null,
             paymentMethodId: row.paymentMethodId || null,
             payment_method_id: row.paymentMethodId || null,
             installmentNumber: Math.max(1, Math.floor(Number(row.installmentNumber || 1))),
@@ -903,6 +920,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
         financeAccountId: input.financeAccountId || null,
         defaultPaymentMethod: input.paymentMethod || "PDV",
         actorUserId: user.id,
+        sellerPartnerUserId: sellerPartnerUserId || null,
         isPendingDelivery: input.isPendingDelivery,
         paymentProvider: input.paymentProvider,
         mpPaymentId: input.mpPaymentId,

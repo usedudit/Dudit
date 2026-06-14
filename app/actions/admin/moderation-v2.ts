@@ -230,10 +230,20 @@ export async function fetchModerationTarget(
                 if (data.user_id) {
                     const { data: profile } = await admin
                         .from("user_profiles")
-                        .select("full_name, email, risk_score")
+                        .select("full_name, risk_score")
                         .eq("id", data.user_id)
                         .single()
-                    if (profile) owner = profile
+                    if (profile) {
+                        const { data: authUser } = await admin
+                            .from("auth.users")
+                            .select("email")
+                            .eq("id", data.user_id)
+                            .maybeSingle()
+                        owner = {
+                            ...profile,
+                            email: authUser?.email || null
+                        }
+                    }
                 }
 
                 const { user_id, ...partnerData } = data

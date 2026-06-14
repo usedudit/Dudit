@@ -491,8 +491,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                     onShare={() => setShowShareModal(true)}
                                                     onDelete={() => setShowDeleteModal(true)}
                                                 />
-                                                <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails}>
-                                                    <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                                <Button onClick={enterEditMode} className="whitespace-nowrap" disabled={isLoadingDetails} leftIcon={<EditIcon size={18} />}>
                                                     Editar serviço
                                                 </Button>
                                             </>
@@ -594,8 +593,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                     onClick={handleSaveService}
                                     disabled={isSavingService || isLoadingDetails}
                                     className="flex-1"
+                                    leftIcon={<SaveIcon size={18} />}
                                 >
-                                    <SaveIcon className="w-4 h-4 mr-2" />
                                     {isSavingService ? "Salvando..." : "Salvar"}
                                 </Button>
                             </>
@@ -610,8 +609,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             variant="outline"
                                             className="flex-1"
                                             disabled={isLoadingDetails}
+                                            leftIcon={<ThreeDotsIcon size={18} />}
                                         >
-                                            <ThreeDotsIcon className="w-4 h-4 mr-2" />
                                             Opções
                                         </Button>
                                     }
@@ -620,8 +619,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                     onClick={enterEditMode}
                                     className="flex-1 whitespace-nowrap"
                                     disabled={isLoadingDetails}
+                                    leftIcon={<EditIcon size={18} />}
                                 >
-                                    <EditIcon className="w-4 h-4 mr-2" />
                                     Editar serviço
                                 </Button>
                             </>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon } from "@/lib/icons"
+import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge } from "@/components/reusable"
@@ -28,7 +28,7 @@ import {
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
-import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
+import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
 
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
@@ -134,19 +134,20 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
 
     const [pdvPromotions, setPdvPromotions] = useState<any[]>([])
+    const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
 
     useEffect(() => {
         if (!partnerId) return
         listActivePromotionsForMarketplaceAction(partnerId).then(res => {
             if (Array.isArray(res)) setPdvPromotions(res)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [partnerId])
 
     const getDisplayPrice = (prod: any) => computeItemDisplayPrice(
         Number(prod.price || 0),
         prod.promotional_price && Number(prod.promotional_price) < Number(prod.price || 0) ? Number(prod.promotional_price) : null,
         pdvPromotions,
-        { productId: prod.id, categoryId: prod.category || undefined },
+        { productId: prod.id, categoryId: prod.category?.id || undefined },
     ).bestPrice
 
     const hasProductsInCatalog = useMemo(() => {
@@ -182,6 +183,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [shippingFee, setShippingFee] = useState(0)
     const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null)
     const [deliveryBreakdown, setDeliveryBreakdown] = useState<Record<string, unknown> | null>(null)
+    const hasDelivery = shippingFee > 0 || deliveryDistanceKm !== null || deliveryBreakdown !== null
     const [otherCosts] = useState(0)
     const [notes, setNotes] = useState("")
     const [cart, setCart] = useState<CartItem[]>([])
@@ -236,6 +238,33 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null)
     const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null)
     const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0)
+    const [preSaleSearch, setPreSaleSearch] = useState("")
+
+    const filteredPreSales = useMemo(() => {
+        const query = preSaleSearch.trim().toLowerCase()
+        if (!query) return preSales
+
+        return preSales.filter((preSale, index) => {
+            const numberMatch = `nº ${index + 1}`.includes(query) || `${index + 1}` === query
+
+            const valStr = formatCurrency(Number(preSale.total_amount || 0)).toLowerCase()
+            const valueMatch = valStr.includes(query) || String(preSale.total_amount).includes(query)
+
+            const customerName = (customers.find((c) => c.id === preSale.customer_id)?.name || "Consumidor final").toLowerCase()
+            const clientMatch = customerName.includes(query)
+
+            const dateStr = new Date(preSale.created_at).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            }).toLowerCase()
+            const dateMatch = dateStr.includes(query)
+
+            return numberMatch || valueMatch || clientMatch || dateMatch
+        })
+    }, [preSales, preSaleSearch, customers])
 
     const isXL = useMediaQuery("(min-width: 1280px)")
     const isLG = useMediaQuery("(min-width: 1024px)")
@@ -252,18 +281,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         const cats = new Set<string>()
         products.forEach((product) => {
             const isService = product.product_type === "Serviço" || product.product_type === "service"
-            if (hasBothProductsAndServices) {
-                if (itemTypeTab === "product" && !isService && product.category) {
-                    cats.add(product.category)
-                } else if (itemTypeTab === "service" && isService && product.category) {
-                    cats.add(product.category)
-                }
-            } else {
-                if (product.category) cats.add(product.category)
+            if (itemTypeTab === "product" && !isService && product.category?.name) {
+                cats.add(product.category.name)
+            } else if (itemTypeTab === "service" && isService && product.category?.name) {
+                cats.add(product.category.name)
             }
         })
         return ["Todos", ...Array.from(cats)]
-    }, [products, hasBothProductsAndServices, itemTypeTab])
+    }, [products, itemTypeTab])
 
     useEffect(() => {
         async function loadTeam() {
@@ -314,6 +339,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         shippingFee: number
         notes: string
         cart: CartItem[]
+        hasDelivery?: boolean
     }) => {
         if (!payload.cart.length) return EMPTY_ORDER_SIGNATURE
         return JSON.stringify({
@@ -323,6 +349,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             discountType: payload.discountType,
             discountCouponCode: payload.discountCouponCode || "",
             shippingFee: Number(payload.shippingFee || 0),
+            hasDelivery: Boolean(payload.hasDelivery),
             notes: payload.notes || "",
             cart: payload.cart.map((item) => ({
                 id: item.id,
@@ -342,31 +369,92 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     const filteredProducts = useMemo(() => {
         let result = products
 
-        if (hasBothProductsAndServices) {
-            if (itemTypeTab === "product") {
-                result = result.filter(p => p.product_type !== "Serviço" && p.product_type !== "service")
-            } else {
-                result = result.filter(p => p.product_type === "Serviço" || p.product_type === "service")
-            }
+        if (itemTypeTab === "product") {
+            result = result.filter(p => p.product_type !== "Serviço" && p.product_type !== "service")
+        } else {
+            result = result.filter(p => p.product_type === "Serviço" || p.product_type === "service")
         }
 
         const term = normalizePDVSearchTerm(debouncedSearch)
 
         if (selectedCategory !== "Todos") {
-            result = result.filter((product) => product.category === selectedCategory)
+            result = result.filter((product) => product.category?.name === selectedCategory)
         }
 
         if (term) {
             result = result.filter((product) => normalizePDVSearchTerm(product.name).includes(term))
         }
 
-        return result
-    }, [products, debouncedSearch, selectedCategory, hasBothProductsAndServices, itemTypeTab])
+        // Sort items with stock_available <= 0 last, keeping others in original order
+        return [...result].sort((a, b) => {
+            const aStock = Number(a.stock_available || 0)
+            const bStock = Number(b.stock_available || 0)
+            const aHasStock = aStock > 0
+            const bHasStock = bStock > 0
 
-    const itemCount = useMemo(() => cart.reduce((acc, item) => acc + item.qty, 0), [cart])
+            if (aHasStock && !bHasStock) return -1
+            if (!aHasStock && bHasStock) return 1
+            return 0
+        })
+    }, [products, debouncedSearch, selectedCategory, itemTypeTab])
+
     const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.qty), 0), [cart])
+
+    const discountVal = useMemo(() => {
+        if (discountType === "percentage") {
+            return (subtotal * discountAmount) / 100
+        }
+        if (discountType === "coupon") {
+            return Number(appliedCouponDiscount || discountAmount || 0)
+        }
+        return discountAmount
+    }, [subtotal, discountAmount, discountType, appliedCouponDiscount])
+
+    const pricingResult = useMemo(() => {
+        return calculateOrderPricing({
+            items: cart.map(item => ({
+                productId: item.productId,
+                unitPrice: item.price,
+                quantity: item.qty,
+                basePrice: item.listUnitPrice,
+                categoryId: products.find(p => p.id === item.productId)?.category?.id || null
+            })),
+            shippingCost: shippingFee,
+            additionalCosts: otherCosts,
+            manualDiscount: discountVal > 0 ? { type: "fixed", value: discountVal } : null,
+            promotions: pdvPromotions
+        })
+    }, [cart, shippingFee, otherCosts, discountVal, pdvPromotions, products])
+
+    const displayedCart = useMemo(() => {
+        const userItems = cart.filter(item => !(item as any).isGift)
+        const giftItems = (pricingResult.appliedGiftProductIds || []).map((giftId, idx) => {
+            const giftProd = products.find(p => p.id === giftId)
+            return {
+                id: `gift-${giftId}-${idx}`,
+                productId: giftId,
+                variantId: null,
+                variantName: null,
+                name: giftProd ? `[BRINDE] ${giftProd.name}` : "[BRINDE] Item Especial",
+                listUnitPrice: 0,
+                price: 0,
+                qty: 1,
+                image: giftProd?.images?.[0] || null,
+                isGift: true
+            }
+        })
+        return [...userItems, ...giftItems]
+    }, [cart, pricingResult.appliedGiftProductIds, products])
+
+    const giftProducts = useMemo(() => {
+        return (pricingResult.appliedGiftProductIds || []).map(giftId => {
+            return products.find(p => p.id === giftId) || { id: giftId, name: "Brinde Especial", images: null }
+        })
+    }, [pricingResult.appliedGiftProductIds, products])
+
+    const itemCount = useMemo(() => displayedCart.reduce((acc, item) => acc + item.qty, 0), [displayedCart])
     const hasWinningDiscount = useMemo(() => {
-        return cart.some((item) => {
+        return cart.filter((item) => !(item as any).isGift).some((item) => {
             const prod = products.find((p) => p.id === item.productId)
             if (!prod) {
                 return item.price < (item.listUnitPrice ?? item.price)
@@ -377,20 +465,11 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 Number(prod.price || 0) + (item.variantId ? (item.listUnitPrice ? (item.listUnitPrice - Number(prod.price || 0)) : 0) : 0),
                 hasPromo ? promoPrice : null,
                 pdvPromotions,
-                { productId: prod.id, categoryId: prod.category || undefined }
+                { productId: prod.id, categoryId: prod.category?.id || undefined }
             )
             return pricing.hasDiscount
         })
     }, [cart, products, pdvPromotions])
-    const discountVal = useMemo(() => {
-        if (discountType === "percentage") {
-            return (subtotal * discountAmount) / 100
-        }
-        if (discountType === "coupon") {
-            return Number(appliedCouponDiscount || discountAmount || 0)
-        }
-        return discountAmount
-    }, [subtotal, discountAmount, discountType, appliedCouponDiscount])
     const total = useMemo(() => Math.max(0, subtotal - discountVal + shippingFee + otherCosts), [subtotal, discountVal, shippingFee, otherCosts])
     const mobileCategoryLabel = selectedCategory === "Todos" ? "Categorias" : selectedCategory
     const selectedCustomer = useMemo(
@@ -405,12 +484,12 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             : { id: selectedCustomerId, name: "Cliente selecionado", email: null as string | null }
     }, [customers, selectedCustomerId])
     const paymentModalCart = useMemo(
-        () => cart.map((item) => ({
+        () => displayedCart.map((item) => ({
             ...item,
             unitPrice: item.price,
             quantity: item.qty,
         })),
-        [cart]
+        [displayedCart]
     )
     const hasNotes = notes.trim().length > 0
     const currentOrderSignature = useMemo(
@@ -423,6 +502,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             shippingFee,
             notes,
             cart,
+            hasDelivery,
         }),
         [
             buildOrderSignature,
@@ -434,6 +514,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
             shippingFee,
             notes,
             cart,
+            hasDelivery,
         ]
     )
     const hasUnsavedOrderChanges = currentOrderSignature !== lastSavedOrderSignature
@@ -465,7 +546,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 const listUnit = Number(product.price || 0) + Number(selectedVariant?.price_adjustment || 0)
                 const prodAny = product as any
                 const promoPrice = prodAny.promotional_price ? Number(prodAny.promotional_price) : 0
-                const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }).bestPrice
+                const effectiveUnit = computeItemDisplayPrice(listUnit, promoPrice > 0 && promoPrice < listUnit ? promoPrice : null, pdvPromotions, { productId: product.id, categoryId: product.category?.id || undefined }).bestPrice
                 if (!product.allow_sell_without_stock && normalizedQty > availableStock) {
                     notifyError(`Estoque insuficiente para o item ${product.name}${selectedVariant?.variant_name ? ` - ${selectedVariant.variant_name}` : ""}`)
                     return prev
@@ -619,6 +700,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 sku: created.sku ?? null,
                 price: Number(created.price ?? payload.price) || 0,
                 stock_available: Number(created.stock_available ?? created.stock_quantity ?? payload.stockQuantity ?? 0) || 0,
+                min_stock: created.min_stock ?? null,
                 allow_sell_without_stock: Boolean(created.allow_sell_without_stock ?? created.allow_sell_without_stock),
                 images: Array.isArray(created.images) ? created.images : null,
                 product_variants: Array.isArray(created.product_variants) ? created.product_variants : [],
@@ -719,7 +801,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 distanceKm: deliveryDistanceKm,
                 deliveryBreakdown,
                 otherCosts,
-                items: cart.map((item) => ({
+                items: cart.filter(item => !item.isGift).map((item) => ({
                     productId: item.productId,
                     variantId: item.variantId,
                     variantName: item.variantName,
@@ -777,23 +859,25 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
     }
 
     const loadPreSale = useCallback((preSale: PreSale) => {
-        const items = (Array.isArray(preSale.items) ? preSale.items : []).map((item: any) => {
-            const basePrice = Number((item.list_unit_price ?? item.listUnitPrice ?? item.unit_price ?? item.price) || 0)
-            const effectivePrice = Number((item.unit_price ?? item.price) || 0)
-            return {
-                id: crypto.randomUUID(),
-                productId: item.product_id ?? item.productId ?? null,
-                variantId: item.variant_id ?? item.variantId ?? null,
-                variantName: item.variant_name || item.variantName || null,
-                name: item.name,
-                listUnitPrice: basePrice,
-                lineDiscountType: null,
-                lineDiscountValue: null,
-                price: effectivePrice,
-                qty: Number((item.quantity ?? item.qty) || 0),
-                image: item.image || null,
-            }
-        })
+        const items = (Array.isArray(preSale.items) ? preSale.items : [])
+            .filter((item: any) => !item.is_gift && !item.isGift)
+            .map((item: any) => {
+                const basePrice = Number((item.list_unit_price ?? item.listUnitPrice ?? item.unit_price ?? item.price) || 0)
+                const effectivePrice = Number((item.unit_price ?? item.price) || 0)
+                return {
+                    id: crypto.randomUUID(),
+                    productId: item.product_id ?? item.productId ?? null,
+                    variantId: item.variant_id ?? item.variantId ?? null,
+                    variantName: item.variant_name || item.variantName || null,
+                    name: item.name,
+                    listUnitPrice: basePrice,
+                    lineDiscountType: null,
+                    lineDiscountValue: null,
+                    price: effectivePrice,
+                    qty: Number((item.quantity ?? item.qty) || 0),
+                    image: item.image || null,
+                }
+            })
 
         const isCoupon = !!preSale.coupon_id
         const couponCodeVal = preSale.coupon_code || ""
@@ -1115,6 +1199,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
         setIsSelectCustomerOpen(true)
     }, [selectedCustomerId, openShippingSheetWithCustomer])
 
+    const handleRemoveShipping = useCallback(() => {
+        setShippingFee(0)
+        setDeliveryDistanceKm(null)
+        setDeliveryBreakdown(null)
+        setShippingCustomerDetails(null)
+        notifySuccess("Entrega removida com sucesso.")
+    }, [notifySuccess])
+
     const applyCouponCode = useCallback(async (rawCode: string) => {
         const code = String(rawCode || "").trim().toUpperCase()
         if (!code) {
@@ -1221,7 +1313,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 className={`space-y-3 flex-1 overflow-y-auto pr-1 ${desktopScrollClass}`}
                 style={{ scrollbarGutter: "stable" }}
             >
-                {cart.map((item) => (
+                {displayedCart.map((item) => (
                     <POSCartItemCard
                         key={item.id}
                         item={item}
@@ -1236,7 +1328,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
     const mobileCartItemsList = (
         <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1 hide-scrollbar">
-            {cart.map((item) => (
+            {displayedCart.map((item) => (
                 <POSCartItemCard
                     key={item.id}
                     item={item}
@@ -1265,15 +1357,6 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                 </FadeIn>
             ) : (
                 <FadeIn key="open" className="flex h-full flex-col gap-4">
-                    {activeCashSession?.opener_name && (() => {
-                        const sessionDate = activeCashSession.opened_at ? new Date(activeCashSession.opened_at).toLocaleString("pt-BR") : ""
-                        return (
-                            <div className="flex items-center gap-2 rounded-xl bg-brand-primary/10 px-4 py-2 text-sm text-brand-primary-dark dark:bg-brand-primary/20 dark:text-blue-300">
-                                <span className="font-medium">Caixa aberto por {activeCashSession.opener_name}</span>
-                                {sessionDate && <span className="text-brand-inactive-text">às {sessionDate}</span>}
-                            </div>
-                        )
-                    })()}
                     <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-12">
                         <div className="flex min-h-0 flex-col xl:col-span-8 xl:px-6">
                             <POSHeader
@@ -1307,41 +1390,85 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 <FadeIn key={`${selectedCategory}-${debouncedSearch}`} className={`mt-2 grid grid-cols-2 gap-3 overflow-y-auto pr-1 pb-24 md:grid-cols-4 xl:grid-cols-5 xl:pb-6 2xl:grid-cols-6 ${desktopScrollClass}`}>
                                     {filteredProducts
                                         .slice(0, (cart.length === 0 && preSales.length > 0) ? (preSaleLimit === 4 ? 8 : preSaleLimit === 3 ? 6 : preSaleLimit === 2 ? 4 : 2) : undefined)
-                                        .map((product) => (
-                                            <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
-                                                <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
-                                                    <img
-                                                        src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
-                                                        alt={product.name}
-                                                        className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
-                                                    />
-                                                    <span className="absolute left-2 top-2 rounded-lg bg-brand-dark/80 px-2 py-1 text-[9px] font-bold text-white backdrop-blur-sm sm:text-[10px] lg:text-[11px]">
-                                                        {Math.max(0, Number(product.stock_available || 0))} em Estoque
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
-                                                    {product.product_variants && product.product_variants.length > 0 && (
-                                                        <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
-                                                    )}
-                                                    {(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, pdvPromotions, { productId: product.id, categoryId: product.category || undefined }); return (<div className="flex items-center gap-1.5 mt-0.5 flex-wrap">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}
+                                        .map((product) => {
+                                            const pr = computeItemDisplayPrice(
+                                                Number(product.price || 0),
+                                                product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null,
+                                                pdvPromotions,
+                                                { productId: product.id, categoryId: product.category?.id || undefined }
+                                            )
+                                            const stock = Number(product.stock_available || 0)
+                                            const minStock = product.min_stock != null ? Number(product.min_stock) : null
+                                            let stockVariant: "green" | "orange" | "red" = "green"
+                                            if (stock <= 0) {
+                                                stockVariant = "red"
+                                            } else if (minStock !== null && minStock > 0 && stock <= minStock) {
+                                                stockVariant = "orange"
+                                            }
 
-                                                    <Button
-                                                        variant="outline"
-                                                        className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
-                                                        onClick={() => {
-                                                            if (product.product_variants && product.product_variants.length > 0) {
-                                                                setVariantPickerProduct(product)
-                                                                return
-                                                            }
-                                                            addToCart(product)
-                                                        }}
-                                                    >
-                                                        Adicionar
-                                                    </Button>
+                                            return (
+                                                <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
+                                                    <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
+                                                        <img
+                                                            src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
+                                                            alt={product.name}
+                                                            className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
+                                                        />
+                                                        {pr.hasDiscount && (
+                                                            <div className="absolute left-2 top-2 z-10">
+                                                                {pr.badgeVariant === "blue" ? (
+                                                                    <Badge variant="blue" icon={null} className="whitespace-nowrap font-bold text-[10px] px-1.5 py-0.5">-{pr.discountPercent}%</Badge>
+                                                                ) : (
+                                                                    <Badge variant="orange" icon={null} className="whitespace-nowrap font-bold text-[10px] px-1.5 py-0.5">-{pr.discountPercent}%</Badge>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute right-2 top-2 z-10">
+                                                            <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap font-bold text-[10px] px-2 py-0.5 bg-white/95 dark:bg-dark-surface/95 shadow-sm">
+                                                                {stock}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{product.name}</p>
+                                                        {product.product_variants && product.product_variants.length > 0 && (
+                                                            <p className="text-sm text-brand-inactive-text">{product.product_variants.length} variação(ões)</p>
+                                                        )}
+
+                                                        {pr.referencePrice ? (
+                                                            <div className="flex flex-col gap-0.5 mt-1">
+                                                                <span className="text-xs text-brand-inactive-text line-through">
+                                                                    {formatCurrency(pr.referencePrice)}
+                                                                </span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                    {formatCurrency(pr.bestPrice)}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center mt-1">
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-base">
+                                                                    {formatCurrency(pr.bestPrice)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        <Button
+                                                            variant="outline"
+                                                            className="mt-3 h-9 w-full rounded-full border-brand-border text-xs font-bold text-brand-dark hover:bg-brand-gray"
+                                                            onClick={() => {
+                                                                if (product.product_variants && product.product_variants.length > 0) {
+                                                                    setVariantPickerProduct(product)
+                                                                    return
+                                                                }
+                                                                addToCart(product)
+                                                            }}
+                                                        >
+                                                            Adicionar
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                 </FadeIn>
                             </AnimatePresence>
 
@@ -1362,6 +1489,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                         index={index}
                                                         customers={customers}
                                                         onClick={() => loadPreSale(preSale)}
+                                                        onDelete={() => removeDraft(preSale.id)}
                                                     />
                                                 </div>
                                             ))}
@@ -1399,6 +1527,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                     onContinue={handleOpenPaymentModal}
                                     onSaveDraft={saveDraftFromMenu}
                                     onAddShipping={handleOpenShippingSheet}
+                                    onRemoveShipping={handleRemoveShipping}
+                                    hasDelivery={hasDelivery}
                                     onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
                                     onOpenNotes={handleOpenNotesSheet}
                                     showItemsShortcut={false}
@@ -1406,6 +1536,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                     hasNotes={hasNotes}
                                     cartItems={cartItemsList}
                                     isEmpty={cart.length === 0}
+                                    appliedGiftProductIds={pricingResult.appliedGiftProductIds}
+                                    onShowGifts={() => setIsGiftModalOpen(true)}
                                     emptyState={
                                         <IconPlaceholder
                                             icon={SalesIcon}
@@ -1488,6 +1620,8 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                 onContinue={handleOpenPaymentModal}
                                 onSaveDraft={saveDraftFromMenu}
                                 onAddShipping={handleOpenShippingSheet}
+                                onRemoveShipping={handleRemoveShipping}
+                                hasDelivery={hasDelivery}
                                 onOpenCreateProduct={() => setIsQuickProductSheetOpen(true)}
                                 onOpenNotes={handleOpenNotesSheet}
                                 showActionsMenu={cart.length > 0}
@@ -1516,29 +1650,34 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
 
                     {isMobile ? (
                         <BottomSheet isOpen={isPreSaleSheetOpen} onClose={() => setIsPreSaleSheetOpen(false)} title="Pedidos em Pré-venda">
-                            <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2 lg:grid-cols-3">
-                                {preSales.map((preSale, index) => (
-                                    <div key={preSale.id} className="relative group">
-                                        <POSPreSaleCard
-                                            preSale={preSale}
-                                            index={index}
-                                            customers={customers}
-                                            onClick={() => {
-                                                loadPreSale(preSale)
-                                                setIsPreSaleSheetOpen(false)
-                                            }}
-                                        />
-                                        <button
-                                            className="absolute right-4 top-4 text-brand-red"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                removeDraft(preSale.id)
-                                            }}
-                                        >
-                                            <TrashIcon size={14} />
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="space-y-4 pt-2">
+                                <div className="px-1">
+                                    <Input
+                                        placeholder="Pesquise por valor, cliente, nº ou data..."
+                                        value={preSaleSearch}
+                                        onChange={(e: any) => setPreSaleSearch(e.target.value)}
+                                        className="w-full"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-4">
+                                    {filteredPreSales.map((preSale) => {
+                                        const originalIndex = preSales.findIndex((p) => p.id === preSale.id)
+                                        return (
+                                            <div key={preSale.id} className="relative group w-full">
+                                                <POSPreSaleCard
+                                                    preSale={preSale}
+                                                    index={originalIndex !== -1 ? originalIndex : 0}
+                                                    customers={customers}
+                                                    onClick={() => {
+                                                        loadPreSale(preSale)
+                                                        setIsPreSaleSheetOpen(false)
+                                                    }}
+                                                    onDelete={() => removeDraft(preSale.id)}
+                                                />
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </BottomSheet>
                     ) : (
@@ -1548,29 +1687,32 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                             title="Pedidos em Pré-venda"
                             widthClassName="w-[560px]"
                         >
-                            <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
-                                {preSales.map((preSale, index) => (
-                                    <div key={preSale.id} className="relative group">
-                                        <POSPreSaleCard
-                                            preSale={preSale}
-                                            index={index}
-                                            customers={customers}
-                                            onClick={() => {
-                                                loadPreSale(preSale)
-                                                setIsPreSaleSheetOpen(false)
-                                            }}
-                                        />
-                                        <button
-                                            className="absolute right-4 top-4 text-brand-red opacity-0 transition-opacity group-hover:opacity-100"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                removeDraft(preSale.id)
-                                            }}
-                                        >
-                                            <TrashIcon size={14} />
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="p-6 space-y-4">
+                                <Input
+                                    placeholder="Pesquise por valor, cliente, nº ou data..."
+                                    value={preSaleSearch}
+                                    onChange={(e: any) => setPreSaleSearch(e.target.value)}
+                                    className="w-full"
+                                />
+                                <div className="flex flex-col gap-4">
+                                    {filteredPreSales.map((preSale) => {
+                                        const originalIndex = preSales.findIndex((p) => p.id === preSale.id)
+                                        return (
+                                            <div key={preSale.id} className="relative group w-full">
+                                                <POSPreSaleCard
+                                                    preSale={preSale}
+                                                    index={originalIndex !== -1 ? originalIndex : 0}
+                                                    customers={customers}
+                                                    onClick={() => {
+                                                        loadPreSale(preSale)
+                                                        setIsPreSaleSheetOpen(false)
+                                                    }}
+                                                    onDelete={() => removeDraft(preSale.id)}
+                                                />
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </DesktopPOSSheet>
                     )}
@@ -1977,6 +2119,48 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         cancelText="Cancelar"
                         variant="warning"
                     />
+                    {isGiftModalOpen && (
+                        <DefaultModal
+                            isOpen={isGiftModalOpen}
+                            onClose={() => setIsGiftModalOpen(false)}
+                            title="Brinde(s) do Pedido"
+                        >
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-center gap-2 text-brand-primary-dark">
+                                    <StarIcon className="h-5 w-5 fill-current text-blue-500" />
+                                    <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Você ganhou brinde(s)!</h4>
+                                </div>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                    Este pedido atingiu os critérios de campanha e ganhou o(s) seguinte(s) brinde(s):
+                                </p>
+                                <div className="space-y-3 pt-2">
+                                    {giftProducts.map((gift, idx) => (
+                                        <div
+                                            key={`${gift.id}-${idx}`}
+                                            className="flex items-center gap-3 rounded-2xl border border-brand-border bg-brand-gray/30 p-3 dark:border-dark-border dark:bg-dark-surface/50"
+                                        >
+                                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-white dark:border-dark-border">
+                                                <img
+                                                    src={getR2ImageUrl((gift as any).images?.[0] || null, "thumbnail")}
+                                                    alt={gift.name}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate font-bold text-brand-dark dark:text-dark-heading">
+                                                    {gift.name}
+                                                </p>
+                                                <span className="inline-block rounded-full bg-brand-green/10 px-2 py-0.5 text-[10px] font-bold text-brand-green">
+                                                    Grátis
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </DefaultModal>
+                    )}
+
                     <CameraScannerModal
                         isOpen={isCameraOpen}
                         onClose={() => setIsCameraOpen(false)}

@@ -59,24 +59,18 @@ const GoalGridCard = React.memo(function GoalGridCard({
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex justify-between items-start gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center min-w-0 gap-2">
-                <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={goal.name}>
-                  {goal.name}
-                </h3>
-                <Badge variant={statusVariant(goal.status)} className="whitespace-nowrap scale-90 shrink-0">
-                  {goal.status}
-                </Badge>
-              </div>
-              <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {goal.start_date} até {goal.end_date}
-              </p>
+          <div className="min-w-0">
+            <div className="flex items-center min-w-0 gap-2">
+              <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate" title={goal.name}>
+                {goal.name}
+              </h3>
+              <Badge variant={statusVariant(goal.status)} className="whitespace-nowrap scale-90 shrink-0">
+                {goal.status}
+              </Badge>
             </div>
-
-            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-              <ActionsDropdown onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
-            </div>
+            <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+              {goal.period_type === "monthly" ? "Mensal" : "Semanal"} • {goal.start_date} até {goal.end_date}
+            </p>
           </div>
         </div>
       </div>
@@ -113,11 +107,16 @@ const GoalGridCard = React.memo(function GoalGridCard({
             </div>
           </div>
 
-          <div className="min-w-0">
-            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Abrangência</span>
-            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-              {goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}
-            </p>
+          <div className="flex items-center justify-between gap-4 mt-1">
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Abrangência</span>
+              <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate" title={goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}>
+                {goal.assigned_user_names?.length ? goal.assigned_user_names.join(", ") : "Todos os vendedores"}
+              </p>
+            </div>
+            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+              <ActionsDropdown onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
+            </div>
           </div>
         </div>
       </div>

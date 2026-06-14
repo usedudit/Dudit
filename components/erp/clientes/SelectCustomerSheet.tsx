@@ -265,7 +265,7 @@ const SelectCustomerSheet = ({
                         setPhoneError(null)
                         setIsNewCustomerSheetOpen(true)
                     }}
-                    className="h-11 w-11 shrink-0"
+                    className="h-[42px] w-[42px] shrink-0"
                     leftIcon={<PlusIcon size={18} />}
                 />
             </div>

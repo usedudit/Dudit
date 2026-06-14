@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useRef, useState, useEffect } from "react"
-import { SearchIcon, UserIcon, ClockIcon, GridIcon, IdentityCardIcon, CameraIcon } from "@/lib/icons"
+import { SearchIcon, UserIcon, IdentityCardIcon, CameraIcon } from "@/lib/icons"
 import { Input, Tabs, TabsList, TabsTrigger, ListItem, Button } from "@/components/reusable"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { Lock, Unlock } from "lucide-react"
@@ -91,11 +91,10 @@ const POSHeader = memo(function POSHeader({
           inputRef.current?.focus()
         }, 50)
       }}
-      className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${
-        focusLock
-          ? "text-brand-primary bg-brand-primary/15"
-          : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
-      }`}
+      className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${focusLock
+        ? "text-brand-primary bg-brand-primary/15"
+        : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border"
+        }`}
       title={focusLock ? "Foco Travado (para leitor de código de barras)" : "Ativar Foco Automático"}
     >
       {focusLock ? <Lock size={16} /> : <Unlock size={16} />}
@@ -179,7 +178,7 @@ const POSHeader = memo(function POSHeader({
             <div className="flex items-center gap-3">
               <ListItem
                 onClick={onOpenCustomerSheet}
-                className="min-w-[220px] gap-4 border-none"
+                className="min-w-[220px] gap-3 border-none"
                 left={
                   <UserProfileImage
                     fullName={selectedCustomer?.name || "Consumidor Final"}
@@ -196,7 +195,7 @@ const POSHeader = memo(function POSHeader({
 
               <ListItem
                 onClick={onOpenSellerSheet}
-                className="min-w-[220px] gap-4 border-none"
+                className="min-w-[220px] gap-3 border-none"
                 left={
                   <UserProfileImage
                     fullName={selectedSeller?.fullName || "Vendedor"}
@@ -216,18 +215,16 @@ const POSHeader = memo(function POSHeader({
       </div>
 
       <div className="flex flex-col gap-2 mb-6 border-b border-brand-border dark:border-dark-border">
-        {hasBothProductsAndServices && (
-          <Tabs value={itemTypeTab} onValueChange={(val) => onItemTypeTabChange(val as "product" | "service")}>
-            <TabsList className="border-b-0 px-0 pb-0 gap-4">
-              <TabsTrigger value="product" className="pb-2">
-                Produtos
-              </TabsTrigger>
-              <TabsTrigger value="service" className="pb-2">
-                Serviços
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
+        <Tabs value={itemTypeTab} onValueChange={(val) => onItemTypeTabChange(val as "product" | "service")}>
+          <TabsList className="border-b-0 px-0 pb-0 gap-4">
+            <TabsTrigger value="product" className="pb-2">
+              Produtos
+            </TabsTrigger>
+            <TabsTrigger value="service" className="pb-2">
+              Serviços
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <Tabs value={selectedCategory} onValueChange={onCategoryChange}>
           <TabsList className="w-full border-b-0 px-0 pb-0">

@@ -587,15 +587,13 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                             onPrint={() => window.print()}
                             onShare={() => { }}
                             trigger={
-                                <Button variant="outline" className="flex-1">
-                                    <ThreeDotsIcon className="w-4 h-4 mr-2" />
+                                <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
                                     Opções
                                 </Button>
                             }
                         />
                         {detail.canEdit && (
-                            <Button onClick={() => onEdit(transactionId)} className="flex-1 whitespace-nowrap">
-                                <EditIcon className="w-4 h-4 mr-2" />
+                            <Button onClick={() => onEdit(transactionId)} className="flex-1 whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                 Editar
                             </Button>
                         )}

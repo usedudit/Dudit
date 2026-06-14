@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useStore } from "@/lib/store-context"
-import { getERPCustomersPageAction, type ERPCustomerListCursor } from "@/app/actions/erp/customers"
+import { getERPCustomersPageAction, getCustomerByIdAction, type ERPCustomerListCursor } from "@/app/actions/erp/customers"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 
@@ -109,7 +109,10 @@ export default function CustomersPage({
             return { items: res.items, nextCursor: res.nextCursor, hasMore: res.hasMore }
         },
         dedupeKey: useCallback((c: any) => String(c?.id || ""), []),
-        getDetailFn: async (_id: string) => null,
+        getDetailFn: async (id: string) => {
+            const res = await getCustomerByIdAction(id)
+            return res.customer || null
+        },
         listToDetail: (item: any) => item,
     })
 

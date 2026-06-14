@@ -202,8 +202,8 @@ export type PartnerTeamMemberBucketItem = {
 }
 
 export async function fetchPartnerTeamMembersBucket(): Promise<PartnerTeamMemberBucketItem[]> {
-  const { getTeamMembers } = await import("@/app/actions/erp/team")
-  const res = await getTeamMembers()
+  const { getPDVSellersAction } = await import("@/app/actions/erp/team")
+  const res = await getPDVSellersAction()
   if (res.error || !res.members?.length) return []
   return res.members.map((m) => ({
     id: m.id,

@@ -160,27 +160,27 @@ export const ReceiptContent = ({
         </div>
 
         {/* Summary Footer */}
-        <div className="mt-auto pt-4 border-t border-dashed border-gray-300 dark:border-gray-700">
+        <div className="mt-auto pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
             <div className="space-y-2 mb-6">
-                <div className="flex justify-between items-center text-[14px]">
-                    <span className="text-gray-500 dark:text-gray-400 font-medium">Itens ({itemCount})</span>
+                <div className="flex justify-between items-center text-sm">
+                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Itens ({itemCount})</span>
                     <span className="font-bold text-brand-dark dark:text-dark-heading">
                         {formatCurrency(subTotal)}
                     </span>
                 </div>
 
                 {discountAmount > 0 && (
-                    <div className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Desconto</span>
-                        <span className="font-bold text-brand-red">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
+                        <span className="font-bold text-brand-green">
                             -{formatCurrency(discountAmount)}
                         </span>
                     </div>
                 )}
 
                 {shippingFee > 0 && (
-                    <div className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Entrega</span>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                             {formatCurrency(shippingFee)}
                         </span>
@@ -188,8 +188,8 @@ export const ReceiptContent = ({
                 )}
 
                 {otherCosts > 0 && (
-                    <div className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">Outros Custos</span>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                             {formatCurrency(otherCosts)}
                         </span>
@@ -198,7 +198,7 @@ export const ReceiptContent = ({
 
                 {pricingDetails.map((detail: any, index: number) => (
                     <div key={`${detail.label}-${index}`} className="flex justify-between items-center text-[14px]">
-                        <span className="text-gray-500 dark:text-gray-400 font-medium">{detail.label}</span>
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{detail.label}</span>
                         <span className={`font-bold ${detail.tone === "positive" ? "text-brand-green" : detail.tone === "negative" ? "text-brand-red" : "text-brand-dark dark:text-dark-heading"}`}>
                             {detail.prefix || ""}{formatCurrency(detail.amount)}
                         </span>

@@ -153,12 +153,13 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                                     variant="outline"
                                     className="h-[42px]"
                                     onClick={() => setIsUndoModalOpen(true)}
+                                    leftIcon={<RotateIcon size={18} />}
                                 >
-                                    <RotateIcon className="w-4 h-4 mr-2" /> Desfazer
+                                    Desfazer
                                 </Button>
 
-                                <Button className="h-[42px]" onClick={() => { /* PDF Logic */ }}>
-                                    <DownloadIcon className="w-4 h-4 mr-2" /> PDF
+                                <Button className="h-[42px]" onClick={() => { /* PDF Logic */ }} leftIcon={<DownloadIcon size={18} />}>
+                                    PDF
                                 </Button>
                             </div>
                         </div>
@@ -295,14 +296,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading }: StockMovementD
                     variant="outline"
                     className="flex-1 h-12"
                     onClick={() => setIsUndoModalOpen(true)}
+                    leftIcon={<RotateIcon size={18} />}
                 >
-                    <RotateIcon className="w-4 h-4 mr-2" />
                     Desfazer
                 </Button>
                 <Button
                     className="flex-1 h-12"
+                    leftIcon={<DownloadIcon size={18} />}
                 >
-                    <DownloadIcon className="w-4 h-4 mr-2" />
                     PDF
                 </Button>
             </div>

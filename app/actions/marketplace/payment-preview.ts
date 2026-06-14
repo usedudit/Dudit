@@ -2,10 +2,119 @@
 
 import { requireUser } from "@/lib/auth/authorization"
 import { pickBestPaymentMethod } from "@/lib/services/payment-method.service"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
+import { computePaymentLine, type PaymentMethodFeeConfig } from "@/lib/payments/financial-engine"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
+
+const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
+
+const toSafeMoney = (value: number) => {
+  const n = Number(value || 0)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, round2(n))
+}
+
+function distributeInstallments(total: number, installments: number): number[] {
+  const count = Math.max(1, Math.floor(Number(installments || 1)))
+  const cents = Math.round(toSafeMoney(total) * 100)
+  const base = Math.floor(cents / count)
+  const remainder = cents - base * count
+  const out: number[] = []
+  for (let i = 0; i < count; i += 1) {
+    out.push((base + (i < remainder ? 1 : 0)) / 100)
+  }
+  return out
+}
+
+type MarketplacePreviewResult = {
+  finalAmount: number
+  interestAmount: number
+  feeAmount: number
+  paymentMethodDiscountAmount: number
+  amountBeforeInterest: number
+  amountBeforeFee: number
+  installmentNumber: number
+  installmentAmounts: number[]
+  appliedDiscountPercent: number
+  appliedFeePercent: number
+  appliedInterestPercent: number
+}
+
+function marketplaceCalculateAmounts(input: {
+  originalAmount: number
+  installmentNumber?: number
+  paymentMethod: PaymentMethodFeeConfig
+}): MarketplacePreviewResult {
+  const originalAmount = toSafeMoney(input.originalAmount)
+  const installmentNumber = Math.max(1, Number(input.installmentNumber || 1))
+  const maxInstallments = Math.max(1, Number(input.paymentMethod.maxInstallments || 24))
+  const clampedInstallments = Math.min(installmentNumber, maxInstallments)
+  const pm = input.paymentMethod
+  const feePercent = Math.max(0, Number(pm.feePercent || 0))
+  const feeFixed = Math.max(0, Number(pm.feeFixed || 0))
+  const discountPercent = Math.min(100, Math.max(0, Number(pm.discountPercent || 0)))
+  const fixedInterestPercent = Math.max(0, Number(pm.fixedInterestPercent || 0))
+
+  const installmentFeePercent = (pm.installmentFees || []).find(
+    (entry: { installmentNumber: number; feePercent: number }) => Number(entry.installmentNumber) === clampedInstallments,
+  )?.feePercent || 0
+
+  let currentTotal = originalAmount
+
+  // Step 1: discount (reduces the amount)
+  const discountCalc = computePaymentLine({
+    amountReceived: currentTotal,
+    paymentMethod: {
+      discountPercent,
+      feePercent: 0,
+      feeFixed: 0,
+      feeBearer: "merchant",
+      maxInstallments,
+      installmentFees: [],
+    },
+  })
+  const paymentMethodDiscountAmount = discountCalc.adjustmentType === "discount" ? discountCalc.adjustmentAmount : 0
+  currentTotal = toSafeMoney(currentTotal - paymentMethodDiscountAmount)
+  const amountBeforeInterest = currentTotal
+
+  // Step 2: installment interest (marketplace-specific chaining)
+  const totalInterestPercent = Math.max(0, fixedInterestPercent + Number(installmentFeePercent || 0))
+  const interestAmount = round2(currentTotal * (totalInterestPercent / 100))
+  currentTotal = toSafeMoney(currentTotal + interestAmount)
+  const amountBeforeFee = currentTotal
+
+  // Step 3: fee (increases the amount when customer-borne)
+  const feeCalc = computePaymentLine({
+    amountReceived: currentTotal,
+    paymentMethod: {
+      discountPercent: 0,
+      feePercent,
+      feeFixed,
+      feeBearer: pm.feeBearer,
+      maxInstallments,
+      installmentFees: [],
+    },
+  })
+  const feeAmount = feeCalc.adjustmentType === "fee" ? feeCalc.adjustmentAmount : 0
+  const finalAmount = pm.feeBearer === "customer"
+    ? toSafeMoney(currentTotal + feeAmount)
+    : currentTotal
+
+  return {
+    finalAmount,
+    interestAmount,
+    feeAmount,
+    paymentMethodDiscountAmount,
+    amountBeforeInterest,
+    amountBeforeFee,
+    installmentNumber: clampedInstallments,
+    installmentAmounts: distributeInstallments(finalAmount, clampedInstallments),
+    appliedDiscountPercent: discountPercent,
+    appliedFeePercent: feePercent,
+    appliedInterestPercent: totalInterestPercent,
+  }
+}
 
 export async function previewMarketplacePaymentAction(input: {
   partnerId: string
@@ -35,20 +144,22 @@ export async function previewMarketplacePaymentAction(input: {
     .select("installment_number, fee_percent")
     .eq("payment_method_id", method.id)
 
-  const result = calculatePaymentAmounts({
+  const feeConfig: PaymentMethodFeeConfig = {
+    feePercent: Number(method.fee_percent || 0),
+    feeFixed: Number(method.fee_fixed || 0),
+    feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+    discountPercent: Number(method.discount_percent || 0),
+    maxInstallments: Number(method.max_installments || 1),
+    installmentFees: (fees || []).map((row: any) => ({
+      installmentNumber: Number(row.installment_number || 1),
+      feePercent: Number(row.fee_percent || 0),
+    })),
+  }
+
+  const result = marketplaceCalculateAmounts({
     originalAmount: Math.max(0, Number(input.originalAmount || 0)),
     installmentNumber: Math.max(1, Number(input.installmentNumber || 1)),
-    paymentMethod: {
-      feePercent: Number(method.fee_percent || 0),
-      feeFixed: Number(method.fee_fixed || 0),
-      feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-      discountPercent: Number(method.discount_percent || 0),
-      maxInstallments: Number(method.max_installments || 1),
-      installmentFees: (fees || []).map((row: any) => ({
-        installmentNumber: Number(row.installment_number || 1),
-        feePercent: Number(row.fee_percent || 0),
-      })),
-    },
+    paymentMethod: feeConfig,
   })
 
   const maxInst = Math.max(1, Number(method.max_installments || 1))
@@ -56,27 +167,17 @@ export async function previewMarketplacePaymentAction(input: {
   
   if (chosenType === "credit_card" && maxInst > 1) {
     for (let i = 1; i <= maxInst; i++) {
-      const calc = calculatePaymentAmounts({
+      const calc = marketplaceCalculateAmounts({
         originalAmount: Math.max(0, Number(input.originalAmount || 0)),
         installmentNumber: i,
-        paymentMethod: {
-          feePercent: Number(method.fee_percent || 0),
-          feeFixed: Number(method.fee_fixed || 0),
-          feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-          discountPercent: Number(method.discount_percent || 0),
-          maxInstallments: Number(method.max_installments || 1),
-          installmentFees: (fees || []).map((row: any) => ({
-            installmentNumber: Number(row.installment_number || 1),
-            feePercent: Number(row.fee_percent || 0),
-          })),
-        },
+        paymentMethod: feeConfig,
       })
       installmentOptions.push({
         installments: i,
         installmentValue: calc.installmentAmounts[0] || 0,
         hasInterest: calc.interestAmount > 0,
         totalInterest: calc.interestAmount,
-        finalAmount: calc.finalAmount
+        finalAmount: calc.finalAmount,
       })
     }
   }

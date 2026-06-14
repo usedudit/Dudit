@@ -88,6 +88,7 @@ export async function createCommissionExpenseForEntity(params: {
     reference_note: referenceNote,
     account_id: params.accountId || null,
     created_by_user_id: params.createdByUserId || null,
+    seller_partner_user_id: params.partnerUserId,
   }
 
   let insertResult = await params.supabase

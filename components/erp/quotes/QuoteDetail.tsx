@@ -946,8 +946,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             onDelete={() => setShowDeleteModal(true)}
                             onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
                             trigger={
-                                <Button variant="outline" className="flex-1">
-                                    <ThreeDotsIcon className="w-4 h-4 mr-2" /> Opções
+                                <Button variant="outline" className="flex-1" leftIcon={<ThreeDotsIcon size={18} />}>
+                                    Opções
                                 </Button>
                             }
                         />
@@ -957,13 +957,13 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                 className="flex-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white border-none"
                                 disabled={isConverting}
                                 onClick={handleConvertClick}
+                                leftIcon={<ArrowRightIcon size={18} />}
                             >
-                                <ArrowRightIcon className="w-4 h-4 mr-2" />
                                 {isConverting ? "…" : "Converter"}
                             </Button>
                         )}
-                        <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap">
-                            <EditIcon className="w-4 h-4 mr-2" /> Editar
+                        <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
+                            Editar
                         </Button>
                     </div>
 

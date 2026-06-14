@@ -9,12 +9,21 @@ const PixIcon = ({ className }: { className?: string }) => (
     </svg>
 )
 
-export function PaymentMethodIndicator({ label }: { label?: string | null }) {
+export function PaymentMethodIndicator({ label, simplifyMultiple = true }: { label?: string | null; simplifyMultiple?: boolean }) {
     if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
     
     const parts = label.split(",").map(p => p.trim()).filter(Boolean)
     if (parts.length > 1) {
-        return <PaymentMethodIndicatorKeyed part="Múltiplos meios" />
+        if (simplifyMultiple) {
+            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" />
+        }
+        return (
+            <div className="flex flex-wrap gap-2 items-center">
+                {parts.map((part, index) => (
+                    <PaymentMethodIndicatorKeyed key={index} part={part} />
+                ))}
+            </div>
+        )
     }
     
     return <PaymentMethodIndicatorKeyed part={parts[0] || label} />

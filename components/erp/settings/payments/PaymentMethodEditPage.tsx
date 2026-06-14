@@ -505,7 +505,7 @@ export function PaymentMethodEditPage({ partnerId, editingMethod, existingMethod
                                 )}
 
                                 {isPix && (
-                                    <FormSection title="Configuração de Chave PIX">
+                                    <FormSection hasSeparator title="Configuração de Chave PIX">
                                         <div className="space-y-6">
                                             <div className="bg-brand-gray/30 dark:bg-dark-surface/50 p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center justify-between">
                                                 <div>

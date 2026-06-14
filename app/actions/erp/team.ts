@@ -7,6 +7,18 @@ import type { PartnerRole } from "@/lib/permissions/types"
 import { can } from "@/lib/permissions/can"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
+// ─── Stats Types ────────────────────────────────────────────────────────────
+
+export type TeamMemberStats = {
+    partnerUserId: string
+    fullName: string | null
+    avatarUrl: string | null
+    saleCount: number
+    totalSalesValue: number
+    totalCommissionValue: number
+    lastSaleDate: string | null
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface TeamMember {
@@ -21,11 +33,74 @@ export interface TeamMember {
     isOwner: boolean // true if this user is the partners.user_id
 }
 
+const ROLE_ORDER: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4 }
+
+async function fetchPartnerTeamMembers(partnerId: string): Promise<{ members: TeamMember[]; error?: string }> {
+    const admin = getAdminClient()
+
+    const { data: partner } = await admin
+        .from("partners")
+        .select("user_id")
+        .eq("id", partnerId)
+        .single()
+    const ownerUserId = partner?.user_id
+
+    let { data: partnerUsers, error } = await admin
+        .from("partner_users")
+        .select("id, user_id, role_id, created_at")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: true })
+    if (error) return { members: [], error: error.message }
+
+    if (ownerUserId && !partnerUsers?.some((pu: any) => pu.user_id === ownerUserId)) {
+        const { data: newPu } = await admin
+            .from("partner_users")
+            .insert({ partner_id: partnerId, user_id: ownerUserId, role_id: "owner" })
+            .select("id, user_id, role_id, created_at")
+            .single()
+        if (newPu) partnerUsers = partnerUsers ? [newPu, ...partnerUsers] : [newPu]
+    }
+
+    if (!partnerUsers || partnerUsers.length === 0) return { members: [] }
+
+    const userIds = partnerUsers.map((pu: any) => pu.user_id)
+    const [profilesRes, authRes] = await Promise.all([
+        admin.from("user_profiles").select("user_id, full_name").in("user_id", userIds),
+        admin.from("auth.users").select("id, email").in("id", userIds),
+    ])
+
+    let emailMap: Record<string, string> = {}
+    if (authRes.data) for (const u of authRes.data) emailMap[u.id] = u.email || ""
+
+    const profileMap: Record<string, { full_name: string | null }> = {}
+    if (profilesRes.data) for (const p of profilesRes.data) profileMap[p.user_id] = { full_name: p.full_name }
+
+    const members: TeamMember[] = partnerUsers
+        .map((pu: any) => ({
+            id: pu.id,
+            userId: pu.user_id,
+            email: emailMap[pu.user_id] || "",
+            fullName: profileMap[pu.user_id]?.full_name || null,
+            avatarUrl: null,
+            role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
+            permissions: null,
+            createdAt: pu.created_at,
+            isOwner: pu.user_id === ownerUserId,
+        }) as TeamMember)
+        .sort((a: TeamMember, b: TeamMember) => {
+            if (a.isOwner && !b.isOwner) return -1
+            if (!a.isOwner && b.isOwner) return 1
+            return (ROLE_ORDER[a.role] ?? 4) - (ROLE_ORDER[b.role] ?? 4)
+        })
+
+    return { members }
+}
+
 // ─── Server Actions ─────────────────────────────────────────────────────────
 
 /**
  * Get all team members for the current ERP.
- * Returns users from partner_users table + the partner owner.
+ * Requires settings.settings_team permission (OWNER/ADMIN/MANAGER).
  */
 export async function getTeamMembers(): Promise<{ members: TeamMember[]; currentUserRole?: PartnerRole; currentUserId?: string; error?: string }> {
     try {
@@ -33,117 +108,146 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; current
         const context = await getCurrentPartnerContext()
         if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
 
-        // SECURITY: Verify the user actually has access to this partner.
-        // getCurrentPartnerContext reads from a client-settable cookie,
-        // so we must validate against partner_users to prevent enumeration.
         const access = await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
         if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
             return { members: [], error: "Sem permissão para visualizar equipe." }
         }
 
-        const admin = getAdminClient()
-        const partnerId = context.partnerId
-
-        // Get the partner owner
-        const { data: partner } = await admin
-            .from("partners")
-            .select("user_id")
-            .eq("id", partnerId)
-            .single()
-
-        const ownerUserId = partner?.user_id
-
-        // Get all partner_users entries
-        let { data: partnerUsers, error } = await admin
-            .from("partner_users")
-            .select("id, user_id, role_id, created_at")
-            .eq("partner_id", partnerId)
-            .order("created_at", { ascending: true })
-
-        if (error) return { members: [], error: error.message }
-
-        // Fix: Ensure owner is in partner_users so they appear in the team list and are assignable.
-        if (ownerUserId && !partnerUsers?.some((pu: any) => pu.user_id === ownerUserId)) {
-            const { data: newPu } = await admin
-                .from("partner_users")
-                .insert({
-                    partner_id: partnerId,
-                    user_id: ownerUserId,
-                    role_id: "owner"
-                })
-                .select("id, user_id, role_id, created_at")
-                .single()
-
-            if (newPu) {
-                partnerUsers = partnerUsers ? [newPu, ...partnerUsers] : [newPu]
-            }
-        }
-
-        if (!partnerUsers || partnerUsers.length === 0) {
-            return { members: [] }
-        }
-
-        // Get user profiles for all members
-        const userIds = partnerUsers.map((pu: any) => pu.user_id)
-        const { data: profiles } = await admin
-            .from("user_profiles")
-            .select("user_id, full_name")
-            .in("user_id", userIds)
-
-        // Get auth emails
-        const { data: authUsers } = await admin
-            .from("auth.users")
-            .select("id, email")
-            .in("id", userIds)
-
-        // If auth.users query fails (it might), fallback to getting emails individually
-        let emailMap: Record<string, string> = {}
-        if (authUsers) {
-            for (const u of authUsers) {
-                emailMap[u.id] = u.email || ""
-            }
-        } else {
-            // Fallback: get emails from Supabase auth admin API
-            for (const userId of userIds) {
-                try {
-                    const { data: { user } } = await admin.auth.admin.getUserById(userId)
-                    if (user?.email) emailMap[userId] = user.email
-                } catch {
-                    // skip
-                }
-            }
-        }
-
-        const profileMap: Record<string, { full_name: string | null; avatar_url: string | null }> = {}
-        if (profiles) {
-            for (const p of profiles) {
-                profileMap[p.user_id] = { full_name: p.full_name, avatar_url: null }
-            }
-        }
-
-        const members: TeamMember[] = partnerUsers.map((pu: any) => ({
-            id: pu.id,
-            userId: pu.user_id,
-            email: emailMap[pu.user_id] || "",
-            fullName: profileMap[pu.user_id]?.full_name || null,
-            avatarUrl: profileMap[pu.user_id]?.avatar_url || null,
-            role: String(pu.role_id || "delivery").toUpperCase() as PartnerRole,
-            permissions: null,
-            createdAt: pu.created_at,
-            isOwner: pu.user_id === ownerUserId,
-        }))
-
-        // Sort: owner first, then by role hierarchy
-        const roleOrder: Record<string, number> = { OWNER: 0, ADMIN: 1, MANAGER: 2, OPERATOR: 3, DELIVERY: 4 }
-        members.sort((a, b) => {
-            if (a.isOwner && !b.isOwner) return -1
-            if (!a.isOwner && b.isOwner) return 1
-            return (roleOrder[a.role] ?? 4) - (roleOrder[b.role] ?? 4)
-        })
+        const { members, error } = await fetchPartnerTeamMembers(context.partnerId)
+        if (error) return { members: [], error }
 
         return { members, currentUserRole: context.role as PartnerRole, currentUserId: context.userId }
     } catch (error: any) {
         return { members: [], error: error.message }
+    }
+}
+
+/**
+ * Lightweight version for PDV seller selection.
+ * Requires pdv.sell permission instead of settings.settings_team,
+ * so OPERADOR (cashier) roles can see and assign sellers.
+ */
+export async function getPDVSellersAction(): Promise<{ members: TeamMember[]; error?: string }> {
+    try {
+        await requireUser()
+        const context = await getCurrentPartnerContext()
+        if (!context) return { members: [], error: "Contexto de ERP não encontrado" }
+        await requirePartnerAccessWithPermission(context.partnerId, "pdv", "sell")
+        return await fetchPartnerTeamMembers(context.partnerId)
+    } catch (error: any) {
+        return { members: [], error: error.message }
+    }
+}
+
+/**
+ * Returns per-member sales and commission stats for the team page.
+ * Requires settings.settings_team permission.
+ */
+export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberStats[]; error?: string }> {
+    try {
+        await requireUser()
+        const context = await getCurrentPartnerContext()
+        if (!context) return { stats: [], error: "Contexto de ERP não encontrado" }
+
+        const access = await requirePartnerAccessWithPermission(context.partnerId, "settings", "settings_team")
+        if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_team")) {
+            return { stats: [], error: "Sem permissão para visualizar estatísticas." }
+        }
+
+        const admin = getAdminClient()
+        const partnerId = context.partnerId
+
+        // Get all commission transactions grouped by seller
+        const { data: commissionData } = await admin
+            .from("transactions")
+            .select("seller_partner_user_id, amount, created_at")
+            .eq("partner_id", partnerId)
+            .eq("category", "Comissões")
+            .eq("transaction_type", "expense")
+            .not("seller_partner_user_id", "is", null)
+            .order("created_at", { ascending: false })
+
+        // Aggregate per seller
+        const statsMap = new Map<string, { saleCount: number; totalCommissionValue: number; lastSaleDate: string | null }>()
+
+        if (commissionData) {
+            for (const row of commissionData) {
+                const sid = row.seller_partner_user_id as string
+                if (!sid) continue
+                const existing = statsMap.get(sid) || { saleCount: 0, totalCommissionValue: 0, lastSaleDate: null as string | null }
+                existing.saleCount += 1
+                existing.totalCommissionValue += Number(row.amount || 0)
+                if (!existing.lastSaleDate || (row.created_at && row.created_at > existing.lastSaleDate)) {
+                    existing.lastSaleDate = row.created_at as string
+                }
+                statsMap.set(sid, existing)
+            }
+        }
+
+        // Get total sales amount per commission owner by parsing reference_note
+        // reference_note format: "commission:sale:<entityId>:<partnerUserId>"
+        const referenceNotes = (commissionData || [])
+            .filter((r: any) => r.seller_partner_user_id)
+            .map((r: any) => r.reference_note as string)
+            .filter(Boolean)
+
+        // Extract unique entity IDs from reference notes for PDV sales and ERP orders
+        const saleIds: string[] = []
+        const orderIds: string[] = []
+        const entityToSellerMap = new Map<string, string>() // entityId -> sellerPartnerUserId
+
+        for (const ref of referenceNotes) {
+            const parts = ref.split(":")
+            if (parts.length >= 4 && parts[0] === "commission" && parts[1] === "sale") {
+                const entityId = parts[2]
+                const sellerId = parts[3]
+                saleIds.push(entityId)
+                entityToSellerMap.set(entityId, sellerId)
+            }
+        }
+
+        // Query sales (PDV) amounts
+        let saleAmountMap = new Map<string, number>()
+        if (saleIds.length > 0) {
+            const { data: salesData } = await admin
+                .from("sales")
+                .select("id, total_amount")
+                .in("id", saleIds)
+            if (salesData) {
+                for (const s of salesData) {
+                    saleAmountMap.set(s.id, Number(s.total_amount || 0))
+                }
+            }
+        }
+
+        // Build per-seller total sales value
+        const salesValuePerSeller = new Map<string, number>()
+        for (const [entityId, sellerId] of entityToSellerMap) {
+            const amount = saleAmountMap.get(entityId) || 0
+            salesValuePerSeller.set(sellerId, (salesValuePerSeller.get(sellerId) || 0) + amount)
+        }
+
+        // Get all partner users to build full stats list
+        const { members, error: membersErr } = await fetchPartnerTeamMembers(partnerId)
+        if (membersErr) return { stats: [], error: membersErr }
+
+        const stats: TeamMemberStats[] = members.map((m) => {
+            const s = statsMap.get(m.id)
+            const totalSalesValue = salesValuePerSeller.get(m.id) || 0
+            return {
+                partnerUserId: m.id,
+                fullName: m.fullName,
+                avatarUrl: m.avatarUrl,
+                saleCount: s?.saleCount || 0,
+                totalSalesValue,
+                totalCommissionValue: s?.totalCommissionValue || 0,
+                lastSaleDate: s?.lastSaleDate || null,
+            }
+        })
+
+        return { stats }
+    } catch (error: any) {
+        return { stats: [], error: error.message }
     }
 }
 

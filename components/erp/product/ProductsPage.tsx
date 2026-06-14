@@ -1011,7 +1011,7 @@ export default function ProductsPage({
                 <Button
                     variant="ghost"
                     onClick={() => setBulkEditModal({ isOpen: true })}
-                    leftIcon={<EditIcon className="w-4 h-4" />}
+                    leftIcon={<EditIcon size={18} />}
                     className="h-10 px-3"
                 >
                     Ações em massa
@@ -1022,8 +1022,8 @@ export default function ProductsPage({
                     onClick={() => setConfirmations((p) => ({ ...p, bulkInactive: true }))}
                     leftIcon={
                         selectedProds.every((p) => !p.is_active)
-                            ? <CheckCircleIcon className="w-4 h-4" />
-                            : <BlockedIcon className="w-4 h-4" />
+                            ? <CheckCircleIcon size={18} />
+                            : <BlockedIcon size={18} />
                     }
                     className="h-10 px-3"
                 >

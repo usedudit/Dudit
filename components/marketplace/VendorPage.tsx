@@ -571,7 +571,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         if (partner?.id) {
             listActivePromotionsForMarketplaceAction(partner.id)
                 .then(res => setPartnerPromotions(Array.isArray(res) ? res : []))
-                .catch(() => {})
+                .catch(() => { })
         }
     }, [partner?.id])
 
@@ -759,7 +759,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             />
 
             <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
-                <div className="max-w-[1400px] mx-auto px-4 h-[76px] flex items-center gap-4">
+                <div className="max-w-[1400px] mx-auto h-[76px] flex items-center gap-4">
                     <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50" />
                     <div className="min-w-0">
                         <h2 className="text-[17px] font-bold text-brand-dark truncate">{partner.storeName}</h2>

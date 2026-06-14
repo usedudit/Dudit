@@ -225,30 +225,31 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {isPaidOrder ? (
                         <section className="space-y-6">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
-                            <div className="space-y-4">
-                                {items.map((item: any, idx: number) => (
-                                    <div key={idx} className="flex items-start gap-4">
-                                        <div className="w-16 h-16 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border">
-                                            <img
-                                                src={getR2ImageUrl(item.image, "thumbnail")}
-                                                className="w-full h-full object-cover rounded-xl"
-                                                alt={item.name}
-                                                onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.name || "Produto sem nome"}</h4>
-                                                <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.unitPrice * item.quantity)}</span>
+                            <FormSection title="Itens do Pedido" hasSeparator={false} className="mt-0">
+                                <div className="space-y-4">
+                                    {items.map((item: any, idx: number) => (
+                                        <div key={idx} className="flex items-start gap-4">
+                                            <div className="w-16 h-16 overflow-hidden shrink-0 rounded-xl border border-brand-border dark:border-dark-border">
+                                                <img
+                                                    src={getR2ImageUrl(item.image, "thumbnail")}
+                                                    className="w-full h-full object-cover rounded-xl"
+                                                    alt={item.name}
+                                                    onError={(e: any) => { e.target.src = "https://img.dudit.com.br/static/Placeholder.png" }} />
                                             </div>
-                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
-                                            <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                <span>{formatProductQuantity(item.quantity, item.unit)} • {formatProductUnitPrice(item.unitPrice, item.unit)}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading truncate">{item.name || "Produto sem nome"}</h4>
+                                                    <span className="font-bold text-[14px] md:text-[15px] text-brand-dark dark:text-dark-heading">{formatCurrency(item.unitPrice * item.quantity)}</span>
+                                                </div>
+                                                <div className="text-xs text-brand-inactive-text dark:text-dark-body uppercase mb-2">SKU: {item.sku || "N/A"}</div>
+                                                <div className="flex items-center gap-2 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    <span>{formatProductQuantity(item.quantity, item.unit)} • {formatProductUnitPrice(item.unitPrice, item.unit)}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            </FormSection>
                         </section>
                     ) : (
                         <section>
@@ -319,7 +320,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                             </div>
@@ -427,7 +428,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                         </td>
                                                         <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-center gap-2">
-                                                                 {item.isEditing ? (
+                                                                {item.isEditing ? (
                                                                     <button
                                                                         onClick={() => {
                                                                             if (!item.name || item.name.trim() === '') {
@@ -1049,7 +1050,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                             <div className="text-[11px] font-medium text-brand-inactive-text mt-0.5 tracking-wider uppercase truncate">{product.sku}</div>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 shrink-0">
-                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>)})()}</div>
+                                                            <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">{(() => { const pr = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, searchPromotions, { productId: product.id, categoryId: product.category_id || undefined }); return (<div className="flex items-center gap-1.5">{pr.referencePrice && <span className="text-xs text-brand-inactive-text line-through">{formatCurrency(pr.referencePrice)}</span>}<span className="text-sm font-bold">{formatCurrency(pr.bestPrice)}</span>{pr.badgeVariant === "blue" && <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}{pr.badgeVariant === "orange" && <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>}</div>) })()}</div>
                                                             <div className="text-xs font-bold text-white bg-brand-dark dark:bg-brand-green px-2 py-1 rounded-md whitespace-nowrap">
                                                                 {product.isService ? "Serviço" : `${product.stock} em estoque`}
                                                             </div>

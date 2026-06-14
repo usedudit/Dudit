@@ -119,9 +119,27 @@ const ProductListItem = React.memo(
 
                 case "price":
                     return (
-                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                            {formatCurrency(product.price)}
-                        </span>
+                        <div className="flex flex-col items-start">
+                            {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                                <>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-brand-orange font-semibold">
+                                            -{Math.round(((product.price - product.promotional_price) / product.price) * 100)}%
+                                        </span>
+                                        <span className="text-xs text-brand-inactive-text line-through">
+                                            {formatCurrency(product.price)}
+                                        </span>
+                                    </div>
+                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading mt-0.5">
+                                        {formatCurrency(product.promotional_price)}
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                    {formatCurrency(product.price)}
+                                </span>
+                            )}
+                        </div>
                     )
 
                 case "visibility":

@@ -7,7 +7,7 @@ import { PaymentMethodSchema } from "@/lib/validation/schemas"
 import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
-import { calculatePaymentAmounts } from "@/lib/payments/calculation"
+import { computePaymentLine } from "@/lib/payments/financial-engine"
 import { recalculateSplitPaymentFromBaseAmounts, type SplitInputRow } from "@/lib/payments/split-breakdown"
 import { toCanonicalPaymentType, toLegacyPaymentType } from "@/lib/payments/payment-method"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
@@ -125,7 +125,7 @@ function sanitizeInstallmentFees(input: InstallmentFeeInput[] | undefined, maxIn
 }
 
 export async function getPaymentMethodsAction(partnerId: string) {
-    await requirePartnerAccessWithPermission(partnerId, "payment_methods", "view")
+    await requirePartnerAccessWithPermission(partnerId)
 
     // Use admin client after authz check so invited ERP users can read methods.
     const supabase = createAdminClient()
@@ -214,20 +214,22 @@ export async function calculatePaymentMethodAmountsAction(input: {
         .select("installment_number, fee_percent")
         .eq("payment_method_id", input.paymentMethodId)
 
-    const result = calculatePaymentAmounts({
-        originalAmount: input.originalAmount,
+    const pmConfig = {
+        feePercent: Number(method.fee_percent || 0),
+        feeFixed: Number(method.fee_fixed || 0),
+        feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+        discountPercent: Number(method.discount_percent || 0),
+        maxInstallments: Number(method.max_installments || 1),
+        installmentFees: (fees || []).map((row: any) => ({
+            installmentNumber: row.installment_number,
+            feePercent: Number(row.fee_percent || 0),
+        })),
+    }
+
+    const engine = computePaymentLine({
+        amountReceived: input.originalAmount,
+        paymentMethod: pmConfig,
         installmentNumber: input.installmentNumber,
-        paymentMethod: {
-            feePercent: Number(method.fee_percent || 0),
-            feeFixed: Number(method.fee_fixed || 0),
-            feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-            discountPercent: Number(method.discount_percent || 0),
-            maxInstallments: Number(method.max_installments || 1),
-            installmentFees: (fees || []).map((row: any) => ({
-                installmentNumber: row.installment_number,
-                feePercent: Number(row.fee_percent || 0),
-            })),
-        },
     })
 
     const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
@@ -236,32 +238,42 @@ export async function calculatePaymentMethodAmountsAction(input: {
 
     if (chosenType === "credit_card" && maxInst > 1) {
         for (let i = 1; i <= maxInst; i++) {
-            const calc = calculatePaymentAmounts({
-                originalAmount: Math.max(0, Number(input.originalAmount || 0)),
+            const calc = computePaymentLine({
+                amountReceived: Math.max(0, Number(input.originalAmount || 0)),
+                paymentMethod: pmConfig,
                 installmentNumber: i,
-                paymentMethod: {
-                    feePercent: Number(method.fee_percent || 0),
-                    feeFixed: Number(method.fee_fixed || 0),
-                    feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
-                    discountPercent: Number(method.discount_percent || 0),
-                    maxInstallments: Number(method.max_installments || 1),
-                    installmentFees: (fees || []).map((row: any) => ({
-                        installmentNumber: Number(row.installment_number || 1),
-                        feePercent: Number(row.fee_percent || 0),
-                    })),
-                },
             })
             installmentOptions.push({
                 installments: i,
-                installmentValue: calc.installmentAmounts[0] || 0,
-                hasInterest: calc.interestAmount > 0,
-                totalInterest: calc.interestAmount,
-                finalAmount: calc.finalAmount
+                installmentValue: calc.effectiveAmount,
+                hasInterest: calc.adjustmentType === "fee" && calc.adjustmentAmount > 0,
+                totalInterest: calc.adjustmentType === "fee" ? calc.adjustmentAmount : 0,
+                finalAmount: calc.effectiveAmount
             })
         }
     }
 
-    return { success: true, installmentOptions, ...result }
+    return {
+        success: true,
+        installmentOptions,
+        finalAmount: engine.effectiveAmount,
+        paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+        feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+        interestAmount: 0,
+        amountBeforeInterest: engine.amountReceived,
+        amountBeforeFee: engine.amountReceived,
+        installmentNumber: engine.adjustmentType === "fee" ? 1 : 0,
+        installmentAmounts: [engine.effectiveAmount],
+        appliedDiscountPercent: engine.adjustmentType === "discount" ? engine.adjustmentPercent : 0,
+        appliedFeePercent: engine.adjustmentType === "fee" ? engine.adjustmentPercent : 0,
+        appliedInterestPercent: 0,
+        amountReceived: engine.amountReceived,
+        adjustmentType: engine.adjustmentType,
+        adjustmentPercent: engine.adjustmentPercent,
+        adjustmentAmount: engine.adjustmentAmount,
+        effectiveAmount: engine.effectiveAmount,
+        netAmount: engine.netAmount,
+    }
 }
 
 /**
@@ -285,6 +297,7 @@ export async function previewSplitPaymentBreakdownAction(input: {
     const splitRows: SplitInputRow[] = input.legs.map((l) => ({
         method: l.method,
         amount: l.baseAmount,
+        amountReceived: l.baseAmount,
         paymentMethodId: l.paymentMethodId,
         installmentNumber: Math.max(1, Math.floor(Number(l.installmentNumber || 1))),
     }))

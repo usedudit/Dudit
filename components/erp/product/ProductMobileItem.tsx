@@ -78,18 +78,46 @@ const ProductMobileItem = React.memo(
 
                         {/* Linha 3: Preço • Estoque • Badge + Checkbox */}
                         <div className="flex items-end justify-between gap-2 mt-0.5">
-                            <div className="flex items-center flex-wrap gap-y-1">
-                                <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
-                                    {formatCurrency(product.price)}
-                                </span>
-                                <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
-                                <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                    {stock} un
-                                </span>
-                                <span className="mx-2"></span>
-                                <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
-                                    {status.label}
-                                </Badge>
+                            <div className="flex flex-col gap-1">
+                                {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                                    <>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xs text-brand-orange font-semibold">
+                                                -{Math.round(((product.price - product.promotional_price) / product.price) * 100)}%
+                                            </span>
+                                            <span className="text-xs text-brand-inactive-text line-through">
+                                                {formatCurrency(product.price)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center flex-wrap gap-y-1">
+                                            <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(product.promotional_price)}
+                                            </span>
+                                            <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
+                                            <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
+                                                {stock} un
+                                            </span>
+                                            <span className="mx-2"></span>
+                                            <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
+                                                {status.label}
+                                            </Badge>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center flex-wrap gap-y-1">
+                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                                            {formatCurrency(product.price)}
+                                        </span>
+                                        <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
+                                        <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
+                                            {stock} un
+                                        </span>
+                                        <span className="mx-2"></span>
+                                        <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
+                                            {status.label}
+                                        </Badge>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Selection Checkbox */}

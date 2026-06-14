@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown } from '@/components/reusable';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
+import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
@@ -1253,12 +1254,25 @@ const PaymentModal = ({
             : view === 'split'
                 ? payments
                     .filter((payment) => payment.method && payment.amount > 0.009)
-                    .map((payment) => ({
-                        method: payment.method,
-                        amount: Number(payment.amount || 0),
-                        paymentMethodId: payment.paymentMethodId || null,
-                        installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
-                    }))
+                    .map((payment, i) => {
+                        const pr = splitPreview && 'success' in splitPreview && splitPreview.success
+                            ? splitPreview.rows[i]
+                            : null
+                        const finalAmt = Number(pr?.finalAmount ?? payment.amount ?? 0)
+                        return {
+                            method: payment.method,
+                            amount: finalAmt,
+                            amountReceived: Number(pr?.amountReceived ?? payment.amount ?? 0),
+                            adjustmentType: pr?.adjustmentType || 'none',
+                            adjustmentPercent: Number(pr?.adjustmentPercent || 0),
+                            adjustmentAmount: Number(pr?.adjustmentAmount || 0),
+                            effectiveAmount: Number(pr?.effectiveAmount ?? finalAmt),
+                            netAmount: Number(pr?.netAmount ?? finalAmt),
+                            feeBearer: pr?.feeBearer || null,
+                            paymentMethodId: payment.paymentMethodId || null,
+                            installmentNumber: Math.max(1, Number(payment.installmentNumber || 1)),
+                        }
+                    })
                 : [{
                     method: (() => {
                         const selectedMethodObj = activeMethods.find((method) => method.id === selectedMethodId);
@@ -1268,6 +1282,13 @@ const PaymentModal = ({
                         return view === 'money' ? 'Dinheiro' : (view === 'pix' ? 'Pix' : 'Cartão');
                     })(),
                     amount: Number(totalPaidCalculated || 0),
+                    amountReceived: Number(paymentCalculation?.amountReceived ?? totalPaidCalculated ?? 0),
+                    adjustmentType: paymentCalculation?.adjustmentType || 'none',
+                    adjustmentPercent: Number(paymentCalculation?.adjustmentPercent || 0),
+                    adjustmentAmount: Number(paymentCalculation?.adjustmentAmount || 0),
+                    effectiveAmount: Number(paymentCalculation?.effectiveAmount ?? totalPaidCalculated ?? 0),
+                    netAmount: Number(paymentCalculation?.netAmount ?? totalPaidCalculated ?? 0),
+                    feeBearer: paymentCalculation?.feeBearer || null,
                     paymentMethodId: selectedMethodId || null,
                     installmentNumber: Math.max(1, Number(installments || 1)),
                 }];
@@ -1437,17 +1458,19 @@ const PaymentModal = ({
                     </div>
 
                     {/* Customer Info Section */}
-                    <div className="flex items-start justify-between mb-8">
-                        <div className="flex gap-4">
-                            <div className="w-12 h-12 bg-brand-dark rounded-full flex items-center justify-center text-white font-medium text-lg shrink-0">
-                                {customer?.name?.substring(0, 2).toUpperCase() || 'CF'}
-                            </div>
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <UserProfileImage
+                                fullName={customer?.name || 'Consumidor Final'}
+                                imageUrl={customer?.avatar_url || customer?.avatarUrl || customer?.image}
+                                className="w-12 h-12 text-white font-medium text-lg shrink-0"
+                            />
                             <div className="flex flex-col overflow-hidden">
                                 <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[180px]">{customer?.name || 'Consumidor Final'}</span>
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{headerSubtitle}</span>
                             </div>
                         </div>
-                        <div className="flex flex-col items-end text-right">
+                        <div className="flex flex-col items-end text-right justify-center">
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date())}</span>
                             <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date())}</span>
                         </div>
@@ -1520,17 +1543,19 @@ const PaymentModal = ({
                                     {view === 'methods' && (
                                         <motion.div key="methods" variants={contentVariants} initial="initial" animate="animate" exit="exit" className="w-full h-full flex flex-col">
                                             {/* Mobile Customer Info */}
-                                            <div className="md:hidden flex items-start justify-between mb-6 px-1">
-                                                <div className="flex gap-4">
-                                                    <div className="w-12 h-12 bg-brand-dark rounded-full flex items-center justify-center text-white font-medium text-lg shrink-0">
-                                                        {customer?.name?.substring(0, 2).toUpperCase() || 'CB'}
-                                                    </div>
+                                            <div className="md:hidden flex items-center justify-between mb-6 px-1">
+                                                <div className="flex items-center gap-4">
+                                                    <UserProfileImage
+                                                        fullName={customer?.name || 'Consumidor Final'}
+                                                        imageUrl={customer?.avatar_url || customer?.avatarUrl || customer?.image}
+                                                        className="w-12 h-12 text-white font-medium text-lg shrink-0"
+                                                    />
                                                     <div className="flex flex-col overflow-hidden">
                                                         <span className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[150px]">{customer?.name || 'Consumidor Final'}</span>
                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{headerSubtitle}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col items-end text-right">
+                                                <div className="flex flex-col items-end text-right justify-center">
                                                     <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{formatDate(new Date())}</span>
                                                     <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">{formatTime(new Date())}</span>
                                                 </div>
@@ -1787,34 +1812,64 @@ const PaymentModal = ({
                                                     {payments.map((p, idx) => {
                                                         const li = activeSplitLegs.findIndex((l) => l.id === p.id);
                                                         const pr = splitPreview && 'success' in splitPreview && splitPreview.success && li >= 0
-                                                            ? (splitPreview.rows[li] as { finalAmount: number; paymentMethodDiscountAmount?: number; interestAmount?: number; feeAmount?: number })
+                                                            ? splitPreview.rows[li] as any
                                                             : null;
-                                                        const sub: string[] = [];
-                                                        if (pr) {
-                                                            if (Number(pr.paymentMethodDiscountAmount || 0) > 0) sub.push(`Desc. meio −${formatCurrency(pr.paymentMethodDiscountAmount || 0)}`);
-                                                            if (Number(pr.interestAmount || 0) > 0) sub.push(`+ juros ${formatCurrency(pr.interestAmount || 0)}`);
-                                                            if (Number(pr.feeAmount || 0) > 0) sub.push(`taxa (estim.) ${formatCurrency(pr.feeAmount || 0)}`);
-                                                        }
-                                                        const showFinal = pr != null && Math.abs(pr.finalAmount - p.amount) > 0.005;
+                                                        const amtReceived = Number(pr?.amountReceived ?? p.amount ?? 0)
+                                                        const adjType = pr?.adjustmentType || 'none'
+                                                        const adjAmt = Number(pr?.adjustmentAmount || 0)
+                                                        const effAmt = Number(pr?.effectiveAmount ?? amtReceived)
+                                                        const netAmt = Number(pr?.netAmount ?? effAmt)
+                                                        const adjPct = Number(pr?.adjustmentPercent || 0)
+                                                        const showAdjustment = adjType !== 'none' && adjAmt > 0.005
                                                         return (
-                                                            <SplitPaymentCard
-                                                                key={p.id}
-                                                                icon={getIconForMethod(p.method, p.paymentMethodId)}
-                                                                label={p.method || "Selecionar método"}
-                                                                amount={formatCurrency(p.amount)}
-                                                                recalculatedAmount={showFinal ? formatCurrency(pr!.finalAmount) : undefined}
-                                                                subLabel={sub.length ? sub.join(" · ") : undefined}
-                                                                onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
-                                                            />
+                                                            <div key={p.id} onClick={() => { setEditingPaymentIndex(idx); setView('split_method_select'); }}
+                                                                className="border border-brand-border dark:border-dark-border rounded-lg p-4 cursor-pointer hover:bg-brand-light-bg dark:hover:bg-dark-card-bg transition-colors">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    {getIconForMethod(p.method, p.paymentMethodId)({})}
+                                                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{p.method || "Selecionar método"}</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                                                    <span className="text-brand-inactive-text">Recebido:</span>
+                                                                    <span className="text-right font-medium text-brand-dark dark:text-dark-heading">{formatCurrency(amtReceived)}</span>
+                                                                    {showAdjustment && (
+                                                                        <>
+                                                                            <span className="text-brand-inactive-text">
+                                                                                {adjType === 'discount' ? 'Desconto:' : 'Taxa:'}
+                                                                            </span>
+                                                                            <span className={`text-right font-medium ${adjType === 'discount' ? 'text-green-600' : 'text-amber-600'}`}>
+                                                                                {adjType === 'discount' ? `−${formatCurrency(adjAmt)} (${adjPct}%)` : `+${formatCurrency(adjAmt)} (${adjPct}%)`}
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                    <span className="text-brand-inactive-text">Abate:</span>
+                                                                    <span className="text-right font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(effAmt)}</span>
+                                                                    {adjType === 'fee' && pr?.feeBearer === 'merchant' && (
+                                                                        <>
+                                                                            <span className="text-brand-inactive-text">Líquido:</span>
+                                                                            <span className="text-right font-medium text-brand-inactive-text">{formatCurrency(netAmt)}</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         );
                                                     })}
                                                 </div>
                                                 {splitPreview && 'success' in splitPreview && splitPreview.success && (
-                                                    <div className="mt-4 flex flex-col sm:flex-row sm:items-baseline sm:justify-end gap-1 sm:gap-2 border-t border-brand-border dark:border-dark-border pt-4 text-right">
-                                                        <span className="text-sm text-brand-inactive-text">Total base (pedido):</span>
-                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
-                                                        <span className="text-sm text-brand-inactive-text sm:ml-2">Total a cobrar:</span>
-                                                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(splitPreview.finalTotal)}</span>
+                                                    <div className="mt-4 flex flex-col gap-2 border-t border-brand-border dark:border-dark-border pt-4">
+                                                        <div className="flex justify-between items-baseline text-sm">
+                                                            <span className="text-brand-inactive-text">Total do pedido:</span>
+                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-baseline text-sm">
+                                                            <span className="text-brand-inactive-text">Total em abates:</span>
+                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(splitPreview.finalTotal)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-baseline border-t border-dashed border-brand-border dark:border-dark-border pt-2">
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Saldo restante:</span>
+                                                            <span className={`text-lg font-bold ${splitPreview.finalTotal >= chargeTarget - 0.005 ? 'text-green-600' : 'text-amber-600'}`}>
+                                                                {formatCurrency(Math.max(0, chargeTarget - splitPreview.finalTotal))}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

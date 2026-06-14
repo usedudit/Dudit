@@ -47,11 +47,11 @@ async function resolveCustomerPhone(params: {
   const admin = getAdminClient()
   const { data } = await admin
     .from("customers")
-    .select("phone, mobile")
+    .select("phone")
     .eq("id", params.customerId)
     .eq("partner_id", params.partnerId)
     .maybeSingle()
-  return normalizePhoneToE164(data?.phone || data?.mobile || null)
+  return normalizePhoneToE164(data?.phone || null)
 }
 
 export async function scheduleWhatsappJob(params: {

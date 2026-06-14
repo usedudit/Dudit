@@ -1920,8 +1920,7 @@ export default function CreateTransactionPage({
                         <Button variant="outline" onClick={requestClose} disabled={isSaving} className="flex-1 h-12">
                             Cancelar
                         </Button>
-                        <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-12">
-                            <SaveIcon className="w-4 h-4 mr-2" />
+                        <Button onClick={handleSave} disabled={isSaving} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>
                             {isSaving ? "Salvando..." : isEditMode ? "Salvar alterações" : "Salvar lançamento"}
                         </Button>
                     </div>

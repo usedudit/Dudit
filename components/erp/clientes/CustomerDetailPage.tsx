@@ -37,7 +37,7 @@ function formatOrderId(id: string): string {
 export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const realCustomerId = customer.originalId || customer.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
-    const [activeTab, setActiveTab] = useState('Purchase History');
+    const [activeTab, setActiveTab] = useState('General');
     const [isScrolled, setIsScrolled] = useState(false);
     const isMobile = useMediaQuery("(max-width: 767px)");
     const isTablet = useMediaQuery("(max-width: 1279px)");
@@ -130,7 +130,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         fetchAddress();
     }, [realCustomerId]);
 
-    const isInformationTab = activeTab === 'Information';
+
 
     const stats = useMemo(() => {
         const totalOrders = fetchedOrders.length;
@@ -216,27 +216,27 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     }
 
     return (
-        <AnimatePresence mode="wait">
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+        <FadeIn>
+            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
                         {/* Sticky Header */}
-                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                        <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                                {/* Back button - desktop */}
+                                {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
 
-                                {/* Desktop Title Row */}
-                                <div className="hidden md:flex items-start justify-between">
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="truncate">{customer.name}</span>
+                                        <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="hidden md:inline truncate">{customer.name}</span>
                                             <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="whitespace-nowrap scale-90 shrink-0">
                                                 {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
                                             </Badge>
@@ -247,58 +247,25 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                         </div>
                                     </div>
 
+                                    {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
                                             onDelete={() => setShowDeleteModal(true)}
                                         />
-                                        <Button className='whitespace-nowrap' onClick={() => onEdit?.({ ...customer, originalId: realCustomerId })}>
-                                            <EditIcon className="w-4 h-4 mr-2" />
+                                        <Button className='whitespace-nowrap' onClick={() => onEdit?.({ ...customer, originalId: realCustomerId })} leftIcon={<EditIcon size={18} />}>
                                             Editar cliente
                                         </Button>
                                     </div>
                                 </div>
 
-                                {/* Tablet/Mobile: Customer info header */}
-                                {isTablet && (
-                                    <div className="pt-4 pb-0 flex items-start gap-3">
-                                        <button onClick={handleBack} className="md:hidden flex items-center justify-center w-8 h-8 mt-1 rounded-full bg-gray-50 dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-dark-border shrink-0">
-                                            <ChevronLeftIcon className="w-4 h-4" />
-                                        </button>
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <UserProfileImage
-                                                fullName={customer.name || "Cliente"}
-                                                className="w-10 h-10 text-lg shrink-0"
-                                            />
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <h2 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">{customer.name}</h2>
-                                                    <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="scale-75 shrink-0">
-                                                        {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
-                                                    </Badge>
-                                                </div>
-                                                <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                    {formatOrderId(customer.id)} • {customer.email || 'Sem e-mail'}
-                                                </div>
-                                                <div className="flex items-center gap-2 mt-1 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                    <span>Cliente desde {customer.createdAt ? formatDate(customer.createdAt) : '-'}</span>
-                                                    <span className="text-gray-300 dark:text-gray-600">•</span>
-                                                    <span>{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
                                 {/* Tabs */}
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"} pt-4 md:pt-0 pb-0 flex items-center`}>
-                                    <div className="md:hidden mr-4">
-                                        <button onClick={handleBack} className="hidden md:flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 dark:bg-dark-border text-brand-dark dark:text-dark-heading border border-gray-200 dark:border-dark-border">
-                                            <ChevronLeftIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="Purchase History">Histórico</TabsTrigger>
+                                        <TabsTrigger value="General">Dados Gerais</TabsTrigger>
                                         <TabsTrigger value="Review">Avaliações</TabsTrigger>
+                                        {isTablet && (
+                                            <TabsTrigger value="Orders">Pedidos</TabsTrigger>
+                                        )}
                                     </TabsList>
                                 </div>
                             </div>
@@ -309,208 +276,137 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                 {/* Main Column */}
                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                    <TabsContent value="Purchase History" className="mt-0">
+                                    <TabsContent value="General" className="mt-0">
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-                                            {/* KPICard Stats Row */}
-                                            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-10">
-                                                <KPICard
-                                                    title="Pedidos"
-                                                    value={stats.totalOrders}
-                                                />
-                                                <KPICard
-                                                    title="Total Gasto"
-                                                    value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"}
-                                                />
-                                                <KPICard
-                                                    title="Valor médio"
-                                                    value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"}
-                                                />
-                                                <KPICard
-                                                    title="Última Compra"
-                                                    value={stats.lastOrderDate}
-                                                />
-                                            </div>
-
-                                            {/* Orders List / Table */}
-                                            <div className="mt-6">
-                                                <AnimatePresence mode="wait">
-                                                    {isLoadingOrders ? (
-                                                        <div className="flex-1 flex items-center justify-center p-8 py-20">
-                                                            <ThreeDotsLoader />
+                                            {isTablet ? (
+                                                /* Tablet/Mobile: Customer Info */
+                                                <div className="mb-8">
+                                                    <div className="flex items-center gap-3 mb-6">
+                                                        <UserProfileImage
+                                                            fullName={customer.name || "Cliente"}
+                                                            className="w-14 h-14 text-xl shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <h2 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{customer.name}</h2>
+                                                                <Badge variant={customer.status === 'ativo' ? 'green' : customer.status === 'inativo' ? 'gray' : 'red'} className="shrink-0">
+                                                                    {customer.status === 'ativo' ? 'Ativo' : customer.status === 'inativo' ? 'Inativo' : 'Bloqueado'}
+                                                                </Badge>
+                                                            </div>
+                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {formatOrderId(customer.id)} • {customer.email || 'Sem e-mail'}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                <span>Cliente desde {customer.createdAt ? formatDate(customer.createdAt) : '-'}</span>
+                                                                <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                                <span>{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
+                                                            </div>
                                                         </div>
-                                                    ) : formattedOrders.length > 0 ? (
-                                                        isMobile || isTablet ? (
-                                                            <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
-                                                                {paginatedOrders.map((o: any) => (
-                                                                    <div
-                                                                        key={o.originalId}
-                                                                        className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
-                                                                        onClick={() => handleDetailsOrder(o)}
-                                                                    >
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex justify-between items-start mb-0.5">
-                                                                                <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
-                                                                                    {o.displayId}
-                                                                                </h3>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                                                                <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
-                                                                                    {o.statusLabel}
-                                                                                </Badge>
-                                                                                {!o.hasOnlyServices && (
-                                                                                    <Badge variant={o.deliveryStatusColor || "gray"} className="h-5 text-[10px] px-1.5">
-                                                                                        {o.deliveryStatusLabel || "N/I"}
-                                                                                    </Badge>
-                                                                                )}
-                                                                            </div>
-                                                                            <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1.5">
-                                                                                {o.formattedDate}
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2 text-[14px] mt-1">
-                                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                                    {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
-                                                                                </span>
-                                                                                <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
-                                                                                <span className="font-bold text-brand-primary">
-                                                                                    {formatCurrency(o.total_amount)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                                {totalPages > 1 && (
-                                                                    <div className="flex justify-center mt-6">
-                                                                        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-                                                                    </div>
-                                                                )}
+                                                    </div>
+
+                                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 space-y-3">
+                                                        {(customer.cpf || customer.cnpj) && (
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                    {customer.cnpj ? 'CNPJ' : 'CPF'}
+                                                                </span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {customer.cnpj || customer.cpf}
+                                                                </span>
                                                             </div>
-                                                        ) : (
-                                                            <div className="w-full overflow-hidden rounded-xl relative">
-                                                                <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                                                <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleTableScroll}>
-                                                                    <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                                        <thead>
-                                                                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                                {COLUMNS.map((col, idx) => {
-                                                                                    const isSorted = sortConfig?.key === col.id;
-                                                                                    const isFirst = idx === 0;
-                                                                                    const isLast = idx === COLUMNS.length - 1;
-
-                                                                                    return (
-                                                                                        <th
-                                                                                            key={col.id}
-                                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
-                                                                                            style={{ width: col.width }}
-                                                                                            onClick={() => {
-                                                                                                setSortConfig((prev: any) => ({
-                                                                                                    key: col.id,
-                                                                                                    direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
-                                                                                                }))
-                                                                                            }}
-                                                                                        >
-                                                                                            <span className="flex items-center gap-1.5">
-                                                                                                {col.label}
-                                                                                            </span>
-                                                                                        </th>
-                                                                                    )
-                                                                                })}
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {paginatedOrders.map((o: any) => (
-                                                                                <tr
-                                                                                    key={o.originalId}
-                                                                                    className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
-                                                                                    onClick={() => handleDetailsOrder(o)}
-                                                                                >
-                                                                                    <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
-                                                                                        <div className="flex items-center gap-3">
-                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                                <ShoppingCartIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                                                                            </div>
-                                                                                            <div className="flex flex-col text-left min-w-0">
-                                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
-                                                                                                    {o.displayId}
-                                                                                                </span>
-                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                                    {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                                        <span className="text-[13px] font-bold text-brand-primary">
-                                                                                            {formatCurrency(o.total_amount)}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                                        <div className="flex gap-2 w-full">
-                                                                                            {o.situation === "cancelled" ? (
-                                                                                                <Badge variant="red">Cancelado</Badge>
-                                                                                            ) : (
-                                                                                                <>
-                                                                                                    <Badge variant={o.statusColor}>
-                                                                                                        {o.statusLabel}
-                                                                                                    </Badge>
-                                                                                                    {!o.hasOnlyServices && (
-                                                                                                        <Badge variant={o.deliveryStatusColor || "gray"}>
-                                                                                                            {o.deliveryStatusLabel || "N/I"}
-                                                                                                        </Badge>
-                                                                                                    )}
-                                                                                                </>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                                                                        <span className="text-[13px] font-medium truncate max-w-[120px]">
-                                                                                            {o.order_source || "Manual"}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border">
-                                                                                        <div className="flex flex-col text-left">
-                                                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                                {o.formattedDate}
-                                                                                            </span>
-                                                                                            {o.formattedTime && (
-                                                                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                                                    {o.formattedTime}
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
+                                                        )}
+                                                        {customer.phone && (
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.phone}</span>
                                                             </div>
-                                                        )
-                                                    ) : null}
-                                                </AnimatePresence>
-                                            </div>
+                                                        )}
+                                                        {customer.mobile && (
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Celular</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.mobile}</span>
+                                                            </div>
+                                                        )}
+                                                        {customer.email && (
+                                                            <div className="flex justify-between items-center py-2">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">E-mail</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[60%]">{customer.email}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
-                                            {totalPages > 1 && formattedOrders.length > 0 && (
-                                                <div className="flex justify-center mt-6 w-full hidden md:flex">
-                                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                                                    {/* Address on tablet */}
+                                                    {customerAddress && (
+                                                        <div className="mt-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5">
+                                                            <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading mb-2">Endereço</h3>
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">{customerAddress}</p>
+                                                            {billingAddress && (
+                                                                <>
+                                                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading mt-3 mb-1">Cobrança</h4>
+                                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">{billingAddress}</p>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
+                                            ) : (
+                                                <>
+                                                    {/* Desktop: KPI Stats Row */}
+                                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-10">
+                                                        <KPICard title="Pedidos" value={stats.totalOrders} />
+                                                        <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
+                                                        <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
+                                                        <KPICard title="Última Compra" value={stats.lastOrderDate} />
+                                                    </div>
 
-                                            {!isLoadingOrders && paginatedOrders.length === 0 && (
-                                                <div className="mt-6">
-                                                    <IconPlaceholder
-                                                        title="Nenhum pedido encontrado"
-                                                        subtitle="Este cliente ainda não realizou nenhum pedido."
-                                                        imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
-                                                        imageAlt='Nenhum pedido encontrado'
-                                                        placeholderType="image"
+                                                    {/* Desktop: Orders Table */}
+                                                    <OrdersContent
+                                                        isLoadingOrders={isLoadingOrders}
+                                                        formattedOrders={formattedOrders}
+                                                        paginatedOrders={paginatedOrders}
+                                                        totalPages={totalPages}
+                                                        page={page}
+                                                        setPage={setPage}
+                                                        handleDetailsOrder={handleDetailsOrder}
+                                                        tableContainerRef={tableContainerRef}
+                                                        handleTableScroll={handleTableScroll}
+                                                        scrollState={scrollState}
+                                                        sortConfig={sortConfig}
+                                                        setSortConfig={setSortConfig}
                                                     />
-                                                </div>
+                                                </>
                                             )}
-
                                         </motion.div>
                                     </TabsContent>
+
+                                    {/* Tablet/Mobile: Orders Tab (KPI + Orders) */}
+                                    {isTablet && (
+                                        <TabsContent value="Orders" className="mt-0">
+                                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+                                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                                    <KPICard title="Pedidos" value={stats.totalOrders} />
+                                                    <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
+                                                    <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
+                                                    <KPICard title="Última Compra" value={stats.lastOrderDate} />
+                                                </div>
+
+                                                <OrdersContent
+                                                    isLoadingOrders={isLoadingOrders}
+                                                    formattedOrders={formattedOrders}
+                                                    paginatedOrders={paginatedOrders}
+                                                    totalPages={totalPages}
+                                                    page={page}
+                                                    setPage={setPage}
+                                                    handleDetailsOrder={handleDetailsOrder}
+                                                    tableContainerRef={tableContainerRef}
+                                                    handleTableScroll={handleTableScroll}
+                                                    scrollState={scrollState}
+                                                    sortConfig={sortConfig}
+                                                    setSortConfig={setSortConfig}
+                                                />
+                                            </motion.div>
+                                        </TabsContent>
+                                    )}
 
                                     <TabsContent value="Review" className="mt-0">
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -685,6 +581,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                     Opções
                                 </Button>
                             }
+                            className="flex-1 h-12"
                         />
                         <Button
                             className="flex-1 h-12"
@@ -708,7 +605,203 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                 <SavingStatusModal isOpen={isDeleting} text="Excluindo cliente..." />
             </div >
-        </AnimatePresence >
+        </FadeIn>
+    );
+};
+
+/* ── Orders Content ──────────────────────────────────────────── */
+
+const OrdersContent = ({
+    isLoadingOrders, formattedOrders, paginatedOrders, totalPages, page, setPage,
+    handleDetailsOrder, tableContainerRef, handleTableScroll, scrollState,
+    sortConfig, setSortConfig,
+}: {
+    isLoadingOrders: boolean; formattedOrders: any[]; paginatedOrders: any[]; totalPages: number;
+    page: number; setPage: (p: number) => void; handleDetailsOrder: (o: any) => void;
+    tableContainerRef: React.RefObject<HTMLDivElement | null>; handleTableScroll: () => void;
+    scrollState: { left: boolean; right: boolean };
+    sortConfig: { key: string; direction: "asc" | "desc" } | null;
+    setSortConfig: (c: any) => void;
+}) => {
+    const isMobile = useMediaQuery("(max-width: 767px)");
+
+    return (
+        <div className="mt-6">
+            <AnimatePresence mode="wait">
+                {isLoadingOrders ? (
+                    <div className="flex-1 flex items-center justify-center p-8 py-20">
+                        <ThreeDotsLoader />
+                    </div>
+                ) : formattedOrders.length > 0 ? (
+                    isMobile ? (
+                        <div className="flex flex-col border-b border-brand-border dark:border-dark-border">
+                            {paginatedOrders.map((o: any) => (
+                                <div
+                                    key={o.originalId}
+                                    className="py-5 flex items-start gap-4 border-b border-gray-50 dark:border-dark-border/50 last:border-none cursor-pointer"
+                                    onClick={() => handleDetailsOrder(o)}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-0.5">
+                                            <h3 className="font-bold text-[16px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                {o.displayId}
+                                            </h3>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                            <Badge variant={o.statusColor} className="h-5 text-[10px] px-1.5">
+                                                {o.statusLabel}
+                                            </Badge>
+                                            {!o.hasOnlyServices && (
+                                                <Badge variant={o.deliveryStatusColor || "gray"} className="h-5 text-[10px] px-1.5">
+                                                    {o.deliveryStatusLabel || "N/I"}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate mt-1.5">
+                                            {o.formattedDate}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[14px] mt-1">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                                {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
+                                            </span>
+                                            <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
+                                            <span className="font-bold text-brand-primary">
+                                                {formatCurrency(o.total_amount)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {totalPages > 1 && (
+                                <div className="flex justify-center mt-6">
+                                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full overflow-hidden rounded-xl relative">
+                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleTableScroll}>
+                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                    <thead>
+                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                            {COLUMNS.map((col, idx) => {
+                                                const isSorted = sortConfig?.key === col.id;
+                                                const isFirst = idx === 0;
+                                                const isLast = idx === COLUMNS.length - 1;
+
+                                                return (
+                                                    <th
+                                                        key={col.id}
+                                                        className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg pr-6" : ""}`}
+                                                        style={{ width: col.width }}
+                                                        onClick={() => {
+                                                            setSortConfig((prev: any) => ({
+                                                                key: col.id,
+                                                                direction: prev?.key === col.id && prev.direction === 'asc' ? 'desc' : 'asc'
+                                                            }))
+                                                        }}
+                                                    >
+                                                        <span className="flex items-center gap-1.5">
+                                                            {col.label}
+                                                        </span>
+                                                    </th>
+                                                )
+                                            })}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedOrders.map((o: any) => (
+                                            <tr
+                                                key={o.originalId}
+                                                className="group hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
+                                                onClick={() => handleDetailsOrder(o)}
+                                            >
+                                                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                            <ShoppingCartIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                                        </div>
+                                                        <div className="flex flex-col text-left min-w-0">
+                                                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[150px] leading-tight mb-0.5">
+                                                                {o.displayId}
+                                                            </span>
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {o.items_count} {o.items_count === 1 ? 'item' : 'itens'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                    <span className="text-[13px] font-bold text-brand-primary">
+                                                        {formatCurrency(o.total_amount)}
+                                                    </span>
+                                                </td>
+                                                <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex gap-2 w-full">
+                                                        {o.situation === "cancelled" ? (
+                                                            <Badge variant="red">Cancelado</Badge>
+                                                        ) : (
+                                                            <>
+                                                                <Badge variant={o.statusColor}>
+                                                                    {o.statusLabel}
+                                                                </Badge>
+                                                                {!o.hasOnlyServices && (
+                                                                    <Badge variant={o.deliveryStatusColor || "gray"}>
+                                                                        {o.deliveryStatusLabel || "N/I"}
+                                                                    </Badge>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                                    <span className="text-[13px] font-medium truncate max-w-[120px]">
+                                                        {o.order_source || "Manual"}
+                                                    </span>
+                                                </td>
+                                                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border">
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                            {o.formattedDate}
+                                                        </span>
+                                                        {o.formattedTime && (
+                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
+                                                                {o.formattedTime}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )
+                ) : null}
+            </AnimatePresence>
+
+            {totalPages > 1 && formattedOrders.length > 0 && (
+                <div className="flex justify-center mt-6 w-full hidden md:flex">
+                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                </div>
+            )}
+
+            {!isLoadingOrders && formattedOrders.length === 0 && (
+                <div className="mt-6">
+                    <IconPlaceholder
+                        title="Nenhum pedido encontrado"
+                        subtitle="Este cliente ainda não realizou nenhum pedido."
+                        imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                        imageAlt='Nenhum pedido encontrado'
+                        placeholderType="image"
+                    />
+                </div>
+            )}
+        </div>
     );
 };
 

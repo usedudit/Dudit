@@ -402,8 +402,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving}>
-                                            <SaveIcon className="w-4 h-4 mr-2" />
+                                        <Button onClick={handleSave} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -853,8 +852,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                             onClick={handleSave}
                             disabled={isSaving}
                             className={`flex-1 h-12 ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-brand-red/90'}`}
+                            leftIcon={<SaveIcon size={18} />}
                         >
-                            <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}
                         </Button>
                     </div>

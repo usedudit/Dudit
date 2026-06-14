@@ -37,7 +37,7 @@ import POSShippingSheet from "@/components/erp/pdv/POSShippingSheet"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
-
+import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -53,11 +53,6 @@ interface CreateOrderProps {
     onBack: () => void
     partnerId: string
     editOrderId?: string
-}
-
-type PaymentBreakdownEntry = {
-    method: string
-    amount: number
 }
 
 type FinanceAccountOption = {
@@ -2055,8 +2050,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         onClick={handleSaveOrder}
                         disabled={isSaving}
                         className="flex-1 h-12"
+                        leftIcon={<SaveIcon size={18} />}
                     >
-                        <SaveIcon className="w-4 h-4 mr-2" />
                         {isSaving ? "Salvando..." : primaryActionLabel}
                     </Button>
                 </div>

@@ -130,8 +130,9 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                         className="text-sm font-bold text-brand-dark dark:text-dark-heading underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:bg-transparent px-0 flex items-center"
                         onClick={addSupplier}
                         disabled={!isEditing}
+                        leftIcon={<PlusIcon size={18} />}
                     >
-                        <PlusIcon className="w-4 h-4 mr-2" /> Adicionar fornecedor
+                        Adicionar fornecedor
                     </Button>
                 </div>
             )}

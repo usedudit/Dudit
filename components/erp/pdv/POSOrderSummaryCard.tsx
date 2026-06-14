@@ -1,9 +1,9 @@
 "use client"
 
 import { memo, type ReactNode } from "react"
-import { ChevronRightIcon, FileIcon, TagIcon, ThreeDotsIcon, TrashIcon } from "@/lib/icons"
+import { ChevronRightIcon, FileIcon, TagIcon, ThreeDotsIcon, TrashIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
-import { Button, IconPlaceholder } from "@/components/reusable"
+import { Button, IconPlaceholder, Badge } from "@/components/reusable"
 import Dropdown from "@/components/reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 
@@ -27,6 +27,8 @@ type SummaryProps = {
   onContinue: () => void
   onSaveDraft: () => unknown | Promise<unknown>
   onAddShipping: () => void
+  onRemoveShipping?: () => void
+  hasDelivery?: boolean
   onOpenCreateProduct: () => void
   onOpenNotes: () => void
   showItemsShortcut?: boolean
@@ -39,10 +41,12 @@ function POSOrderActionsMenu({
   onSaveDraft,
   onOpenDiscount,
   onAddShipping,
+  onRemoveShipping,
+  hasDelivery,
   onOpenCreateProduct,
   onOpenNotes,
   showActionsMenu = true,
-}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onOpenCreateProduct" | "onOpenNotes" | "showActionsMenu">) {
+}: Pick<SummaryProps, "onSaveDraft" | "onOpenDiscount" | "onAddShipping" | "onRemoveShipping" | "hasDelivery" | "onOpenCreateProduct" | "onOpenNotes" | "showActionsMenu">) {
   if (!showActionsMenu) return null
 
   return (
@@ -64,8 +68,13 @@ function POSOrderActionsMenu({
         <TagIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Aplicar Desconto
       </DropdownItem>
       <DropdownItem onClick={onAddShipping}>
-        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Adicionar Entrega
+        <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> {hasDelivery ? "Editar Entrega" : "Adicionar Entrega"}
       </DropdownItem>
+      {hasDelivery && onRemoveShipping && (
+        <DropdownItem onClick={onRemoveShipping}>
+          <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" /> <span className="text-brand-red dark:text-brand-red">Remover Entrega</span>
+        </DropdownItem>
+      )}
       <DropdownItem onClick={onOpenCreateProduct}>
         <FileIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" /> Criar Produto
       </DropdownItem>
@@ -94,6 +103,8 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
   onContinue,
   onSaveDraft,
   onAddShipping,
+  onRemoveShipping,
+  hasDelivery,
   onOpenCreateProduct,
   onOpenNotes,
   showItemsShortcut = true,
@@ -135,30 +146,44 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
 
       <div className="space-y-3 pt-1 text-sm">
         <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-          <span>Sub-Total</span>
+          <span className="font-medium">Sub-Total</span>
           <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(subtotal)}</span>
         </div>
         {discountVal > 0 && (
           <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-            <span>
+            <span className="font-medium">
               {discountType === "percentage"
                 ? `Desconto (${Number(discountInputValue || 0)}%)`
                 : discountType === "coupon"
                   ? `Desconto (Cupom ${discountCouponCode || "-"} - ${formatCurrency(Number(couponDiscountValue || discountVal || 0))} OFF)`
                   : `Desconto (${formatCurrency(Number(discountInputValue || 0))})`}
             </span>
-            <span className="font-bold text-brand-red">-{formatCurrency(discountVal)}</span>
+            <span className="font-bold text-brand-green">-{formatCurrency(discountVal)}</span>
           </div>
         )}
-        {shippingFee > 0 && (
+        {hasDelivery && (
           <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-            <span>Taxa de entrega</span>
-            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(shippingFee)}</span>
+            <span className="flex items-center gap-1.5">
+              Taxa de entrega
+              {onRemoveShipping && (
+                <button
+                  type="button"
+                  onClick={onRemoveShipping}
+                  className="rounded p-0.5 text-brand-red hover:bg-brand-red/10 transition-colors"
+                  title="Remover entrega"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
+            <span className="font-bold text-brand-dark dark:text-dark-heading">
+              {shippingFee > 0 ? formatCurrency(shippingFee) : "Grátis"}
+            </span>
           </div>
         )}
         {otherCosts > 0 && (
           <div className="flex items-center justify-between text-brand-inactive-text dark:text-dark-body">
-            <span>Outros custos</span>
+            <span className="font-medium">Outros custos</span>
             <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(otherCosts)}</span>
           </div>
         )}
@@ -178,6 +203,8 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
           onSaveDraft={onSaveDraft}
           onOpenDiscount={onOpenDiscount}
           onAddShipping={onAddShipping}
+          onRemoveShipping={onRemoveShipping}
+          hasDelivery={hasDelivery}
           onOpenCreateProduct={onOpenCreateProduct}
           onOpenNotes={onOpenNotes}
           showActionsMenu={showActionsMenu}
@@ -195,12 +222,16 @@ export default function POSDesktopOrderPanel({
   cartItems,
   isEmpty = false,
   emptyState,
+  appliedGiftProductIds = [],
+  onShowGifts,
   ...summaryProps
 }: SummaryProps & {
   hasNotes?: boolean
   cartItems?: ReactNode
   isEmpty?: boolean
   emptyState?: ReactNode
+  appliedGiftProductIds?: string[]
+  onShowGifts?: () => void
 }) {
   if (isEmpty) {
     return (
@@ -223,6 +254,21 @@ export default function POSDesktopOrderPanel({
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-xl lg:text-2xl font-bold text-brand-dark dark:text-dark-heading">Resumo do Pedido</h3>
         <div className="flex items-center gap-2">
+          {appliedGiftProductIds && appliedGiftProductIds.length > 0 && (
+            <button
+              type="button"
+              className="cursor-pointer transition-transform hover:scale-105 active:scale-95 flex items-center mr-1"
+              onClick={onShowGifts}
+            >
+              <Badge
+                variant="blue"
+                icon={<StarIcon className="h-3.5 w-3.5 fill-current" />}
+                className="font-bold text-xs py-1.5 px-3 gap-1 flex items-center"
+              >
+                Pedido com brinde
+              </Badge>
+            </button>
+          )}
           {hasNotes && (
             <Button variant="outline" className="h-9 w-9 p-0" onClick={onOpenNotes}>
               <FileIcon className="h-4 w-4 text-brand-dark dark:text-dark-heading" />

@@ -26,6 +26,16 @@ export type PaymentCalculationResult = {
   appliedDiscountPercent: number
   appliedFeePercent: number
   appliedInterestPercent: number
+  /** @deprecated Use amountReceived from financial-engine */
+  amountReceived?: number
+  /** @deprecated Use effectiveAmount from financial-engine */
+  effectiveAmount?: number
+  /** @deprecated Use netAmount from financial-engine */
+  netAmount?: number
+  /** @deprecated Use adjustmentAmount from financial-engine */
+  adjustmentAmount?: number
+  /** @deprecated Use adjustmentType from financial-engine */
+  adjustmentType?: string
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100

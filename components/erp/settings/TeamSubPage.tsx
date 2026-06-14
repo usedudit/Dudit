@@ -4,8 +4,8 @@ import React, { useState, useEffect, useTransition, useRef, useCallback } from "
 import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton } from "@/components/reusable"
 import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { getTeamMembers, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
-import type { TeamMember } from "@/app/actions/erp/team"
+import { getTeamMembers, getTeamMemberStatsAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
+import type { TeamMember, TeamMemberStats } from "@/app/actions/erp/team"
 import type { PartnerRole } from "@/lib/permissions/types"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -88,6 +88,8 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
     const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
     const [inviteToDelete, setInviteToDelete] = useState<string | null>(null)
     const { toast } = useToast()
+    const [selectedMemberStats, setSelectedMemberStats] = useState<TeamMemberStats | null>(null)
+    const [isLoadingStats, setIsLoadingStats] = useState(false)
 
     const fetchMembers = async () => {
         setIsLoadingMembers(true)
@@ -189,6 +191,25 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
             }
         })
     }
+
+    const handleShowMemberStats = useCallback(async (member: TeamMember) => {
+        setIsLoadingStats(true)
+        setSelectedMemberStats(null)
+        const { stats } = await getTeamMemberStatsAction()
+        if (stats) {
+            const memberStat = stats.find((s) => s.partnerUserId === member.id)
+            setSelectedMemberStats(memberStat || {
+                partnerUserId: member.id,
+                fullName: member.fullName,
+                avatarUrl: member.avatarUrl,
+                saleCount: 0,
+                totalSalesValue: 0,
+                totalCommissionValue: 0,
+                lastSaleDate: null,
+            })
+        }
+        setIsLoadingStats(false)
+    }, [])
 
     const copyToClipboard = () => {
         if (inviteUrl) {
@@ -292,7 +313,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                             </thead>
                                                             <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                                                                 {teamMembers.map((member) => (
-                                                                    <tr key={member.userId} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors">
+                                                                    <tr key={member.userId} className="group hover:bg-brand-gray/50 dark:hover:bg-dark-border/20 transition-colors cursor-pointer" onClick={() => handleShowMemberStats(member)}>
                                                                         <td className="py-4 px-6">
                                                                             <div className="flex items-center gap-4">
                                                                                 <UserProfileImage
@@ -352,7 +373,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                     <div className="md:hidden flex flex-col">
                                                         {teamMembers.map((member, idx) => (
                                                             <React.Fragment key={member.userId}>
-                                                                <div className="py-5 flex items-start justify-between gap-4">
+                                                                <div className="py-5 flex items-start justify-between gap-4 cursor-pointer" onClick={() => handleShowMemberStats(member)}>
                                                                     <div className="flex items-start gap-4 min-w-0 flex-1">
                                                                         <UserProfileImage
                                                                             fullName={member.fullName || "Usuário"}
@@ -630,6 +651,46 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                         onConfirm={handleRevokeInvitation}
                         isLoading={isPending}
                     />
+
+                    {/* Member Stats Modal */}
+                    <DefaultModal
+                        isOpen={!!selectedMemberStats}
+                        onClose={() => setSelectedMemberStats(null)}
+                        title={selectedMemberStats?.fullName || "Membro"}
+                    >
+                        {isLoadingStats ? (
+                            <div className="flex justify-center py-12">
+                                <ThreeDotsLoader />
+                            </div>
+                        ) : selectedMemberStats && (
+                            <div className="space-y-4 py-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4">
+                                        <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">Vendas</p>
+                                        <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{selectedMemberStats.saleCount}</p>
+                                    </div>
+                                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4">
+                                        <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">Total vendido</p>
+                                        <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedMemberStats.totalSalesValue)}
+                                        </p>
+                                    </div>
+                                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4">
+                                        <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">Comissões</p>
+                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedMemberStats.totalCommissionValue)}
+                                        </p>
+                                    </div>
+                                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4">
+                                        <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body uppercase tracking-wide mb-1">Última venda</p>
+                                        <p className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {selectedMemberStats.lastSaleDate ? formatDate(selectedMemberStats.lastSaleDate) : "Nenhuma"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </DefaultModal>
                 </Tabs>
             </div>
         </FadeIn>

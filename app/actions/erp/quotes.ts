@@ -620,13 +620,19 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
     if (quote.user_id) {
         const { data: profile } = await supabase
             .from("user_profiles")
-            .select("full_name, email")
+            .select("full_name")
             .eq("user_id", quote.user_id)
             .maybeSingle()
         if (profile) {
+            const admin = getAdminClient()
+            const { data: authUser } = await admin
+                .from("auth.users")
+                .select("email")
+                .eq("id", quote.user_id)
+                .maybeSingle()
             sellerInfo = {
                 name: profile.full_name,
-                email: profile.email
+                email: authUser?.email || null
             }
         }
     }
@@ -2074,13 +2080,18 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 if (quote.user_id) {
                     const { data: profile } = await admin
                         .from("user_profiles")
-                        .select("full_name, email")
+                        .select("full_name")
                         .eq("user_id", quote.user_id)
                         .maybeSingle()
                     if (profile) {
+                        const { data: authUser } = await admin
+                            .from("auth.users")
+                            .select("email")
+                            .eq("id", quote.user_id)
+                            .maybeSingle()
                         sellerInfo = {
                             name: profile.full_name,
-                            email: profile.email
+                            email: authUser?.email || null
                         }
                     }
                 }

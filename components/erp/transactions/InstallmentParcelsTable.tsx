@@ -76,13 +76,13 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
         <div className="w-full space-y-4">
             {/* Desktop View */}
             <div className="hidden md:block w-full overflow-x-auto rounded-xl">
-                <table className="w-full text-left border-separate border-spacing-0 min-w-[920px]">
+                <table className="w-full text-left border-separate border-spacing-0">
                     <thead>
                         <tr className="bg-brand-gray dark:bg-dark-border/50">
                             <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg pl-6">Parcela</th>
                             <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body">Valor</th>
-                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body">Status</th>
-                            <th className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${hasActions ? "" : "rounded-r-lg pr-6"}`}>Data do Pagamento</th>
+                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                            <th className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-40 ${hasActions ? "" : "rounded-r-lg pr-6"}`}>Data do Pagamento</th>
                             {hasActions && (
                                 <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-r-lg pr-6 text-center w-24">Ações</th>
                             )}
@@ -101,7 +101,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                                 Parcela {row.installmentNumber}/{row.totalCount}
                                             </span>
                                             <div className="mt-1 flex" onClick={(e) => e.stopPropagation()}>
-                                                <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} />
+                                                <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} />
                                             </div>
                                         </div>
                                     </td>
@@ -153,7 +153,7 @@ export default function InstallmentParcelsTable({ rows, getActionsSlot, onRowCli
                                         Parcela {row.installmentNumber}/{row.totalCount}
                                     </span>
                                     <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                                        <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} />
+                                        <PaymentMethodIndicator label={formatInstallmentPaymentMethod(row.paymentType)} simplifyMultiple={false} />
                                     </div>
                                 </div>
                                 <div className="text-right">

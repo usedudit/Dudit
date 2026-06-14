@@ -621,9 +621,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </div>
 
-                                                    <div className="mt-8">
-                                                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Itens do Pedido</h3>
+                                                    <FormSection title="Itens do Pedido" hasSeparator className="mt-0">
                                                         <div className="space-y-4">
                                                             {sortedOrderItems.map((item: any) => {
                                                                 const isService = !!item.service_id || item.line_type === "service_booking";
@@ -688,14 +686,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 );
                                                             })}
                                                         </div>
-                                                    </div>
+                                                    </FormSection>
 
-                                                    <div className="mt-8">
-                                                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                                        <div className="flex items-center justify-between">
-                                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Detalhes do Pagamento</h3>
-                                                        </div>
-
+                                                    <FormSection title="Detalhes do Pagamento" hasSeparator={false} className="mt-0">
                                                         <div className="space-y-3">
                                                             <PaymentRow
                                                                 label="Método de Pagamento"
@@ -769,7 +762,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </FormSection>
                                                 </div>
 
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
@@ -1042,8 +1035,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             </div>
                         </div>
                     </Tabs>
-                </div>
-            </FadeIn>
+                </div >
+            </FadeIn >
 
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <ActionsDropdown

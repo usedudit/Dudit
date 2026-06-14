@@ -25,6 +25,7 @@ import {
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goals.service"
+import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 
 type ERPItemPayload = {
     productId: string | null
@@ -59,12 +60,7 @@ type ERPOrderPayload = {
     paidAmount?: number
     notes?: string
     paymentMethod: string
-    paymentBreakdown?: Array<{
-        method: string
-        amount: number
-        paymentMethodId?: string | null
-        installmentNumber?: number
-    }>
+    paymentBreakdown?: PaymentBreakdownEntry[]
     address?: {
         zipCode: string
         street: string
@@ -83,13 +79,6 @@ type OrderStockItem = {
     product_id?: string | null
     variant_id?: string | null
     quantity: number
-}
-
-type PaymentBreakdownEntry = {
-    method: string
-    amount: number
-    paymentMethodId?: string | null
-    installmentNumber?: number
 }
 
 function isMissingOrdersIsPosSaleColumnError(error: unknown): boolean {
@@ -195,13 +184,24 @@ function normalizePaymentMethodLabel(value?: string | null) {
 
 function sanitizePaymentBreakdown(entries: ERPOrderPayload["paymentBreakdown"]) {
     const normalizedEntries = (entries || [])
-        .map((entry) => ({
-            method: normalizePaymentMethodLabel(entry?.method),
-            amount: Math.max(0, Number(entry?.amount || 0)),
-            paymentMethodId: entry?.paymentMethodId || null,
-            installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
-        }))
-        .filter((entry) => entry.method && entry.amount > 0.009)
+        .map((entry) => {
+            const amt = Math.max(0, Number(entry?.amount || 0))
+            const effectiveAmt = entry?.effectiveAmount != null ? Math.max(0, Number(entry.effectiveAmount)) : amt
+            return {
+                method: normalizePaymentMethodLabel(entry?.method),
+                amount: effectiveAmt,
+                amountReceived: Math.max(0, Number(entry?.amountReceived ?? entry?.amount ?? 0)),
+                adjustmentType: entry?.adjustmentType || 'none',
+                adjustmentPercent: Math.max(0, Number(entry?.adjustmentPercent || 0)),
+                adjustmentAmount: Math.max(0, Number(entry?.adjustmentAmount || 0)),
+                effectiveAmount: effectiveAmt,
+                netAmount: entry?.netAmount != null ? Math.max(0, Number(entry.netAmount)) : effectiveAmt,
+                feeBearer: entry?.feeBearer || null,
+                paymentMethodId: entry?.paymentMethodId || null,
+                installmentNumber: Math.max(1, Math.floor(Number(entry?.installmentNumber || 1))),
+            }
+        })
+        .filter((entry) => entry.method && entry.effectiveAmount > 0.009)
 
     return normalizedEntries
 }
@@ -1373,20 +1373,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     couponDiscountAmount = pricingResult.couponDiscountAmount
     let serverTotalAmount = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
-    const paymentPricing = await applyPaymentMethodPricingToTotal(
-        supabase,
-        partnerId,
-        serverTotalAmount,
-        sanitizedPaymentBreakdown,
-    )
-    if (!paymentPricing.ok) return { error: paymentPricing.error }
-    serverTotalAmount = paymentPricing.finalTotal
-    const paymentMethodDiscountAmount = paymentPricing.paymentMethodDiscountAmount
-    const paymentMethodExtraAmount = Math.max(0, Math.round((paymentPricing.feeAmount + paymentPricing.interestAmount) * 100) / 100)
-    const adjustedPaymentBreakdown =
-        paymentPricing.adjustedBreakdown?.length > 0
-            ? paymentPricing.adjustedBreakdown
-            : sanitizedPaymentBreakdown
+    const breakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
+    const hasBreakdown = sanitizedPaymentBreakdown.length > 0
+    const finalTotal = hasBreakdown ? breakdownTotal : serverTotalAmount
+    const paymentMethodDiscountAmount = Math.max(0, serverTotalAmount - finalTotal)
+    const paymentMethodExtraAmount = Math.max(0, finalTotal - serverTotalAmount)
+    serverTotalAmount = finalTotal
+    const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,
@@ -2121,20 +2114,13 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     couponDiscountAmount = updatePricingResult.couponDiscountAmount
     let updateServerTotal = updatePricingResult.finalTotal
-    const updatePaymentPricing = await applyPaymentMethodPricingToTotal(
-        supabase,
-        data.partnerId,
-        updateServerTotal,
-        sanitizedPaymentBreakdown,
-    )
-    if (!updatePaymentPricing.ok) return { error: updatePaymentPricing.error }
-    updateServerTotal = updatePaymentPricing.finalTotal
-    const updatePaymentMethodDiscountAmount = updatePaymentPricing.paymentMethodDiscountAmount
-    const updatePaymentMethodExtraAmount = Math.max(0, Math.round((updatePaymentPricing.feeAmount + updatePaymentPricing.interestAmount) * 100) / 100)
-    const adjustedPaymentBreakdown =
-        updatePaymentPricing.adjustedBreakdown?.length > 0
-            ? updatePaymentPricing.adjustedBreakdown
-            : sanitizedPaymentBreakdown
+    const updateBreakdownTotal = sanitizedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
+    const hasUpdateBreakdown = sanitizedPaymentBreakdown.length > 0
+    const updateFinalTotal = hasUpdateBreakdown ? updateBreakdownTotal : updateServerTotal
+    const updatePaymentMethodDiscountAmount = Math.max(0, updateServerTotal - updateFinalTotal)
+    const updatePaymentMethodExtraAmount = Math.max(0, updateFinalTotal - updateServerTotal)
+    updateServerTotal = updateFinalTotal
+    const adjustedPaymentBreakdown = sanitizedPaymentBreakdown
     const paymentMethodSummary = buildPaymentMethodSummary(adjustedPaymentBreakdown, data.paymentMethod)
     const paymentState = resolvePaymentState({
         requestedStatus: data.paymentStatus,

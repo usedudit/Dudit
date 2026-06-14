@@ -61,7 +61,6 @@ export default function POSQuickProductSheet({
           label="Estoque"
           name="quickProductStock"
           type="number"
-          min={0}
           value={stockQuantity}
           onChange={(e) => setStockQuantity(Math.max(0, Number(e.target.value || 0)))}
         />

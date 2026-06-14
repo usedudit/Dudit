@@ -95,8 +95,7 @@ export default function CouponDetailPage({
                                         onDelete={() => onDelete(coupon)}
                                         onShare={onShare ? () => onShare(coupon) : undefined}
                                     />
-                                    <Button onClick={() => onEdit(coupon)} className="whitespace-nowrap">
-                                        <EditIcon className="w-[18px] h-[18px] mr-2" />
+                                    <Button onClick={() => onEdit(coupon)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                         Editar cupom
                                     </Button>
                                 </div>

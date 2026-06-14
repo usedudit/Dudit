@@ -79,7 +79,7 @@ export function HistoryTimeline({
         <div className="max-w-[1000px] py-4">
             {(title || subtitle) && (
                 <div className="mb-8">
-                    {title && <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>}
+                    {title && <h2 className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">{title}</h2>}
                     {subtitle && <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">{subtitle}</p>}
                 </div>
             )}

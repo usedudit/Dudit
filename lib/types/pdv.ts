@@ -1,12 +1,13 @@
 export type PDVProduct = {
   id: string
   name: string
-  category?: string | null
+  category?: { id: string; name: string } | null
   sku?: string | null
   gtin?: string | null
   price: number
   promotional_price?: number | null
   stock_available: number
+  min_stock?: number | null
   allow_sell_without_stock?: boolean
   images?: string[] | null
   product_type?: string | null
@@ -66,11 +67,9 @@ export type PDVPaymentMethodOption = {
   priority?: number | null
 }
 
-export type PDVPaymentBreakdownEntry = {
-  method: string
-  amount: number
-  paymentMethodId?: string | null
-}
+import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
+
+export type PDVPaymentBreakdownEntry = PaymentBreakdownEntry
 
 export type PDVCartItem = {
   id: string
@@ -87,4 +86,5 @@ export type PDVCartItem = {
   price: number
   qty: number
   image: string | null
+  isGift?: boolean
 }

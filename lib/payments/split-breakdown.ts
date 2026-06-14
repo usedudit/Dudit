@@ -1,4 +1,5 @@
-import { calculatePaymentAmounts, type PaymentMethodFeeConfig } from "./calculation"
+import type { PaymentMethodFeeConfig } from "./calculation"
+import { computePaymentLine, type PaymentBreakdownLine, type AdjustmentType } from "./financial-engine"
 
 export const SPLIT_BASE_SUM_TOLERANCE = 0.01
 
@@ -15,7 +16,9 @@ export function safeSplitMoney(n: number): number {
 
 export type SplitInputRow = {
     method: string
+    /** @deprecated Use amountReceived instead */
     amount: number
+    amountReceived?: number
     paymentMethodId: string | null
     installmentNumber: number
 }
@@ -69,6 +72,13 @@ export type RecalculatedSplitRow = SplitInputRow & {
     interestAmount: number
     feeAmount: number
     paymentMethodDiscountAmount: number
+    /** New financial engine fields */
+    amountReceived?: number
+    adjustmentType?: AdjustmentType
+    adjustmentPercent?: number
+    adjustmentAmount?: number
+    effectiveAmount?: number
+    netAmount?: number
 }
 
 /**
@@ -119,54 +129,68 @@ export function recalculateSplitPaymentFromBaseAmounts(
         }
 
         const row = rows[0]!
-        const declared = safeSplitMoney(Number(row.amount || 0))
-        // For a single payment row, discount/fees must ALWAYS be calculated on the full order total (safeBase).
-        const baseForThisLeg = safeBase
-        const isPartial = declared < safeBase - 0.005
+        const amountReceived = safeSplitMoney(Number(row.amountReceived ?? (row.amount || 0)))
+
+        if (amountReceived <= 0) {
+            return { ok: false, error: "Valor do pagamento inválido." }
+        }
 
         const mId = row.paymentMethodId ? String(row.paymentMethodId) : ""
         const method = mId ? methodById.get(mId) : null
+
         if (!method?.id) {
-            const finalAmt = isPartial ? declared : baseForThisLeg
             return {
                 ok: true,
-                finalTotal: baseForThisLeg,
+                finalTotal: amountReceived,
                 feeAmount: 0,
                 interestAmount: 0,
                 paymentMethodDiscountAmount: 0,
                 adjustedRows: [
                     {
                         ...row,
-                        finalAmount: finalAmt,
+                        amount: amountReceived,
+                        finalAmount: amountReceived,
                         interestAmount: 0,
                         feeAmount: 0,
                         paymentMethodDiscountAmount: 0,
+                        amountReceived,
+                        adjustmentType: "none",
+                        adjustmentPercent: 0,
+                        adjustmentAmount: 0,
+                        effectiveAmount: amountReceived,
+                        netAmount: amountReceived,
                     },
                 ],
             }
         }
 
-        const calc = calculatePaymentAmounts({
-            originalAmount: baseForThisLeg,
+        const feeConfig = toFeeConfig(method, feesByMethod)
+        const engine = computePaymentLine({
+            amountReceived,
+            paymentMethod: feeConfig,
             installmentNumber: row.installmentNumber,
-            paymentMethod: toFeeConfig(method, feesByMethod),
         })
 
-        const finalAmt = round2(Number(calc.finalAmount || 0))
-        const rowFinalAmt = isPartial ? declared : finalAmt
         return {
             ok: true,
-            finalTotal: finalAmt,
-            feeAmount: round2(Number(calc.feeAmount || 0)),
-            interestAmount: round2(Number(calc.interestAmount || 0)),
-            paymentMethodDiscountAmount: round2(Number(calc.paymentMethodDiscountAmount || 0)),
+            finalTotal: engine.effectiveAmount,
+            feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+            interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
+            paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
             adjustedRows: [
                 {
                     ...row,
-                    finalAmount: rowFinalAmt,
-                    interestAmount: Number(calc.interestAmount || 0),
-                    feeAmount: Number(calc.feeAmount || 0),
-                    paymentMethodDiscountAmount: Number(calc.paymentMethodDiscountAmount || 0),
+                    amount: engine.effectiveAmount,
+                    finalAmount: engine.effectiveAmount,
+                    interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
+                    feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+                    paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+                    amountReceived: engine.amountReceived,
+                    adjustmentType: engine.adjustmentType,
+                    adjustmentPercent: engine.adjustmentPercent,
+                    adjustmentAmount: engine.adjustmentAmount,
+                    effectiveAmount: engine.effectiveAmount,
+                    netAmount: engine.netAmount,
                 },
             ],
         }
@@ -187,8 +211,8 @@ export function recalculateSplitPaymentFromBaseAmounts(
     let totalPmDiscount = 0
 
     for (const row of rows) {
-        const rowBase = safeSplitMoney(Number(row.amount || 0))
-        if (rowBase <= 0) {
+        const amountReceived = safeSplitMoney(Number(row.amountReceived ?? (row.amount || 0)))
+        if (amountReceived <= 0) {
             return { ok: false, error: "Cada parte do pagamento dividido deve ser maior que zero." }
         }
 
@@ -198,32 +222,46 @@ export function recalculateSplitPaymentFromBaseAmounts(
         if (!method?.id) {
             adjustedRows.push({
                 ...row,
-                finalAmount: rowBase,
+                amount: amountReceived,
+                finalAmount: amountReceived,
                 interestAmount: 0,
                 feeAmount: 0,
                 paymentMethodDiscountAmount: 0,
+                amountReceived,
+                adjustmentType: "none",
+                adjustmentPercent: 0,
+                adjustmentAmount: 0,
+                effectiveAmount: amountReceived,
+                netAmount: amountReceived,
             })
-            finalTotal = round2(finalTotal + rowBase)
+            finalTotal = round2(finalTotal + amountReceived)
             continue
         }
 
-        const calc = calculatePaymentAmounts({
-            originalAmount: rowBase,
-            installmentNumber: row.installmentNumber,
+        const engine = computePaymentLine({
+            amountReceived,
             paymentMethod: toFeeConfig(method, feesByMethod),
+            installmentNumber: row.installmentNumber,
         })
 
-        const finalAmt = round2(Number(calc.finalAmount || 0))
-        totalFee = round2(totalFee + Number(calc.feeAmount || 0))
-        totalInterest = round2(totalInterest + Number(calc.interestAmount || 0))
-        totalPmDiscount = round2(totalPmDiscount + Number(calc.paymentMethodDiscountAmount || 0))
+        const finalAmt = engine.effectiveAmount
+        totalFee = round2(totalFee + (engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0))
+        totalInterest = round2(totalInterest + (engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0))
+        totalPmDiscount = round2(totalPmDiscount + (engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0))
 
         adjustedRows.push({
             ...row,
+            amount: finalAmt,
             finalAmount: finalAmt,
-            interestAmount: Number(calc.interestAmount || 0),
-            feeAmount: Number(calc.feeAmount || 0),
-            paymentMethodDiscountAmount: Number(calc.paymentMethodDiscountAmount || 0),
+            interestAmount: engine.adjustmentType === "interest" ? engine.adjustmentAmount : 0,
+            feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
+            paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+            amountReceived: engine.amountReceived,
+            adjustmentType: engine.adjustmentType,
+            adjustmentPercent: engine.adjustmentPercent,
+            adjustmentAmount: engine.adjustmentAmount,
+            effectiveAmount: engine.effectiveAmount,
+            netAmount: engine.netAmount,
         })
         finalTotal = round2(finalTotal + finalAmt)
     }
@@ -239,12 +277,21 @@ export function recalculateSplitPaymentFromBaseAmounts(
 }
 
 /**
- * Maps recalculated rows to stored breakdown: `amount` is the **final** charged amount per method (after discount/interest/fee).
+ * Maps recalculated rows to stored breakdown.
+ * Includes all financial-engine fields for auditability.
+ * `amount` is kept for backward compat (deprecated).
  */
-export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): SplitInputRow[] {
+export function toStoredBreakdownAmounts(rows: RecalculatedSplitRow[]): PaymentBreakdownLine[] {
     return rows.map((r) => ({
         method: r.method,
         amount: r.finalAmount,
+        amountReceived: r.amountReceived ?? r.finalAmount,
+        adjustmentType: r.adjustmentType ?? "none",
+        adjustmentPercent: r.adjustmentPercent ?? 0,
+        adjustmentAmount: r.adjustmentAmount ?? 0,
+        feeBearer: null,
+        effectiveAmount: r.effectiveAmount ?? r.finalAmount,
+        netAmount: r.netAmount ?? r.finalAmount,
         paymentMethodId: r.paymentMethodId,
         installmentNumber: r.installmentNumber,
     }))

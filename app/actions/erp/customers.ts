@@ -547,13 +547,17 @@ export async function getCustomerOrdersAction(customerId: string) {
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("marketplace_user_id")
+    .select("id, marketplace_user_id")
     .eq("id", customerId)
     .maybeSingle()
 
-  const buyerId = customer?.marketplace_user_id
+  if (!customer) {
+    return { orders: [] }
+  }
 
-  if (!buyerId) {
+  const buyerIds = [customer.marketplace_user_id, customer.id].filter(Boolean)
+
+  if (buyerIds.length === 0) {
     return { orders: [] }
   }
 
@@ -564,7 +568,6 @@ export async function getCustomerOrdersAction(customerId: string) {
       order_number,
       mp_payment_id,
       created_at,
-      order_date,
       situation,
       payment_status,
       delivery_status,
@@ -576,7 +579,7 @@ export async function getCustomerOrdersAction(customerId: string) {
       notes,
       order_items ( id, quantity, service_id, line_type )
     `)
-    .eq("buyer_id", buyerId)
+    .in("buyer_id", buyerIds)
     .order("created_at", { ascending: false })
     .limit(50)
 
@@ -756,7 +759,7 @@ export async function getERPCustomersPageAction(
 
     let q = supabase
       .from("customers")
-      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf")
+      .select("id, name, email, phone, status, store_credit, created_at, store_id, cpf, person_type, cnpj")
       .eq("partner_id", partnerId)
 
     if (options?.storeId) {
@@ -788,6 +791,36 @@ export async function getERPCustomersPageAction(
         }
       }
     }))
+
+    // Aggregate order stats for this page of customers
+    const customerIds = items.map((c: any) => c.id).filter(Boolean)
+    if (customerIds.length > 0) {
+      const { data: orderAgg } = await supabase
+        .from("orders")
+        .select("buyer_id, total_amount, created_at")
+        .in("buyer_id", customerIds)
+        .neq("situation", "cancelled")
+
+      if (orderAgg) {
+        const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
+        for (const o of orderAgg) {
+          const prev = statsMap.get(o.buyer_id) || { orders_count: 0, total_spent: 0, last_order_at: null }
+          prev.orders_count++
+          prev.total_spent += Number(o.total_amount) || 0
+          if (o.created_at && (!prev.last_order_at || o.created_at > prev.last_order_at)) {
+            prev.last_order_at = o.created_at
+          }
+          statsMap.set(o.buyer_id, prev)
+        }
+        for (const item of items) {
+          const stats = statsMap.get(item.id)
+          item.orders_count = stats?.orders_count || 0
+          item.total_spent = stats?.total_spent || 0
+          item.last_order_at = stats?.last_order_at || null
+        }
+      }
+    }
+
     const last = items[items.length - 1]
     const nextCursor: ERPCustomerListCursor | null =
       hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null
