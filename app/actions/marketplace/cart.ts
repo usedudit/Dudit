@@ -1010,7 +1010,8 @@ export async function checkoutCartAction(
       name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
       email: user.email,
       phone: buyerProfile?.phone || null,
-      cpf: null
+      cpf: null,
+      userId: user.id,
     })
   } catch (e) {
     console.error("Error ensuring marketplace customer in checkoutCartAction:", e)

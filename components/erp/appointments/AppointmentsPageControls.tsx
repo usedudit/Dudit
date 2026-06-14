@@ -201,7 +201,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                         <Button
                             variant="outline"
                             onClick={onOpenFilter}
-                            leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}
+                            leftIcon={<FilterIcon size={18} />}
                             className="h-[42px] relative"
                         >
                             Filtros

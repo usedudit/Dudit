@@ -20,7 +20,7 @@ import TransactionDetailView from "./TransactionDetailView"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import type { ERPTransaction, FinancialTransactionCursor, TransactionTab } from "@/lib/services/transactions.types"
 import type { RecurringOccurrence } from "@/app/actions/erp/recurring-transactions"
-import { markRecurringOccurrenceAsPaidAction } from "@/app/actions/erp/transactions"
+import { markRecurringOccurrenceAsPaidAction, recordRegularTransactionPaymentAction } from "@/app/actions/erp/transactions"
 import { getInstallmentGroupDetailsAction } from "@/app/actions/erp/transactions"
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
@@ -167,7 +167,6 @@ export default function TransactionsPage({
     const [selection, setSelection] = useState({ ids: new Set<string>() })
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [editingRecurringTemplateId, setEditingRecurringTemplateId] = useState<string | null>(null)
-    const [markingAsPaid, setMarkingAsPaid] = useState(false)
     const [openInstallmentGroupId, setOpenInstallmentGroupId] = useState<string | null>(null)
     const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
@@ -185,8 +184,6 @@ export default function TransactionsPage({
     const [cancelReason, setCancelReason] = useState("")
     const [cancellingTransaction, setCancellingTransaction] = useState(false)
     const [settlingGroup, setSettlingGroup] = useState(false)
-    const [confirmRegularMarkAsPaid, setConfirmRegularMarkAsPaid] = useState<ERPTransaction | null>(null)
-    const [markingRegularAsPaid, setMarkingRegularAsPaid] = useState(false)
     const isScrolled = false
     const observerTarget = useRef<HTMLDivElement>(null)
 
@@ -818,16 +815,17 @@ export default function TransactionsPage({
     )
 
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
-        if (transaction.isRecurringOccurrence) {
-            setSelectedInstallmentForPayment(transaction as any)
-            setPaymentAmount(String(Number(transaction.amount || 0).toFixed(2)))
-            setInterestAmount("0")
-            setDiscountAmount("0")
-            setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
-            setPaymentModalOpen(true)
-        } else {
-            setConfirmRegularMarkAsPaid(transaction)
-        }
+        setSelectedInstallmentForPayment(transaction as any)
+        const initialAmount = Number(
+            transaction.installmentRemainingAmount ?? 
+            transaction.amount ?? 
+            0
+        )
+        setPaymentAmount(String(initialAmount.toFixed(2)))
+        setInterestAmount("0")
+        setDiscountAmount("0")
+        setPaymentMethodId(resolvedPaymentMethods?.[0]?.id || "")
+        setPaymentModalOpen(true)
     }, [resolvedPaymentMethods])
 
     const handleRequestCancelPending = useCallback((transaction: ERPTransaction) => {
@@ -865,35 +863,6 @@ export default function TransactionsPage({
             setCancellingTransaction(false)
         }
     }, [confirmCancelTransaction, cancellingTransaction, partnerId, cancelReason, notifyError, notifySuccess, refreshTransactionsNow])
-
-
-
-    const handleConfirmRegularMarkAsPaid = useCallback(async () => {
-        const transaction = confirmRegularMarkAsPaid
-        if (!transaction) return
-        if (markingRegularAsPaid) return
-        setMarkingRegularAsPaid(true)
-        try {
-            const { updateManualTransactionAction } = await import("@/app/actions/erp/transactions")
-
-            const res = await updateManualTransactionAction(transaction.id, partnerId, {
-                status: "paid",
-                paymentDate: new Date().toISOString()
-            } as any)
-
-            if (!res.success) {
-                notifyError(res.error || "Erro ao atualizar transação")
-                return
-            }
-            notifySuccess(`Transação marcada como ${transaction.ledgerDirection === "in" ? "recebida" : "paga"}!`)
-            void refreshTransactionsNow()
-        } catch {
-            notifyError("Erro ao atualizar transação")
-        } finally {
-            setMarkingRegularAsPaid(false)
-            setConfirmRegularMarkAsPaid(null)
-        }
-    }, [partnerId, markingRegularAsPaid, refreshTransactionsNow, notifySuccess, notifyError, confirmRegularMarkAsPaid])
 
     const handleSettleInstallmentGroup = useCallback(
         async (transaction: ERPTransaction) => {
@@ -1059,7 +1028,7 @@ export default function TransactionsPage({
                     return
                 }
                 notifySuccess("Pagamento da ocorrência registrado.")
-            } else {
+            } else if (selectedInstallmentForPayment.installmentGroupId) {
                 const res = await recordInstallmentPaymentAction({
                     partnerId,
                     transactionId: selectedInstallmentForPayment.id,
@@ -1073,6 +1042,24 @@ export default function TransactionsPage({
                     return
                 }
                 notifySuccess(res.data.fullyPaid ? "Parcela quitada com sucesso." : "Pagamento parcial registrado.")
+            } else {
+                const res = await recordRegularTransactionPaymentAction({
+                    partnerId,
+                    transactionId: selectedInstallmentForPayment.id,
+                    paymentAmount: paid,
+                    interestAmount: interest,
+                    discountAmount: discount,
+                    paymentMethodId: paymentMethodId || null,
+                })
+                if (!res.success) {
+                    notifyError(res.error || "Erro ao registrar pagamento")
+                    return
+                }
+                notifySuccess(
+                    selectedInstallmentForPayment.ledgerDirection === "in"
+                        ? "Recebimento registrado com sucesso."
+                        : "Pagamento registrado com sucesso."
+                )
             }
             setPaymentModalOpen(false)
             setSelectedInstallmentForPayment(null)
@@ -1140,159 +1127,210 @@ export default function TransactionsPage({
                 </DefaultModal>
 
                 <DefaultModal
-                    isOpen={!!confirmRegularMarkAsPaid}
-                    onClose={() => {
-                        if (markingRegularAsPaid) return
-                        setConfirmRegularMarkAsPaid(null)
-                    }}
-                    title={`Confirmar ${confirmRegularMarkAsPaid?.ledgerDirection === "in" ? "recebimento" : "pagamento"}`}
-                    maxWidth="md"
-                >
-                    {confirmRegularMarkAsPaid ? (
-                        <div className="space-y-4">
-                            <p className="text-sm text-brand-inactive-text">
-                                Deseja marcar esta transação como {confirmRegularMarkAsPaid.ledgerDirection === "in" ? "recebida" : "paga"}?
-                            </p>
-                            <div className="rounded-lg border border-brand-border dark:border-dark-border p-3 text-sm">
-                                <p className="font-semibold">{confirmRegularMarkAsPaid.description}</p>
-                                <p className="text-brand-inactive-text mt-1">
-                                    Valor: {formatCurrency(confirmRegularMarkAsPaid.amount)} • Vencimento: {confirmRegularMarkAsPaid.dueDate}
-                                </p>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setConfirmRegularMarkAsPaid(null)} disabled={markingRegularAsPaid}>
-                                    Cancelar
-                                </Button>
-                                <Button onClick={() => void handleConfirmRegularMarkAsPaid()} disabled={markingRegularAsPaid}>
-                                    Confirmar
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                </DefaultModal>
-
-                <DefaultModal
                     isOpen={paymentModalOpen}
                     onClose={() => {
                         if (payingInstallment) return
                         setPaymentModalOpen(false)
                         setSelectedInstallmentForPayment(null)
                     }}
-                    title={selectedInstallmentForPayment?.isRecurringOccurrence ? "Registrar pagamento da ocorrência" : "Registrar pagamento da parcela"}
+                    title={
+                        selectedInstallmentForPayment
+                            ? selectedInstallmentForPayment.isRecurringOccurrence
+                                ? "Registrar pagamento da ocorrência"
+                                : selectedInstallmentForPayment.installmentGroupId
+                                    ? "Registrar pagamento da parcela"
+                                    : selectedInstallmentForPayment.ledgerDirection === "in"
+                                        ? "Registrar recebimento"
+                                        : "Registrar pagamento"
+                            : "Registrar pagamento"
+                    }
                     maxWidth="md"
                 >
-                    {selectedInstallmentForPayment ? (
-                        <div className="space-y-4">
+                    {selectedInstallmentForPayment ? (() => {
+                        const isInstallment = !!selectedInstallmentForPayment.installmentGroupId
+                        const isRecurring = !!selectedInstallmentForPayment.isRecurringOccurrence
+                        const isRegular = !isInstallment && !isRecurring
+                        const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
+                        const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
+                        
+                        return (
                             <div className="space-y-4">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="min-w-0">
-                                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                            {selectedInstallmentForPayment.description}
-                                        </h3>
-                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                            {selectedInstallmentForPayment.isRecurringOccurrence ? (
-                                                <Badge variant="purple">
-                                                    Recorrente
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="gray">
-                                                    Parcela {selectedInstallmentForPayment.installmentNumber}
-                                                </Badge>
-                                            )}
-                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                Vence em {selectedInstallmentForPayment.dueDate || (selectedInstallmentForPayment.occurrenceDate ? formatBrazilDateFromDbInput(selectedInstallmentForPayment.occurrenceDate, 'dayMonthYear') : '-')}
-                                            </span>
+                                <div className="space-y-4">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
+                                                {selectedInstallmentForPayment.description}
+                                            </h3>
+                                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                {isRecurring ? (
+                                                    <Badge variant="purple">
+                                                        Recorrente
+                                                    </Badge>
+                                                ) : isInstallment ? (
+                                                    <Badge variant="gray">
+                                                        Parcela {selectedInstallmentForPayment.installmentNumber}
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="gray">
+                                                        Avulso
+                                                    </Badge>
+                                                )}
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                    Vence em {selectedInstallmentForPayment.dueDate || (selectedInstallmentForPayment.occurrenceDate ? formatBrazilDateFromDbInput(selectedInstallmentForPayment.occurrenceDate, 'dayMonthYear') : '-')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
+                                            <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(currentRemaining)}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
-                                        <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0))}
-                                        </p>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <MoneyInput
+                                                label="Valor do pagamento"
+                                                value={Number(paymentAmount || 0)}
+                                                onChange={(value) => setPaymentAmount(String(value))}
+                                                min={0}
+                                            />
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
+                                                Valor principal que abaterá a dívida/parcela.
+                                            </p>
+                                        </div>
+                                        <FormDropdown
+                                            label="Meio de pagamento"
+                                            value={paymentMethodId}
+                                            setValue={setPaymentMethodId}
+                                            options={(resolvedPaymentMethods || []).map((pm: any) => ({
+                                                value: pm.id,
+                                                label: pm.name,
+                                            }))}
+                                            placeholder="Selecione"
+                                        />
+                                        <div>
+                                            <MoneyInput
+                                                label="Juros"
+                                                value={Number(interestAmount || 0)}
+                                                onChange={(value) => setInterestAmount(String(value))}
+                                                min={0}
+                                            />
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
+                                                Acréscimo financeiro cobrado.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <MoneyInput
+                                                label="Desconto"
+                                                value={Number(discountAmount || 0)}
+                                                onChange={(value) => setDiscountAmount(String(value))}
+                                                min={0}
+                                            />
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
+                                                Desconto concedido na transação.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg dark:bg-dark-surface/50 p-4 space-y-4">
+                                        {/* Part 1: Debt Balance reduction */}
+                                        <div className="space-y-1 pb-3 border-b border-brand-border dark:border-dark-border">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    Abatimento do Saldo
+                                                </span>
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(Number(paymentAmount || 0))}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                {isRegular 
+                                                    ? "Esta transação será totalmente liquidada e marcada como paga."
+                                                    : `Este valor reduzirá o saldo restante. Novo saldo restante: ${formatCurrency(nextRemaining)}`}
+                                            </p>
+                                        </div>
+
+                                        {/* Part 2: Cash Flow (Valor Líquido) */}
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    Fluxo de Caixa (Valor Líquido)
+                                                </span>
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="rounded-lg bg-white dark:bg-dark-surface/50 p-2.5 border border-brand-border dark:border-dark-border/50 space-y-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
+                                                <div className="flex justify-between">
+                                                    <span>Valor do pagamento (principal)</span>
+                                                    <span>{formatCurrency(Number(paymentAmount || 0))}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>(+) Juros adicionais</span>
+                                                    <span className={Number(interestAmount || 0) > 0 ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
+                                                        {formatCurrency(Number(interestAmount || 0))}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>(-) Desconto aplicado</span>
+                                                    <span className={Number(discountAmount || 0) > 0 ? "text-brand-green dark:text-emerald-400 font-semibold" : ""}>
+                                                        {formatCurrency(Number(discountAmount || 0))}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between border-t border-brand-border dark:border-dark-border pt-1.5 font-bold text-brand-dark dark:text-dark-heading">
+                                                    <span>(=) Total líquido {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebido" : "pago"}</span>
+                                                    <span>{formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">
+                                                Nota: Juros e descontos ajustam o valor financeiro movimentado na conta, sem alterar o valor abatido da obrigação principal.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <MoneyInput
-                                        label="Valor do pagamento"
-                                        value={Number(paymentAmount || 0)}
-                                        onChange={(value) => setPaymentAmount(String(value))}
-                                        min={0}
-                                    />
-                                    <FormDropdown
-                                        label="Meio de pagamento"
-                                        value={paymentMethodId}
-                                        setValue={setPaymentMethodId}
-                                        options={(resolvedPaymentMethods || []).map((pm: any) => ({
-                                            value: pm.id,
-                                            label: pm.name,
-                                        }))}
-                                        placeholder="Selecione"
-                                    />
-                                    <MoneyInput
-                                        label="Juros"
-                                        value={Number(interestAmount || 0)}
-                                        onChange={(value) => setInterestAmount(String(value))}
-                                        min={0}
-                                    />
-                                    <MoneyInput
-                                        label="Desconto"
-                                        value={Number(discountAmount || 0)}
-                                        onChange={(value) => setDiscountAmount(String(value))}
-                                        min={0}
-                                    />
-                                </div>
-
-                                <div className="rounded-xl border border-brand-border dark:border-dark-border p-4 flex items-center justify-between gap-4">
-                                    <div>
-                                        <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">Total a processar</p>
-                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                            Valor final com juros e desconto aplicados.
-                                        </p>
-                                    </div>
-                                    <p className="font-bold text-[20px] text-brand-dark dark:text-dark-heading">
-                                        {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
-                                    </p>
+                                <div className="flex justify-end gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (payingInstallment) return
+                                            setPaymentModalOpen(false)
+                                            setSelectedInstallmentForPayment(null)
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
+                                        Confirmar {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebimento" : "pagamento"}
+                                    </Button>
                                 </div>
                             </div>
-
-                            <div className="flex justify-end gap-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        if (payingInstallment) return
-                                        setPaymentModalOpen(false)
-                                        setSelectedInstallmentForPayment(null)
-                                    }}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
-                                    Confirmar pagamento
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
+                        )
+                    })() : null}
                 </DefaultModal>
 
                 <SavingStatusModal
                     isOpen={
                         settlingGroup ||
                         payingInstallment ||
-                        markingAsPaid ||
-                        markingRegularAsPaid ||
                         cancellingTransaction
                     }
                     text={
                         settlingGroup
                             ? "Quitando parcelas..."
                             : payingInstallment
-                                ? "Registrando pagamento da parcela..."
-                                : markingAsPaid || markingRegularAsPaid
-                                    ? "Registrando pagamento..."
-                                    : cancellingTransaction
-                                        ? "Cancelando transação..."
-                                        : "Salvando..."
+                                ? selectedInstallmentForPayment?.isRecurringOccurrence
+                                    ? "Registrando pagamento da ocorrência..."
+                                    : selectedInstallmentForPayment?.installmentGroupId
+                                        ? "Registrando pagamento da parcela..."
+                                        : "Registrando pagamento..."
+                                : cancellingTransaction
+                                    ? "Cancelando transação..."
+                                    : "Salvando..."
                     }
                 />
             </>

@@ -768,7 +768,7 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                                     />
                                 }
                                 label="" />
-                            <Button variant="outline" onClick={() => setIsFilterOpen(true)} leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}>
+                            <Button variant="outline" onClick={() => setIsFilterOpen(true)} leftIcon={<FilterIcon size={18} />}>
                                 Filtros
                             </Button>
                             {hasActiveFilters && <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1"></div>}

@@ -1,3 +1,5 @@
+import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
+
 export type OpeningHoursData = {
   [day in string]?: {
     enabled: boolean
@@ -67,8 +69,8 @@ export function getOpeningStatus(
     return "Informações de horário não disponíveis";
   }
 
-  const currentDayIndex = nowDate.getDay();
-  const currentMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
+  const { dayOfWeek: currentDayIndex, hour, minute } = getSaoPauloDateComponents(nowDate)
+  const currentMinutes = hour * 60 + minute
 
   // Verifica horários válidos hoje
   const todayKey = DAYS_OF_WEEK[currentDayIndex];

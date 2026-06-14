@@ -60,7 +60,7 @@ export default function ReturnPageControls({
                             prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                         />
                     </div>
-                    <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}>
+                    <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon size={18} />}>
                         Filtros
                     </Button>
                 </div>

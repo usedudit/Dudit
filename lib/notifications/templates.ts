@@ -9,6 +9,7 @@ interface TemplateContext {
   date?: string
   time?: string
   reminderLabel?: string
+  mixType?: "service" | "both"
 }
 
 export function buildNotificationContent(
@@ -24,6 +25,18 @@ export function buildNotificationContent(
 
   switch (type) {
     case "order_created":
+      if (ctx.mixType === "service") {
+        return {
+          title: "Novo agendamento",
+          message: `${customer} agendou ${service}${when ? ` para ${when}` : ""}.`,
+        }
+      }
+      if (ctx.mixType === "both") {
+        return {
+          title: "Novo pedido (produto + serviço)",
+          message: `Pedido ${orderRef} de ${customer} contém produtos e serviços agendados.`,
+        }
+      }
       return {
         title: "Novo pedido",
         message: `Pedido ${orderRef} de ${customer} aguardando pagamento.`,

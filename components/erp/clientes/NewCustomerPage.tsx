@@ -890,8 +890,8 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                             onClick={handleSave}
                             disabled={isSaving || isEditLoadingLocked}
                             className="flex-1 h-12"
+                            leftIcon={<SaveIcon size={18} />}
                         >
-                            <SaveIcon className="w-4 h-4 mr-2" />
                             {isSaving ? "Salvando..." : "Salvar"}
                         </Button>
                     </div>

@@ -1,4 +1,5 @@
 import type { OpeningHoursData } from "@/lib/utils/opening-hours"
+import { getSaoPauloDateComponents, createSaoPauloDate } from "@/lib/utils/formatters"
 
 const MINUTES_IN_DAY = 24 * 60
 const DAYS_OF_WEEK = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const
@@ -51,7 +52,8 @@ type DayWindow = { openMinute: number; closeMinute: number }
 
 function getScheduleForDate(openingHours: OpeningHoursData | null | undefined, date: Date): DayWindow | null {
   if (!openingHours || typeof openingHours !== "object") return null
-  const dayKey = DAYS_OF_WEEK[date.getDay()]
+  const { dayOfWeek } = getSaoPauloDateComponents(date)
+  const dayKey = DAYS_OF_WEEK[dayOfWeek]
   const schedule = openingHours[dayKey]
   if (!schedule?.enabled) return null
 
@@ -67,21 +69,21 @@ function getScheduleForDate(openingHours: OpeningHoursData | null | undefined, d
 }
 
 function cloneDateAtMinute(baseDate: Date, minuteOfDay: number): Date {
-  const result = new Date(baseDate)
-  result.setHours(0, 0, 0, 0)
+  const { year, month, day } = getSaoPauloDateComponents(baseDate)
   const dayOffset = Math.floor(minuteOfDay / MINUTES_IN_DAY)
   const minuteRemainder = minuteOfDay % MINUTES_IN_DAY
+  const hour = Math.floor(minuteRemainder / 60)
+  const minute = minuteRemainder % 60
+
+  const baseCloned = createSaoPauloDate(year, month, day, hour, minute)
   if (dayOffset > 0) {
-    result.setDate(result.getDate() + dayOffset)
+    return new Date(baseCloned.getTime() + dayOffset * 24 * 60 * 60 * 1000)
   }
-  result.setMinutes(minuteRemainder)
-  return result
+  return baseCloned
 }
 
 function addDays(baseDate: Date, days: number): Date {
-  const result = new Date(baseDate)
-  result.setDate(result.getDate() + days)
-  return result
+  return new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000)
 }
 
 function findNextOpenDay(openingHours: OpeningHoursData | null | undefined, fromDate: Date): Date | null {
@@ -124,7 +126,8 @@ export function adjustToBusinessHours(
       continue
     }
 
-    const minuteNow = current.getHours() * 60 + current.getMinutes()
+    const { hour: hNow, minute: mNow } = getSaoPauloDateComponents(current)
+    const minuteNow = hNow * 60 + mNow
     const absoluteMinuteNow = minuteNow
     const openMinute = schedule.openMinute
     const closeMinute = schedule.closeMinute
@@ -140,7 +143,8 @@ export function adjustToBusinessHours(
 
     if (remaining <= 0) return new Date(current)
 
-    const currentMinute = current.getHours() * 60 + current.getMinutes()
+    const { hour: curH, minute: curM } = getSaoPauloDateComponents(current)
+    const currentMinute = curH * 60 + curM
     const availableToday = closeMinute - currentMinute
     if (availableToday >= remaining) {
       const doneAt = new Date(current.getTime() + remaining * 60000)

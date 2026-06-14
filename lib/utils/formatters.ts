@@ -286,3 +286,77 @@ export function getBillingUnitSuffix(unit?: string | null): string {
   }
 }
 
+/**
+ * Returns year, month, day, hour, minute, second and dayOfWeek in America/Sao_Paulo timezone.
+ */
+export function getSaoPauloDateComponents(date: Date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+  const partVal = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0)
+
+  const year = partVal("year")
+  const month = partVal("month")
+  const day = partVal("day")
+  let hour = partVal("hour")
+  if (hour === 24) hour = 0 // formatToParts can return 24 for midnight depending on node/V8 version
+  const minute = partVal("minute")
+  const second = partVal("second")
+
+  const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "short",
+  })
+  const weekdayParts = weekdayFormatter.formatToParts(date)
+  const weekdayStr = weekdayParts.find((p) => p.type === "weekday")?.value || ""
+
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  }
+  const dayOfWeek = weekdayMap[weekdayStr] ?? date.getDay()
+
+  return { year, month, day, hour, minute, second, dayOfWeek }
+}
+
+/**
+ * Returns the timezone offset in minutes for America/Sao_Paulo for a given Date.
+ * E.g., returns -180 (for UTC-3).
+ */
+export function getSaoPauloOffsetMinutes(date: Date = new Date()): number {
+  try {
+    const tzString = date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+    const localString = date.toLocaleString("en-US", { timeZone: "UTC" })
+    const tzDate = new Date(tzString)
+    const localDate = new Date(localString)
+    return Math.round((tzDate.getTime() - localDate.getTime()) / 60000)
+  } catch {
+    return -180 // Fallback to standard UTC-3
+  }
+}
+
+/**
+ * Creates a Date object representing the given calendar date/time in America/Sao_Paulo.
+ */
+export function createSaoPauloDate(year: number, month: number, day: number, hour: number, minute: number): Date {
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
+  const offsetMinutes = getSaoPauloOffsetMinutes(utcDate)
+  return new Date(utcDate.getTime() - offsetMinutes * 60000)
+}
+
+
+

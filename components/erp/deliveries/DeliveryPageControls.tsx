@@ -52,7 +52,7 @@ export default function DeliveryPageControls({
                             prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                         />
                     </div>
-                    <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}>Filtros</Button>
+                    <Button variant="outline" onClick={onOpenFilter} leftIcon={<FilterIcon size={18} />}>Filtros</Button>
                 </div>
                 <div className="flex-1" />
                 <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">

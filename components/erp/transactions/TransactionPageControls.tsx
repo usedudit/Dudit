@@ -206,7 +206,7 @@ const TransactionPageControls: React.FC<TransactionPageControlsProps> = ({
                         <Button
                             variant="outline"
                             onClick={onOpenFilter}
-                            leftIcon={<FilterIcon className="h-[18px] w-[18px]" />}
+                            leftIcon={<FilterIcon size={18} />}
                         >
                             Filtros
                         </Button>

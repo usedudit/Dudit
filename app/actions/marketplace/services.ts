@@ -3,6 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { cache } from "react"
+import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
 
 // ─── Constants (mirrored from ERP appointments.ts) ─────────────────────────
 const DEFAULT_BUSINESS_HOURS = { startHour: 8, startMinute: 0, endHour: 19, endMinute: 0 }
@@ -255,11 +256,11 @@ export async function getPublicAvailableTimeSlots(
       }
     }
 
-    // Filter out past time slots for today
     const now = new Date()
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+    const { year: nowYear, month: nowMonth, day: nowDay, hour, minute } = getSaoPauloDateComponents(now)
+    const todayStr = `${nowYear}-${String(nowMonth).padStart(2, "0")}-${String(nowDay).padStart(2, "0")}`
     if (date === todayStr) {
-      const currentMinutes = now.getHours() * 60 + now.getMinutes()
+      const currentMinutes = hour * 60 + minute
       return {
         success: true,
         slots: slots.filter((slot) => {
@@ -316,7 +317,8 @@ export async function createPublicAppointment(data: {
       name: customerName,
       email: user.email,
       phone: profile?.phone || null,
-      cpf: null
+      cpf: null,
+      userId: user.id,
     })
 
     // Calculate end_time

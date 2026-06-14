@@ -1,3 +1,5 @@
+import { getSaoPauloDateComponents } from "@/lib/utils/formatters"
+
 export type DeliveryRuleType = "fixed" | "multiplier"
 
 export type DeliverySettings = {
@@ -97,7 +99,8 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const distanceFee = extraDistanceKm * extraKmPrice
   fee += distanceFee
 
-  const nowMinutes = (input.currentTime.getHours() * 60) + input.currentTime.getMinutes()
+  const { hour, minute } = getSaoPauloDateComponents(input.currentTime)
+  const nowMinutes = (hour * 60) + minute
   const activeRules = (input.rules || [])
     .filter((r) => r.isActive)
     .filter((r) => isTimeInRange(nowMinutes, r.startTime, r.endTime))

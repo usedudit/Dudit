@@ -20,14 +20,47 @@ export async function ensureMarketplaceCustomer({
 }: CustomerParams): Promise<string | null> {
   const supabase = getAdminClient()
 
-  // Clean CPF if provided
   const cleanCpf = cpf ? cpf.replace(/\D/g, "") : null
   const isValidCpf = cleanCpf && validateCPF(cleanCpf)
+  const marketplaceUserId = userId || null
 
   let customerId: string | null = null
 
-  // 1. Try to find by email
-  if (email) {
+  // 1. Try to find by marketplace_user_id (highest priority)
+  if (marketplaceUserId) {
+    const { data: existing } = await supabase
+      .from("customers")
+      .select("id, name, email, phone, cpf")
+      .eq("partner_id", partnerId)
+      .eq("marketplace_user_id", marketplaceUserId)
+      .maybeSingle()
+
+    if (existing) {
+      customerId = existing.id
+
+      // Update non-sensitive fields if needed
+      const updateData: Record<string, any> = {}
+      if (name && existing.name !== name) updateData.name = name
+      if (phone && !existing.phone) updateData.phone = phone
+      if (email && !existing.email) updateData.email = email
+      if (isValidCpf && !existing.cpf) {
+        try {
+          const { encryptCPF } = await import("@/lib/crypto")
+          updateData.cpf = await encryptCPF(cleanCpf)
+          updateData.person_type = "pf"
+        } catch (e) {
+          console.error("Error encrypting CPF during customer update:", e)
+        }
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await supabase.from("customers").update(updateData).eq("id", customerId)
+      }
+    }
+  }
+
+  // 2. Try to find by email (only if not found by marketplace_user_id)
+  if (!customerId && email) {
     const { data: existingCustomer } = await supabase
       .from("customers")
       .select("id, cpf, phone")
@@ -38,8 +71,7 @@ export async function ensureMarketplaceCustomer({
 
     if (existingCustomer) {
       customerId = existingCustomer.id
-      
-      // Update phone or CPF if they were missing
+
       let needsUpdate = false
       const updateData: Record<string, any> = {}
 
@@ -60,109 +92,104 @@ export async function ensureMarketplaceCustomer({
         }
       }
 
-      if (userId) {
-        updateData.user_id = userId
+      if (marketplaceUserId) {
+        updateData.marketplace_user_id = marketplaceUserId
         needsUpdate = true
       }
 
       if (needsUpdate) {
-        await supabase
-          .from("customers")
-          .update(updateData)
-          .eq("id", customerId)
+        await supabase.from("customers").update(updateData).eq("id", customerId)
       }
     }
   }
 
-  // 2. If not found by email, try to find by CPF
-    if (isValidCpf) {
-      const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
-      
-      // Fetch all customers of this partner who have non-null CPFs
-      const { data: existingCpfs, error: fetchError } = await supabase
-        .from("customers")
-        .select("id, cpf, email, phone")
-        .eq("partner_id", partnerId)
-        .not("cpf", "is", null)
+  // 3. Try to find by CPF (only if not found by marketplace_user_id or email)
+  if (!customerId && isValidCpf) {
+    const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
 
-      if (fetchError) {
-        console.error("[ensureMarketplaceCustomer] Error fetching customers by CPF:", fetchError)
-      }
+    const { data: existingCpfs, error: fetchError } = await supabase
+      .from("customers")
+      .select("id, cpf, email, phone")
+      .eq("partner_id", partnerId)
+      .not("cpf", "is", null)
 
-      if (!fetchError && existingCpfs) {
-        for (const row of existingCpfs) {
-          try {
-            const decrypted = await decryptCPF(row.cpf)
-            if (decrypted === cleanCpf) {
-              customerId = row.id
-
-              // Update email, phone if missing
-              let needsUpdate = false
-              const updateData: Record<string, any> = {}
-
-              if (!row.email && email) {
-                updateData.email = email
-                needsUpdate = true
-              }
-              if (!row.phone && phone) {
-                updateData.phone = phone
-                needsUpdate = true
-              }
-
-              if (needsUpdate) {
-                const { error: updateError } = await supabase
-                  .from("customers")
-                  .update(updateData)
-                  .eq("id", customerId)
-                if (updateError) {
-                  console.error("[ensureMarketplaceCustomer] Error updating customer by CPF:", updateError)
-                }
-              }
-              break
-            }
-          } catch (e) {
-            console.error("[ensureMarketplaceCustomer] Decryption error:", e)
-            continue
-          }
-        }
-      }
-    }
-
-    // 3. If still not found, create new customer
-    if (!customerId) {
-      let encryptedCpf: string | null = null
-      if (isValidCpf) {
+    if (!fetchError && existingCpfs) {
+      for (const row of existingCpfs) {
         try {
-          const { encryptCPF } = await import("@/lib/crypto")
-          encryptedCpf = await encryptCPF(cleanCpf)
+          const decrypted = await decryptCPF(row.cpf)
+          if (decrypted === cleanCpf) {
+            customerId = row.id
+
+            let needsUpdate = false
+            const updateData: Record<string, any> = {}
+
+            if (!row.email && email) {
+              updateData.email = email
+              needsUpdate = true
+            }
+            if (!row.phone && phone) {
+              updateData.phone = phone
+              needsUpdate = true
+            }
+            if (marketplaceUserId) {
+              updateData.marketplace_user_id = marketplaceUserId
+              needsUpdate = true
+            }
+
+            if (needsUpdate) {
+              const { error: updateError } = await supabase
+                .from("customers")
+                .update(updateData)
+                .eq("id", customerId)
+              if (updateError) {
+                console.error("[ensureMarketplaceCustomer] Error updating customer by CPF:", updateError)
+              }
+            }
+            break
+          }
         } catch (e) {
-          console.error("Error encrypting CPF during customer creation:", e)
+          console.error("[ensureMarketplaceCustomer] Decryption error:", e)
         }
       }
+    }
+  }
 
-      const { data: newCustomer, error: custError } = await supabase
-        .from("customers")
-        .insert({
-          partner_id: partnerId,
-          name: name,
-          email: email || null,
-          phone: phone || null,
-          cpf: encryptedCpf,
-          person_type: "pf", // default to 'pf'
-          status: "ativo",
-          user_id: userId || null,
-        })
-        .select("id")
-        .single()
-
-      if (custError) {
-        console.error("[ensureMarketplaceCustomer] Error inserting new customer:", custError)
-      }
-
-      if (!custError && newCustomer) {
-        customerId = newCustomer.id
+  // 4. Create new customer
+  if (!customerId) {
+    let encryptedCpf: string | null = null
+    if (isValidCpf) {
+      try {
+        const { encryptCPF } = await import("@/lib/crypto")
+        encryptedCpf = await encryptCPF(cleanCpf)
+      } catch (e) {
+        console.error("Error encrypting CPF during customer creation:", e)
       }
     }
 
-  return customerId;
+    const { data: newCustomer, error: custError } = await supabase
+      .from("customers")
+      .insert({
+        partner_id: partnerId,
+        name: name,
+        email: email || null,
+        phone: phone || null,
+        cpf: encryptedCpf,
+        person_type: "pf",
+        status: "ativo",
+        user_id: marketplaceUserId,
+        marketplace_user_id: marketplaceUserId,
+      })
+      .select("id")
+      .single()
+
+    if (custError) {
+      console.error("[ensureMarketplaceCustomer] Error inserting new customer:", custError)
+    }
+
+    if (!custError && newCustomer) {
+      customerId = newCustomer.id
+    }
+  }
+
+  return customerId
 }

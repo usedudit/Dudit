@@ -464,16 +464,6 @@ export async function executeRecurringClaim(claim: ClaimedRecurringExecution): P
     },
   })
 
-  import("@/lib/services/notification-automation.service")
-    .then(({ onSubscriptionRenewed }) =>
-      onSubscriptionRenewed({
-        partnerId: claim.partnerId,
-        subscriptionId: claim.subscriptionId,
-        customerId: claim.customerId,
-        customerName: customer.name,
-      }),
-    )
-    .catch(console.error)
 }
 
 export async function failRecurringClaim(executionId: string, errorMessage: string): Promise<void> {

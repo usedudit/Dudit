@@ -289,7 +289,7 @@ export default function PromotionFormPage({
                         allowCouponCombination: !!editingRule.allow_coupon_combination,
                         usageLimit: parseNumberField(editingRule.usage_limit),
                         usageLimitPerCustomer: parseNumberField(editingRule.usage_limit_per_customer),
-                        isActive: editingRule.is_active ?? true,
+                        isActive: true,
                         productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
                         categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
                         serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
@@ -346,7 +346,7 @@ export default function PromotionFormPage({
                             allowCouponCombination: !!editingRule.allow_coupon_combination,
                             usageLimit: parseNumberField(editingRule.usage_limit),
                             usageLimitPerCustomer: parseNumberField(editingRule.usage_limit_per_customer),
-                            isActive: editingRule.is_active ?? true,
+                            isActive: true,
                             productIds: editingRule.apply_scope === "specific_products" ? editingRuleProductIds : [],
                             categoryIds: editingRule.apply_scope === "category" ? editingRuleCategoryIds : [],
                             serviceIds: editingRule.apply_scope === "specific_services" ? editingRuleServiceIds : [],
@@ -957,7 +957,7 @@ export default function PromotionFormPage({
                                         <form onSubmit={handleSaveCampaign} className="grid grid-cols-12 gap-y-8 lg:gap-y-0">
                                             {/* Left Column */}
                                             <div className="col-span-12 lg:col-span-8 lg:pr-12 space-y-6">
-                                                <FormSection title="Pedido Origem">
+                                                <FormSection title="Dados Gerais">
                                                     <Input
                                                         label="Nome da Campanha"
                                                         name="campName"
@@ -994,31 +994,40 @@ export default function PromotionFormPage({
                                             </div>
 
                                             {/* Right Column */}
-                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                                                 <SidebarCard hasTopStrip>
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Duração da Campanha</h3>
                                                     <div className="space-y-5">
                                                         <DatePicker
                                                             label="Início da Vigência"
                                                             value={campStarts}
-                                                            onChange={(d) => setCampStarts(d.toISOString())}
+                                                            onChange={(d) => setCampStarts(d ? d.toISOString() : "")}
                                                         />
                                                         <DatePicker
                                                             label="Fim da Vigência"
                                                             value={campEnds}
-                                                            onChange={(d) => setCampEnds(d.toISOString())}
+                                                            onChange={(d) => setCampEnds(d ? d.toISOString() : "")}
                                                         />
-
-                                                        <div className="flex items-center gap-2">
-                                                            <Checkbox
-                                                                checked={campActive}
-                                                                onChange={() => setCampActive(!campActive)}
-                                                                disabled={isReadOnly}
-                                                                label="Esta campanha está ativa e válida"
-                                                            />
-                                                        </div>
                                                     </div>
                                                 </SidebarCard>
+
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
+                                                    <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
+                                                    <div className="space-y-4">
+                                                        <Checkbox
+                                                            checked={editingRule?.allow_coupon_combination || false}
+                                                            onChange={() => editingRule && setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
+                                                            disabled={isReadOnly}
+                                                            label="Permitir uso combinado com cupons de desconto"
+                                                        />
+                                                        <Checkbox
+                                                            checked={campActive}
+                                                            onChange={() => setCampActive(!campActive)}
+                                                            disabled={isReadOnly}
+                                                            label="Campanha ativa e disponível"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </form>
                                     </FadeIn>
@@ -1236,23 +1245,7 @@ export default function PromotionFormPage({
                                                                     onChange={(e) => setEditingRule({ ...editingRule, usage_limit_per_customer: e.target.value === "" ? "" : parseInt(e.target.value) })}
                                                                 />
                                                             </div>
-                                                        </SidebarCard>
-
-                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
-                                                            <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
-                                                            <div className="space-y-4">
-                                                                <Checkbox
-                                                                    checked={editingRule.allow_coupon_combination || false}
-                                                                    onChange={() => setEditingRule({ ...editingRule, allow_coupon_combination: !editingRule.allow_coupon_combination })}
-                                                                    label="Permitir uso combinado com cupons de desconto"
-                                                                />
-                                                                <Checkbox
-                                                                    checked={editingRule.is_active ?? true}
-                                                                    onChange={() => setEditingRule({ ...editingRule, is_active: !editingRule.is_active })}
-                                                                    label="Regra ativa e disponível"
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        </SidebarCard>                                                        {/* Configurações e status removido */}
                                                     </div>
                                                 </div>
                                             )}

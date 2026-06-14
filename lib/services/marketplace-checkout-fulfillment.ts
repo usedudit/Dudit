@@ -261,18 +261,6 @@ async function createSubscriptionFromPlan(
 
   if (execError) throw execError
 
-  import("@/lib/services/notification-automation.service")
-    .then(({ onSubscriptionCreated }) =>
-      onSubscriptionCreated({
-        partnerId: params.partnerId,
-        subscriptionId: subscription.id as string,
-        customerId,
-        customerName: params.buyerName,
-        planName: undefined,
-      }),
-    )
-    .catch(console.error)
-
   return { subscriptionId: subscription.id as string, executionId: execution.id as string }
 }
 
@@ -453,6 +441,25 @@ export async function fulfillMarketplaceOrder(
           })
         } else if (bookingResult.appointmentId) {
           result.appointmentIds!.push(bookingResult.appointmentId)
+        }
+
+        if (bookingResult.appointmentId && line.bookingMetadata) {
+          const { serviceName, date, time } = line.bookingMetadata
+          import("@/lib/services/notification-automation.service")
+            .then(({ notifyAppointmentCreatedFromMarketplace }) =>
+              notifyAppointmentCreatedFromMarketplace({
+                partnerId: order.partner_id,
+                appointmentId: bookingResult.appointmentId!,
+                customerName: buyerName,
+                serviceName,
+                startDate: date,
+                startTime: time,
+                customerId: null,
+                marketplaceOrderId: orderId,
+                storeName: undefined,
+              }),
+            )
+            .catch(console.error)
         }
       }
 

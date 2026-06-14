@@ -510,40 +510,83 @@ export async function getCustomerOrdersAction(customerId: string) {
 
   const supabase = await getSupabaseServerClient()
 
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("marketplace_user_id")
+    .eq("id", customerId)
+    .maybeSingle()
+
+  const buyerId = customer?.marketplace_user_id
+
+  if (!buyerId) {
+    return { orders: [] }
+  }
+
   const { data: orders, error } = await supabase
     .from("orders")
     .select(`
       id,
       order_number,
+      mp_payment_id,
       created_at,
+      order_date,
       situation,
+      payment_status,
+      delivery_status,
+      delivery_type,
       total_amount,
-      order_items ( id )
+      paid_amount,
+      customer_name,
+      order_source,
+      notes,
+      order_items ( id, quantity, service_id, line_type )
     `)
-    .eq("buyer_id", customerId)
+    .eq("buyer_id", buyerId)
     .order("created_at", { ascending: false })
 
   if (error) {
     return { error: error.message }
   }
 
-  const formattedOrders = orders.map((o: any) => {
-    const dateStr = formatDate(o.created_at)
+  const { getDeliveryStatusMeta, getDeliveryStatusLabelForType } = await import("@/lib/orders/status")
+  const { formatDate, formatTime } = await import("@/lib/utils")
 
-    let status = o.situation
-    if (status === 'paid' || status === 'delivered') status = 'Paid'
-    else if (status === 'cancelled') status = 'Cancelled'
-    else status = 'Pending'
+  const formattedOrders = orders.map((o: any) => {
+    const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any
+    const orderItems = o.order_items || []
+    const hasOnlyServices = orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking")
+
+    const statusMap: Record<string, { label: string; color: string }> = {
+      paid: { label: "Pago", color: "green" },
+      partially_paid: { label: "Parcialmente Pago", color: "orange" },
+      shipped: { label: "Enviado", color: "blue" },
+      delivered: { label: "Entregue", color: "green" },
+      cancelled: { label: "Cancelado", color: "red" },
+      in_process: { label: "Em anÃ¡lise", color: "yellow" },
+      pending: { label: "Pendente", color: "gray" },
+    }
+    const statusInfo = statusMap[o.situation] || { label: o.situation, color: "gray" }
 
     return {
-      id: o.order_number || o.id.substring(0, 8),
+      id: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
       originalId: o.id,
-      date: dateStr,
+      date: formatDate(o.order_date || o.created_at),
+      formattedTime: formatTime(o.order_date || o.created_at),
       total: o.total_amount,
-      status: status,
+      paidAmount: Number(o.paid_amount || 0),
+      statusLabel: statusInfo.label,
+      statusColor: statusInfo.color,
       situation: o.situation,
+      delivery_status: o.delivery_status,
+      delivery_type: o.delivery_type || "delivery",
+      deliveryStatusLabel: getDeliveryStatusLabelForType(o.delivery_status, o.delivery_type),
+      deliveryStatusColor: deliveryInfo.variant,
       items: o.order_items ? o.order_items.length : 0,
-      createdAt: o.created_at
+      items_count: orderItems.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0),
+      customer_name: o.customer_name || "Consumidor final",
+      order_source: o.order_source || "Manual",
+      createdAt: o.order_date || o.created_at,
+      hasOnlyServices,
     }
   })
 

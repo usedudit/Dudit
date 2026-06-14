@@ -5,8 +5,8 @@ export interface Customer {
   email: string | null
   phone: string | null
   cpf_cnpj: string | null
+  marketplace_user_id: string | null
   created_at: string
-  // Outros campos de identificação (cpf, cnpj, nome_fantasia, etc) são tratados dinamicamente no código
   [key: string]: any
 }
 

@@ -19,6 +19,8 @@ import {
   ActionsDropdown
 } from "@/components/reusable"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
+import FilterChip from "@/components/reusable/FilterChip"
+import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityPage } from "@/hooks/use-entity-page"
@@ -28,16 +30,108 @@ import {
   deleteCampaignAction,
   simulatePromotionsAction,
   getPromotionScopeDataAction,
+  toggleCampaignsStatusAction,
+  bulkUpdateCampaignsAction
 } from "@/app/actions/shared/promotions"
 import { formatCurrency } from "@/lib/utils/formatters"
+import {
+  EMPTY_DATE_PERIOD,
+  resolveDatePeriodBounds,
+  ymdInBounds,
+  msToBrazilYmd,
+  isDatePeriodFilterActive,
+  type DatePeriodFilterValue,
+} from "@/lib/utils/filter-date-period"
 import PromotionFormPage from "./PromotionFormPage"
 import PromotionGridCard from "./PromotionGridCard"
-import { PlusIcon, SearchIcon, TagIcon, SparklesIcon, TrashIcon, EditIcon, EyeIcon, PlayIcon, InfoIcon } from "@/lib/icons"
+import PromotionBulkEditModal from "./PromotionBulkEditModal"
+import PromotionPageControls from "./PromotionPageControls"
+import {
+  PlusIcon,
+  SearchIcon,
+  TagIcon,
+  SparklesIcon,
+  TrashIcon,
+  EditIcon,
+  EyeIcon,
+  PlayIcon,
+  InfoIcon,
+  FilterIcon,
+  ListIcon,
+  GridIcon,
+  ArrowUpDownIcon,
+  BlockedIcon,
+  CheckCircleIcon
+} from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 const Div = (props: any) => React.createElement("div", props)
 const P = (props: any) => React.createElement("p", props)
 const Span = (props: any) => React.createElement("span", props)
+
+const getPromotionTypeLabel = (rule: any) => {
+  if (!rule) return "Sem regras"
+  switch (rule.promotion_type) {
+    case "discount": return "Desconto Direto"
+    case "buy_x_pay_y": return "Leve X Pague Y"
+    case "gift": return "Ganhar Brinde"
+    default: return rule.promotion_type || "Outro"
+  }
+}
+
+const getApplyScopeLabel = (scope: string) => {
+  switch (scope) {
+    case "entire_cart": return "Toda a Sacola"
+    case "specific_products": return "Produtos Específicos"
+    case "category": return "Categorias Específicas"
+    case "specific_services": return "Serviços Específicos"
+    default: return "Toda a Sacola"
+  }
+}
+
+const formatRuleDetails = (rule: any) => {
+  if (!rule) return { above: "Sem limites de uso", below: "-" }
+  let above = "Sem limites de uso"
+  const globalLimit = rule.usage_limit
+  const customerLimit = rule.usage_limit_per_customer
+  if (globalLimit && customerLimit) {
+    above = `Global: ${globalLimit} | Por cliente: ${customerLimit}`
+  } else if (globalLimit) {
+    above = `Limite global: ${globalLimit}`
+  } else if (customerLimit) {
+    above = `Limite por cliente: ${customerLimit}`
+  }
+
+  let below = ""
+  if (rule.promotion_type === "discount") {
+    const isPercent = rule.discount_type === "percentage"
+    const formatCurrencyLocal = (val: any) => {
+      if (val === undefined || val === null) return ""
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+    }
+    const valStr = isPercent 
+      ? `${rule.discount_value}% Desc.` 
+      : `${formatCurrencyLocal(rule.discount_value)} Desc.`
+    const maxStr = rule.max_discount_amount 
+      ? ` - Max ${formatCurrencyLocal(rule.max_discount_amount)}` 
+      : ""
+    below = `${valStr}${maxStr}`
+  } else if (rule.promotion_type === "buy_x_pay_y") {
+    below = `Leve ${rule.buy_quantity} Pague ${rule.pay_quantity}`
+  } else if (rule.promotion_type === "gift") {
+    below = `1 Brinde`
+  }
+
+  if (rule.min_spend_amount) {
+    const formatCurrencyLocal = (val: any) => {
+      if (val === undefined || val === null) return ""
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+    }
+    below += ` - Min ${formatCurrencyLocal(rule.min_spend_amount)}`
+  }
+
+  return { above, below }
+}
 
 export default function PromotionsPage({
   partnerId,
@@ -120,6 +214,22 @@ export default function PromotionsPage({
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [isProcessingAction, setIsProcessingAction] = useState(false)
 
+  // New States
+  const [viewMode, setViewModeState] = useState<"list" | "grid">(isTabletOrMobile ? "grid" : "list")
+  const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
+  const [filters, setFilters] = useState<{
+    status: string[]
+    datePeriod: DatePeriodFilterValue
+  }>({
+    status: [],
+    datePeriod: { ...EMPTY_DATE_PERIOD }
+  })
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+  const [showBulkStatusModal, setShowBulkStatusModal] = useState(false)
+  const [bulkStatusToApply, setBulkStatusToApply] = useState(true)
+
   // Simulator State
   const [simCart, setSimCart] = useState<Array<{ product: any; quantity: number }>>([])
   const [simCoupon, setSimCoupon] = useState("")
@@ -158,15 +268,85 @@ export default function PromotionsPage({
     loadScope()
   }, [partnerId])
 
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, filters, activeTab])
+
+  const hasActiveFilters = useMemo(() => {
+    return filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod) || search.trim().length > 0
+  }, [filters, search])
+
+  const filterSections = useMemo<FilterSectionConfig[]>(() => {
+    return [
+      {
+        id: "status",
+        title: "Status da Campanha",
+        type: "checkbox-list",
+        options: ["Ativa", "Rascunho/Inativa"],
+      },
+      {
+        id: "datePeriod",
+        title: "Período de Vigência",
+        type: "date-period",
+      },
+    ]
+  }, [])
+
   // Filter & Paginate campaigns
   const filteredCampaigns = useMemo(() => {
+    let result = campaigns
+    
+    // 1. Search term filter
     const term = debouncedSearch.toLowerCase().trim()
-    if (!term) return campaigns
-    return campaigns.filter(c =>
-      c.name.toLowerCase().includes(term) ||
-      (c.description && c.description.toLowerCase().includes(term))
-    )
-  }, [campaigns, debouncedSearch])
+    if (term) {
+      result = result.filter(c =>
+        c.name.toLowerCase().includes(term) ||
+        (c.description && c.description.toLowerCase().includes(term))
+      )
+    }
+
+    // 2. Status filter
+    if (filters.status.length > 0) {
+      result = result.filter(c => {
+        const statusStr = c.is_active ? "Ativa" : "Rascunho/Inativa"
+        return filters.status.includes(statusStr)
+      })
+    }
+
+    // 3. Date period filter
+    if (isDatePeriodFilterActive(filters.datePeriod)) {
+      const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+      result = result.filter(c => {
+        if (!c.starts_at) return false
+        const campDateYmd = msToBrazilYmd(new Date(c.starts_at).getTime())
+        return ymdInBounds(campDateYmd, startYmd, endYmd)
+      })
+    }
+
+    // 4. Sort
+    if (sortConfig) {
+      result = [...result].sort((a, b) => {
+        let aVal: any = a[sortConfig.key]
+        let bVal: any = b[sortConfig.key]
+
+        if (sortConfig.key === 'starts_at') {
+          aVal = a.starts_at ? new Date(a.starts_at).getTime() : 0
+          bVal = b.starts_at ? new Date(b.starts_at).getTime() : 0
+        } else if (sortConfig.key === 'apply_scope') {
+          const promoA = promotions.find(p => p.campaign_id === a.id)
+          const promoB = promotions.find(p => p.campaign_id === b.id)
+          aVal = promoA?.apply_scope || ""
+          bVal = promoB?.apply_scope || ""
+        }
+
+        if (aVal === bVal) return 0
+        const comparison = aVal < bVal ? -1 : 1
+        return sortConfig.direction === 'asc' ? comparison : -comparison
+      })
+    }
+
+    return result
+  }, [campaigns, debouncedSearch, filters, sortConfig, promotions])
 
   const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
   const paginatedCampaigns = useMemo(() => {
@@ -232,6 +412,39 @@ export default function PromotionsPage({
     setSelection({ ids: new Set() })
     afterMutation()
     refreshPromotions()
+  }
+
+  const handleBulkStatusChange = async () => {
+    const ids = Array.from(selection.ids)
+    if (ids.length === 0) return
+    setIsProcessingAction(true)
+    const res = await toggleCampaignsStatusAction(partnerId, ids, bulkStatusToApply)
+    setIsProcessingAction(false)
+    setShowBulkStatusModal(false)
+    if (res.success) {
+      toast({ title: "Status atualizado com sucesso." })
+      setSelection({ ids: new Set() })
+      afterMutation()
+      refreshPromotions()
+    } else {
+      toast({ title: "Erro ao atualizar status.", description: res.error, variant: "destructive" })
+    }
+  }
+
+  const handleBulkEditApply = async (fields: any) => {
+    const ids = Array.from(selection.ids)
+    if (ids.length === 0) return
+    setIsProcessingAction(true)
+    const res = await bulkUpdateCampaignsAction(partnerId, ids, fields)
+    setIsProcessingAction(false)
+    if (res.success) {
+      toast({ title: "Campanhas atualizadas com sucesso." })
+      setSelection({ ids: new Set() })
+      afterMutation()
+      refreshPromotions()
+    } else {
+      toast({ title: "Erro ao atualizar campanhas.", description: res.error, variant: "destructive" })
+    }
   }
 
   const handleRunSimulation = async () => {
@@ -365,43 +578,17 @@ export default function PromotionsPage({
               {activeTab === "list" ? (
                 <>
                   {/* Page Controls */}
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
-                    <div className="hidden md:flex items-center w-full gap-4">
-                      <div className="w-80">
-                        <Input
-                          name="search"
-                          placeholder="Buscar campanhas..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          className="h-[42px]"
-                          variant="full-rounded"
-                          prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                          label=""
-                        />
-                      </div>
-                    </div>
-
-                    <div className="md:hidden flex items-center gap-2 w-full">
-                      <div className="flex-1 min-w-0">
-                        <Input
-                          name="search"
-                          placeholder="Buscar..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          className="h-[42px] w-full"
-                          variant="full-rounded"
-                          prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                          label=""
-                        />
-                      </div>
-                      <Button
-                        onClick={() => openEntity('create')}
-                        className="w-[42px] h-[42px] p-0 flex items-center justify-center shrink-0"
-                      >
-                        <PlusIcon size={18} />
-                      </Button>
-                    </div>
-                  </div>
+                  <PromotionPageControls
+                    search={search}
+                    onSearchChange={setSearch}
+                    onOpenFilter={() => setIsFilterSheetOpen(true)}
+                    filters={filters}
+                    setFilters={setFilters}
+                    viewMode={viewMode}
+                    onViewModeChange={(mode) => setViewModeState(mode)}
+                    hasActiveFilters={hasActiveFilters}
+                    onAddCampaign={() => openEntity('create')}
+                  />
 
                   {/* List and Table Content */}
                   <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
@@ -426,7 +613,10 @@ export default function PromotionsPage({
                         subtitle="Ajuste os termos de busca."
                         itemButton={{
                           text: "Limpar filtros",
-                          action: () => setSearch("")
+                          action: () => {
+                            setSearch("")
+                            setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })
+                          }
                         }}
                       />
                     ) : (
@@ -440,7 +630,7 @@ export default function PromotionsPage({
                           singularItemName="campanha"
                         />
 
-                        {isTabletOrMobile ? (
+                        {effectiveViewMode === "grid" ? (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                             {paginatedCampaigns.map((camp: any) => {
                               const isSelected = selection.ids.has(camp.id)
@@ -473,19 +663,91 @@ export default function PromotionsPage({
                                   <tr className="bg-brand-gray dark:bg-dark-border/50">
                                     <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
                                       <Checkbox
-                                        checked={selection.ids.size === paginatedCampaigns.length && paginatedCampaigns.length > 0}
+                                        checked={paginatedCampaigns.length > 0 && paginatedCampaigns.every(x => selection.ids.has(x.id))}
                                         onChange={(checked) => {
                                           setSelection({ ids: checked ? new Set(paginatedCampaigns.map(x => x.id)) : new Set() })
                                         }}
                                         className="bg-white dark:bg-dark-background"
                                       />
                                     </th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Campanha</th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Vigência</th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Público</th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">Regras</th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center">Status</th>
-                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">Ações</th>
+                                    
+                                    {/* Campanha column (sortable) */}
+                                    <th
+                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                      onClick={() => {
+                                        setSortConfig((prev) => ({
+                                          key: "name",
+                                          direction: prev?.key === "name" && prev.direction === "asc" ? "desc" : "asc",
+                                        }))
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        Campanha
+                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                          <ArrowUpDownIcon
+                                            size={14}
+                                            className={`transition-all duration-200 ${sortConfig?.key === "name" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "name" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                          />
+                                        </div>
+                                      </div>
+                                    </th>
+
+                                    {/* Vigência column (sortable) */}
+                                    <th
+                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                      onClick={() => {
+                                        setSortConfig((prev) => ({
+                                          key: "starts_at",
+                                          direction: prev?.key === "starts_at" && prev.direction === "asc" ? "desc" : "asc",
+                                        }))
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        Vigência
+                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                          <ArrowUpDownIcon
+                                            size={14}
+                                            className={`transition-all duration-200 ${sortConfig?.key === "starts_at" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "starts_at" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                          />
+                                        </div>
+                                      </div>
+                                    </th>
+
+                                    {/* Escopo column */}
+                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                      Escopo
+                                    </th>
+
+                                    {/* Regras column */}
+                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50">
+                                      Regras
+                                    </th>
+
+                                    {/* Status column (sortable) */}
+                                    <th
+                                      className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
+                                      onClick={() => {
+                                        setSortConfig((prev) => ({
+                                          key: "is_active",
+                                          direction: prev?.key === "is_active" && prev.direction === "asc" ? "desc" : "asc",
+                                        }))
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        Status
+                                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                          <ArrowUpDownIcon
+                                            size={14}
+                                            className={`transition-all duration-200 ${sortConfig?.key === "is_active" ? "text-brand-dark dark:text-dark-heading opacity-100" : "text-brand-inactive-text opacity-0 group-hover:opacity-40"} ${sortConfig?.key === "is_active" && sortConfig?.direction === "desc" ? "rotate-180" : ""}`}
+                                          />
+                                        </div>
+                                      </div>
+                                    </th>
+
+                                    {/* Ações column */}
+                                    <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 text-center rounded-r-lg">
+                                      Ações
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -510,20 +772,41 @@ export default function PromotionsPage({
                                         <td className="p-2 border-b border-brand-border dark:border-dark-border">
                                           <div className="flex flex-col">
                                             <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{camp.name}</span>
-                                            {camp.description && <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-[250px]">{camp.description}</span>}
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body truncate max-w-[250px] font-semibold mt-0.5">
+                                              {getPromotionTypeLabel(campPromos[0])}
+                                            </span>
                                           </div>
                                         </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border text-[13px] text-brand-inactive-text dark:text-dark-body">
-                                          {camp.starts_at ? new Date(camp.starts_at).toLocaleDateString() : 'Indeterminado'}
-                                          {camp.ends_at ? ` a ${new Date(camp.ends_at).toLocaleDateString()}` : ''}
+                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                          {camp.starts_at && camp.ends_at ? (
+                                            <div className="flex flex-col text-[13px] text-brand-inactive-text dark:text-dark-body">
+                                              <span>{new Date(camp.starts_at).toLocaleDateString()}</span>
+                                              <span className="text-xs text-gray-400">{new Date(camp.ends_at).toLocaleDateString()}</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">Indeterminado</span>
+                                          )}
                                         </td>
                                         <td className="p-2 border-b border-brand-border dark:border-dark-border">
-                                          <Badge variant="blue" className="text-xs">
-                                            {camp.customer_scope === "specific" ? "Segmentado" : "Geral"}
-                                          </Badge>
+                                          <div className="flex flex-col text-[13px]">
+                                            <span className="font-medium text-brand-dark dark:text-dark-heading">
+                                              Público: {camp.customer_scope === "specific" ? "Segmentado" : "Geral"}
+                                            </span>
+                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                              Abrangência: {getApplyScopeLabel(campPromos[0]?.apply_scope || "entire_cart")}
+                                            </span>
+                                          </div>
                                         </td>
-                                        <td className="p-2 border-b border-brand-border dark:border-dark-border text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
-                                          {campPromos.length} regra{campPromos.length !== 1 && 's'}
+                                        <td className="p-2 border-b border-brand-border dark:border-dark-border">
+                                          {(() => {
+                                            const details = formatRuleDetails(campPromos[0])
+                                            return (
+                                              <div className="flex flex-col text-[13px]">
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-normal">{details.above}</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5">{details.below}</span>
+                                              </div>
+                                            )
+                                          })()}
                                         </td>
                                         <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                                           <Badge variant={camp.is_active ? "green" : "gray"}>
@@ -532,7 +815,6 @@ export default function PromotionsPage({
                                         </td>
                                         <td className="p-2 border-b border-brand-border dark:border-dark-border text-center" onClick={(e) => e.stopPropagation()}>
                                           <ActionsDropdown
-                                            onView={() => openEntity('view', camp.id)}
                                             onEdit={() => openEntity('edit', camp.id)}
                                             onDuplicate={() => openEntity('duplicate', camp.id)}
                                             onDelete={() => handleDeleteCampaign(camp)}
@@ -786,16 +1068,64 @@ export default function PromotionsPage({
         )}
       </AnimatePresence>
 
-      <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection({ ids: new Set() })}>
+      <FloatingActionBar
+        selectedCount={selection.ids.size}
+        onClearSelection={() => setSelection({ ids: new Set() })}
+      >
         <Button
           variant="ghost"
-          size="sm"
-          className="text-brand-red gap-2 font-bold px-3 hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-900/20"
-          onClick={() => setShowBulkDeleteModal(true)}
+          onClick={() => setShowBulkEditModal(true)}
+          leftIcon={<EditIcon className="w-4 h-4" />}
+          className="h-10 px-3 font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/50"
         >
-          <TrashIcon size={16} /> Excluir Selecionados
+          Ações em massa
+        </Button>
+
+        <Button
+          variant="ghost"
+          onClick={() => {
+            const allInactive = paginatedCampaigns.filter(c => selection.ids.has(c.id)).every(c => !c.is_active)
+            setBulkStatusToApply(allInactive)
+            setShowBulkStatusModal(true)
+          }}
+          leftIcon={
+            paginatedCampaigns.filter(c => selection.ids.has(c.id)).every(c => !c.is_active)
+              ? <CheckCircleIcon className="w-4 h-4 text-green-600" />
+              : <BlockedIcon className="w-4 h-4 text-orange-500" />
+          }
+          className="h-10 px-3 font-semibold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border/50"
+        >
+          {paginatedCampaigns.filter(c => selection.ids.has(c.id)).every(c => !c.is_active) ? "Ativar" : "Desativar"}
+        </Button>
+
+        <Button
+          variant="ghost"
+          onClick={() => setShowBulkDeleteModal(true)}
+          leftIcon={<TrashIcon className="w-4 h-4" />}
+          className="h-10 px-3 font-semibold text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90 hover:bg-red-50 dark:hover:bg-red-900/20"
+        >
+          Excluir
         </Button>
       </FloatingActionBar>
+
+      <PromotionBulkEditModal
+        isOpen={showBulkEditModal}
+        onClose={() => setShowBulkEditModal(false)}
+        selectedCount={selection.ids.size}
+        partnerId={partnerId}
+        scopeData={scopeData}
+        onApply={handleBulkEditApply}
+      />
+
+      <AlertModal
+        isOpen={showBulkStatusModal}
+        onClose={() => setShowBulkStatusModal(false)}
+        onConfirm={handleBulkStatusChange}
+        title="Atualizar Status"
+        description={`Tem certeza que deseja ${bulkStatusToApply ? "ativar" : "desativar"} ${selection.ids.size} campanha(s)?`}
+        confirmText="Confirmar"
+        variant="warning"
+      />
 
       <AlertModal
         isOpen={showBulkDeleteModal}
@@ -815,6 +1145,15 @@ export default function PromotionsPage({
         confirmText="Sim, excluir"
         variant="danger"
         onConfirm={confirmSingleDelete}
+      />
+
+      <FilterSheet
+        isOpen={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        sections={filterSections}
+        filters={filters}
+        setFilters={setFilters}
+        onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
       />
 
       <SavingStatusModal isOpen={isProcessingAction} text="Processando..." />

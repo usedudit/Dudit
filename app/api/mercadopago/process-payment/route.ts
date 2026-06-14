@@ -461,18 +461,18 @@ async function handler(request: NextRequest) {
       productIdsForCache = [...new Set(validatedItems.map((i) => i.product_id))]
     }
 
-    // SEGURANÇA: Validar que o total é positivo e razoável
+    // SEGURANÇA: Validar que o total do servidor coincide com o snapshot do frontend
     if (checkoutPricing) {
-      console.info("[CHECKOUT_PRICING_AUDIT]", {
-        source: "mercadopago-process-payment",
-        checkout: checkoutPricing,
-        serverRecalculated: {
-          couponDiscount: couponDiscountAmount,
-          deliveryFee,
-          finalTotal: totalAmount,
-        },
-      })
-      totalAmount = checkoutPricing.finalTotal
+      if (Math.abs(totalAmount - checkoutPricing.finalTotal) > 0.01) {
+        SecureLogger.error("Checkout pricing mismatch in process-payment", {
+          serverTotal: totalAmount,
+          clientFinalTotal: checkoutPricing.finalTotal,
+        })
+        return NextResponse.json({
+          error: "Os valores do checkout não conferem. Atualize a página e tente novamente."
+        }, { status: 400 })
+      }
+      // Usar deliveryFee e descontos do snapshot apenas para manter compatibilidade
       deliveryFee = checkoutPricing.deliveryFee
       couponDiscountAmount = checkoutPricing.couponDiscount
       paymentMethodDiscountAmount = checkoutPricing.paymentMethodDiscount
@@ -693,7 +693,8 @@ async function handler(request: NextRequest) {
         name: customerName,
         email: user.email,
         phone: userProfile?.phone || null,
-        cpf: payerCpf
+        cpf: payerCpf,
+        userId: buyerId,
       })
     } catch (e) {
       console.error("Error ensuring marketplace customer in process-payment route:", e)

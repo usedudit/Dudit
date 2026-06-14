@@ -1681,6 +1681,115 @@ export async function recordInstallmentPaymentAction(input: {
     }
 }
 
+export async function recordRegularTransactionPaymentAction(input: {
+    partnerId: string
+    transactionId: string
+    paymentAmount: number
+    interestAmount?: number
+    discountAmount?: number
+    paymentMethodId?: string | null
+}) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        const { userId } = await requirePartnerAccessWithPermission(input.partnerId, "financial", "edit")
+        const supabase = createAdminClient()
+
+        const { data: tx, error: txErr } = await supabase
+            .from("transactions")
+            .select("id, status, partner_id, description, category, category_id, subcategory_id, account_id, contact_id, customer_id, contact_type, payment_type, notes, due_date, original_amount, amount, transaction_type, refund_kind")
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+            .single()
+        if (txErr || !tx) throw new Error(txErr?.message || "Transação não encontrada.")
+        if (!isStatusPending(tx.status)) throw new Error("A transação já está quitada.")
+
+        const paymentAmount = Number(input.paymentAmount || 0)
+        const interestAmount = Number(input.interestAmount || 0)
+        const discountAmount = Number(input.discountAmount || 0)
+        if (!Number.isFinite(paymentAmount) || !Number.isFinite(interestAmount) || !Number.isFinite(discountAmount)) {
+            throw new Error("Valores de pagamento inválidos.")
+        }
+
+        const finalPaid = Math.round((paymentAmount + interestAmount - discountAmount) * 100) / 100
+        if (finalPaid <= 0) {
+            throw new Error("O valor final pago (após juros e desconto) deve ser maior que zero.")
+        }
+
+        const original = Math.abs(Number(tx.original_amount ?? tx.amount ?? 0))
+        const nowIso = new Date().toISOString()
+
+        let resolvedAccountId = tx.account_id
+        if (input.paymentMethodId) {
+            const { data: pm } = await supabase
+                .from("payment_methods")
+                .select("default_finance_account_id")
+                .eq("id", input.paymentMethodId)
+                .eq("partner_id", input.partnerId)
+                .maybeSingle()
+            if (pm?.default_finance_account_id) {
+                resolvedAccountId = pm.default_finance_account_id
+            }
+        }
+
+        if (resolvedAccountId) {
+            await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
+                transaction_type: tx.transaction_type,
+                amount: finalPaid,
+                refund_kind: tx.refund_kind,
+            })
+        }
+
+        const pmTypeLabel = input.paymentMethodId
+            ? await paymentMethodDisplayLabel(supabase, input.partnerId, input.paymentMethodId)
+            : tx.payment_type
+
+        const updatePayload: Record<string, unknown> = {
+            status: "paid",
+            payment_date: nowIso,
+            interest_amount: interestAmount > 0 ? interestAmount : (tx.interest_amount || null),
+            discount_amount: discountAmount > 0 ? discountAmount : (tx.discount_amount || null),
+            original_amount: original,
+            paid_amount: finalPaid,
+            amount: finalPaid,
+            updated_at: nowIso,
+        }
+        if (resolvedAccountId) {
+            updatePayload.account_id = resolvedAccountId
+        }
+        if (input.paymentMethodId !== undefined) {
+            updatePayload.payment_method_id = input.paymentMethodId || null
+            updatePayload.payment_type = pmTypeLabel || null
+        }
+
+        const { error: updateErr } = await supabase
+            .from("transactions")
+            .update(updatePayload)
+            .eq("id", input.transactionId)
+            .eq("partner_id", input.partnerId)
+        if (updateErr) throw updateErr
+
+        await logAuditEvent({
+            partnerId: input.partnerId,
+            actorUserId: userId,
+            entityType: "transaction",
+            entityId: input.transactionId,
+            actionType: "paid",
+            changeLines: ["marcou esta transação como paga."],
+            metadata: { oldStatus: "Pendente", newStatus: "Pago" },
+            source: "manual",
+        })
+
+        await revalidateEntityTimeline("transaction", input.transactionId)
+        await revalidateTransactions(input.partnerId)
+
+        return { success: true as const }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao registrar pagamento" }
+    }
+}
+
 export async function settleInstallmentGroupAction(input: {
     partnerId: string
     installmentGroupId: string

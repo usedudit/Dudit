@@ -870,6 +870,12 @@ export function CheckoutPageClient() {
         () => checkoutContext?.productsSubtotal !== undefined ? checkoutContext.productsSubtotal : totalAmount,
         [checkoutContext?.productsSubtotal, totalAmount],
     )
+    const contextTotalSubtotal = useMemo(
+        () => checkoutContext?.productsSubtotal !== undefined
+            ? (checkoutContext.productsSubtotal || 0) + (checkoutContext.servicesSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0)
+            : totalAmount,
+        [checkoutContext?.productsSubtotal, checkoutContext?.servicesSubtotal, checkoutContext?.subscriptionsSubtotal, totalAmount],
+    )
 
     useEffect(() => {
         let active = true
@@ -996,8 +1002,12 @@ export function CheckoutPageClient() {
             checkoutTotalToCharge - (chargedBase - methodDiscount + methodInterest)
         ).toFixed(2)))
 
+        const snapshotSubtotal = payDepositOnly && checkoutContext?.deposit.available
+            ? (checkoutContext.productsSubtotal || 0) + (checkoutContext.subscriptionsSubtotal || 0) + (checkoutContext.deposit.previewAmount || 0)
+            : contextTotalSubtotal
+
         return {
-            subtotal: totalAmount,
+            subtotal: snapshotSubtotal,
             couponDiscount,
             paymentMethodDiscount: methodDiscount,
             paymentMethodInterest: methodInterest,
@@ -1015,6 +1025,9 @@ export function CheckoutPageClient() {
         deliveryFee,
         checkoutTotalWithDelivery,
         checkoutTotalToCharge,
+        payDepositOnly,
+        checkoutContext,
+        contextTotalSubtotal,
     ])
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: products.map((product) => ({
@@ -1319,7 +1332,7 @@ export function CheckoutPageClient() {
             <div className="space-y-3 mb-4">
                 <div className="flex justify-between text-sm font-medium text-brand-inactive-text">
                     <span>Subtotal</span>
-                    <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                    <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
                 </div>
                 {couponDiscount > 0 && (
                     <div className="flex justify-between text-sm font-medium text-brand-green">
@@ -2580,11 +2593,11 @@ export function CheckoutPageClient() {
                                 {/* Totals Summary */}
                                 <FormSection title="Resumo dos Valores" hasSeparator>
                                     <div className="space-y-2 text-sm text-brand-inactive-text">
-                                        <div className="flex justify-between">
-                                            <span>Subtotal</span>
-                                            <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
-                                        </div>
-                                        {couponDiscount > 0 && (
+                                    <div className="flex justify-between">
+                                        <span>Subtotal</span>
+                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
+                                    </div>
+                                    {couponDiscount > 0 && (
                                             <div className="flex justify-between text-brand-green font-semibold">
                                                 <span>Desconto do cupom</span>
                                                 <span>-{formatCurrency(couponDiscount)}</span>

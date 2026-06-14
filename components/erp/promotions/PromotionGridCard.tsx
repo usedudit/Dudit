@@ -15,6 +15,60 @@ interface PromotionGridCardProps {
     onDelete: () => void
 }
 
+const getPromotionTypeLabel = (rule: any) => {
+    if (!rule) return "Sem regras"
+    switch (rule.promotion_type) {
+        case "discount": return "Desconto Direto"
+        case "buy_x_pay_y": return "Leve X Pague Y"
+        case "gift": return "Ganhar Brinde"
+        default: return rule.promotion_type || "Outro"
+    }
+}
+
+const formatRuleDetails = (rule: any) => {
+    if (!rule) return { above: "Sem limites de uso", below: "-" }
+    let above = "Sem limites de uso"
+    const globalLimit = rule.usage_limit
+    const customerLimit = rule.usage_limit_per_customer
+    if (globalLimit && customerLimit) {
+        above = `Global: ${globalLimit} | Por cliente: ${customerLimit}`
+    } else if (globalLimit) {
+        above = `Limite global: ${globalLimit}`
+    } else if (customerLimit) {
+        above = `Limite por cliente: ${customerLimit}`
+    }
+
+    let below = ""
+    if (rule.promotion_type === "discount") {
+        const isPercent = rule.discount_type === "percentage"
+        const formatCurrency = (val: any) => {
+            if (val === undefined || val === null) return ""
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+        }
+        const valStr = isPercent 
+            ? `${rule.discount_value}% Desc.` 
+            : `${formatCurrency(rule.discount_value)} Desc.`
+        const maxStr = rule.max_discount_amount 
+            ? ` - Max ${formatCurrency(rule.max_discount_amount)}` 
+            : ""
+        below = `${valStr}${maxStr}`
+    } else if (rule.promotion_type === "buy_x_pay_y") {
+        below = `Leve ${rule.buy_quantity} Pague ${rule.pay_quantity}`
+    } else if (rule.promotion_type === "gift") {
+        below = `1 Brinde`
+    }
+
+    if (rule.min_spend_amount) {
+        const formatCurrency = (val: any) => {
+            if (val === undefined || val === null) return ""
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+        }
+        below += ` - Min ${formatCurrency(rule.min_spend_amount)}`
+    }
+
+    return { above, below }
+}
+
 const PromotionGridCard = React.memo(({
     campaign,
     campaignPromotions,
@@ -24,9 +78,9 @@ const PromotionGridCard = React.memo(({
     onEdit,
     onDelete
 }: PromotionGridCardProps) => {
-
-    const formattedStartDate = campaign.starts_at ? new Date(campaign.starts_at).toLocaleDateString('pt-BR') : null
-    const formattedEndDate = campaign.ends_at ? new Date(campaign.ends_at).toLocaleDateString('pt-BR') : null
+    const rule = campaignPromotions[0]
+    const promoTypeLabel = getPromotionTypeLabel(rule)
+    const ruleDetails = formatRuleDetails(rule)
 
     return (
         <motion.div
@@ -69,31 +123,39 @@ const PromotionGridCard = React.memo(({
                     </div>
 
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body font-semibold mt-0.5">
-                        {campaignPromotions.length} regra{campaignPromotions.length !== 1 && 's'}
+                        {promoTypeLabel}
                     </p>
                 </div>
             </div>
 
-            {campaign.description && (
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body line-clamp-2 my-3">
-                    {campaign.description}
-                </p>
-            )}
+            <div className="my-3 flex flex-col">
+                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">{ruleDetails.above}</span>
+                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading mt-0.5">{ruleDetails.below}</span>
+            </div>
 
             <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between">
                 <div className="flex flex-col">
                     <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
                         <CalendarIcon className="w-3.5 h-3.5" /> Vigência
                     </span>
-                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading mt-0.5">
-                        {formattedStartDate || "Indeterminado"}
-                        {formattedEndDate ? ` a ${formattedEndDate}` : ''}
-                    </span>
+                    {campaign.starts_at && campaign.ends_at ? (
+                        <div className="flex flex-col mt-0.5">
+                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                {new Date(campaign.starts_at).toLocaleDateString('pt-BR')}
+                            </span>
+                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                {new Date(campaign.ends_at).toLocaleDateString('pt-BR')}
+                            </span>
+                        </div>
+                    ) : (
+                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading mt-0.5">
+                            Indeterminado
+                        </span>
+                    )}
                 </div>
 
                 <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                     <ActionsDropdown
-                        onView={onDetails}
                         onEdit={onEdit}
                         onDelete={onDelete}
                     />

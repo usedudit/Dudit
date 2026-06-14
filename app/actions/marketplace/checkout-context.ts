@@ -99,14 +99,12 @@ export async function getMarketplaceCheckoutContextAction(input: {
   let productsSubtotal = 0
   let servicesSubtotal = 0
   let subscriptionsSubtotal = 0
-  let depositPreviewBase = 0
 
   for (const line of resolved.lines) {
     const total = line.unitPrice * line.quantity
     if (line.itemType === "product") productsSubtotal += total
     else if (line.itemType === "service_booking") {
       servicesSubtotal += total
-      depositPreviewBase += line.fullPrice ?? line.unitPrice * line.quantity
     } else subscriptionsSubtotal += total
   }
 
@@ -275,11 +273,11 @@ export async function getMarketplaceCheckoutContextAction(input: {
     requirements.hasServiceLines &&
     depositAllowed &&
     depositEnabled &&
-    depositPreviewBase > 0 &&
+    servicesSubtotal > 0 &&
     (serviceDepositManualEnabled || (serviceDepositMpEnabled && mpConnected))
 
   const previewAmount =
-    depositAvailable ? Math.round(depositPreviewBase * (depositPercent / 100) * 100) / 100 : 0
+    depositAvailable ? Math.round(servicesSubtotal * (depositPercent / 100) * 100) / 100 : 0
 
   const addresses = partnerRow?.addresses
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses

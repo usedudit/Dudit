@@ -14,13 +14,7 @@ export function PaymentMethodIndicator({ label }: { label?: string | null }) {
     
     const parts = label.split(",").map(p => p.trim()).filter(Boolean)
     if (parts.length > 1) {
-        return (
-            <div className="flex flex-wrap gap-2 items-center">
-                {parts.map((part, index) => (
-                    <PaymentMethodIndicatorKeyed key={index} part={part} />
-                ))}
-            </div>
-        )
+        return <PaymentMethodIndicatorKeyed part="Múltiplos meios" />
     }
     
     return <PaymentMethodIndicatorKeyed part={parts[0] || label} />
@@ -31,7 +25,10 @@ function PaymentMethodIndicatorKeyed({ part }: { part: string }) {
     let icon: React.ReactNode = null
     let colorClass = "text-brand-inactive-text dark:text-dark-body"
 
-    if (normalized.includes("mercado") || normalized.includes("mp") || normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
+    if (normalized.includes("multiplo") || normalized.includes("múltiplo")) {
+        icon = <CreditCardIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />
+        colorClass = "text-brand-inactive-text dark:text-dark-body"
+    } else if (normalized.includes("mercado") || normalized.includes("mp") || normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
         icon = <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-3.5 h-3.5 object-contain" />
         colorClass = "text-brand-blue dark:text-brand-blue"
     } else if (normalized.includes("pix")) {

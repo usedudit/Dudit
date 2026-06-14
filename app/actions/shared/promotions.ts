@@ -200,6 +200,116 @@ export async function deleteCampaignAction(partnerId: string, campaignId: string
   return { success: true }
 }
 
+export async function toggleCampaignsStatusAction(
+  partnerId: string,
+  campaignIds: string[],
+  isActive: boolean
+) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+  const supabase = await getSupabaseServerClient()
+
+  const { error } = await supabase
+    .from("campaigns")
+    .update({ is_active: isActive })
+    .in("id", campaignIds)
+    .eq("partner_id", partnerId)
+
+  if (error) return { success: false, error: error.message }
+
+  await revalidatePromotions(partnerId)
+  return { success: true }
+}
+
+export async function bulkUpdateCampaignsAction(
+  partnerId: string,
+  campaignIds: string[],
+  fields: {
+    startsAt?: string | null
+    endsAt?: string | null
+    customerScope?: "all" | "specific"
+    customerIds?: string[]
+    priority?: number
+    minSpendAmount?: number | null
+    usageLimit?: number | null
+    usageLimitPerCustomer?: number | null
+  }
+) {
+  await requireUser()
+  await requirePartnerAccessWithPermission(partnerId, "coupons", "edit")
+  const supabase = await getSupabaseServerClient()
+
+  // 1. Update Campaign fields if provided
+  const campaignUpdates: any = {}
+  if (fields.startsAt !== undefined) campaignUpdates.starts_at = fields.startsAt
+  if (fields.endsAt !== undefined) campaignUpdates.ends_at = fields.endsAt
+  if (fields.customerScope !== undefined) campaignUpdates.customer_scope = fields.customerScope
+
+  if (Object.keys(campaignUpdates).length > 0) {
+    const { error: campaignError } = await supabase
+      .from("campaigns")
+      .update(campaignUpdates)
+      .in("id", campaignIds)
+      .eq("partner_id", partnerId)
+
+    if (campaignError) return { success: false, error: campaignError.message }
+  }
+
+  // 2. Handle customer selections if customerScope is updated
+  if (fields.customerScope === "specific" && fields.customerIds !== undefined) {
+    // Delete existing assignments for these campaigns
+    const { error: deleteError } = await supabase
+      .from("campaign_customers")
+      .delete()
+      .in("campaign_id", campaignIds)
+
+    if (deleteError) return { success: false, error: deleteError.message }
+
+    // Insert new ones
+    if (fields.customerIds.length > 0) {
+      const records: any[] = []
+      for (const campaignId of campaignIds) {
+        for (const customerId of fields.customerIds) {
+          records.push({ campaign_id: campaignId, customer_id: customerId })
+        }
+      }
+      const { error: insertError } = await supabase
+        .from("campaign_customers")
+        .insert(records)
+
+      if (insertError) return { success: false, error: insertError.message }
+    }
+  } else if (fields.customerScope === "all") {
+    // Delete custom customer associations
+    const { error: deleteError } = await supabase
+      .from("campaign_customers")
+      .delete()
+      .in("campaign_id", campaignIds)
+
+    if (deleteError) return { success: false, error: deleteError.message }
+  }
+
+  // 3. Update linked promotions if promotion fields are provided
+  const promotionUpdates: any = {}
+  if (fields.priority !== undefined) promotionUpdates.priority = fields.priority
+  if (fields.minSpendAmount !== undefined) promotionUpdates.min_spend_amount = fields.minSpendAmount
+  if (fields.usageLimit !== undefined) promotionUpdates.usage_limit = fields.usageLimit
+  if (fields.usageLimitPerCustomer !== undefined) promotionUpdates.usage_limit_per_customer = fields.usageLimitPerCustomer
+
+  if (Object.keys(promotionUpdates).length > 0) {
+    const { error: promoError } = await supabase
+      .from("promotions")
+      .update(promotionUpdates)
+      .in("campaign_id", campaignIds)
+      .eq("partner_id", partnerId)
+
+    if (promoError) return { success: false, error: promoError.message }
+  }
+
+  await revalidatePromotions(partnerId)
+  return { success: true }
+}
+
 // ---------------------------------------------------------------------------
 // Promotion Actions
 // ---------------------------------------------------------------------------

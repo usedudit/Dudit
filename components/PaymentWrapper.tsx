@@ -232,15 +232,18 @@ export function PaymentWrapper({
 
             let preferenceData: any
             try {
-                preferenceData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
+            preferenceData = await fetchJSONWithCSRF<any>("/api/mercadopago/create-preference", {
                     method: "POST",
                     body: {
                         products: orderDetails.items.map(p => ({
                             id: p.id, name: p.name, price: p.price, quantity: p.quantity, variant_id: p.variant_id,
                         })),
                         partnerId,
+                        buyerId,
                         couponCode: orderDetails.couponCode,
                         deliveryFee: orderDetails.deliveryFee,
+                        cartItemIds: orderDetails.cartItemIds,
+                        payDepositOnly,
                         checkoutPricing: orderDetails.checkoutPricing,
                     },
                 })

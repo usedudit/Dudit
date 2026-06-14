@@ -113,7 +113,7 @@ export async function confirmPickupPaymentAction(params: {
       .eq("id", params.orderId)
       .single()
     if (fullOrder) {
-      onOrderStatusChanged(fullOrder, "paid", undefined).catch(console.error)
+      onOrderStatusChanged(fullOrder, "paid", undefined, { skipPartnerTeam: true }).catch(console.error)
     }
   } catch {}
 

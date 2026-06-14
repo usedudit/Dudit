@@ -73,6 +73,23 @@ async function notifyCustomer(params: {
   })
 }
 
+async function getOrderMixType(orderId: string): Promise<"product" | "service" | "both" | null> {
+  const admin = getAdminClient()
+  const { data: items } = await admin
+    .from("order_items")
+    .select("line_type")
+    .eq("order_id", orderId)
+
+  if (!items || items.length === 0) return null
+
+  const hasProduct = items.some((i: { line_type: string }) => i.line_type === "product")
+  const hasService = items.some((i: { line_type: string }) => i.line_type === "service_booking")
+
+  if (hasProduct && hasService) return "both"
+  if (hasService) return "service"
+  return "product"
+}
+
 export async function scheduleNotificationAppointmentReminders(params: {
   partnerId: string
   appointmentId: string
@@ -313,6 +330,32 @@ export async function onAppointmentStatusChanged(
   }
 }
 
+export async function notifyAppointmentCreatedFromMarketplace(params: {
+  partnerId: string
+  appointmentId: string
+  customerName: string
+  serviceName: string
+  startDate: string
+  startTime: string
+  customerId?: string | null
+  marketplaceOrderId?: string | null
+  storeName?: string
+}) {
+  const appointment = {
+    partner_id: params.partnerId,
+    id: params.appointmentId,
+    customer_name: params.customerName,
+    service_name: params.serviceName,
+    start_date: params.startDate,
+    start_time: params.startTime,
+    customer_id: params.customerId || null,
+    marketplace_order_id: params.marketplaceOrderId || null,
+    source: "appointment",
+  }
+
+  await onAppointmentCreated(appointment)
+}
+
 const CUSTOMER_SITUATION_TYPES: Record<string, NotificationType> = {
   paid: "order_paid",
   cancelled: "order_cancelled",
@@ -329,6 +372,7 @@ export async function onOrderStatusChanged(
   order: Record<string, unknown>,
   situation?: string,
   deliveryStatus?: string,
+  options?: { skipPartnerTeam?: boolean },
 ) {
   const partnerId = String(order.partner_id)
   const orderId = String(order.id)
@@ -349,13 +393,40 @@ export async function onOrderStatusChanged(
   }
 
   if (situation === "pending") {
-    await notifyPartnerTeam({
-      partnerId,
-      type: "order_created",
-      entityType: "order",
-      entityId: orderId,
-      ctx,
-    })
+    const mixType = await getOrderMixType(orderId)
+
+    if (mixType === "service" || mixType === "both") {
+      const { data: serviceItem } = await admin
+        .from("order_items")
+        .select("services!inner(name)")
+        .eq("order_id", orderId)
+        .eq("line_type", "service_booking")
+        .limit(1)
+        .maybeSingle()
+
+      const serviceName = (serviceItem as any)?.services?.name || "serviço"
+
+      await notifyPartnerTeam({
+        partnerId,
+        type: "order_created",
+        entityType: "order",
+        entityId: orderId,
+        ctx: {
+          ...ctx,
+          serviceName,
+          mixType,
+        },
+        variant: mixType,
+      })
+    } else {
+      await notifyPartnerTeam({
+        partnerId,
+        type: "order_created",
+        entityType: "order",
+        entityId: orderId,
+        ctx,
+      })
+    }
     return
   }
 
@@ -371,7 +442,7 @@ export async function onOrderStatusChanged(
         ctx: { ...ctx, orderNumber },
       })
     }
-    if (situation === "paid" || situation === "cancelled" || situation === "refunded") {
+    if (!options?.skipPartnerTeam && (situation === "paid" || situation === "cancelled" || situation === "refunded")) {
       await notifyPartnerTeam({
         partnerId,
         type,
@@ -398,81 +469,21 @@ export async function onOrderStatusChanged(
   }
 }
 
-export async function onSubscriptionCreated(params: {
+export async function onSubscriptionCreated(_params: {
   partnerId: string
   subscriptionId: string
   customerId?: string | null
   customerName?: string
   planName?: string
 }) {
-  const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", params.partnerId)
-    .maybeSingle()
-
-  const ctx = {
-    customerName: params.customerName || "Cliente",
-    storeName: partner?.store_name || params.planName,
-  }
-
-  await notifyPartnerTeam({
-    partnerId: params.partnerId,
-    type: "subscription_created",
-    entityType: "subscription",
-    entityId: params.subscriptionId,
-    ctx,
-  })
-
-  const userId = await resolveCustomerUserId({ customerId: params.customerId })
-  if (userId) {
-    await notifyCustomer({
-      userId,
-      type: "subscription_created",
-      entityType: "subscription",
-      entityId: params.subscriptionId,
-      ctx,
-    })
-  }
 }
 
-export async function onSubscriptionRenewed(params: {
+export async function onSubscriptionRenewed(_params: {
   partnerId: string
   subscriptionId: string
   customerId?: string | null
   customerName?: string
 }) {
-  const admin = getAdminClient()
-  const { data: partner } = await admin
-    .from("partners")
-    .select("store_name")
-    .eq("id", params.partnerId)
-    .maybeSingle()
-
-  const ctx = {
-    customerName: params.customerName || "Cliente",
-    storeName: partner?.store_name || undefined,
-  }
-
-  await notifyPartnerTeam({
-    partnerId: params.partnerId,
-    type: "subscription_renewed",
-    entityType: "subscription",
-    entityId: params.subscriptionId,
-    ctx,
-  })
-
-  const userId = await resolveCustomerUserId({ customerId: params.customerId })
-  if (userId) {
-    await notifyCustomer({
-      userId,
-      type: "subscription_renewed",
-      entityType: "subscription",
-      entityId: params.subscriptionId,
-      ctx,
-    })
-  }
 }
 
 export async function broadcastAdminAnnouncement(params: {

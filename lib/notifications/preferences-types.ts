@@ -26,7 +26,6 @@ export const NOTIFICATION_CATEGORIES = {
       "order_refunded",
       "appointment_created",
       "appointment_reminder",
-      "subscription_created",
     ] as NotificationType[],
   },
   seller: {
@@ -37,8 +36,6 @@ export const NOTIFICATION_CATEGORIES = {
       "order_cancelled",
       "appointment_created",
       "appointment_cancelled",
-      "subscription_created",
-      "subscription_renewed",
     ] as NotificationType[],
   },
   system: {

@@ -102,15 +102,16 @@ const networkOnlyErrorHandler = {
       const offlineFallback = await caches.match("/~offline");
       if (offlineFallback) return offlineFallback;
     }
-    return Response.error();
+    return new Response(null, { status: 503, statusText: "Service Unavailable" });
   },
 };
 
 const duditRuntimeCaching = [
   // BLOQUEIO TOTAL: ERP, API, Auth, Server Actions, rotas privadas
+  // NOTA: navigation requests (document) passam direto — sem interferência do SW
   {
     matcher: ({ request, url }: { request: Request; url: URL }) =>
-      isUncacheableRequest(request, url),
+      request.destination !== "document" && isUncacheableRequest(request, url),
     handler: new NetworkOnly({
       plugins: [networkOnlyErrorHandler],
     }),
