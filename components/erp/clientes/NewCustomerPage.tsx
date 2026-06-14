@@ -31,7 +31,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
-import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getPartnerCustomersAction } from "@/app/actions/erp/customers"
+import { createComprehensiveCustomerAction, updateComprehensiveCustomerAction, getCustomerByIdAction } from "@/app/actions/erp/customers"
 import { getAddressesAction } from "@/app/actions/shared/addresses"
 import { consultarCNPJ } from "@/lib/nuvem-fiscal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -130,9 +130,9 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             const fetchData = async () => {
                 setIsLoadingData(true)
                 try {
-                    const res = await getPartnerCustomersAction(partnerId)
-                    if (res.customers) {
-                        const c = res.customers.find((x: any) => x.id === customerId)
+                    const res = await getCustomerByIdAction(customerId)
+                    if (res.customer) {
+                        const c = res.customer
                         if (c) {
                             setCustomerName(c.name || "")
                             setPersonType(c.person_type === "pj" ? "Pessoa Jurídica" : "Pessoa Física")

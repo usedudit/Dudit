@@ -148,6 +148,7 @@ export default function CustomersPage({
     const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
 
+    const rafRef = useRef<number>(0)
     const tableContainerRef = useRef<HTMLDivElement>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
 
@@ -162,11 +163,19 @@ export default function CustomersPage({
         })
     }, [])
 
+    const handleScroll = useCallback(() => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        rafRef.current = requestAnimationFrame(checkScroll)
+    }, [checkScroll])
+
     useEffect(() => {
         checkScroll()
         window.addEventListener("resize", checkScroll)
-        return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, viewMode, rawCustomers])
+        return () => {
+            window.removeEventListener("resize", checkScroll)
+            if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        }
+    }, [checkScroll])
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -530,7 +539,7 @@ export default function CustomersPage({
                                                     <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                                                     <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleScroll}>
                                                         <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">

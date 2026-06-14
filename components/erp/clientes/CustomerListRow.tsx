@@ -157,7 +157,13 @@ const CustomerListItem = React.memo(
     )
   },
   (prev, next) =>
-    prev.customer === next.customer &&
+    prev.customer.originalId === next.customer.originalId &&
+    prev.customer.name === next.customer.name &&
+    prev.customer.status === next.customer.status &&
+    prev.customer.orders === next.customer.orders &&
+    prev.customer.totalOrderValue === next.customer.totalOrderValue &&
+    prev.customer.lastOrderDate === next.customer.lastOrderDate &&
+    prev.customer.storeCredit === next.customer.storeCredit &&
     prev.selected === next.selected &&
     prev.columns === next.columns
 )

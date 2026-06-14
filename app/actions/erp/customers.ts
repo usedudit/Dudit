@@ -4,7 +4,9 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidatePath } from "next/cache"
 import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatTime } from "@/lib/utils"
+import { decryptCPF, encryptCPF } from "@/lib/crypto"
+import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { requireUser, requirePartnerAccessWithPermission, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -26,7 +28,6 @@ async function prepareEncryptedCpf(
   }
 
   const cleanCpf = cpf.replace(/\D/g, "")
-  const { encryptCPF, decryptCPF } = await import("@/lib/crypto")
 
   const cpfQuery = supabase
     .from("customers")
@@ -504,6 +505,40 @@ export async function updateComprehensiveCustomerAction(data: {
   return { success: true }
 }
 
+export async function getCustomerByIdAction(customerId: string) {
+  const user = await requireUser()
+  if (!user) return { error: "NÃ£o autenticado" }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select(`
+      id, name, email, phone, mobile, phone_fixed, status, person_type,
+      cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
+      store_credit, notes, birth_date, mother_name, father_name, website,
+      created_at, zip_code, street, number, complement, neighborhood,
+      city, state, country
+    `)
+    .eq("id", customerId)
+    .maybeSingle()
+
+  if (!customer) {
+    return { error: "Cliente nÃ£o encontrado" }
+  }
+
+  // Decrypt CPF if present
+  if (customer.cpf) {
+    try {
+      customer.cpf = await decryptCPF(customer.cpf)
+    } catch (e) {
+      // keep encrypted
+    }
+  }
+
+  return { customer }
+}
+
 export async function getCustomerOrdersAction(customerId: string) {
   const user = await requireUser()
   if (!user) return { error: "NÃ£o autenticado" }
@@ -543,13 +578,13 @@ export async function getCustomerOrdersAction(customerId: string) {
     `)
     .eq("buyer_id", buyerId)
     .order("created_at", { ascending: false })
+    .limit(50)
 
   if (error) {
     return { error: error.message }
   }
 
-  const { getDeliveryStatusMeta, getDeliveryStatusLabelForType } = await import("@/lib/orders/status")
-  const { formatDate, formatTime } = await import("@/lib/utils")
+
 
   const formattedOrders = orders.map((o: any) => {
     const deliveryInfo = getDeliveryStatusMeta(o.delivery_status) as any
@@ -616,10 +651,9 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
-    
-    // Decrypt CPFs for display
-    const { decryptCPF } = await import("@/lib/crypto")
-    for (const c of result) {
+
+    // Decrypt CPFs in parallel
+    await Promise.all(result.map(async (c: any) => {
       if (c.cpf) {
         try {
           c.cpf = await decryptCPF(c.cpf)
@@ -627,7 +661,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
           // Keep encrypted if decryption fails
         }
       }
-    }
+    }))
 
     // Prioritize: current store customers first, then others
     if (currentStoreId) {
@@ -744,9 +778,8 @@ export async function getERPCustomersPageAction(
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
 
-    // Decrypt CPFs for display
-    const { decryptCPF } = await import("@/lib/crypto")
-    for (const item of items) {
+    // Decrypt CPFs in parallel
+    await Promise.all(items.map(async (item: any) => {
       if (item.cpf) {
         try {
           item.cpf = await decryptCPF(item.cpf)
@@ -754,7 +787,7 @@ export async function getERPCustomersPageAction(
           // Keep encrypted if decryption fails
         }
       }
-    }
+    }))
     const last = items[items.length - 1]
     const nextCursor: ERPCustomerListCursor | null =
       hasMore && last?.created_at && last?.id ? { createdAt: String(last.created_at), id: String(last.id) } : null

@@ -63,20 +63,32 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ left: false, right: false });
 
+    const rafRef = useRef<number>(0)
+
     const checkScroll = useCallback(() => {
         if (!tableContainerRef.current) return
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
-        setScrollState({
-            left: scrollLeft > 0,
-            right: scrollLeft < scrollWidth - clientWidth - 2,
+        setScrollState((prev) => {
+            const left = scrollLeft > 0
+            const right = scrollLeft < scrollWidth - clientWidth - 2
+            if (prev.left === left && prev.right === right) return prev
+            return { left, right }
         })
     }, []);
+
+    const handleTableScroll = useCallback(() => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        rafRef.current = requestAnimationFrame(checkScroll)
+    }, [checkScroll])
 
     useEffect(() => {
         checkScroll()
         window.addEventListener("resize", checkScroll)
-        return () => window.removeEventListener("resize", checkScroll)
-    }, [checkScroll, fetchedOrders]);
+        return () => {
+            window.removeEventListener("resize", checkScroll)
+            if (rafRef.current) cancelAnimationFrame(rafRef.current)
+        }
+    }, [checkScroll]);
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -377,7 +389,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                                 <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
                                                                 <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
-                                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                                <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleTableScroll}>
                                                                     <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
                                                                         <thead>
                                                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
@@ -735,7 +747,7 @@ function ReviewsContent({ customerId }: { customerId: string }) {
             <IconPlaceholder
                 title="Nenhuma avaliação"
                 subtitle="Este cliente ainda não avaliou nenhum produto ou serviço."
-                imageSrc="https://img.dudit.com.br/static/mascots/SacolaVazia.png"
+                imageSrc="https://img.dudit.com.br/static/mascots/Avaliacoes.png"
                 imageAlt="Nenhuma avaliação"
                 placeholderType="image"
             />
