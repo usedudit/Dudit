@@ -12,6 +12,7 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { getDeliveryStatusLabel, getPaymentStatusLabel } from "@/lib/orders/status"
 import { getOrderHistoryEntries } from "@/lib/services/order-history.service"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
 import { finalizeOrderInventory, releaseOrderInventory, reserveOrderInventory, shouldDeductInventory } from "@/lib/stock/reservations"
@@ -2573,6 +2574,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
                     continue
                 }
                 processedCount += 1
+                await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
 
                 if (stockWasRestoredOnCancel) {
                     const restoreResult = await createOrderStockMovement({

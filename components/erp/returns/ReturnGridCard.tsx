@@ -47,7 +47,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
           <p className="font-bold text-brand-dark dark:text-dark-heading truncate">{returnRequest.orderNumber}</p>
         </div>
         <div>
-          <p className="text-xs text-brand-inactive-text">Resolucao</p>
+          <p className="text-xs text-brand-inactive-text">Resolução</p>
           <p className="font-bold text-brand-dark dark:text-dark-heading">{getReturnResolutionLabel(returnRequest.approvedResolution || returnRequest.desiredResolution || returnRequest.refundType || "refund")}</p>
         </div>
       </div>
@@ -63,7 +63,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
           </p>
         </div>
         <div onClick={(e) => e.stopPropagation()}>
-          <ActionsDropdown 
+          <ActionsDropdown
             onView={onDetails}
             onEdit={canManage && !["RESOLVED", "REJECTED", "EXPIRED"].includes(returnRequest.status) ? onEdit : undefined}
           />

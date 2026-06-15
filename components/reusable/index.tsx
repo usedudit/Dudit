@@ -49,5 +49,6 @@ export { DatePicker } from "./DatePicker"
 export { TimePicker } from "./TimePicker"
 export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } from "./Tabs"
 export { Barcode } from "./Barcode"
+export { QuantitySelector } from "./QuantitySelector"
 export { BarcodeScannerInput } from "./BarcodeScannerInput"
 

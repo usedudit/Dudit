@@ -10,6 +10,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { revalidateOrders, revalidateOrderHistory, revalidateStockMovements, revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import type { ReturnRequestListItem } from "@/lib/returns/types"
 import {
@@ -304,7 +305,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
 
         return successResponse(normalized)
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao carregar devolucao")
+        return errorResponse(e?.message || "Erro ao carregar devolução")
     }
 }
 
@@ -317,16 +318,36 @@ export async function createReturnRequestAction(input: unknown) {
         assertRole(access.roleId, MANAGE_ROLES)
         const supabase = createAdminClient()
 
-        // Validate that the order has situation = 'paid'
+        // Validate that the order has situation = 'paid' or 'partially_paid'
         const { data: order, error: orderError } = await supabase
             .from("orders")
-            .select("id, situation")
+            .select("id, situation, delivery_status")
             .eq("id", data.orderId)
             .single()
 
         if (orderError || !order) throw new Error("Pedido não encontrado")
-        if (order.situation !== "paid") {
+        if (order.situation !== "paid" && order.situation !== "partially_paid") {
             throw new Error("Não é permitido criar devolução para pedidos não pagos.")
+        }
+
+        // Fetch order items to validate item types for exchange
+        const { data: orderItems, error: itemsError } = await supabase
+            .from("order_items")
+            .select("id, product_id, service_id, line_type")
+            .eq("order_id", data.orderId)
+
+        if (itemsError || !orderItems) throw new Error("Erro ao buscar itens do pedido")
+
+        const returnedItemIds = new Set(data.items.map((item: any) => item.order_item_id))
+        const returnedServices = orderItems.filter((item: any) => returnedItemIds.has(item.id) && (item.service_id || item.line_type === "service_booking"))
+
+        if (data.resolution === "exchange") {
+            if (order.delivery_status !== "delivered") {
+                throw new Error("A troca só é permitida para pedidos concluídos (entregues/executados).")
+            }
+            if (returnedServices.length > 0) {
+                throw new Error("Não é permitido realizar troca de itens de serviço.")
+            }
         }
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
@@ -353,7 +374,7 @@ export async function createReturnRequestAction(input: unknown) {
             entityType: "return_request",
             entityId: requestId,
             actionType: "created",
-            changeLines: ["criou solicitacao de troca/devolucao."],
+            changeLines: ["criou solicitacao de troca/devolução."],
             metadata: { orderId: data.orderId, resolution: data.resolution },
             source: "manual",
         })
@@ -383,7 +404,7 @@ export async function createReturnRequestAction(input: unknown) {
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao criar devolucao")
+        return errorResponse(e?.message || "Erro ao criar devolução")
     }
 }
 
@@ -403,9 +424,28 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
 
         if (orderError || !order) throw new Error("Pedido nao encontrado")
         if (order.buyer_id !== user.id) throw new Error("Sem permissao")
-        if (String(order.situation || "").toLowerCase() === "cancelled") throw new Error("Pedido cancelado nao aceita devolucao")
-        if (!canRequestPostFulfillmentResolution(order)) {
-            throw new Error("Este pedido ainda nao saiu para entrega. Solicite o cancelamento enquanto a entrega nao iniciou.")
+        if (order.situation !== "paid" && order.situation !== "partially_paid") {
+            throw new Error("Não é permitido criar solicitação para pedidos não pagos.")
+        }
+
+        // Fetch order items to validate item types for exchange
+        const { data: orderItems, error: itemsError } = await supabase
+            .from("order_items")
+            .select("id, product_id, service_id, line_type")
+            .eq("order_id", base.orderId)
+
+        if (itemsError || !orderItems) throw new Error("Erro ao buscar itens do pedido")
+
+        const returnedItemIds = new Set(base.items.map((item: any) => item.order_item_id))
+        const returnedServices = orderItems.filter((item: any) => returnedItemIds.has(item.id) && (item.service_id || item.line_type === "service_booking"))
+
+        if (base.resolution === "exchange") {
+            if (order.delivery_status !== "delivered") {
+                throw new Error("A troca só é permitida para pedidos concluídos (entregues/executados).")
+            }
+            if (returnedServices.length > 0) {
+                throw new Error("Não é permitido realizar troca de itens de serviço.")
+            }
         }
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
@@ -428,7 +468,7 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
         await revalidateReturns(order.partner_id, base.orderId, requestId)
         return successResponse({ id: requestId })
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao enviar solicitacao")
+        return errorResponse(e?.message || "Erro ao enviar solicitação")
     }
 }
 
@@ -449,7 +489,7 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
         if (orderError || !order) throw new Error("Pedido nao encontrado")
         if (order.buyer_id !== user.id) throw new Error("Sem permissao")
         if (!canRequestOrderCancellation(order)) {
-            throw new Error("Este pedido ja esta em entrega. Para continuar, solicite devolucao, troca ou reembolso.")
+            throw new Error("Este pedido ja esta em entrega. Para continuar, solicite devolução, troca ou reembolso.")
         }
 
         const { data: created, error } = await supabase.rpc("create_return_request", {
@@ -474,6 +514,31 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao solicitar cancelamento")
     }
+}
+
+/**
+ * Extracts the total amount paid via Mercado Pago from the order's payment_breakdown.
+ * Uses the canonical `provider` field (set at checkout as "Mercado Pago"), NOT display labels.
+ * Falls back to the full order amount when the order was paid entirely via MP (no breakdown).
+ */
+export function extractMercadoPagoPaidAmount(order: any): number {
+    const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : []
+    if (breakdown.length === 0) {
+        // No breakdown = single payment method. Check if it was MP.
+        const provider = String(order?.payment_provider || "").toLowerCase()
+        if (provider.includes("mercado") || order?.mp_payment_id) {
+            return getOrderAmountPaid(order)
+        }
+        return 0
+    }
+    // Sum only entries where provider is "Mercado Pago" (canonical value set by checkout)
+    return breakdown.reduce((sum: number, entry: any) => {
+        const entryProvider = String(entry.provider || "").toLowerCase()
+        if (entryProvider.includes("mercado")) {
+            return sum + Math.max(0, Number(entry.amount || entry.effectiveAmount || 0))
+        }
+        return sum
+    }, 0)
 }
 
 async function maybeRefundMercadoPago(params: {
@@ -545,7 +610,7 @@ export async function processReturnRequestAction(input: unknown) {
             .from("return_requests")
             .select(`
                 id, partner_id, order_id, status, request_type, order_total_snapshot,
-                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id),
+                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown),
                 return_items(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)
@@ -587,19 +652,51 @@ export async function processReturnRequestAction(input: unknown) {
         if (error) throw error
 
         const result = processed as any
-        const mercadoPagoRefundAmount = data.refundAmount > 0
+
+        // Post-sales Phase 1 adjustment: Cancellation approved/resolved -> Cancel Order + Sync appointments/transactions
+        if (request.request_type === "cancellation" && (data.nextStatus === "APPROVED" || data.nextStatus === "RESOLVED")) {
+            const { error: updateOrderError } = await supabase
+                .from("orders")
+                .update({
+                    situation: "cancelled",
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", request.order_id)
+
+            if (updateOrderError) {
+                console.error("[processReturnRequest] Error updating order to cancelled:", updateOrderError)
+            } else {
+                await syncCancelledOrderAppointmentsAndTransactions(supabase, request.order_id)
+                await logAuditEvent({
+                    partnerId: request.partner_id,
+                    actorUserId: user.id,
+                    entityType: "order",
+                    entityId: request.order_id,
+                    actionType: "cancelled",
+                    changeLines: ["Pedido cancelado - solicitação de cancelamento aprovada."],
+                    source: "manual",
+                })
+            }
+        }
+        const requestedRefundAmount = data.refundAmount > 0
             ? data.refundAmount
             : data.exchangeBalanceResolution === "refund"
                 ? toNumber(result?.exchange_surplus_amount)
                 : 0
-        if (hasMercadoPago && mercadoPagoRefundAmount > 0) {
-            await maybeRefundMercadoPago({
-                partnerId: data.partnerId,
-                requestId: data.requestId,
-                refundId: result?.refund_id,
-                amount: mercadoPagoRefundAmount,
-                order: (request as any).orders,
-            })
+        if (hasMercadoPago && requestedRefundAmount > 0) {
+            // Cap the MP refund to only the portion actually paid via Mercado Pago.
+            // Any excess (paid via external methods) flows through the existing manual refund path.
+            const mpPaidAmount = extractMercadoPagoPaidAmount((request as any).orders)
+            const cappedMpRefundAmount = Math.min(requestedRefundAmount, mpPaidAmount)
+            if (cappedMpRefundAmount > 0) {
+                await maybeRefundMercadoPago({
+                    partnerId: data.partnerId,
+                    requestId: data.requestId,
+                    refundId: result?.refund_id,
+                    amount: cappedMpRefundAmount,
+                    order: (request as any).orders,
+                })
+            }
         }
 
         await logAuditEvent({
@@ -608,7 +705,7 @@ export async function processReturnRequestAction(input: unknown) {
             entityType: "return_request",
             entityId: data.requestId,
             actionType: data.action,
-            changeLines: data.nextStatus ? [`alterou status para ${data.nextStatus}.`] : ["atualizou a solicitacao."],
+            changeLines: data.nextStatus ? [`alterou status para ${data.nextStatus}.`] : ["atualizou a solicitação."],
             metadata: {
                 refundAmount: data.refundAmount,
                 storeCreditAmount: data.storeCreditAmount,
@@ -625,7 +722,7 @@ export async function processReturnRequestAction(input: unknown) {
 
         return successResponse(result)
     } catch (e: any) {
-        return errorResponse(e?.message || "Erro ao processar devolucao")
+        return errorResponse(e?.message || "Erro ao processar devolução")
     }
 }
 
@@ -638,7 +735,7 @@ export async function escalateReturnRequestAction(partnerId: string, requestId: 
         refundAmount: 0,
         storeCreditAmount: 0,
         returnToInventory: false,
-        notes: reason || "Escalado para moderacao Dudit",
+        notes: reason || "Escalado para moderação Dudit",
         idempotencyKey: `escalate:${requestId}:${Date.now()}`,
     })
 }

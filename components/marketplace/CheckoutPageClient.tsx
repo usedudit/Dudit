@@ -1788,12 +1788,13 @@ export function CheckoutPageClient() {
                         payWithAmount: payWithAmount || undefined,
                         checkoutPricingSnapshot,
                     })
-                    if (result.error) throw new Error(result.error)
+                    if ('error' in result && result.error) throw new Error(result.error)
+                    const successResult = result as any
                     sessionStorage.removeItem("checkout_session")
 
                     setPixPaymentData({
-                        orderId: result.orderId,
-                        orderNumber: result.orderNumber,
+                        orderId: successResult.orderId,
+                        orderNumber: successResult.orderNumber,
                         amount: checkoutTotalToCharge,
                         orderDetails: {
                             items: products.map(p => ({

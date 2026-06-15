@@ -22,6 +22,8 @@ import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
 import { formatDateTime } from "@/lib/utils/formatters";
+import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 // ─── Helper: delete image from R2 ──────────────────────────────────────────
 
@@ -130,7 +132,7 @@ export async function getModerationQueue(
             logo_moderation_status, banner_moderation_status, risk_score, created_at,
             user_profiles!partners_user_id_fkey(full_name)
         `)
-    
+
     if (statusFilter && statusFilter !== "all") {
         partnerQuery = partnerQuery.or(`logo_moderation_status.eq.${statusFilter},banner_moderation_status.eq.${statusFilter}`)
     } else {
@@ -162,7 +164,7 @@ export async function getModerationQueue(
         const images: string[] = []
         if (p.store_image_url) images.push(p.store_image_url)
         if (p.banner_url) images.push(p.banner_url)
-        
+
         // Determine consolidated status
         let status = "approved"
         if (p.logo_moderation_status === "pending_moderation" || p.banner_moderation_status === "pending_moderation") {
@@ -220,7 +222,7 @@ export async function getModerationQueue(
     const mappedReturns: ModerationItem[] = (returnDisputes || []).map((r: any) => ({
         id: r.id,
         type: "return_dispute" as const,
-        title: `Disputa de devolucao ${r.order_number_snapshot || String(r.order_id).slice(0, 8)}`,
+        title: `Disputa de devolução ${r.order_number_snapshot || String(r.order_id).slice(0, 8)}`,
         description: [r.reason, r.customer_message].filter(Boolean).join(" - ") || null,
         price: 0,
         images: (r.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
@@ -260,7 +262,7 @@ export async function approveModeration(
     if (type === "return_dispute") {
         const { data: rr, error: rrError } = await supabase
             .from("return_requests")
-            .select("id, partner_id, order_id, status")
+            .select("id, partner_id, order_id, status, request_type")
             .eq("id", entityId)
             .eq("status", "ESCALATED")
             .single()
@@ -276,10 +278,36 @@ export async function approveModeration(
             p_refund_payment_method: null,
             p_return_to_inventory: false,
             p_store_credit_amount: 0,
-            p_notes: "Moderacao aprovou o cliente para continuidade da resolucao.",
+            p_notes: "Moderacao aprovou o cliente para continuidade da resolução.",
             p_idempotency_key: `moderation-approve:${entityId}:${Date.now()}`,
         })
         if (error) return { success: false, error: error.message }
+
+        if (rr.request_type === "cancellation") {
+            const { error: updateOrderError } = await supabase
+                .from("orders")
+                .update({
+                    situation: "cancelled",
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", rr.order_id)
+
+            if (updateOrderError) {
+                console.error("[approveModeration] Error updating order to cancelled:", updateOrderError)
+            } else {
+                await syncCancelledOrderAppointmentsAndTransactions(supabase, rr.order_id)
+                await logAuditEvent({
+                    partnerId: rr.partner_id,
+                    actorUserId: admin.userId,
+                    entityType: "order",
+                    entityId: rr.order_id,
+                    actionType: "cancelled",
+                    changeLines: ["Pedido cancelado - disputa de cancelamento aprovada pela moderação."],
+                    source: "manual",
+                })
+            }
+        }
+
         await adminAuditLog({
             adminUserId: admin.userId,
             actionType: AdminActionType.MODERATION_APPROVE,
@@ -330,9 +358,9 @@ export async function approveModeration(
         actionType: AdminActionType.MODERATION_APPROVE,
         targetType: type,
         targetId: entityId,
-        metadata: { 
-            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status }, 
-            name: type === "product" ? entity.name : entity.store_name 
+        metadata: {
+            previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status },
+            name: type === "product" ? entity.name : entity.store_name
         },
     })
 
@@ -571,11 +599,11 @@ export async function rejectModeration(
         actionType: AdminActionType.MODERATION_REJECT,
         targetType: type,
         targetId: entityId,
-        metadata: { 
-            reason: reason.trim(), 
+        metadata: {
+            reason: reason.trim(),
             previousStatus: type === "product" ? entity.moderation_status : { logo: entity.logo_moderation_status, banner: entity.banner_moderation_status },
             name: type === "product" ? entity.name : entity.store_name,
-            riskScoreAdded: type === "product" ? 3 : 0 
+            riskScoreAdded: type === "product" ? 3 : 0
         },
     })
 

@@ -6,7 +6,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: "default" | "outline" | "outlinered" | "destructive" | "warning" | "ghost" | "filled" | "link"
+    variant?: "default" | "outline" | "outlinered" | "destructive" | "warning" | "ghost" | "ghostred" | "filled" | "link"
     size?: "default" | "sm" | "lg" | "icon"
     asChild?: boolean
     isLoading?: boolean

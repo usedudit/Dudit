@@ -12,6 +12,8 @@ import {
   prepareProductBuyNowCheckoutAction,
 } from "@/app/actions/marketplace/cart-extensions"
 import { addPurchasableServiceToCartAction } from "@/app/actions/marketplace/cart-extensions"
+import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
+import { logAuditEvent } from "@/lib/services/timeline.service"
 
 const revalidateOrdersCache = async () => await revalidateOrders("")
 
@@ -110,7 +112,7 @@ export async function cancelBuyerOrderAction(orderId: string) {
 
   const { data: order, error: fetchError } = await supabase
     .from("orders")
-    .select("situation, buyer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity)")
+    .select("id, situation, buyer_id, mp_payment_id, partner_id, inventory_deducted, order_items(product_id, variant_id, quantity, service_id, line_type)")
     .eq("id", orderId)
     .single()
 
@@ -187,6 +189,20 @@ export async function cancelBuyerOrderAction(orderId: string) {
     }
   }
 
+  // Call helper to sync appointments and transactions
+  await syncCancelledOrderAppointmentsAndTransactions(supabase, orderId)
+
+  // Log audit event for the cancelled order
+  await logAuditEvent({
+    partnerId: order.partner_id,
+    actorUserId: user.id,
+    entityType: "order",
+    entityId: orderId,
+    actionType: "cancelled",
+    changeLines: ["Cliente cancelou o pedido."],
+    source: "marketplace",
+  })
+
   revalidateOrdersCache()
   return { success: true }
 }
@@ -220,4 +236,123 @@ export async function getOrderHistoryForBuyerAction(orderId: string) {
     console.error("[getOrderHistoryForBuyerAction] error:", err)
     return { error: err.message || "Erro ao buscar histórico" }
   }
+}
+
+export async function confirmOrderFulfillmentAction(orderId: string) {
+  const user = await requireUser()
+  if (!user) {
+    return { error: "Não autenticado" }
+  }
+
+  const supabase = await getSupabaseServerClient()
+
+  // 1. Fetch order details with items
+  const { data: order, error: fetchError } = await supabase
+    .from("orders")
+    .select("id, buyer_id, partner_id, delivery_status, situation, order_items(id, product_id, service_id, line_type, quantity)")
+    .eq("id", orderId)
+    .single()
+
+  if (fetchError || !order) {
+    return { error: "Pedido não encontrado" }
+  }
+
+  if (order.buyer_id !== user.id) {
+    return { error: "Sem permissão" }
+  }
+
+  const orderItems = order.order_items || []
+  const hasProducts = orderItems.some(
+    (item: any) => !item.service_id && item.line_type !== "service_booking" && !item.recurring_plan_id && item.line_type !== "subscription"
+  )
+  const hasServices = orderItems.some(
+    (item: any) => item.service_id || item.line_type === "service_booking"
+  )
+
+  // 2. Enforce product delivery verification
+  if (hasProducts) {
+    const validDeliveryStates = ["sent", "shipped", "out_for_delivery", "delivered"]
+    if (!validDeliveryStates.includes(order.delivery_status || "")) {
+      return { error: "Os produtos ainda não foram enviados para entrega." }
+    }
+  }
+
+  // 3. Enforce service execution date verification
+  const { data: appointments } = await supabase
+    .from("appointments")
+    .select("id, status, start_date, start_time, end_date, end_time")
+    .eq("marketplace_order_id", orderId)
+
+  if (hasServices && appointments && appointments.length > 0) {
+    let latestCompletionTime = 0
+    let latestAppt: any = null
+    for (const appt of appointments) {
+      const apptEnd = new Date(`${appt.end_date}T${appt.end_time}`)
+      if (apptEnd.getTime() > latestCompletionTime) {
+        latestCompletionTime = apptEnd.getTime()
+        latestAppt = appt
+      }
+    }
+
+    if (Date.now() < latestCompletionTime) {
+      const apptDateStr = latestAppt.start_date
+      const apptTimeStr = latestAppt.start_time.slice(0, 5)
+      return {
+        error: `A execução dos serviços só pode ser confirmada após o término do agendamento (${apptDateStr} às ${apptTimeStr}).`
+      }
+    }
+  }
+
+  // 4. Update order delivery status
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      delivery_status: "delivered",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId)
+
+  if (updateError) {
+    return { error: updateError.message }
+  }
+
+  // 5. Update active appointments status to 'Concluído' without touching financials
+  if (appointments && appointments.length > 0) {
+    const activeAppts = appointments.filter(
+      (appt: any) => appt.status !== "Concluído" && appt.status !== "Cancelado"
+    )
+    if (activeAppts.length > 0) {
+      const activeIds = activeAppts.map((appt: any) => appt.id)
+      await supabase
+        .from("appointments")
+        .update({
+          status: "Concluído",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", activeIds)
+    }
+  }
+
+  // 6. Log audit event with order history
+  let logMessage = "Cliente confirmou a conclusão do pedido."
+  if (hasProducts && hasServices) {
+    logMessage = "Cliente confirmou o recebimento dos produtos e a execução dos serviços."
+  } else if (hasProducts) {
+    logMessage = "Cliente confirmou o recebimento dos produtos."
+  } else if (hasServices) {
+    logMessage = "Cliente confirmou a execução dos serviços."
+  }
+
+  await logAuditEvent({
+    partnerId: order.partner_id,
+    actorUserId: user.id,
+    entityType: "order",
+    entityId: orderId,
+    actionType: "received",
+    changeLines: [logMessage],
+    source: "marketplace",
+  })
+
+  revalidateOrdersCache()
+  return { success: true }
 }

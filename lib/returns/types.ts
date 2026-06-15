@@ -96,7 +96,7 @@ export type ReturnRequestListItem = {
 export function getReturnStatusLabel(status: string) {
   switch (status) {
     case "PENDING_REVIEW": return "Pendente"
-    case "UNDER_ANALYSIS": return "Em analise"
+    case "UNDER_ANALYSIS": return "Em análise"
     case "APPROVED": return "Aprovada"
     case "REJECTED": return "Recusada"
     case "WAITING_CUSTOMER": return "Aguardando cliente"
@@ -104,7 +104,7 @@ export function getReturnStatusLabel(status: string) {
     case "PROCESSING": return "Aprovada"
     case "RESOLVED": return "Concluida"
     case "EXPIRED": return "Concluida"
-    case "ESCALATED": return "Em analise"
+    case "ESCALATED": return "Em análise"
     default: return status || "Pendente"
   }
 }
@@ -114,7 +114,7 @@ export function getReturnResolutionLabel(resolution: string) {
     case "exchange": return "Troca"
     case "refund": return "Reembolso"
     case "store_credit": return "Vale-compra"
-    case "none": return "Sem resolucao"
+    case "none": return "Sem resolução"
     case "rejected": return "Recusado"
     default: return resolution || "-"
   }

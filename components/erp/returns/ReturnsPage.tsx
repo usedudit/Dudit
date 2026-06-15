@@ -29,11 +29,11 @@ interface ReturnsPageProps {
 const ITEMS_PER_PAGE = 8
 
 const COLUMNS = [
-    { id: "id", label: "Codigo", align: "left" as const, width: "160px" },
+    { id: "id", label: "Código", align: "left" as const, width: "160px" },
     { id: "order_number", label: "Pedido", align: "left" as const, width: "180px" },
     { id: "customer", label: "Cliente", align: "left" as const, width: "240px" },
     { id: "date", label: "Data", align: "left" as const, width: "160px" },
-    { id: "refund_type", label: "Resolucao", align: "left" as const, width: "180px" },
+    { id: "refund_type", label: "Resolução", align: "left" as const, width: "180px" },
     { id: "quantity", label: "Qtd", align: "left" as const, width: "100px" },
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
@@ -161,12 +161,12 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
                 })
                 if (!response.success) throw new Error(response.error)
-                toast({ title: "Sucesso", description: "Solicitacao atualizada com sucesso." })
+                toast({ title: "Sucesso", description: "Solicitação atualizada com sucesso." })
             }
             await loadReturns()
             closeEntity()
         } catch (err: any) {
-            toast({ title: "Erro", description: err?.message || "Erro ao salvar devolucao.", variant: "destructive" })
+            toast({ title: "Erro", description: err?.message || "Erro ao salvar devolução.", variant: "destructive" })
         } finally {
             setIsSaving(false)
         }
@@ -269,7 +269,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                                 </Button>
                                 {canManage && (
                                     <Button onClick={() => openEntity("create")} leftIcon={<PlusIcon size={18} />}>
-                                        Nova devolucao
+                                        Nova devolução
                                     </Button>
                                 )}
                             </div>

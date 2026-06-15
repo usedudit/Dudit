@@ -9,7 +9,7 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
 import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
-import { cancelBuyerOrderAction } from '@/app/actions/marketplace/orders';
+import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/actions/marketplace/orders';
 import { getAddressesAction } from '@/app/actions/shared/addresses';
 import { HistoryTimeline } from '@/components/erp/shared/HistoryTimeline';
 import { getProductUrl, getPartnerUrl, getServiceUrl, getPlanUrl } from '@/lib/utils/url-generator';
@@ -340,12 +340,47 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnServiceItems, setReturnServiceItems] = useState<Record<string, boolean>>({});
     const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
         allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
     });
 
     const handleBack = useCallback(() => onBack(), [onBack]);
+
+    useEffect(() => {
+        if (returnResolution === "exchange") {
+            setReturnServiceItems({});
+        }
+    }, [returnResolution]);
+
+    const handleConfirmFulfillment = async () => {
+        try {
+            setIsConfirming(true);
+            const res = await confirmOrderFulfillmentAction(order.id);
+            if (res && "error" in res && res.error) {
+                toast({
+                    title: "Erro ao confirmar",
+                    description: res.error,
+                    variant: "destructive",
+                });
+            } else {
+                toast({
+                    title: "Sucesso!",
+                    description: "Status de entrega/execução atualizado.",
+                });
+                router.refresh();
+            }
+        } catch (e: any) {
+            toast({
+                title: "Erro",
+                description: e?.message || "Ocorreu um erro ao processar a confirmação.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsConfirming(false);
+        }
+    };
 
     const [userAddresses, setUserAddresses] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<"details" | "history">("details");
@@ -414,8 +449,61 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const canCancelOrder = canRequestOrderCancellation(order);
     const canRequestResolution = canRequestPostFulfillmentResolution(order);
     const isPaidOrPartiallyPaid = ["paid", "partially_paid"].includes(order.situation);
-    const showReturnButton = canRequestResolution || (hasAnyService && isPaidOrPartiallyPaid && !canCancelOrder);
+    const showReturnRequestButton = isPaidOrPartiallyPaid && !canCancelOrder && order.situation !== "cancelled";
+    const returnButtonLabel = order.delivery_status === "delivered"
+        ? "Solicitar troca ou devolução"
+        : "Solicitar reembolso ou vale-compra";
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
+
+    const showConfirmReceiptButton = hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
+    const showConfirmExecutionButton = hasAnyService && order.delivery_status !== "delivered";
+
+    const showExchangeOption = !hasOnlyServices && order.delivery_status === "delivered";
+    const resolutionOptions = [
+        ...(showExchangeOption ? [{ value: "exchange", label: "Troca" }] : []),
+        { value: "refund", label: "Reembolso" },
+        { value: "store_credit", label: "Vale-compra" },
+    ];
+
+    const renderFulfillmentButtons = () => {
+        if (showConfirmReceiptButton && showConfirmExecutionButton) {
+            return (
+                <Button
+                    variant="outline"
+                    className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
+                    onClick={handleConfirmFulfillment}
+                    disabled={isConfirming}
+                >
+                    {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Recebimento e Execução"}
+                </Button>
+            );
+        }
+        if (showConfirmReceiptButton) {
+            return (
+                <Button
+                    variant="outline"
+                    className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
+                    onClick={handleConfirmFulfillment}
+                    disabled={isConfirming}
+                >
+                    {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Recebimento"}
+                </Button>
+            );
+        }
+        if (showConfirmExecutionButton) {
+            return (
+                <Button
+                    variant="outline"
+                    className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
+                    onClick={handleConfirmFulfillment}
+                    disabled={isConfirming}
+                >
+                    {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Execução"}
+                </Button>
+            );
+        }
+        return null;
+    };
 
     const getPaymentTypeLabel = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
@@ -653,7 +741,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 idempotencyKey: `marketplace:${order.id}:${Date.now()}`,
             });
             if (!result.success) throw new Error(result.error);
-            toast({ title: "Solicitacao enviada", description: "A loja recebeu seu pedido de troca ou devolucao." });
+            toast({ title: "Solicitacao enviada", description: "A loja recebeu seu pedido de troca ou devolução." });
             setIsReturnModalOpen(false);
         } catch (err: any) {
             toast({ title: "Erro ao enviar", description: err.message || "Tente novamente.", variant: "destructive" });
@@ -1064,53 +1152,54 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             <div>
                                                 {renderPriceSummary()}
                                             </div>
-                                        </FormSection>
-                                    </div>
+                                            {/* Mobile/Tablet Actions / Buttons */}
+                                            <div className="block lg:hidden space-y-4 pt-4">
+                                                {renderFulfillmentButtons()}
 
-                                    {/* Mobile/Tablet Actions / Buttons */}
-                                    <div className="block lg:hidden space-y-4 pt-4">
-                                        {canCancelOrder && (
-                                            <Button
-                                                variant="outlinered"
-                                                className="w-full h-12 font-bold"
-                                                onClick={() => setIsCancelModalOpen(true)}
-                                                disabled={isCanceling}
-                                            >
-                                                {isCanceling ? (
-                                                    <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
-                                                ) : (
-                                                    "Cancelar pedido"
+                                                {canCancelOrder && (
+                                                    <Button
+                                                        variant="outlinered"
+                                                        className="w-full h-12 font-bold"
+                                                        onClick={() => setIsCancelModalOpen(true)}
+                                                        disabled={isCanceling}
+                                                    >
+                                                        {isCanceling ? (
+                                                            <><Spinner size={16} className="text-brand-red mr-2" /> Cancelando...</>
+                                                        ) : (
+                                                            "Cancelar pedido"
+                                                        )}
+                                                    </Button>
                                                 )}
-                                            </Button>
-                                        )}
 
-                                        {!canCancelOrder && !showReturnButton && order.situation !== "cancelled" && (
-                                            <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                                {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && (
+                                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                        Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
+                                                    </div>
+                                                )}
+
+                                                {showReturnRequestButton && (
+                                                    <>
+                                                        {order.delivery_status === "delivered" && (
+                                                            <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                                Este pedido foi concluído. Para continuar, solicite uma devolução, troca ou reembolso.
+                                                            </p>
+                                                        )}
+                                                        {order.delivery_status !== "delivered" && (
+                                                            <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
+                                                                Para este pedido, você pode solicitar reembolso ou vale-compra.
+                                                            </p>
+                                                        )}
+                                                        <Button
+                                                            variant="outline"
+                                                            className="w-full h-12 font-bold"
+                                                            onClick={() => setIsReturnModalOpen(true)}
+                                                        >
+                                                            {returnButtonLabel}
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
-                                        )}
-
-                                        {showReturnButton && (
-                                            <>
-                                                {canRequestResolution && (
-                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
-                                                    </p>
-                                                )}
-                                                {!canRequestResolution && hasAnyService && (
-                                                    <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Seus servicos estao disponiveis para cancelamento, troca ou devolucao.
-                                                    </p>
-                                                )}
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full h-12 font-bold"
-                                                    onClick={() => setIsReturnModalOpen(true)}
-                                                >
-                                                    Solicitar troca ou devolucao
-                                                </Button>
-                                            </>
-                                        )}
+                                        </FormSection>
                                     </div>
                                 </div>
 
@@ -1127,6 +1216,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Desktop Actions / Buttons */}
                                     <div className="space-y-4 pt-4">
+                                        {renderFulfillmentButtons()}
+
                                         {canCancelOrder && (
                                             <Button
                                                 variant="outlinered"
@@ -1142,22 +1233,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </Button>
                                         )}
 
-                                        {!canCancelOrder && !showReturnButton && order.situation !== "cancelled" && (
+                                        {!canCancelOrder && !showReturnRequestButton && order.situation !== "cancelled" && (
                                             <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/60 dark:bg-dark-border/30 p-4 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                Este pedido ja esta sendo processado. Assim que sair para entrega, voce podera solicitar devolucao, troca ou reembolso.
+                                                Este pedido já está sendo processado. Assim que sair para entrega, você poderá solicitar devolução, troca ou reembolso.
                                             </div>
                                         )}
 
-                                        {showReturnButton && (
+                                        {showReturnRequestButton && (
                                             <>
-                                                {canRequestResolution && (
+                                                {order.delivery_status === "delivered" && (
                                                     <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Este pedido ja esta sendo entregue. Para continuar, solicite uma devolucao, troca ou reembolso.
+                                                        Este pedido foi concluído. Para continuar, solicite uma devolução, troca ou reembolso.
                                                     </p>
                                                 )}
-                                                {!canRequestResolution && hasAnyService && (
+                                                {order.delivery_status !== "delivered" && (
                                                     <p className="mb-3 text-sm text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Seus servicos estao disponiveis para cancelamento, troca ou devolucao.
+                                                        Para este pedido, você pode solicitar reembolso ou vale-compra.
                                                     </p>
                                                 )}
                                                 <Button
@@ -1165,7 +1256,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     className="w-full h-12 font-bold"
                                                     onClick={() => setIsReturnModalOpen(true)}
                                                 >
-                                                    Solicitar troca ou devolucao
+                                                    {returnButtonLabel}
                                                 </Button>
                                             </>
                                         )}
@@ -1253,7 +1344,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 <DefaultModal
                     isOpen={isReturnModalOpen}
                     onClose={() => setIsReturnModalOpen(false)}
-                    title="Solicitar troca ou devolucao"
+                    title="Solicitar troca ou devolução"
                     maxWidth="2xl"
                     footer={
                         <div className="flex justify-end gap-3 w-full">
@@ -1318,7 +1409,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 <Checkbox
                                                     checked={!!returnServiceItems[item.id]}
                                                     onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
-                                                    disabled={isCancelled}
+                                                    disabled={isCancelled || returnResolution === "exchange"}
                                                 />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
@@ -1332,6 +1423,15 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                         )
                                     })}
+                            </div>
+                        )}
+
+                        {returnResolution === "exchange" && hasAnyService && (
+                            <div className="rounded-xl border border-amber-300 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 flex gap-2 items-center">
+                                <AlertCircleIcon size={18} className="text-amber-600 dark:text-amber-500 shrink-0" />
+                                <span className="text-xs text-amber-800 dark:text-amber-400 font-medium">
+                                    Serviços não permitem troca. Selecione Reembolso ou Vale-compra.
+                                </span>
                             </div>
                         )}
 
@@ -1352,14 +1452,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 ]}
                             />
                             <FormDropdown
-                                label="Resolucao"
+                                label="Resolução"
                                 value={returnResolution}
                                 setValue={(val) => setReturnResolution(val as any)}
-                                options={[
-                                    { value: "exchange", label: "Troca" },
-                                    { value: "refund", label: "Reembolso" },
-                                    { value: "store_credit", label: "Vale-compra" },
-                                ]}
+                                options={resolutionOptions}
                             />
                         </div>
 

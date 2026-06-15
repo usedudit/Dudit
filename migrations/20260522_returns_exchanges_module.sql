@@ -804,7 +804,7 @@ BEGIN
     'seller',
     CASE WHEN v_request_type = 'cancellation' THEN 'cancellation_created' ELSE 'return_created' END,
     CASE WHEN v_request_type = 'cancellation' THEN 'Nova solicitacao de cancelamento' ELSE 'Nova solicitacao' END,
-    COALESCE(v_order.order_number, 'Pedido') || CASE WHEN v_request_type = 'cancellation' THEN ' recebeu uma solicitacao de cancelamento.' ELSE ' recebeu uma solicitacao de devolucao ou troca.' END
+    COALESCE(v_order.order_number, 'Pedido') || CASE WHEN v_request_type = 'cancellation' THEN ' recebeu uma solicitacao de cancelamento.' ELSE ' recebeu uma solicitacao de devolução ou troca.' END
   );
 
   RETURN jsonb_build_object('id', v_request_id, 'idempotent', false, 'amount_basis', v_total_amount);

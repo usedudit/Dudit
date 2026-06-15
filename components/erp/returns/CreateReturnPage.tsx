@@ -7,6 +7,7 @@ import {
     DatePicker,
     FormDropdown,
     Input,
+    QuantitySelector,
     MoneyInput,
     Tabs,
     TabsContent,
@@ -821,8 +822,8 @@ export default function CreateReturnPage({
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</th>
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-28">Preço</th>
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-28">Comprado</th>
-                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Motivo</th>
-                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40">Condição</th>
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40 text-center">Motivo</th>
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40 text-center">Condição</th>
                                                                             <th className="py-3 pl-4 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36 rounded-r-lg">Qtd Devolver</th>
                                                                         </tr>
                                                                     </thead>
@@ -916,37 +917,20 @@ export default function CreateReturnPage({
                                                                                 </td>
                                                                                 <td className="py-4 pl-4 pr-6 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <div className="flex justify-center">
-                                                                                        <div className={`flex items-center bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg h-[40px] px-2 w-fit gap-3 ${(!item.checked) ? "opacity-50 pointer-events-none" : ""}`}>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                disabled={!item.checked || item.quantity <= 1}
-                                                                                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-40 text-brand-dark dark:text-dark-heading font-bold"
-                                                                                                onClick={() => {
-                                                                                                    setReturnItems(prev => {
-                                                                                                        const next = [...prev]
-                                                                                                        next[idx] = { ...next[idx], quantity: Math.max(1, next[idx].quantity - 1) }
-                                                                                                        return next
-                                                                                                    })
-                                                                                                }}
-                                                                                            >
-                                                                                                -
-                                                                                            </button>
-                                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{item.quantity}</span>
-                                                                                            <button
-                                                                                                type="button"
-                                                                                                disabled={!item.checked || item.quantity >= item.maxQuantity}
-                                                                                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-40 text-brand-dark dark:text-dark-heading font-bold"
-                                                                                                onClick={() => {
-                                                                                                    setReturnItems(prev => {
-                                                                                                        const next = [...prev]
-                                                                                                        next[idx] = { ...next[idx], quantity: Math.min(next[idx].maxQuantity, next[idx].quantity + 1) }
-                                                                                                        return next
-                                                                                                    })
-                                                                                                }}
-                                                                                            >
-                                                                                                +
-                                                                                            </button>
-                                                                                        </div>
+                                                                                        <QuantitySelector
+                                                                                            value={item.quantity}
+                                                                                            onChange={(val) => {
+                                                                                                setReturnItems(prev => {
+                                                                                                    const next = [...prev]
+                                                                                                    next[idx] = { ...next[idx], quantity: val }
+                                                                                                    return next
+                                                                                                })
+                                                                                            }}
+                                                                                            min={1}
+                                                                                            max={item.maxQuantity}
+                                                                                            size="md"
+                                                                                            disabled={!item.checked}
+                                                                                        />
                                                                                     </div>
                                                                                 </td>
                                                                             </tr>
@@ -1044,37 +1028,19 @@ export default function CreateReturnPage({
                                                                                 />
                                                                                 <div className="flex flex-col">
                                                                                     <span className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5">Qtd Devolver</span>
-                                                                                    <div className="flex items-center bg-brand-gray dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg h-[40px] px-2 w-fit gap-3">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            disabled={item.quantity <= 1}
-                                                                                            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-40 text-brand-dark dark:text-dark-heading font-bold"
-                                                                                            onClick={() => {
-                                                                                                setReturnItems(prev => {
-                                                                                                    const next = [...prev]
-                                                                                                    next[idx] = { ...next[idx], quantity: Math.max(1, next[idx].quantity - 1) }
-                                                                                                    return next
-                                                                                                })
-                                                                                            }}
-                                                                                        >
-                                                                                            -
-                                                                                        </button>
-                                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{item.quantity}</span>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            disabled={item.quantity >= item.maxQuantity}
-                                                                                            className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-dark-border disabled:opacity-40 text-brand-dark dark:text-dark-heading font-bold"
-                                                                                            onClick={() => {
-                                                                                                setReturnItems(prev => {
-                                                                                                    const next = [...prev]
-                                                                                                    next[idx] = { ...next[idx], quantity: Math.min(next[idx].maxQuantity, next[idx].quantity + 1) }
-                                                                                                    return next
-                                                                                                })
-                                                                                            }}
-                                                                                        >
-                                                                                            +
-                                                                                        </button>
-                                                                                    </div>
+                                                                                    <QuantitySelector
+                                                                                        value={item.quantity}
+                                                                                        onChange={(val) => {
+                                                                                            setReturnItems(prev => {
+                                                                                                const next = [...prev]
+                                                                                                next[idx] = { ...next[idx], quantity: val }
+                                                                                                return next
+                                                                                            })
+                                                                                        }}
+                                                                                        min={1}
+                                                                                        max={item.maxQuantity}
+                                                                                        size="md"
+                                                                                    />
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -1221,7 +1187,7 @@ export default function CreateReturnPage({
                                                                     { value: "refund", label: "Reembolso" },
                                                                     { value: "store_credit", label: "Vale-compra" },
                                                                     { value: "exchange", label: "Troca" },
-                                                                    { value: "none", label: "Sem resolucao" },
+                                                                    { value: "none", label: "Sem resolução" },
                                                                     { value: "rejected", label: "Recusada" }
                                                                 ]}
                                                             />

@@ -24,13 +24,13 @@ export default async function AdminReturnsPage({ searchParams }: { searchParams?
                     <table className="w-full min-w-[1100px] text-left text-sm">
                         <thead className="bg-brand-gray dark:bg-dark-border/40">
                             <tr>
-                                <th className="p-3 font-semibold">Solicitacao</th>
+                                <th className="p-3 font-semibold">Solicitação</th>
                                 <th className="p-3 font-semibold">Pedido</th>
                                 <th className="p-3 font-semibold">Cliente</th>
                                 <th className="p-3 font-semibold">Seller</th>
                                 <th className="p-3 font-semibold">Tipo</th>
                                 <th className="p-3 font-semibold">Status</th>
-                                <th className="p-3 font-semibold">Resolucao</th>
+                                <th className="p-3 font-semibold">Resolução</th>
                                 <th className="p-3 font-semibold">Valor</th>
                                 <th className="p-3 font-semibold">Origem</th>
                                 <th className="p-3 font-semibold">Timeline</th>
