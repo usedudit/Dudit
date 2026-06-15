@@ -675,6 +675,12 @@ async function handler(request: NextRequest) {
       paymentMethodDisplayName = "Pix"
     } else if (paymentFormData.payment_method_id === "bolbradesco") {
       paymentMethodDisplayName = "Boleto"
+    } else if (mpPaymentResponse.payment_type_id === "debit_card") {
+      paymentMethodDisplayName = "Cartão de Débito"
+    } else if (mpPaymentResponse.payment_type_id === "account_money" || paymentFormData.payment_method_id === "account_money") {
+      paymentMethodDisplayName = "Saldo Mercado Pago"
+    } else if (mpPaymentResponse.payment_type_id === "digital_currency" || paymentFormData.payment_method_id === "mercado_credito") {
+      paymentMethodDisplayName = "Mercado Crédito"
     } else {
       paymentMethodDisplayName = "Crédito"
     }
@@ -725,7 +731,10 @@ async function handler(request: NextRequest) {
         delivery_address: resolvedOrderDeliveryAddress,
         notes: notes,
         total_amount: totalAmount,
-        situation: paymentStatus === "approved" ? "paid" : (paymentStatus === "in_process" ? "in_process" : "pending"),
+        situation: paymentStatus === "approved" ? "paid"
+          : paymentStatus === "in_process" ? "in_process"
+          : paymentStatus === "rejected" ? "cancelled"
+          : "pending",
         payment_method: paymentMethodDisplayName,
         payment_provider: "Mercado Pago",
         mp_payment_id: mpPaymentId.toString(),

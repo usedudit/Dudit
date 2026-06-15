@@ -689,27 +689,33 @@ export default function CustomersPage({
             <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}>
                 <Button
                     variant="ghost"
-                    size="sm"
-                    className="text-brand-dark dark:text-dark-heading gap-2 font-bold px-3 hover:bg-gray-100 dark:hover:bg-dark-border"
+                    className="h-10 px-3"
+                    leftIcon={
+                        (rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.status === 'inativo') ? (
+                            <CheckCircleIcon size={18} />
+                        ) : (
+                            <BlockedIcon size={18} />
+                        )
+                    }
                     onClick={() => setConfirmations((p) => ({ ...p, bulkInactive: true }))}
                 >
                     {(rawCustomers || []).filter((c: any) => selection.ids.has(c.id)).every((c: any) => c.status === 'inativo') ? (
                         <>
-                            <CheckCircleIcon size={16} className="text-brand-green" /> Ativar
+                            <CheckCircleIcon size={18} /> Ativar
                         </>
                     ) : (
                         <>
-                            <BlockedIcon size={16} className="text-brand-inactive-text" /> Desativar
+                            <BlockedIcon size={18} /> Desativar
                         </>
                     )}
                 </Button>
                 <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-brand-red gap-2 font-bold px-3 hover:bg-red-50 hover:text-brand-red dark:hover:bg-red-900/20"
+                    variant="ghostred"
+                    className="h-10 px-3"
+                    leftIcon={<TrashIcon size={18} />}
                     onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
                 >
-                    <TrashIcon size={16} /> Excluir
+                    Excluir
                 </Button>
             </FloatingActionBar>
         </>

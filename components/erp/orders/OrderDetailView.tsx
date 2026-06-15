@@ -688,7 +688,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </FormSection>
 
-                                                    <FormSection title="Detalhes do Pagamento" hasSeparator={false} className="mt-0">
+                                                    <FormSection title="Detalhes do Pagamento" hasSeparator>
                                                         <div className="space-y-3">
                                                             <PaymentRow
                                                                 label="Método de Pagamento"

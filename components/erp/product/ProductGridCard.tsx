@@ -38,15 +38,13 @@ const ProductGridCard = React.memo(
         onPrefetchTouchStart,
     }: ProductGridCardProps) => {
 
-        // Otimização: Cálculos simples fora do JSX
-        const stock = product.stock_quantity ?? 0
-        const status = getStockStatus(stock, product.min_stock ?? undefined)
-
-        // Suportar tanto a contagem do Supabase quanto array mapeado
         const variationsCount = Array.isArray(product.variants)
             ? (product.variants[0]?.count ?? product.variants.length)
             : 0
         const hasVariations = variationsCount > 0
+        const hasVariantData = hasVariations && product.variant_min_price !== undefined
+        const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         const imageUrl = getPrimaryProductDisplayImage(product)
 
@@ -121,7 +119,22 @@ const ProductGridCard = React.memo(
 
                         {/* Linha 3: Preço */}
                         <div className="mt-1.5">
-                            {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                            {hasVariantData ? (
+                                product.variant_min_price === product.variant_max_price ? (
+                                    <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(product.variant_min_price!)}
+                                    </span>
+                                ) : (
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                            De: {formatCurrency(product.variant_min_price!)}
+                                        </span>
+                                        <span className="text-[16px] font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                                            Até: {formatCurrency(product.variant_max_price!)}
+                                        </span>
+                                    </div>
+                                )
+                            ) : product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
                                 <div className="flex flex-col items-start">
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-xs text-brand-orange font-semibold">
@@ -170,7 +183,7 @@ const ProductGridCard = React.memo(
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Estoque</span>
                             <div className="flex items-center gap-2.5">
-                                <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{stock}</span>
+                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{effectiveStock}</span>
                                 <Tooltip text={`Estoque: ${status.label}`}>
                                     <Badge variant={status.variant} className="whitespace-nowrap scale-90" />
                                 </Tooltip>

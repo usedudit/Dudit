@@ -46,11 +46,13 @@ const ProductListItem = React.memo(
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
     }: ProductListItemProps) => {
-        const stock = product.stock_quantity ?? 0
-        const status = getStockStatus(stock, product.min_stock ?? undefined)
         const variationsCount = Array.isArray(product.variants)
             ? (product.variants[0]?.count ?? product.variants.length)
             : 0
+        const hasVariants = variationsCount > 0
+        const hasVariantData = hasVariants && product.variant_min_price !== undefined
+        const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         const renderCellContent = (colId: string) => {
             switch (colId) {
@@ -100,7 +102,7 @@ const ProductListItem = React.memo(
                         <div className="w-full">
                             <div className={`flex items-center gap-1.5 ${getJustifyClass(columns.find(c => c.id === 'stock')?.align)}`}>
                                 <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-                                    {stock} {product.unit || "UN"}
+                                    {effectiveStock} {product.unit || "UN"}
                                 </span>
                                 <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                 <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
@@ -120,7 +122,22 @@ const ProductListItem = React.memo(
                 case "price":
                     return (
                         <div className="flex flex-col items-start">
-                            {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                            {hasVariantData ? (
+                                product.variant_min_price === product.variant_max_price ? (
+                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                        {formatCurrency(product.variant_min_price!)}
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                            De: {formatCurrency(product.variant_min_price!)}
+                                        </span>
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                                            Até: {formatCurrency(product.variant_max_price!)}
+                                        </span>
+                                    </>
+                                )
+                            ) : product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
                                 <>
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-xs text-brand-orange font-semibold">

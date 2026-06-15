@@ -22,7 +22,6 @@ import {
     Motorbike02Icon,
     ManagerIcon as ManagerIcon01,
     TextFirstlineRightIcon as TextFirstlineRightIcon01,
-    PackageIcon as PackageIcon01,
     PackageDeliveredIcon,
     PackageReceiveIcon as PackageReceiveIcon01,
     PackageRemoveIcon,
@@ -287,7 +286,7 @@ export const ShoppingBagIcon = CreateIcon(ShoppingBag01Icon)
 export const Package = CreateIcon(DeliveryBox01Icon)
 export const BoxIcon = CreateIcon(DeliveryBox01Icon)
 
-export const PackageIcon = CreateIcon(PackageIcon01)
+export const PackageIcon = CreateIcon(DeliveryBox01Icon)
 export const NormalProductsIcon = CreateIcon(PackageDeliveredIcon)
 export const LowProductsIcon = CreateIcon(PackageReceiveIcon01)
 export const OutProductsIcon = CreateIcon(PackageRemoveIcon)

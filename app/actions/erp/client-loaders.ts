@@ -199,6 +199,7 @@ export type PartnerTeamMemberBucketItem = {
   fullName: string | null
   email: string
   role: string
+  avatarUrl: string | null
 }
 
 export async function fetchPartnerTeamMembersBucket(): Promise<PartnerTeamMemberBucketItem[]> {
@@ -210,6 +211,7 @@ export async function fetchPartnerTeamMembersBucket(): Promise<PartnerTeamMember
     fullName: m.fullName,
     email: m.email,
     role: m.role,
+    avatarUrl: m.avatarUrl,
   }))
 }
 

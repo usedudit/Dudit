@@ -659,8 +659,8 @@ const StockMovementPageContent = ({ partnerId, movements: initialMovements, init
                                 setUndoReason('');
                                 setModals(prev => ({ ...prev, bulkUndo: true }));
                             }}
-                            leftIcon={<RotateIcon className="w-4 h-4" />}
-                            className="h-10 px-3 text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface"
+                            leftIcon={<RotateIcon size={18} />}
+                            className="h-10 px-3"
                         >
                             Desfazer
                         </Button>

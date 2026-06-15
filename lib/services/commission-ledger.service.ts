@@ -100,6 +100,7 @@ export async function createCommissionExpenseForEntity(params: {
   if (insertResult.error) {
     const fallbackPayload = { ...payload }
     delete fallbackPayload.created_by_user_id
+    delete fallbackPayload.seller_partner_user_id
     insertResult = await params.supabase.from("transactions").insert(fallbackPayload).select("id").maybeSingle()
   }
 

@@ -53,7 +53,7 @@ export async function checkAndExpireOrder(
     return { expired: false, reason: "order_not_found" }
   }
 
-  if (order.situation !== "pending") {
+  if (order.situation !== "pending" && order.situation !== "in_process") {
     return { expired: false, reason: `not_pending: ${order.situation}` }
   }
 
@@ -78,7 +78,7 @@ export async function checkAndExpireOrder(
       cancelled_at: now,
     })
     .eq("id", orderId)
-    .eq("situation", "pending")
+    .in("situation", ["pending", "in_process"])
 
   if (updateError) {
     return { expired: false, reason: `update_failed: ${updateError.message}` }
@@ -126,7 +126,7 @@ export async function expireAllExpiredOrders(
   const { data: expiredOrders } = await client
     .from("orders")
     .select("id")
-    .eq("situation", "pending")
+    .in("situation", ["pending", "in_process"])
     .is("cancelled_at", null)
     .lt("payment_expires_at", now)
 

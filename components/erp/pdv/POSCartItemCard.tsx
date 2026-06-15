@@ -42,9 +42,6 @@ const POSCartItemCard = memo(function POSCartItemCard({
           </p>
           {isGift ? (
             <div className="mt-2">
-              <Badge variant="blue" className="text-[10px] font-bold uppercase tracking-wide">
-                Brinde
-              </Badge>
             </div>
           ) : (
             <div className="mt-2 flex items-center gap-2">
@@ -53,25 +50,18 @@ const POSCartItemCard = memo(function POSCartItemCard({
                 variant="outline"
                 disabled={item.qty <= 1}
                 onClick={() => onChangeQty(item.id, -1)}
-              >
-                <MinusIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
-              </Button>
+                leftIcon={<MinusIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />}
+              />
               <span className="min-w-8 text-center font-bold">{String(item.qty).padStart(2, "0")}</span>
-              <Button className="flex h-7 w-7 px-0 py-0 items-center justify-center" onClick={() => onChangeQty(item.id, 1)}>
-                <PlusIcon className="h-4 w-4 text-white" />
-              </Button>
+              <Button className="flex h-7 w-7 px-0 py-0 items-center justify-center" onClick={() => onChangeQty(item.id, 1)} leftIcon={<PlusIcon className="h-4 w-4 text-white" />} />
             </div>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-right">
           {!isGift ? (
             <div className="flex flex-wrap justify-end gap-1.5">
-              <Button className="h-8 w-8 px-0 py-0" variant="outline" onClick={() => onEdit(item)}>
-                <EditIcon className="h-4 w-4 text-brand-inactive-text dark:text-dark-body" />
-              </Button>
-              <Button className="h-8 w-8 px-0 py-0" variant="outline" onClick={() => onRemove(item.id)}>
-                <TrashIcon className="h-4 w-4 text-brand-red dark:text-brand-red" />
-              </Button>
+              <Button className="h-8 w-8 px-0 py-0" variant="outline" onClick={() => onEdit(item)} leftIcon={<EditIcon size={16} />} />
+              <Button className="h-8 w-8 px-0 py-0" variant="outlinered" onClick={() => onRemove(item.id)} leftIcon={<TrashIcon size={18} />} />
             </div>
           ) : (
             <div className="h-8" /> // placeholder spacer
@@ -79,16 +69,6 @@ const POSCartItemCard = memo(function POSCartItemCard({
           <div className="mt-1">
             <div className="flex items-center justify-end gap-2">
               <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Total</p>
-              {hasLineDiscount && !isGift && (
-                <Badge variant="orange" className="text-[10px] font-bold uppercase tracking-wide">
-                  Desc.
-                </Badge>
-              )}
-              {isGift && (
-                <Badge variant="blue" className="text-[10px] font-bold uppercase tracking-wide">
-                  Grátis
-                </Badge>
-              )}
             </div>
             <p className="font-bold text-brand-dark dark:text-dark-heading">
               {isGift ? "Grátis" : formatCurrency(item.price * item.qty)}

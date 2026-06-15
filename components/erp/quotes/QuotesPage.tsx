@@ -810,11 +810,11 @@ export default function QuotesPage({
                     Ações em massa
                 </Button>
                 <Button
-                    variant="ghost"
-                    className="h-9 px-3 gap-2 font-bold text-brand-red"
+                    variant="ghostred"
+                    className="h-10 px-3"
+                    leftIcon={<TrashIcon size={18} />}
                     onClick={() => setConfirmations(prev => ({ ...prev, bulkDelete: true }))}
                 >
-                    <TrashIcon className="w-4 h-4" />
                     Excluir
                 </Button>
             </FloatingActionBar>

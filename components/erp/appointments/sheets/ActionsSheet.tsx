@@ -500,7 +500,7 @@ export const AddUnavailableSheet = ({
                 </div>
                 <FormInput label="Duração padrão (min)" type="number" value={newTypeDuration} onChange={(e) => setNewTypeDuration(e.target.value)} />
             </div>
-            <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                 <div className="flex items-center gap-4">
                     <Button className="h-12 flex-1" isLoading={isSavingNewType} onClick={handleSaveNewType}>Salvar Tipo</Button>
                 </div>

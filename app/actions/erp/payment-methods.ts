@@ -196,6 +196,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     originalAmount: number
     paymentMethodId: string
     installmentNumber?: number
+    feeBearer?: "merchant" | "customer"
 }) {
     await requireUser()
     const supabase = createAdminClient()
@@ -217,7 +218,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
     const pmConfig = {
         feePercent: Number(method.fee_percent || 0),
         feeFixed: Number(method.fee_fixed || 0),
-        feeBearer: (method.fee_bearer || "merchant") as "merchant" | "customer",
+        feeBearer: (input.feeBearer || method.fee_bearer || "merchant") as "merchant" | "customer",
         discountPercent: Number(method.discount_percent || 0),
         maxInstallments: Number(method.max_installments || 1),
         installmentFees: (fees || []).map((row: any) => ({
@@ -232,38 +233,60 @@ export async function calculatePaymentMethodAmountsAction(input: {
         installmentNumber: input.installmentNumber,
     })
 
+    const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
+
     const chosenType = toCanonicalPaymentType(method.type || method.payment_type)
     const maxInst = Math.max(1, Number(method.max_installments || 1))
     const installmentOptions = []
 
     if (chosenType === "credit_card" && maxInst > 1) {
         for (let i = 1; i <= maxInst; i++) {
+            const instFee = (pmConfig.installmentFees || []).find((f: any) => f.installmentNumber === i)
+            const instConfig = instFee
+                ? { ...pmConfig, feePercent: Math.max(0, Number(instFee.feePercent || 0)) }
+                : { ...pmConfig, feePercent: 0 }
             const calc = computePaymentLine({
                 amountReceived: Math.max(0, Number(input.originalAmount || 0)),
-                paymentMethod: pmConfig,
+                paymentMethod: instConfig,
                 installmentNumber: i,
             })
+            const hasInterest = Boolean(instFee)
+            const totalToCharge = hasInterest && calc.adjustmentType === "fee" && calc.feeBearer === "customer"
+                ? round2(calc.amountReceived + calc.adjustmentAmount)
+                : (hasInterest && calc.adjustmentType === "discount"
+                    ? round2(calc.amountReceived - calc.adjustmentAmount)
+                    : calc.effectiveAmount)
             installmentOptions.push({
                 installments: i,
-                installmentValue: calc.effectiveAmount,
-                hasInterest: calc.adjustmentType === "fee" && calc.adjustmentAmount > 0,
-                totalInterest: calc.adjustmentType === "fee" ? calc.adjustmentAmount : 0,
-                finalAmount: calc.effectiveAmount
+                installmentValue: round2(totalToCharge / i),
+                hasInterest,
+                totalInterest: hasInterest ? calc.adjustmentAmount : 0,
+                finalAmount: totalToCharge
             })
         }
     }
 
+    const pmFinalAmount = engine.adjustmentType === "discount"
+        ? round2(engine.amountReceived - engine.adjustmentAmount)
+        : (engine.adjustmentType === "fee" && engine.feeBearer === "customer"
+            ? round2(engine.amountReceived + engine.adjustmentAmount)
+            : engine.effectiveAmount)
+
+    const pmDiscount = engine.adjustmentType === "discount"
+        ? round2(engine.amountReceived - pmFinalAmount)
+        : 0
+
     return {
         success: true,
         installmentOptions,
-        finalAmount: engine.effectiveAmount,
-        paymentMethodDiscountAmount: engine.adjustmentType === "discount" ? engine.adjustmentAmount : 0,
+        finalAmount: pmFinalAmount,
+        paymentMethodDiscountAmount: pmDiscount,
         feeAmount: engine.adjustmentType === "fee" ? engine.adjustmentAmount : 0,
         interestAmount: 0,
         amountBeforeInterest: engine.amountReceived,
         amountBeforeFee: engine.amountReceived,
         installmentNumber: engine.adjustmentType === "fee" ? 1 : 0,
-        installmentAmounts: [engine.effectiveAmount],
+        installmentAmounts: [pmFinalAmount],
         appliedDiscountPercent: engine.adjustmentType === "discount" ? engine.adjustmentPercent : 0,
         appliedFeePercent: engine.adjustmentType === "fee" ? engine.adjustmentPercent : 0,
         appliedInterestPercent: 0,
@@ -271,7 +294,7 @@ export async function calculatePaymentMethodAmountsAction(input: {
         adjustmentType: engine.adjustmentType,
         adjustmentPercent: engine.adjustmentPercent,
         adjustmentAmount: engine.adjustmentAmount,
-        effectiveAmount: engine.effectiveAmount,
+        effectiveAmount: pmFinalAmount,
         netAmount: engine.netAmount,
     }
 }

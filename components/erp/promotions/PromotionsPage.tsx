@@ -109,11 +109,11 @@ const formatRuleDetails = (rule: any) => {
       if (val === undefined || val === null) return ""
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
     }
-    const valStr = isPercent 
-      ? `${rule.discount_value}% Desc.` 
+    const valStr = isPercent
+      ? `${rule.discount_value}% Desc.`
       : `${formatCurrencyLocal(rule.discount_value)} Desc.`
-    const maxStr = rule.max_discount_amount 
-      ? ` - Max ${formatCurrencyLocal(rule.max_discount_amount)}` 
+    const maxStr = rule.max_discount_amount
+      ? ` - Max ${formatCurrencyLocal(rule.max_discount_amount)}`
       : ""
     below = `${valStr}${maxStr}`
   } else if (rule.promotion_type === "buy_x_pay_y") {
@@ -295,7 +295,7 @@ export default function PromotionsPage({
   // Filter & Paginate campaigns
   const filteredCampaigns = useMemo(() => {
     let result = campaigns
-    
+
     // 1. Search term filter
     const term = debouncedSearch.toLowerCase().trim()
     if (term) {
@@ -670,7 +670,7 @@ export default function PromotionsPage({
                                         className="bg-white dark:bg-dark-background"
                                       />
                                     </th>
-                                    
+
                                     {/* Campanha column (sortable) */}
                                     <th
                                       className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors"
@@ -1099,10 +1099,10 @@ export default function PromotionsPage({
         </Button>
 
         <Button
-          variant="ghost"
+          variant="ghostred"
           onClick={() => setShowBulkDeleteModal(true)}
-          leftIcon={<TrashIcon className="w-4 h-4" />}
-          className="h-10 px-3 font-semibold text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90 hover:bg-red-50 dark:hover:bg-red-900/20"
+          leftIcon={<TrashIcon size={18} />}
+          className="h-10 px-3"
         >
           Excluir
         </Button>

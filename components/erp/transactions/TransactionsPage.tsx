@@ -817,8 +817,8 @@ export default function TransactionsPage({
     const handleMarkAsPaid = useCallback(async (transaction: ERPTransaction) => {
         setSelectedInstallmentForPayment(transaction as any)
         const initialAmount = Number(
-            transaction.installmentRemainingAmount ?? 
-            transaction.amount ?? 
+            transaction.installmentRemainingAmount ??
+            transaction.amount ??
             0
         )
         setPaymentAmount(String(initialAmount.toFixed(2)))
@@ -1152,7 +1152,7 @@ export default function TransactionsPage({
                         const isRegular = !isInstallment && !isRecurring
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
-                        
+
                         return (
                             <div className="space-y-4">
                                 <div className="space-y-4">
@@ -1246,7 +1246,7 @@ export default function TransactionsPage({
                                                 </span>
                                             </div>
                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {isRegular 
+                                                {isRegular
                                                     ? "Esta transação será totalmente liquidada e marcada como paga."
                                                     : `Este valor reduzirá o saldo restante. Novo saldo restante: ${formatCurrency(nextRemaining)}`}
                                             </p>
@@ -1262,7 +1262,7 @@ export default function TransactionsPage({
                                                     {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
                                                 </span>
                                             </div>
-                                            
+
                                             <div className="rounded-lg bg-white dark:bg-dark-surface/50 p-2.5 border border-brand-border dark:border-dark-border/50 space-y-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
                                                 <div className="flex justify-between">
                                                     <span>Valor do pagamento (principal)</span>
@@ -1285,7 +1285,7 @@ export default function TransactionsPage({
                                                     <span>{formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}</span>
                                                 </div>
                                             </div>
-                                            
+
                                             <p className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">
                                                 Nota: Juros e descontos ajustam o valor financeiro movimentado na conta, sem alterar o valor abatido da obrigação principal.
                                             </p>
@@ -2212,7 +2212,7 @@ export default function TransactionsPage({
                 selectedCount={selection.ids.size}
                 onClearSelection={() => setSelection({ ids: new Set() })}
             >
-                <Button variant="ghost" onClick={() => { }} leftIcon={<EditIcon className="w-4 h-4" />} className="h-10 px-3">
+                <Button variant="ghost" onClick={() => { }} leftIcon={<EditIcon size={18} />} className="h-10 px-3">
                     Ações em massa
                 </Button>
             </FloatingActionBar>

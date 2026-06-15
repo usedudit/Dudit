@@ -331,6 +331,8 @@ async function processWebhookWithRetry(
       paymentMethodName = "Boleto"
     } else if (mpPaymentTypeId === "account_money") {
       paymentMethodName = "Saldo Mercado Pago"
+    } else if (mpPaymentTypeId === "digital_currency" || mpPaymentMethodId === "mercado_credito") {
+      paymentMethodName = "Mercado Crédito"
     } else {
       paymentMethodName = formatPaymentMethodLabel(paymentInfo.payment_method?.type || paymentInfo.payment_method_id)
     }

@@ -753,17 +753,17 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                 <Button
                     variant="ghost"
                     onClick={() => setBulkActionMode(shouldActivateSelected ? "activate" : "deactivate")}
-                    leftIcon={shouldActivateSelected ? <CheckCircleIcon className="w-4 h-4" /> : <BlockedIcon className="w-4 h-4" />}
+                    leftIcon={shouldActivateSelected ? <CheckCircleIcon size={18} /> : <BlockedIcon size={18} />}
                     className="h-10 px-3"
                 >
                     {shouldActivateSelected ? "Ativar" : "Desativar"}
                 </Button>
 
                 <Button
-                    variant="ghost"
+                    variant="ghostred"
                     onClick={() => setBulkActionMode("delete")}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90"
+                    leftIcon={<TrashIcon size={18} />}
+                    className="h-10 px-3"
                 >
                     Excluir
                 </Button>

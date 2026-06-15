@@ -924,18 +924,17 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
 
             {/* Action Bars & Modals */}
             <FloatingActionBar selectedCount={selectedIds.size} onClearSelection={() => setSelectedIds(new Set())}>
-                <Button variant="ghost" onClick={() => setModalState(p => ({ ...p, bulkStatus: true }))} leftIcon={
+                <Button variant="ghost" onClick={() => setModalState(p => ({ ...p, bulkStatus: true }))} className="h-10 px-3" leftIcon={
                     variations.filter(v => selectedIds.has(v.id)).every(v => !v.status)
-                        ? <CheckCircleIcon className="w-4 h-4" />
-                        : <BlockedIcon className="w-4 h-4" />
-                } className="h-10 px-3">
+                        ? <CheckCircleIcon size={18} />
+                        : <BlockedIcon size={18} />
+                }>
                     {variations.filter(v => selectedIds.has(v.id)).every(v => !v.status) ? "Ativar" : "Desativar"}
                 </Button>
-                <Button variant="ghost" onClick={() => setModalState(p => ({ ...p, bulkDelete: true }))} leftIcon={<TrashIcon className="w-4 h-4" />} className="h-10 px-3 text-brand-red">Excluir</Button>
-                <div className="h-4 w-px bg-gray-200 mx-1" />
-                <Button variant="ghost" leftIcon={<Settings2Icon className="w-4 h-4" />} className="h-10 px-3" onClick={() => setIsBulkEditOpen(true)}>
+                <Button variant="ghost" leftIcon={<Settings2Icon size={18} />} className="h-10 px-3" onClick={() => setIsBulkEditOpen(true)}>
                     Editar em Massa
                 </Button>
+                <Button variant="ghostred" onClick={() => setModalState(p => ({ ...p, bulkDelete: true }))} leftIcon={<TrashIcon size={18} />} className="h-10 px-3">Excluir</Button>
             </FloatingActionBar>
 
             <AddVariantSheet

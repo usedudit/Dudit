@@ -16,11 +16,13 @@ interface ProductMobileItemProps {
 
 const ProductMobileItem = React.memo(
     ({ product, onClick, isSelected, onSelect }: ProductMobileItemProps) => {
-        const stock = product.stock_quantity ?? 0
-        const status = getStockStatus(stock, product.min_stock ?? undefined)
         const variationsCount = Array.isArray(product.variants)
             ? (product.variants[0]?.count ?? product.variants.length)
             : 0
+        const hasVariants = variationsCount > 0
+        const hasVariantData = hasVariants && product.variant_min_price !== undefined
+        const effectiveStock = hasVariantData ? (product.variant_total_stock ?? 0) : (product.stock_quantity ?? 0)
+        const status = getStockStatus(effectiveStock, product.min_stock ?? undefined)
 
         return (
             <motion.div
@@ -79,7 +81,42 @@ const ProductMobileItem = React.memo(
                         {/* Linha 3: Preço • Estoque • Badge + Checkbox */}
                         <div className="flex items-end justify-between gap-2 mt-0.5">
                             <div className="flex flex-col gap-1">
-                                {product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
+                                {hasVariantData ? (
+                                    product.variant_min_price === product.variant_max_price ? (
+                                        <div className="flex items-center flex-wrap gap-y-1">
+                                            <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(product.variant_min_price!)}
+                                            </span>
+                                            <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
+                                            <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
+                                                {effectiveStock} un
+                                            </span>
+                                            <span className="mx-2"></span>
+                                            <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
+                                                {status.label}
+                                            </Badge>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                                De: {formatCurrency(product.variant_min_price!)}
+                                            </span>
+                                            <div className="flex items-center flex-wrap gap-y-1">
+                                                <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                    Até: {formatCurrency(product.variant_max_price!)}
+                                                </span>
+                                                <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
+                                                <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
+                                                    {effectiveStock} un
+                                                </span>
+                                                <span className="mx-2"></span>
+                                                <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
+                                                    {status.label}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    )
+                                ) : product.promotional_price && product.promotional_price > 0 && product.promotional_price < product.price ? (
                                     <>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-xs text-brand-orange font-semibold">
@@ -95,7 +132,7 @@ const ProductMobileItem = React.memo(
                                             </span>
                                             <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                             <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                                {stock} un
+                                                {effectiveStock} un
                                             </span>
                                             <span className="mx-2"></span>
                                             <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">
@@ -110,7 +147,7 @@ const ProductMobileItem = React.memo(
                                         </span>
                                         <span className="mx-2 text-brand-inactive-text dark:text-dark-border">•</span>
                                         <span className="text-md font-medium text-brand-inactive-text dark:text-dark-body">
-                                            {stock} un
+                                            {effectiveStock} un
                                         </span>
                                         <span className="mx-2"></span>
                                         <Badge variant={status.variant} className="h-5 text-[10px] px-1.5">

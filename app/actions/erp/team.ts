@@ -157,14 +157,16 @@ export async function getTeamMemberStatsAction(): Promise<{ stats: TeamMemberSta
         const admin = getAdminClient()
         const partnerId = context.partnerId
 
-        // Get all commission transactions grouped by seller
+        // Get commission transactions from last 90 days for performance
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
         const { data: commissionData } = await admin
             .from("transactions")
-            .select("seller_partner_user_id, amount, created_at")
+            .select("seller_partner_user_id, amount, created_at, reference_note")
             .eq("partner_id", partnerId)
             .eq("category", "Comissões")
             .eq("transaction_type", "expense")
             .not("seller_partner_user_id", "is", null)
+            .gte("created_at", ninetyDaysAgo)
             .order("created_at", { ascending: false })
 
         // Aggregate per seller

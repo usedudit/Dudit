@@ -520,7 +520,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 </div>
 
                 {view !== 'menu' && (
-                    <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                    <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                         <div className="flex items-center gap-3">
                             <Button variant="outline" className="h-12 flex-1" onClick={onClose} disabled={isApplying}>Cancelar</Button>
                             <Button variant={view === 'delete' ? 'destructive' : 'default'} className="h-12 flex-1" onClick={handleApply} disabled={isApplying || isCurrentViewBlocked}>

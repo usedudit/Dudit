@@ -366,6 +366,7 @@ const PaymentModal = ({
     const [editingPaymentIndex, setEditingPaymentIndex] = useState<number | null>(null);
     const [paymentCalculation, setPaymentCalculation] = useState<any | null>(null);
     const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
+    const [feeBearerOverride, setFeeBearerOverride] = useState<"merchant" | "customer" | null>(null);
     const [isPaymentCalculationLoading, setIsPaymentCalculationLoading] = useState(false);
     const [isSplitPreviewLoading, setIsSplitPreviewLoading] = useState(false);
     const [splitPreview, setSplitPreview] = useState<
@@ -392,6 +393,7 @@ const PaymentModal = ({
         appliedFeePercent?: number
         appliedInterestPercent?: number
         receiptCart: any[]
+        paymentBreakdown?: Array<{ method: string; amount: number }>
     } | null>(null)
 
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
@@ -404,6 +406,7 @@ const PaymentModal = ({
         setInstallmentOptions([]);
         setIsPaymentCalculationLoading(false);
         setIsPixGenerated(false);
+        setFeeBearerOverride(null);
         if (options?.clearType) {
             setSelectedMethodType(null);
         }
@@ -908,12 +911,16 @@ const PaymentModal = ({
             return;
         }
         const installmentNumber = Math.max(1, Number(installments || 1));
-        const base = chargeTarget; // Always use the full order total for payment method discount/fee calculation
+        // In split mode, calculate discount/fee based on the leg's amount (calcBaseAmount), not the full total
+        const base = editingPaymentIndex !== null
+            ? Math.max(0, Number(calcBaseAmount || 0))
+            : chargeTarget;
         setIsPaymentCalculationLoading(true);
         calculatePaymentMethodAmountsAction({
             originalAmount: base,
             paymentMethodId: selectedMethodId,
             installmentNumber,
+            ...(feeBearerOverride ? { feeBearer: feeBearerOverride } : {}),
         }).then((res: any) => {
             if (!active) return;
             if (res?.success) {
@@ -921,7 +928,8 @@ const PaymentModal = ({
                 if (res.installmentOptions) {
                     setInstallmentOptions(res.installmentOptions);
                 }
-                if (res.finalAmount != null && Number.isFinite(res.finalAmount)) {
+                // Only override paymentBaseAmount in single-payment mode, not split legs
+                if (res.finalAmount != null && Number.isFinite(res.finalAmount) && editingPaymentIndex === null) {
                     setPaymentBaseAmount(res.finalAmount);
                     const nextInput = res.finalAmount > 0 ? String(Math.round(res.finalAmount * 100)) : "";
                     setCashCalculatorInput(nextInput);
@@ -935,7 +943,7 @@ const PaymentModal = ({
         return () => {
             active = false;
         };
-    }, [selectedMethodId, installments, chargeTarget, view]); // Decoupled from calcBaseAmount to prevent recalculation on partial inputs
+    }, [selectedMethodId, installments, chargeTarget, view, editingPaymentIndex, calcBaseAmount, feeBearerOverride]);
 
 
     const handleQuickDenomination = (val: number) => {
@@ -1207,6 +1215,7 @@ const PaymentModal = ({
             setPayments(newPayments);
             setPaymentCalculation(null);
             setSelectedMethodId(method.id);
+            setFeeBearerOverride((method.fee_bearer || "merchant") as "merchant" | "customer");
             setInstallments(String(newPayments[editingPaymentIndex]?.installmentNumber || 1));
             const normalizedType = normalizeMethodType(method.type);
             setView(getTargetViewForMethodType(normalizedType));
@@ -1229,6 +1238,7 @@ const PaymentModal = ({
         if (methodsOfType.length === 1) {
             const only = methodsOfType[0];
             setSelectedMethodId(only.id);
+            setFeeBearerOverride((only.fee_bearer || "merchant") as "merchant" | "customer");
             setPaymentCalculation(null);
             setView(getTargetViewForMethodType(methodType));
             return;
@@ -1322,6 +1332,16 @@ const PaymentModal = ({
 
     const handleStartProcessing = async (forcedPayload?: any) => {
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
+        // Build per-method summary for success snapshot
+        const snapshotBreakdown: Array<{ method: string; amount: number }> = []
+        if (view === 'split') {
+            payments
+                .filter((p) => p.method && p.amount > 0.009)
+                .forEach((p) => snapshotBreakdown.push({ method: p.method || '', amount: p.amount }))
+        } else {
+            const methodName = activeMethods.find((m) => m.id === selectedMethodId)?.name || view
+            snapshotBreakdown.push({ method: methodName, amount: totalPaidCalculated })
+        }
         setSuccessSnapshot({
             subTotal,
             itemCount,
@@ -1341,6 +1361,7 @@ const PaymentModal = ({
             appliedFeePercent: currentPricingTotals.appliedFeePercent,
             appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
             receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
+            paymentBreakdown: snapshotBreakdown,
         })
         setPaymentStatus('processing');
         const payload = forcedPayload || buildConfirmPayload();
@@ -1698,6 +1719,19 @@ const PaymentModal = ({
                                                     </button>
                                                 ))}
                                             </div>
+                                            {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                                <div className="w-full max-w-sm mt-4">
+                                                    <FormDropdown
+                                                        label="Quem paga a taxa?"
+                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
+                                                        setValue={(v: any) => setFeeBearerOverride(v)}
+                                                        options={[
+                                                            { value: "merchant", label: "Empresa (absorve)" },
+                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                        ]}
+                                                    />
+                                                </div>
+                                            )}
                                             {isSinglePricingBusy && (
                                                 <div className="mb-4 flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
@@ -1724,6 +1758,17 @@ const PaymentModal = ({
                                                         className="font-bold text-lg"
                                                     />
                                                 </div>
+                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                                    <FormDropdown
+                                                        label="Quem paga a taxa?"
+                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
+                                                        setValue={(v: any) => setFeeBearerOverride(v)}
+                                                        options={[
+                                                            { value: "merchant", label: "Empresa (absorve)" },
+                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                        ]}
+                                                    />
+                                                )}
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
@@ -1783,6 +1828,17 @@ const PaymentModal = ({
                                                             : [{ value: "1", label: "1x de " + formatCurrency(paymentBaseAmount) }]
                                                     }
                                                 />
+                                                {selectedMethodObj && Number(selectedMethodObj.fee_percent || 0) > 0 && (
+                                                    <FormDropdown
+                                                        label="Quem paga a taxa?"
+                                                        value={feeBearerOverride || selectedMethodObj.fee_bearer || "merchant"}
+                                                        setValue={(v: any) => setFeeBearerOverride(v)}
+                                                        options={[
+                                                            { value: "merchant", label: "Empresa (absorve)" },
+                                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                        ]}
+                                                    />
+                                                )}
                                                 {isSinglePricingBusy && (
                                                     <div className="flex items-center gap-2 text-sm font-medium text-brand-inactive-text">
                                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-border border-t-brand-green" />
@@ -1861,14 +1917,32 @@ const PaymentModal = ({
                                                             <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(chargeTarget)}</span>
                                                         </div>
                                                         <div className="flex justify-between items-baseline text-sm">
-                                                            <span className="text-brand-inactive-text">Total em abates:</span>
+                                                            <span className="text-brand-inactive-text">Total pago:</span>
                                                             <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(splitPreview.finalTotal)}</span>
                                                         </div>
                                                         <div className="flex justify-between items-baseline border-t border-dashed border-brand-border dark:border-dark-border pt-2">
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Saldo restante:</span>
-                                                            <span className={`text-lg font-bold ${splitPreview.finalTotal >= chargeTarget - 0.005 ? 'text-green-600' : 'text-amber-600'}`}>
-                                                                {formatCurrency(Math.max(0, chargeTarget - splitPreview.finalTotal))}
-                                                            </span>
+                                                            {splitPreview.finalTotal >= chargeTarget - 0.005 ? (
+                                                                splitPreview.finalTotal > chargeTarget + 0.005 ? (
+                                                                    <>
+                                                                        <span className="text-sm font-bold text-green-600">Troco:</span>
+                                                                        <span className="text-lg font-bold text-green-600">
+                                                                            {formatCurrency(splitPreview.finalTotal - chargeTarget)}
+                                                                        </span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Valor total atingido:</span>
+                                                                        <span className="text-lg font-bold text-green-600">OK</span>
+                                                                    </>
+                                                                )
+                                                            ) : (
+                                                                <>
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Saldo restante:</span>
+                                                                    <span className="text-lg font-bold text-amber-600">
+                                                                        {formatCurrency(Math.max(0, chargeTarget - splitPreview.finalTotal))}
+                                                                    </span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 )}
@@ -1930,6 +2004,7 @@ const PaymentModal = ({
                                                                 onClick={() => {
                                                                     setPaymentCalculation(null);
                                                                     setSelectedMethodId(method.id);
+                                                                    setFeeBearerOverride((method.fee_bearer || "merchant") as "merchant" | "customer");
                                                                     setView(targetView);
                                                                 }}
                                                             />
@@ -2197,6 +2272,21 @@ const PaymentModal = ({
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Payment method breakdown */}
+                                    {successSnapshot?.paymentBreakdown && successSnapshot.paymentBreakdown.length > 1 && (
+                                        <div className="mb-6 border-t border-brand-border dark:border-dark-border pt-4">
+                                            <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-3">Formas de pagamento</span>
+                                            <div className="space-y-2">
+                                                {successSnapshot.paymentBreakdown.map((entry, i) => (
+                                                    <div key={i} className="flex justify-between items-center py-1">
+                                                        <span className="text-sm text-brand-dark dark:text-dark-heading">{entry.method}</span>
+                                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(entry.amount)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Action Cards Grid */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">

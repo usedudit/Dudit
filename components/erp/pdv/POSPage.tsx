@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrashIcon, ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
+import { ChevronRightIcon, XIcon, SalesIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge } from "@/components/reusable"
@@ -29,7 +29,6 @@ import {
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
-
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import { getTeamMembers } from "@/app/actions/erp/team"
@@ -1417,14 +1416,14 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                         {pr.hasDiscount && (
                                                             <div className="absolute left-2 top-2 z-10">
                                                                 {pr.badgeVariant === "blue" ? (
-                                                                    <Badge variant="blue" icon={null} className="whitespace-nowrap font-bold text-[10px] px-1.5 py-0.5">-{pr.discountPercent}%</Badge>
+                                                                    <Badge variant="blue" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
                                                                 ) : (
-                                                                    <Badge variant="orange" icon={null} className="whitespace-nowrap font-bold text-[10px] px-1.5 py-0.5">-{pr.discountPercent}%</Badge>
+                                                                    <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pr.discountPercent}%</Badge>
                                                                 )}
                                                             </div>
                                                         )}
                                                         <div className="absolute right-2 top-2 z-10">
-                                                            <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap font-bold text-[10px] px-2 py-0.5 bg-white/95 dark:bg-dark-surface/95 shadow-sm">
+                                                            <Badge variant={stockVariant} icon={<PackageIcon className="h-3 w-3" />} className="whitespace-nowrap">
                                                                 {stock}
                                                             </Badge>
                                                         </div>
@@ -2127,7 +2126,7 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                         >
                             <div className="p-6 space-y-4">
                                 <div className="flex items-center gap-2 text-brand-primary-dark">
-                                    <StarIcon className="h-5 w-5 fill-current text-blue-500" />
+                                    <StarIcon className="h-5 w-5 fill-current text-brand-blue" />
                                     <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Você ganhou brinde(s)!</h4>
                                 </div>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">
@@ -2150,9 +2149,9 @@ export default function POSPage({ partnerId, initialData, initialActiveSession }
                                                 <p className="truncate font-bold text-brand-dark dark:text-dark-heading">
                                                     {gift.name}
                                                 </p>
-                                                <span className="inline-block rounded-full bg-brand-green/10 px-2 py-0.5 text-[10px] font-bold text-brand-green">
+                                                <Badge variant="green" icon={null}>
                                                     Grátis
-                                                </span>
+                                                </Badge>
                                             </div>
                                         </div>
                                     ))}

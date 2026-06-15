@@ -108,6 +108,10 @@ export async function getMarketplaceCheckoutContextAction(input: {
     } else subscriptionsSubtotal += total
   }
 
+  // Preserva o subtotal ORIGINAL de serviços (sem descontos de campanha/promoção)
+  // para usar no cálculo do depósito, alinhado com o que o resolver do carrinho usa
+  const originalServicesSubtotal = servicesSubtotal
+
   const [{ data: partnerRow }, plan, deliveryConfig, pixMethodResult, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
@@ -277,7 +281,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     (serviceDepositManualEnabled || (serviceDepositMpEnabled && mpConnected))
 
   const previewAmount =
-    depositAvailable ? Math.round(servicesSubtotal * (depositPercent / 100) * 100) / 100 : 0
+    depositAvailable ? Math.round(originalServicesSubtotal * (depositPercent / 100) * 100) / 100 : 0
 
   const addresses = partnerRow?.addresses
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses

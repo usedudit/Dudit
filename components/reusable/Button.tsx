@@ -42,6 +42,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 "bg-brand-red text-white hover:bg-brand-red/90 focus-visible:ring-brand-red/50 dark:bg-brand-red/70 dark:text-white dark:hover:bg-brand-red/80",
             ghost:
                 "bg-transparent text-brand-dark dark:text-dark-heading hover:bg-gray-100 dark:hover:bg-dark-border focus-visible:ring-gray-300 dark:focus-visible:ring-dark-border",
+            ghostred:
+                "bg-transparent text-brand-red hover:bg-brand-red/5 dark:text-brand-red dark:hover:bg-brand-red/10 focus-visible:ring-brand-red/50 dark:focus-visible:ring-brand-red/50",
             filled:
                 "bg-gray-100 dark:bg-dark-border hover:bg-gray-100/50 dark:hover:bg-dark-border/50 focus-visible:ring-gray-300 dark:focus-visible:ring-dark-border",
             link:

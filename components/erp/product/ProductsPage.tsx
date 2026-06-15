@@ -33,14 +33,13 @@ import {
 } from "@/app/actions/erp/products"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, SelectionBanner, BarcodeScannerInput, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
 import { playBeepSound, vibrateMobile } from "@/lib/utils/barcode"
 import Dropdown from "../../reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
 import AlertModal from "../../reusable/AlertModal"
 import AddProductPage from "./AddProductPage"
 import { ImportXmlModal } from "@/components/erp/import-xml-modal"
-import DefaultModal from "@/components/reusable/DefaultModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import Pagination from "@/components/reusable/Pagination"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
@@ -914,6 +913,7 @@ export default function ProductsPage({
                                                                                         return { ...p, ids: s }
                                                                                     })
                                                                                 }}
+                                                                                className="bg-white dark:bg-dark-background"
                                                                             />
                                                                         </th>
                                                                         {FIXED_COLUMNS.map((col) => {
@@ -1031,10 +1031,10 @@ export default function ProductsPage({
                 </Button>
 
                 <Button
-                    variant="ghost"
+                    variant="ghostred"
                     onClick={() => setConfirmations((p) => ({ ...p, bulkDelete: true }))}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red hover:text-brand-red/90 dark:text-brand-red dark:hover:text-brand-red/90"
+                    leftIcon={<TrashIcon size={18} />}
+                    className="h-10 px-3"
                 >
                     Excluir
                 </Button>

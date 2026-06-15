@@ -215,16 +215,28 @@ const POSHeader = memo(function POSHeader({
       </div>
 
       <div className="flex flex-col gap-2 mb-6 border-b border-brand-border dark:border-dark-border">
-        <Tabs value={itemTypeTab} onValueChange={(val) => onItemTypeTabChange(val as "product" | "service")}>
-          <TabsList className="border-b-0 px-0 pb-0 gap-4">
-            <TabsTrigger value="product" className="pb-2">
+        {hasBothProductsAndServices && (
+          <div className="flex items-center gap-2 py-2">
+            <button
+              onClick={() => onItemTypeTabChange("product")}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${itemTypeTab === "product"
+                ? "bg-brand-green text-white shadow-sm"
+                : "bg-gray-100 dark:bg-dark-border/30 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                }`}
+            >
               Produtos
-            </TabsTrigger>
-            <TabsTrigger value="service" className="pb-2">
+            </button>
+            <button
+              onClick={() => onItemTypeTabChange("service")}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${itemTypeTab === "service"
+                ? "bg-brand-green text-white shadow-sm"
+                : "bg-gray-100 dark:bg-dark-border/30 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"
+                }`}
+            >
               Serviços
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+            </button>
+          </div>
+        )}
 
         <Tabs value={selectedCategory} onValueChange={onCategoryChange}>
           <TabsList className="w-full border-b-0 px-0 pb-0">

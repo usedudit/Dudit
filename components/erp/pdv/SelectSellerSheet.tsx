@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { SearchIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder } from "@/components/reusable"
+import { SearchIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Button, Input, IconPlaceholder, RadioButton } from "@/components/reusable"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
@@ -27,14 +28,22 @@ interface SelectSellerSheetProps {
   isOpen: boolean
   onClose: () => void
   onSelect: (seller: PartnerTeamMemberBucketItem) => void
+  selectedSellerId?: string
 }
 
-const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps) => {
+const SelectSellerSheet = ({ isOpen, onClose, onSelect, selectedSellerId: initialSelectedId }: SelectSellerSheetProps) => {
+  const [selectedId, setSelectedId] = useState<string | undefined>(initialSelectedId)
   const [appendPulse, setAppendPulse] = useState(false)
   const loadMoreLock = useRef(false)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedId(initialSelectedId)
+    }
+  }, [isOpen, initialSelectedId])
 
   const matchesSearch = useCallback((member: PartnerTeamMemberBucketItem, q: string) => {
     return (
@@ -82,6 +91,8 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
     picker.displayed.length === 0 &&
     picker.filtered.length === 0
 
+  const selectedMember = picker.displayed.find((m) => m.id === selectedId)
+
   const content = (
     <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
       <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -117,15 +128,14 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
               <button
                 key={member.id}
                 type="button"
-                onClick={() => {
-                  onSelect(member)
-                  onClose()
-                }}
-                className="group flex w-full items-center gap-4 border-b border-brand-border p-3.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border/40"
+                onClick={() => setSelectedId(member.id)}
+                className="flex w-full items-center gap-4 border-b border-brand-border p-3.5 text-left transition-colors last:border-0 hover:bg-gray-50 dark:border-dark-border dark:hover:bg-dark-border/40"
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-brand-gray text-lg font-bold text-brand-inactive-text dark:border-dark-border dark:bg-gray-800">
-                  {(member.fullName || member.email || "?").charAt(0)}
-                </div>
+                <UserProfileImage
+                  fullName={member.fullName || member.email || "?"}
+                  imageUrl={member.avatarUrl}
+                  className="h-12 w-12 shrink-0 text-xs"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
                     {member.fullName || member.email || "Membro"}
@@ -134,9 +144,12 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
                     {member.role || "Equipe"}
                   </p>
                 </div>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center text-brand-inactive-text opacity-0 transition-opacity group-hover:opacity-100">
-                  <PlusIcon size={18} />
-                </div>
+                <RadioButton
+                  name="seller-select"
+                  value={member.id}
+                  checked={selectedId === member.id}
+                  onChange={() => setSelectedId(member.id)}
+                />
               </button>
             ))}
 
@@ -158,10 +171,23 @@ const SelectSellerSheet = ({ isOpen, onClose, onSelect }: SelectSellerSheetProps
         ) : null}
       </div>
 
-      <footer className="shrink-0 border-t border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+      <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
         <div className="flex items-center gap-3">
           <Button variant="outline" className="h-12 w-full" onClick={onClose}>
             Cancelar
+          </Button>
+          <Button
+            variant="default"
+            className="h-12 w-full"
+            disabled={!selectedId || selectedId === initialSelectedId}
+            onClick={() => {
+              if (selectedMember) {
+                onSelect(selectedMember)
+                onClose()
+              }
+            }}
+          >
+            Salvar
           </Button>
         </div>
       </footer>

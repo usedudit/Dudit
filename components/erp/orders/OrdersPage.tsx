@@ -1025,18 +1025,9 @@ export default function OrdersPage({
                     variant="ghost"
                     onClick={() => setConfirmations((p) => ({ ...p, bulkCancel: true }))}
                     leftIcon={<BlockedIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-surface"
+                    className="h-10 px-3"
                 >
                     Cancelar
-                </Button>
-
-                <Button
-                    variant="ghost"
-                    onClick={() => { }}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="hidden"
-                >
-                    Excluir
                 </Button>
             </FloatingActionBar>
 

@@ -538,10 +538,10 @@ export default function RecurringPlansPage({
             {/* Floating Action Bar */}
             <FloatingActionBar selectedCount={selectedIds.size} onClearSelection={() => setSelectedIds(new Set())}>
                 <Button
-                    variant="ghost"
+                    variant="ghostred"
                     onClick={() => setIsBulkDeleteModalOpen(true)}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red"
+                    leftIcon={<TrashIcon size={18} />}
+                    className="h-10 px-3"
                 >
                     Excluir
                 </Button>

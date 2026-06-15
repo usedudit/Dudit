@@ -197,12 +197,6 @@ export function recalculateSplitPaymentFromBaseAmounts(
     }
 
     const sumBase = sumSplitBaseAmounts(rows)
-    if (sumBase > safeBase + SPLIT_BASE_SUM_TOLERANCE) {
-        return {
-            ok: false,
-            error: `A soma dos valores por método (R$ ${sumBase.toFixed(2)}) não pode ser maior que o total do pedido (R$ ${safeBase.toFixed(2)}).`,
-        }
-    }
 
     const adjustedRows: RecalculatedSplitRow[] = []
     let finalTotal = 0

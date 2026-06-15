@@ -694,7 +694,13 @@ export function CheckoutPageClient() {
             : "Pagar na Entrega"
 
     const pickupRequiresOnlinePayment = isPickup && (checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment") === "require_online_payment"
-    const showTraditionalPaymentOption = !pickupRequiresOnlinePayment && Boolean(
+    const isOnlyServicesWithDeposit = Boolean(
+        checkoutContext?.deposit.available &&
+        requirements?.hasServiceLines &&
+        !requirements?.hasProductLines &&
+        !requirements?.hasSubscriptionLines
+    )
+    const showTraditionalPaymentOption = !pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
         requirements?.hasServiceLines ||
@@ -1367,9 +1373,7 @@ export function CheckoutPageClient() {
                     </div>
                 )}
                 {isPickup && preparationEstimate && (preparationEstimate.preparationTimeMinutes > 0 || preparationEstimate.readyAt.getTime() > preparationEstimate.now.getTime()) && (
-                    <div className="text-xs text-brand-inactive-text">
-                        Retirada {getReadyDayLabel(preparationEstimate)} entre {pickupStartLabel} e {pickupEndLabel}
-                    </div>
+                    <InfoCard color="orange" message={`Retirada ${getReadyDayLabel(preparationEstimate)} entre ${pickupStartLabel} e ${pickupEndLabel}`} />
                 )}
                 {paymentOption === "traditional" && paymentPreviewLoading && (
                     <div className="flex items-center justify-between text-sm font-medium text-brand-inactive-text">
@@ -2593,11 +2597,11 @@ export function CheckoutPageClient() {
                                 {/* Totals Summary */}
                                 <FormSection title="Resumo dos Valores" hasSeparator>
                                     <div className="space-y-2 text-sm text-brand-inactive-text">
-                                    <div className="flex justify-between">
-                                        <span>Subtotal</span>
-                                        <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
-                                    </div>
-                                    {couponDiscount > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Subtotal</span>
+                                            <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(contextTotalSubtotal)}</span>
+                                        </div>
+                                        {couponDiscount > 0 && (
                                             <div className="flex justify-between text-brand-green font-semibold">
                                                 <span>Desconto do cupom</span>
                                                 <span>-{formatCurrency(couponDiscount)}</span>

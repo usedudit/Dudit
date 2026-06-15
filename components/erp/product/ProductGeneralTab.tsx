@@ -96,6 +96,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
     const showInMarketplaceValue = productData.show_in_marketplace === undefined ? "true" : String(productData.show_in_marketplace)
 
+    const hasVariants = (() => {
+        const v = productData.variants
+        if (!Array.isArray(v)) return false
+        if (v.length === 0) return false
+        if (typeof v[0]?.count === 'number') return v[0].count > 0
+        return true
+    })()
+
     const [isOfficialCategoryModalOpen, setIsOfficialCategoryModalOpen] = useState(false)
     const [officialCategoryPath, setOfficialCategoryPath] = useState("")
 
@@ -120,6 +128,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações Básicas">
                     <div className="mb-10">
+                        {hasVariants && (
+                            <div className="mb-4">
+                                <InfoCard
+                                    color="blue"
+                                    message="Este produto possui variações. As imagens podem ser configuradas individualmente para cada variação na aba Variações."
+                                />
+                            </div>
+                        )}
                         <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
                     </div>
 
@@ -165,6 +181,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                 {/* PREÇO */}
                 <FormSection hasSeparator title={isQuickMode ? "Preço e Estoque" : "Preço"}>
+                    {hasVariants && (
+                        <div className="mb-5">
+                            <InfoCard
+                                color="blue"
+                                message="Este produto possui variações. Os preços individuais de cada variação podem ser configurados na aba Variações."
+                            />
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                         {!isQuickMode && (
                             <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
@@ -242,6 +266,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 {/* ESTOQUE */}
                 {!isQuickMode && (
                     <FormSection hasSeparator title="Estoque">
+                        {hasVariants && (
+                            <div className="mb-5">
+                                <InfoCard
+                                    color="blue"
+                                    message="Este produto possui variações. O estoque individual de cada variação pode ser configurado na aba Variações."
+                                />
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                             <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
@@ -283,6 +315,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 Envio e Dimensões
                             </span>
                         } defaultOpen={false} triggerClass="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5 text-left">
+                            {hasVariants && (
+                                <div className="mb-5">
+                                    <InfoCard
+                                        color="blue"
+                                        message="Este produto possui variações. As dimensões e pesos podem variar por variação e devem ser configurados na aba Variações."
+                                    />
+                                </div>
+                            )}
                             <div className="pb-4">
                                 <div className="space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">

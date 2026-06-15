@@ -892,10 +892,10 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
             {/* Floating Action Bar */}
             <FloatingActionBar selectedCount={selectedItemIds.size} onClearSelection={() => setSelectedItemIds(new Set())}>
                 <Button
-                    variant="ghost"
+                    variant="ghostred"
                     onClick={handleBulkDeleteItems}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="h-10 px-3 text-brand-red"
+                    leftIcon={<TrashIcon size={18} />}
+                    className="h-10 px-3"
                 >
                     Remover Selecionados
                 </Button>

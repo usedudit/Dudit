@@ -43,6 +43,9 @@ export interface Product {
   availability_value?: number | null
   availability_unit?: string | null
   moderation_status?: 'approved' | 'pending_moderation' | 'rejected' | null
+  variant_min_price?: number
+  variant_max_price?: number
+  variant_total_stock?: number
 }
 
 export interface ProductDisplay extends Product {

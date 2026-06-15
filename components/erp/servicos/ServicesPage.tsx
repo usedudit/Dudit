@@ -713,17 +713,17 @@ export default function ServicesPage({
                     selectedCount={selection.ids.size}
                     onClearSelection={() => setSelection((p) => ({ ...p, ids: new Set() }))}
                 >
-                    <Button
-                        variant="ghost"
-                        className="h-9 px-3 gap-2 font-bold text-brand-red"
-                        onClick={() => setConfirmations(prev => ({ ...prev, bulkDelete: true }))}
-                    >
-                        <TrashIcon className="w-4 h-4" />
-                        Excluir
-                    </Button>
                     <Button variant="ghost" onClick={() => setConfirmations(p => ({ ...p, bulkInactive: true }))}>
                         {selectedProds.every(p => !p.is_active) ? <CheckCircleIcon size={16} /> : <BlockedIcon size={16} />}
                         {selectedProds.every(p => !p.is_active) ? "Ativar Todos" : "Inativar Todos"}
+                    </Button>
+                    <Button
+                        variant="ghostred"
+                        className="h-10 px-3"
+                        onClick={() => setConfirmations(prev => ({ ...prev, bulkDelete: true }))}
+                        leftIcon={<TrashIcon size={18} />}
+                    >
+                        Excluir
                     </Button>
                 </FloatingActionBar>
             )}

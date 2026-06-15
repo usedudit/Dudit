@@ -1374,22 +1374,65 @@ export async function checkProductInOrdersAction(productId: string) {
     }
 }
 
+const fetchVariantAggregates = async (productIds: string[]) => {
+    if (productIds.length === 0) return {}
+    const supabase = getAdminClient()
+    const { data } = await supabase
+        .from("product_variants")
+        .select("product_id, price_adjustment, stock_quantity, is_active")
+        .in("product_id", productIds)
+    if (!data) return {}
+    const map: Record<string, { variant_min_price: number; variant_max_price: number; variant_total_stock: number }> = {}
+    for (const v of data) {
+        if (!v.is_active) continue
+        if (!map[v.product_id]) map[v.product_id] = { variant_min_price: Infinity, variant_max_price: -Infinity, variant_total_stock: 0 }
+        const m = map[v.product_id]
+        const price = Number(v.price_adjustment) || 0
+        if (price < m.variant_min_price) m.variant_min_price = price
+        if (price > m.variant_max_price) m.variant_max_price = price
+        m.variant_total_stock += Number(v.stock_quantity) || 0
+    }
+    for (const pid of productIds) {
+        if (map[pid]) {
+            if (map[pid].variant_min_price === Infinity) map[pid].variant_min_price = 0
+            if (map[pid].variant_max_price === -Infinity) map[pid].variant_max_price = 0
+        }
+    }
+    return map
+}
+
 export const getCachedProducts = async (partnerId: string) => {
     return unstable_cache(
         async () => {
             const supabase = getAdminClient()
             const { data, error } = await supabase
                 .from("products")
-                .select("id, name, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+                .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
                 .eq("partner_id", partnerId)
                 .limit(100)
                 .order("created_at", { ascending: false })
             if (error) throw error
-            return (data || []).map((p: any) => ({
+            const rows = (data || []).map((p: any) => ({
                 ...p,
                 category: p.category?.name || null,
                 brand: p.brand?.name || null
             }))
+            const withVariants = rows.filter((p: any) => {
+                const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+                return count > 0
+            })
+            if (withVariants.length > 0) {
+                const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
+                for (const p of rows) {
+                    const agg = aggregates[p.id]
+                    if (agg) {
+                        p.variant_min_price = agg.variant_min_price
+                        p.variant_max_price = agg.variant_max_price
+                        p.variant_total_stock = agg.variant_total_stock
+                    }
+                }
+            }
+            return rows
         },
         [TAGS.products(partnerId)],
         { tags: [TAGS.products(partnerId)] }
@@ -1547,7 +1590,7 @@ export async function getERPProductsPageAction(
 
         let q = supabase
             .from("products")
-            .select("id, name, stock_quantity, price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
 
         if (cursor) {
@@ -1566,6 +1609,23 @@ export async function getERPProductsPageAction(
             category: p.category?.name || null,
             brand: p.brand?.name || null
         }))
+
+        const withVariants = rows.filter((p: any) => {
+            const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+            return count > 0
+        })
+        if (withVariants.length > 0) {
+            const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
+            for (const p of rows) {
+                const agg = aggregates[p.id]
+                if (agg) {
+                    p.variant_min_price = agg.variant_min_price
+                    p.variant_max_price = agg.variant_max_price
+                    p.variant_total_stock = agg.variant_total_stock
+                }
+            }
+        }
+
         const hasMore = rows.length > limit
         const items = hasMore ? rows.slice(0, limit) : rows
         const last = items[items.length - 1]
