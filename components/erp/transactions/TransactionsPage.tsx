@@ -1144,7 +1144,7 @@ export default function TransactionsPage({
                                         : "Registrar pagamento"
                             : "Registrar pagamento"
                     }
-                    maxWidth="md"
+                    maxWidth="3xl"
                 >
                     {selectedInstallmentForPayment ? (() => {
                         const isInstallment = !!selectedInstallmentForPayment.installmentGroupId
@@ -1152,42 +1152,116 @@ export default function TransactionsPage({
                         const isRegular = !isInstallment && !isRecurring
                         const currentRemaining = Number(selectedInstallmentForPayment.remainingAmount ?? selectedInstallmentForPayment.amount ?? 0)
                         const nextRemaining = Math.max(0, currentRemaining - Number(paymentAmount || 0))
-
+                        
                         return (
-                            <div className="space-y-4">
-                                <div className="space-y-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="min-w-0">
-                                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
-                                                {selectedInstallmentForPayment.description}
-                                            </h3>
-                                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                {isRecurring ? (
-                                                    <Badge variant="purple">
-                                                        Recorrente
-                                                    </Badge>
-                                                ) : isInstallment ? (
-                                                    <Badge variant="gray">
-                                                        Parcela {selectedInstallmentForPayment.installmentNumber}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="gray">
-                                                        Avulso
-                                                    </Badge>
-                                                )}
-                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                    Vence em {selectedInstallmentForPayment.dueDate || (selectedInstallmentForPayment.occurrenceDate ? formatBrazilDateFromDbInput(selectedInstallmentForPayment.occurrenceDate, 'dayMonthYear') : '-')}
+                            <div className="flex flex-col md:flex-row gap-6">
+                                {/* Left Column: Resumo (Summary Receipt Style) */}
+                                <div className="w-full md:w-[45%] flex flex-col justify-between">
+                                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl p-5 flex flex-col relative h-full border border-brand-border dark:border-dark-border">
+                                        {/* Receipt Header (Customer Info Style) */}
+                                        <div className="flex items-center justify-between pb-4 border-b border-dashed border-brand-border dark:border-dark-border mb-4">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                                                    {isRecurring ? <ClockIcon className="w-5 h-5" /> : isInstallment ? <InstallmentIcon className="w-5 h-5" /> : <MoneyIcon className="w-5 h-5" />}
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading leading-tight truncate max-w-[120px] md:max-w-[150px]" title={selectedInstallmentForPayment.description}>
+                                                            {selectedInstallmentForPayment.description}
+                                                        </span>
+                                                        {isRecurring && (
+                                                            <Badge variant="purple">
+                                                                Recorrente
+                                                            </Badge>
+                                                        )}
+                                                        {isInstallment && (
+                                                            <Badge variant="gray">
+                                                                Parcela {selectedInstallmentForPayment.installmentNumber}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {selectedInstallmentForPayment.dueDate && (
+                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium mt-0.5">
+                                                            Vence em {selectedInstallmentForPayment.dueDate || (selectedInstallmentForPayment.occurrenceDate ? formatBrazilDateFromDbInput(selectedInstallmentForPayment.occurrenceDate, 'dayMonthYear') : '-')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end text-right justify-center shrink-0">
+                                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Restante</span>
+                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(currentRemaining)}
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Restante</p>
-                                            <p className="font-bold text-[18px] text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(currentRemaining)}
-                                            </p>
+
+                                        {/* Summary Details */}
+                                        <div className="space-y-4 flex-1">
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">Resumo do Lançamento</h4>
+                                            
+                                            <div className="space-y-2.5 text-xs">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo Devedor Atual</span>
+                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(currentRemaining)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">(-) Valor Abatido (Principal)</span>
+                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">
+                                                        - {formatCurrency(Number(paymentAmount || 0))}
+                                                    </span>
+                                                </div>
+
+                                                {!isRegular && (
+                                                    <div className="flex justify-between items-center text-[11px] pl-2 border-l border-brand-border dark:border-dark-border">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Novo Saldo Restante</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(nextRemaining)}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <div className="border-t border-dashed border-brand-border dark:border-dark-border my-2"></div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">(+) Juros Adicionais</span>
+                                                    <span className={Number(interestAmount || 0) > 0 ? "font-semibold text-brand-red" : "font-medium text-brand-inactive-text dark:text-dark-body"}>
+                                                        + {formatCurrency(Number(interestAmount || 0))}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">(-) Desconto Aplicado</span>
+                                                    <span className={Number(discountAmount || 0) > 0 ? "font-semibold text-brand-green" : "font-medium text-brand-inactive-text dark:text-dark-body"}>
+                                                        - {formatCurrency(Number(discountAmount || 0))}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Big Total Row */}
+                                        <div className="mt-6 pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <span className="font-bold text-xs text-brand-dark dark:text-dark-heading block">
+                                                        {selectedInstallmentForPayment.ledgerDirection === "in" ? "Total a Receber" : "Total a Pagar"}
+                                                    </span>
+                                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body italic">
+                                                        Fluxo de caixa líquido
+                                                    </span>
+                                                </div>
+                                                <span className="font-black text-lg text-brand-dark dark:text-dark-heading tracking-tight">
+                                                    {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-
+                                </div>
+                                
+                                {/* Right Column: Inputs & Actions (55% width) */}
+                                <div className="w-full md:w-[55%] flex flex-col justify-between space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <MoneyInput
@@ -1196,9 +1270,6 @@ export default function TransactionsPage({
                                                 onChange={(value) => setPaymentAmount(String(value))}
                                                 min={0}
                                             />
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
-                                                Valor principal que abaterá a dívida/parcela.
-                                            </p>
                                         </div>
                                         <FormDropdown
                                             label="Meio de pagamento"
@@ -1217,9 +1288,6 @@ export default function TransactionsPage({
                                                 onChange={(value) => setInterestAmount(String(value))}
                                                 min={0}
                                             />
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
-                                                Acréscimo financeiro cobrado.
-                                            </p>
                                         </div>
                                         <div>
                                             <MoneyInput
@@ -1228,85 +1296,24 @@ export default function TransactionsPage({
                                                 onChange={(value) => setDiscountAmount(String(value))}
                                                 min={0}
                                             />
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
-                                                Desconto concedido na transação.
-                                            </p>
                                         </div>
                                     </div>
 
-                                    <div className="rounded-xl border border-brand-border dark:border-dark-border bg-brand-light-bg dark:bg-dark-surface/50 p-4 space-y-4">
-                                        {/* Part 1: Debt Balance reduction */}
-                                        <div className="space-y-1 pb-3 border-b border-brand-border dark:border-dark-border">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                    Abatimento do Saldo
-                                                </span>
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(Number(paymentAmount || 0))}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {isRegular
-                                                    ? "Esta transação será totalmente liquidada e marcada como paga."
-                                                    : `Este valor reduzirá o saldo restante. Novo saldo restante: ${formatCurrency(nextRemaining)}`}
-                                            </p>
-                                        </div>
-
-                                        {/* Part 2: Cash Flow (Valor Líquido) */}
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                    Fluxo de Caixa (Valor Líquido)
-                                                </span>
-                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}
-                                                </span>
-                                            </div>
-
-                                            <div className="rounded-lg bg-white dark:bg-dark-surface/50 p-2.5 border border-brand-border dark:border-dark-border/50 space-y-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                <div className="flex justify-between">
-                                                    <span>Valor do pagamento (principal)</span>
-                                                    <span>{formatCurrency(Number(paymentAmount || 0))}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span>(+) Juros adicionais</span>
-                                                    <span className={Number(interestAmount || 0) > 0 ? "text-red-600 dark:text-red-400 font-semibold" : ""}>
-                                                        {formatCurrency(Number(interestAmount || 0))}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span>(-) Desconto aplicado</span>
-                                                    <span className={Number(discountAmount || 0) > 0 ? "text-brand-green dark:text-emerald-400 font-semibold" : ""}>
-                                                        {formatCurrency(Number(discountAmount || 0))}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between border-t border-brand-border dark:border-dark-border pt-1.5 font-bold text-brand-dark dark:text-dark-heading">
-                                                    <span>(=) Total líquido {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebido" : "pago"}</span>
-                                                    <span>{formatCurrency(Math.max(0, Number(paymentAmount || 0) + Number(interestAmount || 0) - Number(discountAmount || 0)))}</span>
-                                                </div>
-                                            </div>
-
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body italic">
-                                                Nota: Juros e descontos ajustam o valor financeiro movimentado na conta, sem alterar o valor abatido da obrigação principal.
-                                            </p>
-                                        </div>
+                                    <div className="flex justify-end gap-2 pt-4 border-t border-brand-border dark:border-dark-border">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                if (payingInstallment) return
+                                                setPaymentModalOpen(false)
+                                                setSelectedInstallmentForPayment(null)
+                                            }}
+                                        >
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
+                                            Confirmar {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebimento" : "pagamento"}
+                                        </Button>
                                     </div>
-                                </div>
-
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            if (payingInstallment) return
-                                            setPaymentModalOpen(false)
-                                            setSelectedInstallmentForPayment(null)
-                                        }}
-                                    >
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={() => void handleConfirmInstallmentPayment()} disabled={payingInstallment}>
-                                        Confirmar {selectedInstallmentForPayment.ledgerDirection === "in" ? "recebimento" : "pagamento"}
-                                    </Button>
                                 </div>
                             </div>
                         )

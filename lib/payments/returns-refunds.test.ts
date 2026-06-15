@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractMercadoPagoPaidAmount } from "../../app/actions/erp/returns"
+import { extractMercadoPagoPaidAmount } from "../returns/calculations"
 
 describe("extractMercadoPagoPaidAmount", () => {
     it("should extract full amount when no breakdown is present and provider is Mercado Pago", () => {

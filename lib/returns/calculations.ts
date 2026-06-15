@@ -93,3 +93,29 @@ export function canRequestPostFulfillmentResolution(order: { situation?: string 
   if (situation === "cancelled") return false
   return LOCKED_DELIVERY_STATES.has(deliveryStatus) || situation === "shipped" || situation === "delivered"
 }
+
+/**
+ * Extracts the total amount paid via Mercado Pago from the order's payment_breakdown.
+ * Uses the canonical `provider` field (set at checkout as "Mercado Pago"), NOT display labels.
+ * Falls back to the full order amount when the order was paid entirely via MP (no breakdown).
+ */
+export function extractMercadoPagoPaidAmount(order: any): number {
+  const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : []
+  if (breakdown.length === 0) {
+    // No breakdown = single payment method. Check if it was MP.
+    const provider = String(order?.payment_provider || "").toLowerCase()
+    if (provider.includes("mercado") || order?.mp_payment_id) {
+      return getOrderAmountPaid(order)
+    }
+    return 0
+  }
+  // Sum only entries where provider is "Mercado Pago" (canonical value set by checkout)
+  return breakdown.reduce((sum: number, entry: any) => {
+    const entryProvider = String(entry.provider || "").toLowerCase()
+    if (entryProvider.includes("mercado")) {
+      return sum + Math.max(0, Number(entry.amount || entry.effectiveAmount || 0))
+    }
+    return sum
+  }, 0)
+}
+
