@@ -92,7 +92,7 @@ const OrderListItem = React.memo(
                                     </span>
                                     {Number(order.returnCount || 0) > 0 && (
                                         <Tooltip text="Possui histórico de trocas/devoluções">
-                                            <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
+                                            <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap">
                                                 {Number(order.returnCount || 0) > 1 ? ` ${order.returnCount}` : ""}
                                             </Badge>
                                         </Tooltip>
@@ -131,16 +131,19 @@ const OrderListItem = React.memo(
                                     Cancelado
                                 </Badge>
                             ) : (
-                                <>
-                                    <Badge variant={order.statusColor} icon={<MoneyIcon />}>
-                                        {order.statusLabel}
-                                    </Badge>
-                                    {!order.hasOnlyServices && (
-                                        <Badge variant={order.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
-                                            {order.deliveryStatusLabel || "Não informado"}
-                                        </Badge>
-                                    )}
-                                </>
+                                <Badge variant={order.statusColor} icon={<MoneyIcon />}>
+                                    {order.statusLabel}
+                                </Badge>
+                            )}
+                            {order.is_refunded && (
+                                <Badge variant="purple" icon={<MoneyIcon />}>
+                                    Reembolsado
+                                </Badge>
+                            )}
+                            {!order.hasOnlyServices && order.situation !== "cancelled" && (
+                                <Badge variant={order.deliveryStatusColor || "gray"} icon={<TruckIcon />}>
+                                    {order.deliveryStatusLabel || "Não informado"}
+                                </Badge>
                             )}
                         </div>
                     )

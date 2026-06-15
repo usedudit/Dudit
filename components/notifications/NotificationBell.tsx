@@ -2,8 +2,7 @@
 
 import { NotificationIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
-import Dropdown from "@/components/reusable/Dropdown"
-import { NotificationPanel } from "./NotificationPanel"
+import { NotificationsSheet } from "./NotificationsSheet"
 import { useNotifications } from "@/hooks/use-notifications"
 import { cn } from "@/lib/utils"
 
@@ -23,12 +22,6 @@ export function NotificationBell({
     panelOpen,
     setPanelOpen,
     unreadCount,
-    grouped,
-    isLoading,
-    isFetchingMore,
-    hasMore,
-    fetchMore,
-    registerVisible,
   } = useNotifications()
 
   if (!user) return null
@@ -47,55 +40,33 @@ export function NotificationBell({
       </span>
     ) : null
 
-  const trigger = (
-    <Button
-      variant="outline"
-      className={cn(
-        "rounded-full w-9 h-9 p-0 flex items-center justify-center relative",
-        variant === "marketplace" &&
-          "border-white/30 bg-white/10 hover:bg-white/20 text-white border",
-        buttonClassName,
-      )}
-      aria-label="Notificações"
-    >
-      <NotificationIcon
-        className={cn(
-          "w-4 h-4",
-          variant === "marketplace"
-            ? "text-white"
-            : "text-brand-dark dark:text-dark-heading",
-        )}
-      />
-      {badge}
-    </Button>
-  )
-
   return (
     <div className={className}>
-      <Dropdown
-        trigger={trigger}
-        align="right"
-        width="w-[min(100vw-2rem,380px)]"
-        contentClasses="p-0"
-        showChevron={false}
-        fullWidth={false}
-        onToggle={setPanelOpen}
+      <Button
+        variant="outline"
+        className={cn(
+          "rounded-full w-9 h-9 p-0 flex items-center justify-center relative",
+          variant === "marketplace" &&
+            "border-white/30 bg-white/10 hover:bg-white/20 text-white border",
+          buttonClassName,
+        )}
+        aria-label="Notificações"
+        onClick={() => setPanelOpen(true)}
       >
-        <div className="border-b border-brand-border dark:border-dark-border px-3 py-2.5">
-          <h3 className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-            Notificações
-          </h3>
-        </div>
-        <NotificationPanel
-          grouped={grouped}
-          isLoading={isLoading && panelOpen}
-          isFetchingMore={isFetchingMore}
-          hasMore={hasMore}
-          onLoadMore={() => fetchMore()}
-          onVisible={registerVisible}
-          onNavigate={() => setPanelOpen(false)}
+        <NotificationIcon
+          className={cn(
+            "w-4 h-4",
+            variant === "marketplace"
+              ? "text-white"
+              : "text-brand-dark dark:text-dark-heading",
+          )}
         />
-      </Dropdown>
+        {badge}
+      </Button>
+      <NotificationsSheet
+        isOpen={panelOpen}
+        onClose={() => setPanelOpen(false)}
+      />
     </div>
   )
 }

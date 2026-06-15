@@ -120,8 +120,25 @@ export default async function ExplorarPage({
 
     const query = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : ""
     const type = parseMarketplaceType(resolvedSearchParams.type)
+    const section = typeof resolvedSearchParams.section === "string" ? resolvedSearchParams.section : undefined
 
     const serverFetchType = type
+
+    // Map section to a display title
+    const sectionTitles: Record<string, string> = {
+        trending: "🔥 Bombando na sua região",
+        "ending-soon": "⏰ Acabando hoje",
+        nearby: "📍 Perto de você",
+        recent: "🆕 Recém anunciados",
+        gems: "💎 Achados da Dudit",
+        "for-you": "👀 Para você",
+        "best-sellers": "⭐ Mais vendidos",
+        "top-rated": "🏆 Melhor avaliados",
+        promos: "🎯 Promoções especiais",
+        "most-viewed": "💬 Mais visualizados",
+        popular: "🔥 Populares",
+    }
+    const sectionTitle = section ? sectionTitles[section] || "Explorar" : undefined
 
     // Para estados, passa apenas o slug do estado; a função searchMarketplaceByCity filtrará por estado
     const searchSlug = stateSlug ? stateSlug : cidade
@@ -164,6 +181,7 @@ export default async function ExplorarPage({
                     type={type}
                     cidade={searchSlug}
                     categoria={categoria}
+                    sectionTitle={sectionTitle}
                     userProfile={userProfile}
                     cartCount={cartCount}
                     hideHeaderAndFooter={true}

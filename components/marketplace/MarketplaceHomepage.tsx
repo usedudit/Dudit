@@ -3,10 +3,10 @@
 import { useState, useMemo } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
-import { HeroBanner, ProductCarousel, CategoryList, InfoSection } from "./shared-components"
+import { HeroBanner, ProductCarousel } from "./shared-components"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
-import { getProductDisplayImages } from "@/lib/utils/product-display-images"
+import type { HomeSection } from "@/app/actions/marketplace/discover"
 
 import { useRouter } from "next/navigation"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
@@ -25,9 +25,7 @@ import citiesData from "@/lib/data/cities.json"
 import { MapPinIcon, XIcon } from "@/lib/icons"
 
 interface MarketplaceHomeProps {
-    products: any[]
-    vitrines?: any[]
-    plans?: any[]
+    sections?: HomeSection[]
     user?: any
     userProfile?: any
     cartCount?: number
@@ -48,9 +46,7 @@ const TRENDS = [
 ]
 
 export default function MarketplaceHome({
-    products = [],
-    vitrines = [],
-    plans = [],
+    sections = [],
     user,
     userProfile,
     cartCount,
@@ -149,71 +145,9 @@ export default function MarketplaceHome({
         }
     }
 
-    // useMemo: Prevent re-computation when activeTrend changes (products don't change)
-    const displayProducts = useMemo(() => products.map((product) => {
-        const images = getProductDisplayImages(product)
-        const basePrice = Number(product.promotional_price || product.price)
-        const price = (!product.promotional_price && product.fallback_variant_price) ? Number(product.fallback_variant_price) : basePrice
-
-        return {
-            id: product.id,
-            name: product.name,
-            price,
-            originalPrice: product.promotional_price ? Number(product.price) : undefined,
-            images,
-            rating: product.rating,
-            reviews: 0,
-            partners: Array.isArray(product.partners) ? product.partners[0] : product.partners,
-            category: product.category || null,
-        }
-    }), [products])
-
-    const displayPlans = useMemo(() => plans.map((plan) => {
-        return {
-            id: plan.id,
-            name: plan.name,
-            price: Number(plan.price),
-            originalPrice: undefined,
-            images: plan.images,
-            rating: plan.rating,
-            reviews: 0,
-            partners: plan.partners,
-            category: "Assinatura Recorrente",
-            itemType: "plano",
-            frequency_type: plan.frequency_type,
-            frequency_interval: plan.frequency_interval
-        }
-    }), [plans])
-
-    const recentProducts = displayProducts.slice(0, 10)
-    const alsoLikeProducts = displayProducts.slice(10, 20)
-
-    const promoProducts = useMemo(() => {
-        return displayProducts
-            .filter((p) => p.originalPrice && p.originalPrice > p.price)
-            .slice(0, 10)
-    }, [displayProducts])
-
-    const categoriesWithProducts = useMemo(() => {
-        const groups: { [key: string]: any[] } = {}
-        displayProducts.forEach((item) => {
-            const cat = item.category || "Outros"
-            if (!groups[cat]) groups[cat] = []
-            groups[cat].push(item)
-        })
-        return Object.entries(groups)
-            .map(([name, list]) => ({ name, list }))
-            .filter((g) => g.list.length >= 2)
-            .slice(0, 3)
-    }, [displayProducts])
-
-    const sortedVitrines = useMemo(() => {
-        return [...vitrines].sort((a, b) => {
-            const ratingA = Number(a.rating ?? a.partners?.rating ?? 0)
-            const ratingB = Number(b.rating ?? b.partners?.rating ?? 0)
-            return ratingB - ratingA
-        })
-    }, [vitrines])
+    const userCoords = userProfile?.latitude && userProfile?.longitude
+        ? { lat: userProfile.latitude, lng: userProfile.longitude }
+        : null
 
     const handleAddressFetched = (addr: any) => {
         setForm(f => ({
@@ -273,7 +207,7 @@ export default function MarketplaceHome({
     }
 
     const hasNoLocation = !selectedCityName
-    const hasNoProductsOrVitrines = selectedCityName && displayProducts.length === 0 && vitrines.length === 0
+    const hasNoProductsOrVitrines = selectedCityName && sections.length === 0
 
     const renderMarketingSection = () => (
         <section className="bg-[#fff3db] py-16 md:py-24 mb-0 w-full mt-auto">
@@ -623,91 +557,20 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow">
                 <HeroBanner />
 
-                {recentProducts.length > 0 && (
+                {sections.map((section) => (
                     <ProductCarousel
-                        title="Produtos em alta na sua cidade"
-                        products={recentProducts}
-                        seeMoreLink="/explorar"
-                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                    />
-                )}
-
-                {displayPlans.length > 0 && (
-                    <ProductCarousel
-                        title="Planos em alta na sua cidade"
-                        products={displayPlans}
-                        seeMoreLink="/explorar?type=planos"
-                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                    />
-                )}
-
-                {alsoLikeProducts.length > 0 && (
-                    <ProductCarousel
-                        title="Viu e ainda não levou?"
-                        products={alsoLikeProducts}
-                        seeMoreLink="/explorar"
-                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                    />
-                )}
-
-                {promoProducts.length > 0 && (
-                    <ProductCarousel
-                        title="Coisas em promoção"
-                        products={promoProducts}
-                        seeMoreLink="/explorar?type=produtos"
-                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
-                    />
-                )}
-
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] mb-16">
-                    <div className="bg-[#dfff00] rounded-[20px] p-6 md:px-12 md:py-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-                        <div className="text-center md:text-left">
-                            <h2 className="text-[#335a03] font-black text-3xl md:text-[40px] mb-1 tracking-tight leading-none">BLACK FRIDAY</h2>
-                            <p className="text-[#335a03] font-bold text-lg">Os melhores descontos do ano!</p>
-                        </div>
-                        <button
-                            className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-colors text-base shadow-sm"
-                        >
-                            Conferir ofertas
-                        </button>
-                    </div>
-                </div>
-
-                {categoriesWithProducts.map((catGroup) => (
-                    <ProductCarousel
-                        key={catGroup.name}
-                        title={`Mais procurados em ${catGroup.name}`}
-                        products={catGroup.list}
-                        seeMoreLink={`/explorar?q=${encodeURIComponent(catGroup.name)}`}
-                        userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null}
+                        key={section.id}
+                        title={section.title}
+                        subtitle={section.subtitle}
+                        products={section.items}
+                        seeMoreLink={section.seeMoreLink}
+                        userCoords={userCoords}
                     />
                 ))}
-
-                <CategoryList vitrines={sortedVitrines} />
 
                 {homeAds.length > 0 && (
                     <SponsoredAdsCarousel ads={homeAds} slot="home" title="Patrocinados na sua região" />
                 )}
-
-                <InfoSection />
-
-                <section className="mx-auto mb-16 max-w-[1400px] px-4 lg:px-0">
-                    <h2 className="text-2xl md:text-[32px] font-bold text-gray-900 mb-6">Siga as tendências</h2>
-                    <div className="flex flex-wrap gap-3">
-                        {TRENDS.map((trend) => (
-                            <button
-                                key={trend}
-                                onClick={() => setActiveTrend(trend)}
-                                className={`px-6 py-2.5 border rounded-full font-semibold text-sm transition-colors ${activeTrend === trend
-                                    ? "bg-brand-green text-white border-brand-green"
-                                    : "border-gray-200 text-gray-600 hover:bg-brand-gray hover:border-gray-300"
-                                    }`}
-                            >
-                                {trend}
-                            </button>
-                        ))}
-                    </div>
-                </section>
 
                 {renderAddressModal()}
                 {renderVisitorModal()}

@@ -330,6 +330,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
     }
 
     const showPrice = (product as any).show_price_in_store !== false
+    const badgeLabel = (product as any)._badgeLabel as string | undefined
+    const badgeVariant = (product as any)._badgeVariant as string | undefined
+    const timeLeft = (product as any)._timeLeft as string | undefined
+    const socialProof = (product as any)._socialProof as string | undefined
 
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
@@ -351,6 +355,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                         )}
                         {showPrice && pricing.badgeVariant === "orange" && (
                             <Badge variant="orange" icon={null} className="whitespace-nowrap">-{pricing.discountPercent}%</Badge>
+                        )}
+                        {timeLeft && (
+                            <Badge variant="orange" icon={null} className="whitespace-nowrap">{timeLeft}</Badge>
+                        )}
+                        {badgeLabel && badgeVariant === "green" && (
+                            <Badge variant="green" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
+                        )}
+                        {badgeLabel && badgeVariant === "purple" && (
+                            <Badge variant="purple" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
+                        )}
+                        {badgeLabel && badgeVariant === "blue" && (
+                            <Badge variant="blue" icon={null} className="whitespace-nowrap">{badgeLabel}</Badge>
                         )}
                     </div>
                     {itemType !== "plano" && (
@@ -399,6 +415,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({ product, userCoords, showSel
                             </div>
                         )}
                     </div>
+
+                    {socialProof && (
+                        <p className="text-[11px] text-brand-inactive-text mt-1 leading-tight truncate">
+                            {socialProof}
+                        </p>
+                    )}
 
                     {showSeller && <div className="border-t border-gray-100 my-2" />}
 

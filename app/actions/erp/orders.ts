@@ -1623,6 +1623,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
                 { ...order, partner_id: partnerId },
                 paymentState.situation,
                 order.delivery_status,
+                { skipPartnerTeam: true },
             ),
         )
         .catch(console.error)
@@ -1645,7 +1646,8 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock, unit), product_variants(id, variant_name, sku, stock_quantity, stock_available), services(id, name, images)),
             stores(name),
             coupons(*),
-            appointments(*)
+            appointments(*),
+            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount)
         `)
         .eq("partner_id", partnerId)
 
@@ -1746,6 +1748,24 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         const paymentMethodDiscountAmount = Math.max(0, Math.round((baseBeforePaymentMethod - finalTotal) * 100) / 100)
         const paymentMethodExtraAmount = Math.max(0, Math.round((finalTotal - baseBeforePaymentMethod) * 100) / 100)
 
+        const isRefunded = Array.isArray(data.return_requests) && data.return_requests.some((req: any) => {
+            const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
+            const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
+            const hasRefundValue = Number(req.refund_amount || 0) > 0
+            return isApprovedOrResolved && (isRefundResolution || hasRefundValue)
+        })
+        const refundedAmount = Array.isArray(data.return_requests)
+            ? data.return_requests.reduce((sum: number, req: any) => {
+                const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
+                const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
+                const hasRefundValue = Number(req.refund_amount || 0) > 0
+                if (isApprovedOrResolved && (isRefundResolution || hasRefundValue)) {
+                    return sum + Number(req.refund_amount || 0)
+                }
+                return sum
+            }, 0)
+            : 0
+
         return {
             success: true,
             data: {
@@ -1756,6 +1776,8 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 coupon_discount_amount: couponDiscount,
                 payment_method_discount_amount: paymentMethodDiscountAmount,
                 payment_method_extra_amount: paymentMethodExtraAmount,
+                is_refunded: isRefunded,
+                refunded_amount: refundedAmount,
             },
         }
     }
@@ -3113,7 +3135,7 @@ export async function getERPOrdersPageAction(
                 order_source,
                 created_at,
                 stores(name),
-                return_requests!order_id(id),
+                return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount),
                 order_items(quantity, product_id, variant_id, service_id, line_type)
             `
 
@@ -3166,6 +3188,23 @@ export async function getERPOrdersPageAction(
                 ? row.order_items.reduce((sum: number, item: any) => sum + Number(item?.quantity || 0), 0)
                 : 0),
             return_count: Array.isArray(row?.return_requests) ? row.return_requests.length : 0,
+            is_refunded: Array.isArray(row?.return_requests) && row.return_requests.some((req: any) => {
+                const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
+                const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
+                const hasRefundValue = Number(req.refund_amount || 0) > 0
+                return isApprovedOrResolved && (isRefundResolution || hasRefundValue)
+            }),
+            refunded_amount: Array.isArray(row?.return_requests)
+                ? row.return_requests.reduce((sum: number, req: any) => {
+                    const isApprovedOrResolved = ["APPROVED", "RESOLVED"].includes(req.status)
+                    const isRefundResolution = req.approved_resolution === "refund" || (!req.approved_resolution && req.desired_resolution === "refund")
+                    const hasRefundValue = Number(req.refund_amount || 0) > 0
+                    if (isApprovedOrResolved && (isRefundResolution || hasRefundValue)) {
+                        return sum + Number(req.refund_amount || 0)
+                    }
+                    return sum
+                }, 0)
+                : 0,
             // Backward-compatible field used by UI, with fallback when column doesn't exist in DB
             order_date: row?.order_date || row?.created_at || null,
         }))

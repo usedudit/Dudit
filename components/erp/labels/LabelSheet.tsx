@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import JsBarcode from "jsbarcode"
 import { type LabelPreset, type LabelContentConfig } from "@/lib/labels/presets"
 import { detectBarcodeFormat } from "@/lib/utils/barcode"
@@ -24,10 +24,42 @@ interface LabelSheetProps {
   printMode?: boolean
 }
 
-export function LabelSheet({ products, preset, contentConfig, printMode = false }: LabelSheetProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [barcodesReady, setBarcodesReady] = useState(false)
+function BarcodeCell({ value }: { value: string }) {
+  const ref = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    if (!ref.current || !value) return
+    if (ref.current.querySelector("svg")) return
+    try {
+      JsBarcode(ref.current, value, {
+        format: detectBarcodeFormat(value),
+        width: 1.2,
+        height: 24,
+        fontSize: 8,
+        margin: 1,
+        displayValue: true,
+      })
+    } catch {
+      /* ignore */
+    }
+  }, [value])
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        margin: "0.5mm 0",
+        overflow: "hidden",
+      }}
+    />
+  )
+}
+
+export function LabelSheet({ products, preset, contentConfig, printMode = false }: LabelSheetProps) {
   const allLabels = products.flatMap((product) =>
     Array.from({ length: product.labelQuantity }, (_, index) => ({
       ...product,
@@ -38,36 +70,6 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
 
   const labelsPerPage = preset.cols * preset.rows
   const totalPages = Math.max(1, Math.ceil(allLabels.length / labelsPerPage))
-
-  const renderBarcodeRef = useRef<(() => void) | null>(null)
-  renderBarcodeRef.current = () => {
-    const elements = containerRef.current?.querySelectorAll("[data-barcode-id]")
-    if (!elements) return
-    elements.forEach((el) => {
-      const id = el.getAttribute("data-barcode-id")
-      const value = el.getAttribute("data-barcode-value")
-      if (!id || !value || el.querySelector("svg")) return
-      try {
-        JsBarcode(el, value, {
-          format: detectBarcodeFormat(value),
-          width: 1.2,
-          height: 24,
-          fontSize: 8,
-          margin: 1,
-          displayValue: true,
-        })
-      } catch {
-        /* ignore */
-      }
-    })
-    setBarcodesReady(true)
-  }
-
-  useEffect(() => {
-    setBarcodesReady(false)
-    const timer = setTimeout(() => renderBarcodeRef.current?.(), 150)
-    return () => clearTimeout(timer)
-  }, [allLabels, preset])
 
   const labelStyle: React.CSSProperties = {
     width: `${preset.labelWidth}mm`,
@@ -85,7 +87,7 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
   }
 
   return (
-    <div ref={containerRef}>
+    <div>
       {Array.from({ length: totalPages }, (_, pageIdx) => {
         const pageLabels = allLabels.slice(pageIdx * labelsPerPage, (pageIdx + 1) * labelsPerPage)
 
@@ -148,18 +150,7 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
                   )}
 
                   {contentConfig.showBarcode && label.barcodeValue && (
-                    <div
-                      data-barcode-id={`bc-${label.key}`}
-                      data-barcode-value={label.barcodeValue}
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        margin: "0.5mm 0",
-                        overflow: "hidden",
-                      }}
-                    />
+                    <BarcodeCell value={label.barcodeValue} />
                   )}
 
                   {contentConfig.showPrice && (

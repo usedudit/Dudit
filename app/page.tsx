@@ -1,5 +1,6 @@
 import MarketplaceHome from "@/components/marketplace/MarketplaceHomepage"
-import { getHomeDataByCity, resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
+import { getHomeSections, type HomeSection } from "@/app/actions/marketplace/discover"
+import { resolveCityAndStateFromSlug } from "@/app/actions/marketplace/products"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
@@ -7,7 +8,6 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
-import { enrichMarketplaceDistance } from "@/lib/services/location.service"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
@@ -43,43 +43,45 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
     const t0 = performance.now()
     console.log(`[SSR] Home (Feed Payload) | START for city: ${cityName || "global"}`)
 
-    let products: any[] = []
-    let vitrines: any[] = []
-    let plans: any[] = []
+    let sections: HomeSection[] = []
     let homeAds: SponsoredAd[] = []
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
         const isDefaultSP = citySlug === "sao-paulo-sp" && cityName === "Estado de São Paulo"
-        const cityData = await getHomeDataByCity(cityName, state, isDefaultSP)
-        products = cityData.products
-        vitrines = cityData.vitrines
-        plans = cityData.plans || []
 
-        homeAds = await getSponsoredAdsForSlot("home", {
-            lat: userProfile?.latitude ?? null,
-            lng: userProfile?.longitude ?? null,
-            citySlug,
-            city: cityName,
-            state,
-        })
+        const coords = userProfile?.latitude && userProfile?.longitude
+            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+            : null
+
+        const [sectionsResult, adsResult] = await Promise.all([
+            getHomeSections({
+                city: cityName,
+                state,
+                stateOnly: isDefaultSP,
+                citySlug,
+                coords,
+                userId: user?.id ?? null,
+            }),
+            getSponsoredAdsForSlot("home", {
+                lat: userProfile?.latitude ?? null,
+                lng: userProfile?.longitude ?? null,
+                citySlug,
+                city: cityName,
+                state,
+            }),
+        ])
+
+        sections = sectionsResult
+        homeAds = adsResult
     }
 
-    const coords = userProfile?.latitude && userProfile?.longitude
-        ? { lat: userProfile.latitude, lng: userProfile.longitude }
-        : null
-
-    const productsWithDistance = enrichMarketplaceDistance(products || [], coords)
-    const plansWithDistance = enrichMarketplaceDistance(plans || [], coords)
-
     const tEnd = performance.now()
-    console.log(`[SSR] Home (Feed Payload) | END | Time: ${(tEnd - t0).toFixed(2)}ms`)
+    console.log(`[SSR] Home (Feed Payload) | END | ${sections.length} sections | Time: ${(tEnd - t0).toFixed(2)}ms`)
 
     return (
         <MarketplaceHome
-            products={productsWithDistance}
-            vitrines={vitrines || []}
-            plans={plansWithDistance}
+            sections={sections}
             user={user}
             userProfile={userProfile}
             cartCount={cartCount}

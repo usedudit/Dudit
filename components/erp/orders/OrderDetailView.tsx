@@ -526,6 +526,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <Badge variant={paymentStatus.variant}>
                                                     {paymentStatus.label}
                                                 </Badge>
+                                                {order.is_refunded && (
+                                                    <Badge variant="purple">
+                                                        Reembolsado
+                                                    </Badge>
+                                                )}
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -623,7 +628,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         </div>
                                                     </div>
 
-                                                    <FormSection title="Itens do Pedido" hasSeparator className="mt-0">
+                                                    <FormSection title="Itens do Pedido" hasSeparator>
                                                         <div className="space-y-4">
                                                             {sortedOrderItems.map((item: any) => {
                                                                 const isService = !!item.service_id || item.line_type === "service_booking";
@@ -757,6 +762,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <PaymentRow
                                                                     label="Troco Solicitado"
                                                                     value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(cashChangeAmount)} (para {formatCurrency(payWithAmount)})</span>} />
+                                                            )}
+                                                            {order.is_refunded && Number(order.refunded_amount || 0) > 0 && (
+                                                                <PaymentRow
+                                                                    label="Valor Reembolsado"
+                                                                    value={<span className="text-brand-red font-bold">- {formatCurrency(order.refunded_amount || 0)}</span>} />
                                                             )}
 
                                                             <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
@@ -1017,6 +1027,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Troco Solicitado"
                                                                 value={<span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(cashChangeAmount)} (para {formatCurrency(payWithAmount)})</span>} />
                                                         )}
+                                                        {order.is_refunded && Number(order.refunded_amount || 0) > 0 && (
+                                                            <PaymentRow
+                                                                label="Valor Reembolsado"
+                                                                value={<span className="text-brand-red font-bold">- {formatCurrency(order.refunded_amount || 0)}</span>} />
+                                                        )}
 
                                                         <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                                             <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
@@ -1101,7 +1116,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 </div>
             </BottomSheet>
 
-        {printModalOrderId && (
+            {printModalOrderId && (
                 <SaleReceiptPrintModal
                     isOpen={!!printModalOrderId}
                     onClose={() => setPrintModalOrderId(null)}

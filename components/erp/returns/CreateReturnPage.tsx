@@ -19,9 +19,10 @@ import {
     Checkbox,
     Separator,
     FormSection,
+    DefaultModal,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon, XIcon } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { fetchReturnOrderBucketAction } from "@/app/actions/erp/returns"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
@@ -191,6 +192,8 @@ export default function CreateReturnPage({
     const [exchangeStatus, setExchangeStatus] = useState("pending")
     const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
     const [isInventoryRestoreModalOpen, setIsInventoryRestoreModalOpen] = useState(false)
+    const [isMpWarningModalOpen, setIsMpWarningModalOpen] = useState(false)
+    const [mpWarningChecked, setMpWarningChecked] = useState(false)
     const [evidenceImages, setEvidenceImages] = useState<(string | File)[]>([])
     const [evidenceUploads, setEvidenceUploads] = useState<any[]>([])
     const [observations, setObservations] = useState("")
@@ -431,6 +434,26 @@ export default function CreateReturnPage({
         setIsInventoryRestoreModalOpen(false)
     }, [onSave, pendingSaveData])
 
+    const handleConfirmMpWarning = useCallback(() => {
+        setIsMpWarningModalOpen(false)
+        if (!pendingSaveData) return
+
+        const shouldAskInventoryRestore =
+            mode === "edit" &&
+            returnRequest &&
+            pendingSaveData.status === "APPROVED" &&
+            returnRequest.status !== "APPROVED" &&
+            ["cancellation", "return", "exchange"].includes(returnRequest.requestType || "return")
+
+        if (shouldAskInventoryRestore) {
+            setIsInventoryRestoreModalOpen(true)
+            return
+        }
+
+        onSave({ ...pendingSaveData, returnToInventory: false })
+        setPendingSaveData(null)
+    }, [mode, returnRequest, pendingSaveData, onSave])
+
     const handleFormSubmit = async () => {
         const checkedItems = returnItems.filter(item => item.checked)
         if (checkedItems.length === 0) return
@@ -529,6 +552,19 @@ export default function CreateReturnPage({
                     reason: item.reason,
                     condition: item.condition,
                 })),
+            }
+
+            const isMpAutomaticRefund =
+                returnStatus === "APPROVED" &&
+                resolutionType === "refund" &&
+                refundPaymentMethod === "Mercado Pago" &&
+                isMercadoPagoOrder
+
+            if (isMpAutomaticRefund) {
+                setPendingSaveData(payload)
+                setIsMpWarningModalOpen(true)
+                setMpWarningChecked(false)
+                return
             }
 
             const shouldAskInventoryRestore =
@@ -1550,6 +1586,98 @@ export default function CreateReturnPage({
                 disabled={isSaving}
                 isLoading={isSaving}
             />
+
+            <DefaultModal
+                isOpen={isMpWarningModalOpen}
+                onClose={() => {
+                    setIsMpWarningModalOpen(false)
+                    setPendingSaveData(null)
+                }}
+                maxWidth="md"
+            >
+                <div className="flex flex-col relative">
+                    <button
+                        onClick={() => {
+                            setIsMpWarningModalOpen(false)
+                            setPendingSaveData(null)
+                        }}
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
+                        title="Fechar"
+                    >
+                        <XIcon size={18} />
+                    </button>
+
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden bg-[#e6f4ea]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
+                            alt="Reembolso Automático"
+                            className="w-64 h-auto object-contain transform translate-y-4"
+                        />
+                    </div>
+
+                    <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
+                        Confirmar Reembolso Automático
+                    </h4>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-6 text-center leading-relaxed">
+                        Você está prestes a aprovar uma devolução com reembolso automático via <strong>Mercado Pago</strong>. O valor será estornado diretamente na conta ou cartão do comprador.
+                    </p>
+
+                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4 mb-6 space-y-2.5">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Pedido</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedOrder?.displayId || selectedOrder?.order_number}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Cliente</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedOrder?.customer_name || selectedOrder?.customer?.name}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Estorno</span>
+                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(refundValue)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mb-6 flex items-start gap-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl p-4">
+                        <Checkbox
+                            checked={mpWarningChecked}
+                            onChange={(checked: boolean) => setMpWarningChecked(!!checked)}
+                        />
+                        <div
+                            className="text-xs font-medium text-red-800 dark:text-red-300 leading-normal select-none cursor-pointer"
+                            onClick={() => setMpWarningChecked(!mpWarningChecked)}
+                        >
+                            Estou ciente de que o estorno de <strong className="font-bold">{formatCurrency(refundValue)}</strong> será solicitado imediatamente ao Mercado Pago e que esta ação não poderá ser desfeita.
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsMpWarningModalOpen(false)
+                                setPendingSaveData(null)
+                            }}
+                            className="flex-1 h-[46px]"
+                            disabled={isSaving}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmMpWarning}
+                            className={`flex-1 h-[46px] text-white border-none transition-colors ${
+                                mpWarningChecked
+                                    ? "bg-emerald-600 hover:bg-emerald-700"
+                                    : "bg-emerald-600/50 cursor-not-allowed opacity-50"
+                            }`}
+                            disabled={!mpWarningChecked || isSaving}
+                        >
+                            Confirmar Estorno
+                        </Button>
+                    </div>
+                </div>
+            </DefaultModal>
 
             <UnsavedChangesDialog
                 open={showConfirmDialog}

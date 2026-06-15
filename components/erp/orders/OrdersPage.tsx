@@ -89,6 +89,8 @@ interface Order {
     statusIcon?: React.ReactNode;
     deliveryStatusIcon?: React.ReactNode;
     hasOnlyServices?: boolean;
+    is_refunded?: boolean;
+    refunded_amount?: number;
 }
 
 interface FilterState {
@@ -335,6 +337,8 @@ export default function OrdersPage({
                     canEdit: o.situation !== "cancelled",
                     paidAmount: Number(o.paid_amount || 0),
                     hasOnlyServices,
+                    is_refunded: Boolean(o.is_refunded),
+                    refunded_amount: Number(o.refunded_amount || 0),
                 }
             })
             .filter((o: Order) => {

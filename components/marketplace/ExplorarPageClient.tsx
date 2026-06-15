@@ -46,6 +46,7 @@ interface ExplorarPageClientProps {
     type?: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos'
     cidade?: string
     categoria?: string
+    sectionTitle?: string
     userProfile?: any
     cartCount?: number
     exploreAds?: SponsoredAd[]

@@ -239,7 +239,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                                                 {order.partners?.store_name || "Loja Parceira"}
                                                                 {returnHistoryCount > 0 && (
                                                                     <Tooltip text="Possui histórico de trocas/devoluções">
-                                                                        <Badge variant="gray" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap inline-flex">
+                                                                        <Badge variant="purple" icon={<ReturnIcon />} className="scale-90 whitespace-nowrap inline-flex">
                                                                             {returnHistoryCount > 1 ? ` ${returnHistoryCount}` : ""}
                                                                         </Badge>
                                                                     </Tooltip>

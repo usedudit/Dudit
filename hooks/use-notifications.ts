@@ -12,6 +12,7 @@ import { useNotificationsRealtime } from "./use-notifications-realtime"
 import { useSupabase } from "@/providers/supabase-provider"
 
 const READ_DELAY_MS = 2000
+const READ_INTERVAL_MS = 1000
 
 function groupNotificationsByDate(items: NotificationRecord[]) {
   const groups: { label: string; items: NotificationRecord[] }[] = []
@@ -50,8 +51,8 @@ export function useNotifications() {
   const { user } = useSupabase()
   const queryClient = useQueryClient()
   const [panelOpen, setPanelOpen] = useState(false)
-  const readTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const visibleIdsRef = useRef<Set<string>>(new Set())
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const visibleTimestampsRef = useRef<Map<string, number>>(new Map())
 
   const unreadQuery = useQuery({
     queryKey: ["notifications", "unread-count", user?.id],
@@ -96,40 +97,69 @@ export function useNotifications() {
 
   const grouped = useMemo(() => groupNotificationsByDate(allItems), [allItems])
 
+  const unreadMapRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    unreadMapRef.current = new Set(
+      allItems.filter((n) => !n.is_read).map((n) => n.id),
+    )
+  }, [allItems])
+
   const registerVisible = useCallback((id: string, visible: boolean) => {
-    if (visible) visibleIdsRef.current.add(id)
-    else visibleIdsRef.current.delete(id)
+    if (visible) {
+      if (!visibleTimestampsRef.current.has(id)) {
+        visibleTimestampsRef.current.set(id, Date.now())
+      }
+    } else {
+      visibleTimestampsRef.current.delete(id)
+    }
   }, [])
 
-  const markVisibleAsRead = useCallback(async () => {
-    const ids = [...visibleIdsRef.current].filter((id) => {
-      const item = allItems.find((n) => n.id === id)
-      return item && !item.is_read
-    })
+  const markAsRead = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return
-
-    await markNotificationsReadAction(ids)
-    visibleIdsRef.current.clear()
-    invalidate()
-  }, [allItems, invalidate])
+    try {
+      await markNotificationsReadAction(ids)
+      invalidate()
+    } catch (e) {
+      console.error("[notifications] markAsRead error:", e)
+    }
+  }, [invalidate])
 
   useEffect(() => {
     if (!panelOpen) {
-      if (readTimerRef.current) {
-        clearTimeout(readTimerRef.current)
-        readTimerRef.current = null
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
+      visibleTimestampsRef.current.clear()
       return
     }
 
-    readTimerRef.current = setTimeout(() => {
-      markVisibleAsRead()
-    }, READ_DELAY_MS)
+    intervalRef.current = setInterval(() => {
+      const now = Date.now()
+      const toMark: string[] = []
+
+      visibleTimestampsRef.current.forEach((timestamp, id) => {
+        if (unreadMapRef.current.has(id) && now - timestamp >= READ_DELAY_MS) {
+          toMark.push(id)
+        }
+      })
+
+      for (const id of toMark) {
+        visibleTimestampsRef.current.delete(id)
+      }
+
+      if (toMark.length > 0) {
+        markAsRead(toMark)
+      }
+    }, READ_INTERVAL_MS)
 
     return () => {
-      if (readTimerRef.current) clearTimeout(readTimerRef.current)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
-  }, [panelOpen, allItems, markVisibleAsRead])
+  }, [panelOpen, markAsRead])
 
   return {
     user,

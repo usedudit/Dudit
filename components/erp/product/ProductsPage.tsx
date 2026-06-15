@@ -45,6 +45,7 @@ import Pagination from "@/components/reusable/Pagination"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
+import { LabelPrintModal } from "@/components/erp/labels/LabelPrintModal"
 
 // New Component Imports
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
@@ -67,6 +68,7 @@ import {
     SearchIcon,
     EditIcon,
     CameraIcon,
+    PackageIcon,
 } from "@/lib/icons"
 
 import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
@@ -235,6 +237,7 @@ export default function ProductsPage({
     // ── Local products state (for optimistic updates after mutations) ──
     const [products, setProducts] = useState<Product[]>(effectiveBaseProducts as Product[])
     const [page, setPage] = useState(1)
+    const [showLabelModal, setShowLabelModal] = useState(false)
 
     // Sync local products when query data changes
     const prevProductsRef = useRef(effectiveBaseProducts)
@@ -808,6 +811,9 @@ export default function ProductsPage({
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
                                             <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
+                                        <DropdownItem onClick={() => setShowLabelModal(true)}>
+                                            <PackageIcon size={16} /> Gerar Etiquetas
+                                        </DropdownItem>
                                     </Dropdown>
 
                                     <Button
@@ -1104,6 +1110,14 @@ export default function ProductsPage({
             )}
 
             <SavingStatusModal isOpen={actionModal.open} text={actionModal.text || "Salvando..."} />
+
+            {showLabelModal && (
+                <LabelPrintModal
+                    isOpen={showLabelModal}
+                    onClose={() => setShowLabelModal(false)}
+                    allProducts={products}
+                />
+            )}
         </>
     )
 }

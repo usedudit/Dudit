@@ -224,7 +224,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
         <LabelPrintModal
           isOpen={showPrintModal}
           onClose={() => setShowPrintModal(false)}
-          products={labelProducts}
+          allProducts={products}
         />
       )}
     </div>
