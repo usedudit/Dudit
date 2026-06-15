@@ -6,8 +6,7 @@ import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/r
 import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
-import { getQuoteWithItemsCached } from "@/lib/data/quotes"
-import { getPartnerAddressAction } from "@/app/actions/erp/quotes"
+import { getPartnerAddressAction, getQuoteDetailsAction } from "@/app/actions/erp/quotes"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import QuotePreview from "./QuotePreview"
 
@@ -51,17 +50,19 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             setLoading(true)
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser
 
-            const [quoteDetails, partnerRes, storeRes, addressRes] = await Promise.all([
-                getQuoteWithItemsCached(quoteId, partnerId),
+            const [quoteDetailsRes, partnerRes, storeRes, addressRes] = await Promise.all([
+                getQuoteDetailsAction(quoteId, partnerId),
                 supabase.from("partners").select("store_name, store_image_url").eq("id", partnerId).maybeSingle(),
                 supabase.from("stores").select("name, image_url").eq("partner_id", partnerId).limit(1).maybeSingle(),
                 getPartnerAddressAction(partnerId),
             ])
 
-            if (cancelled || !quoteDetails) {
+            if (cancelled || !quoteDetailsRes?.success || !quoteDetailsRes.data) {
                 setLoading(false)
                 return
             }
+
+            const quoteDetails = quoteDetailsRes.data
 
             const partnerName = storeRes.data?.name || partnerRes.data?.store_name || "Parceiro"
             const rawAvatar = storeRes.data?.image_url || partnerRes.data?.store_image_url || selectedStore?.image_url || undefined

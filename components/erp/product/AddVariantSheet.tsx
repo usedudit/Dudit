@@ -613,10 +613,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             const csrfResponse = await fetchWithCSRF("/api/csrf-token", { method: "GET" })
             const { token: csrfToken } = await csrfResponse.json()
 
-            // 1. Coleta todos os SKUs existentes para evitar duplicatas (do produto atual)
-            const existingSkus = new Set(existingVariants.map(v => v.sku?.toLowerCase()))
-
-            // 2. Process each row, ensuring SKU uniqueness
+            // 1. Process each row, ensuring SKU uniqueness
             const usedSkusInBatch = new Set<string>()
 
             const variantsToSave = await Promise.all(
@@ -629,18 +626,24 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     if (activeImage && activeImage instanceof File) {
                         imagePublicId = await uploadVariantImage(activeImage)
                     } else if (typeof activeImage === 'string') {
-                        // Se for string, já é o key original ou um key novo (não modificado ou restaurado)
                         imagePublicId = activeImage
                     }
 
                     // SKU UNIQUENESS LOGIC
-                    let finalSku = row.sku || ""
-                    const baseSku = finalSku.toLowerCase()
-                    let counter = 2
+                    const rowVariantType = variants.map(v => v.type).join(" / ")
+                    const rowVariantValue = row.values.join(" / ")
+                    const matchingExisting = existingVariants.find(ev => ev.value === rowVariantValue && ev.type === rowVariantType)
 
-                    while (existingSkus.has(finalSku.toLowerCase()) || usedSkusInBatch.has(finalSku.toLowerCase())) {
-                        finalSku = `${row.sku}-${counter}`
-                        counter++
+                    let finalSku: string
+                    if (matchingExisting) {
+                        finalSku = matchingExisting.sku || row.sku || ""
+                    } else {
+                        finalSku = row.sku || ""
+                        let counter = 2
+                        while (usedSkusInBatch.has(finalSku.toLowerCase())) {
+                            finalSku = `${row.sku}-${counter}`
+                            counter++
+                        }
                     }
                     usedSkusInBatch.add(finalSku.toLowerCase())
 
@@ -693,6 +696,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             setIsSaving(false)
         }
     }
+
+    const showImageColumn = variants.some(v => v.useImage)
 
     const content = (
         <div className="flex flex-col h-full bg-white dark:bg-dark-surface w-full">
@@ -855,21 +860,15 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                         <table className="w-full text-left border-collapse min-w-[900px]">
                                             <thead>
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                    {[{
-                                                        label: "Imagem", width: "80px", first: true
-                                                    }, {
-                                                        label: "Variante", width: "auto"
-                                                    }, {
-                                                        label: "Preço", width: "150px"
-                                                    }, {
-                                                        label: "Estoque", width: "160px"
-                                                    }, {
-                                                        label: "SKU", width: "200px"
-                                                    }, {
-                                                        label: "Status", width: "100px", align: "center"
-                                                    }, {
-                                                        label: "", width: "60px", last: true
-                                                    }].map((col, idx) => (
+                                                    {[
+                                                        ...(showImageColumn ? [{ label: "Imagem", width: "80px", first: true }] : []),
+                                                        { label: "Variante", width: "auto", first: !showImageColumn },
+                                                        { label: "Preço", width: "150px" },
+                                                        { label: "Estoque", width: "160px" },
+                                                        { label: "SKU", width: "200px" },
+                                                        { label: "Status", width: "100px", align: "center" },
+                                                        { label: "", width: "60px", last: true },
+                                                    ].map((col, idx) => (
                                                         <th
                                                             key={col.label || idx}
                                                             className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body relative bg-brand-gray dark:bg-dark-border/50 align-middle ${col.first ? "rounded-l-lg pl-4" : ""} ${col.last ? "rounded-r-lg" : ""}`}
@@ -900,6 +899,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                 transition={{ duration: 0.2 }}
                                                                 className="border-b border-brand-border dark:border-dark-border last:border-0 group hover:bg-brand-gray dark:hover:bg-dark-border/20 transition-colors"
                                                             >
+                                                                {showImageColumn && (
                                                                 <td className="p-2 pl-4 border-b border-brand-border dark:border-dark-border align-middle">
                                                                     <VariantImageUpload
                                                                         size="sm"
@@ -908,6 +908,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                                                         onRemove={() => setImageToDelete({ type: 'row', key: row.id })}
                                                                     />
                                                                 </td>
+                                                                )}
                                                                 <td className="p-2 border-b border-brand-border dark:border-dark-border align-middle">
                                                                     <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading block">{row.name}</span>
                                                                 </td>

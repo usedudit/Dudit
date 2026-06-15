@@ -123,7 +123,6 @@ const VariationRow = React.memo(({ item, isSelected, isEditing, onSelect, onTogg
             <td className="p-3 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center action-btn">
                     <ActionsDropdown
-                        onEdit={() => onEdit(item)}
                         onDelete={() => onDelete(item)}
                         trigger={
                             <Button variant="outline" size="icon" className="w-[40px] h-[40px] p-0 flex items-center justify-center bg-transparent" disabled={!isEditing}>
@@ -710,9 +709,9 @@ export const ProductVariationsTab: React.FC<ProductVariationsTabProps> = ({
                     {/* Header Section */}
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Variações ({filteredVariations.length})</h3>
-                        <Button variant="link" className="flex items-center hidden md:flex" onClick={() => setIsSheetOpen(true)} disabled={!isEditing}>
-                            + Adicionar Variação
-                        </Button>
+                            <Button variant="link" className="flex items-center hidden md:flex" onClick={() => setIsSheetOpen(true)} disabled={!isEditing}>
+                                {variations.length === 0 ? "+ Adicionar Variação" : "+ Adicionar/Editar variações"}
+                            </Button>
                     </div>
 
                     {/* MOBILE CONTROLS ROW */}
