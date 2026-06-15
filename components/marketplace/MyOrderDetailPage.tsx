@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -337,6 +337,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [returnResolution, setReturnResolution] = useState<"exchange" | "refund" | "store_credit">("refund");
     const [returnMessage, setReturnMessage] = useState("");
     const [returnItems, setReturnItems] = useState<Record<string, number>>({});
+    const [returnConditions, setReturnConditions] = useState<Record<string, "sealed" | "opened" | "damaged">>({});
     const [returnServiceItems, setReturnServiceItems] = useState<Record<string, boolean>>({});
     const [returnEvidence, setReturnEvidence] = useState<(string | File)[]>([]);
     const [isBottomSummaryOpen, setIsBottomSummaryOpen] = useState(false);
@@ -699,7 +700,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const submitReturnRequest = async () => {
         const productItems = Object.entries(returnItems)
             .filter(([, quantity]) => Number(quantity) > 0)
-            .map(([orderItemId, quantity]) => ({ order_item_id: orderItemId, quantity: Number(quantity), reason: returnReason }));
+            .map(([orderItemId, quantity]) => ({
+                order_item_id: orderItemId,
+                quantity: Number(quantity),
+                reason: returnReason,
+                condition: returnConditions[orderItemId] || "opened"
+            }));
 
         const serviceItems = Object.entries(returnServiceItems)
             .filter(([, checked]) => checked)
@@ -1369,27 +1375,49 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                         });
                                         return (
-                                            <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
-                                                <Checkbox
-                                                    checked={Number(returnItems[item.id] || 0) > 0}
-                                                    onChange={(checked) => setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }))}
-                                                />
-                                                <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
-                                                    <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                                            <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <Checkbox
+                                                        checked={Number(returnItems[item.id] || 0) > 0}
+                                                        onChange={(checked) => {
+                                                            setReturnItems(prev => ({ ...prev, [item.id]: checked ? 1 : 0 }));
+                                                            if (checked) {
+                                                                setReturnConditions(prev => ({ ...prev, [item.id]: "opened" }));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <img src={itemImage} alt={item.products?.name || item.product_name} className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.products?.name || item.product_name}</p>
+                                                        <p className="text-xs text-brand-inactive-text">Comprado: {formatProductQuantity(item.quantity, item.products?.unit, true)}</p>
+                                                    </div>
                                                 </div>
-                                                <Input
-                                                    type="number"
-                                                    min={Number(returnItems[item.id] || 0) > 0 ? 1 : 0}
-                                                    max={item.quantity}
-                                                    value={returnItems[item.id] || 0}
-                                                    onChange={(e) => setReturnItems(prev => ({
-                                                        ...prev,
-                                                        [item.id]: Math.max(0, Math.min(Number(item.quantity || 1), Number(e.target.value || 0))),
-                                                    }))}
-                                                    className="!w-20"
-                                                />
+                                                <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
+                                                    <div className="flex flex-col gap-1 w-24">
+                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase">Qtd</span>
+                                                        <QuantitySelector
+                                                            value={returnItems[item.id] || 1}
+                                                            onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
+                                                            min={1}
+                                                            max={item.quantity}
+                                                            disabled={!returnItems[item.id]}
+                                                            size="sm"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1 w-32">
+                                                        <span className="text-[10px] text-brand-inactive-text font-bold uppercase">Condição</span>
+                                                        <FormDropdown
+                                                            value={returnConditions[item.id] || "opened"}
+                                                            setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
+                                                            disabled={!returnItems[item.id]}
+                                                            options={[
+                                                                { value: "opened", label: "Aberto" },
+                                                                { value: "sealed", label: "Lacrado" },
+                                                                { value: "damaged", label: "Danificado" },
+                                                            ]}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         )
                                     })}
@@ -1441,13 +1469,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 value={returnReason}
                                 setValue={setReturnReason}
                                 options={[
-                                    { value: "wrong_item", label: "Recebi item errado" },
+                                    { value: "wrong_item", label: "Item errado" },
                                     { value: "defective", label: "Item com defeito" },
                                     { value: "damaged", label: "Item danificado" },
-                                    { value: "different_from_description", label: "Diferente da descricao" },
+                                    { value: "different_from_description", label: "Diferente da descrição" },
                                     { value: "missing_parts", label: "Faltam partes" },
                                     { value: "arrived_late", label: "Chegou atrasado" },
-                                    { value: "changed_mind", label: "Mudei de ideia" },
+                                    { value: "changed_mind", label: "Mudou de ideia" },
                                     { value: "other", label: "Outro" },
                                 ]}
                             />

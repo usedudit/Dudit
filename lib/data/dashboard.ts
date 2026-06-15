@@ -273,7 +273,7 @@ async function getCachedProducts(partnerId: string): Promise<ProductsDashboardDa
       const [products, orders, items] = await Promise.all([
         supabase.from("products").select("id, name, stock_quantity, price, is_active, created_at, category_id, category:product_categories!category_id(name)").eq("partner_id", partnerId).order("created_at", { ascending: false }).limit(300),
         supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${from}T00:00:00`).order("created_at", { ascending: false }).limit(300),
-        supabase.from("order_items").select("product_name, quantity, total_price, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(600),
+        supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(600),
       ])
       if (products.error) throw products.error
       if (orders.error) throw orders.error

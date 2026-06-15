@@ -76,6 +76,9 @@ export type ReturnRequestListItem = {
   evidenceImages: string[]
   observations?: string
   expiresAt?: string | null
+  paymentProvider?: string
+  mpPaymentId?: string | null
+  refundPaymentMethod?: string
   items: Array<{
     id: string
     orderItemId: string

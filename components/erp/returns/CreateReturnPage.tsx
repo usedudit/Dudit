@@ -22,7 +22,7 @@ import {
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon, SearchIcon, TrashIcon, AlertCircleIcon, CalendarIcon } from "@/lib/icons"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { fetchReturnOrderBucketAction } from "@/app/actions/erp/returns"
 import { fetchPartnerProductsBucket } from "@/app/actions/erp/client-loaders"
 import { ReturnRequest, ReturnItem } from "./types"
@@ -38,7 +38,6 @@ import { useNotification } from "@/hooks/use-notification"
 import AlertModal from "@/components/reusable/AlertModal"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
-
 
 interface CreateReturnPageProps {
     partnerId: string
@@ -74,21 +73,29 @@ function mapToLegacyCondition(condition: string): "aberto" | "lacrado" | "danifi
     return "aberto"
 }
 
-function mapToLegacyReason(reason: string): "defeito" | "arrependimento" | "tamanho_incorreto" | "outro" {
+function mapToLegacyReason(reason: string): string {
     const raw = String(reason || "").toLowerCase()
-    if (raw === "defective") return "defeito"
-    if (raw === "changed_mind") return "arrependimento"
-    if (raw === "wrong_size") return "tamanho_incorreto"
-    if (raw === "other") return "outro"
-    if (raw === "defeito" || raw === "arrependimento" || raw === "tamanho_incorreto" || raw === "outro") return raw as any
-    return "outro"
+    if (raw === "wrong_item" || raw === "item errado" || raw === "recebi item errado") return "wrong_item"
+    if (raw === "defective" || raw === "item com defeito" || raw === "defeito") return "defective"
+    if (raw === "damaged" || raw === "item danificado") return "damaged"
+    if (raw === "different_from_description" || raw === "diferente da descricao" || raw === "diferente da descrição") return "different_from_description"
+    if (raw === "missing_parts" || raw === "faltam partes") return "missing_parts"
+    if (raw === "arrived_late" || raw === "chegou atrasado") return "arrived_late"
+    if (raw === "changed_mind" || raw === "mudei de ideia" || raw === "arrependimento" || raw === "mudou de ideia") return "changed_mind"
+    if (raw === "wrong_size" || raw === "tamanho_incorreto") return "other"
+    if (raw === "other" || raw === "outro") return "other"
+    return "other"
 }
 
 function getLegacyReasonLabel(reason: string): string {
     const legacy = mapToLegacyReason(reason)
-    if (legacy === "defeito") return "Defeito"
-    if (legacy === "arrependimento") return "Arrependimento"
-    if (legacy === "tamanho_incorreto") return "Tamanho Incorreto"
+    if (legacy === "wrong_item") return "Item errado"
+    if (legacy === "defective") return "Item com defeito"
+    if (legacy === "damaged") return "Item danificado"
+    if (legacy === "different_from_description") return "Diferente da descrição"
+    if (legacy === "missing_parts") return "Faltam partes"
+    if (legacy === "arrived_late") return "Chegou atrasado"
+    if (legacy === "changed_mind") return "Mudou de ideia"
     return "Outro"
 }
 
@@ -160,6 +167,21 @@ export default function CreateReturnPage({
     const [resolutionType, setResolutionType] = useState<"exchange" | "store_credit" | "refund" | "none" | "rejected">("refund")
     const [refundType, setRefundType] = useState<ReturnRequest["refundType"]>("full")
     const [refundValue, setRefundValue] = useState<number>(0)
+    const [refundPaymentMethod, setRefundPaymentMethod] = useState<string>("")
+
+    const isMercadoPagoOrder = useMemo(() => {
+        if (!selectedOrder) return false
+        const provider = String(selectedOrder.payment_provider || selectedOrder.paymentProvider || "").toLowerCase()
+        return Boolean(selectedOrder.mp_payment_id || selectedOrder.mpPaymentId) || provider.includes("mercado")
+    }, [selectedOrder])
+
+    useEffect(() => {
+        if (selectedOrder && mode === "create") {
+            const provider = String(selectedOrder.payment_provider || selectedOrder.paymentProvider || "").toLowerCase()
+            const isMP = Boolean(selectedOrder.mp_payment_id || selectedOrder.mpPaymentId) || provider.includes("mercado")
+            setRefundPaymentMethod(isMP ? "Mercado Pago" : "pix")
+        }
+    }, [selectedOrder, mode])
     const [creditType, setCreditType] = useState<"full" | "partial">("full")
     const [creditValue, setCreditValue] = useState<number>(0)
     const [replacementProduct, setReplacementProduct] = useState("")
@@ -226,6 +248,10 @@ export default function CreateReturnPage({
                 status: returnRequest.orderStatus || "paid",
                 deliveryStatus: returnRequest.deliveryStatus || "delivered",
                 totalAmount: returnRequest.refundValue || 0,
+                payment_provider: returnRequest.paymentProvider,
+                paymentProvider: returnRequest.paymentProvider,
+                mp_payment_id: returnRequest.mpPaymentId,
+                mpPaymentId: returnRequest.mpPaymentId,
             })
 
             // Setup items checklist
@@ -252,6 +278,7 @@ export default function CreateReturnPage({
             setResolutionType((returnRequest.approvedResolution || returnRequest.desiredResolution || "refund") as any)
             setRefundType(returnRequest.refundType || (returnRequest.desiredResolution === "store_credit" ? "store_credit" : returnRequest.desiredResolution === "refund" ? "partial" : "none"))
             setRefundValue(returnRequest.refundValue)
+            setRefundPaymentMethod(returnRequest.refundPaymentMethod || "")
             setCreditValue(returnRequest.storeCreditValue || 0)
             setReplacementProduct((returnRequest as any).replacementProduct || "")
             setEvidenceImages(returnRequest.evidenceImages || [])
@@ -475,6 +502,7 @@ export default function CreateReturnPage({
                 creditType,
                 status: returnStatus,
                 refundValue,
+                refundPaymentMethod,
                 storeCreditValue: creditValue,
                 replacementProduct,
                 exchangeStatus,
@@ -890,10 +918,14 @@ export default function CreateReturnPage({
                                                                                             })
                                                                                         }}
                                                                                         options={[
-                                                                                            { value: "defeito", label: "Defeito" },
-                                                                                            { value: "arrependimento", label: "Arrependimento" },
-                                                                                            { value: "tamanho_incorreto", label: "Tamanho Incorreto" },
-                                                                                            { value: "outro", label: "Outro" }
+                                                                                            { value: "wrong_item", label: "Item errado" },
+                                                                                            { value: "defective", label: "Item com defeito" },
+                                                                                            { value: "damaged", label: "Item danificado" },
+                                                                                            { value: "different_from_description", label: "Diferente da descrição" },
+                                                                                            { value: "missing_parts", label: "Faltam partes" },
+                                                                                            { value: "arrived_late", label: "Chegou atrasado" },
+                                                                                            { value: "changed_mind", label: "Mudou de ideia" },
+                                                                                            { value: "other", label: "Outro" }
                                                                                         ]}
                                                                                     />
                                                                                 </td>
@@ -1003,10 +1035,14 @@ export default function CreateReturnPage({
                                                                                         })
                                                                                     }}
                                                                                     options={[
-                                                                                        { value: "defeito", label: "Defeito" },
-                                                                                        { value: "arrependimento", label: "Arrependimento" },
-                                                                                        { value: "tamanho_incorreto", label: "Tamanho Incorreto" },
-                                                                                        { value: "outro", label: "Outro" }
+                                                                                        { value: "wrong_item", label: "Item errado" },
+                                                                                        { value: "defective", label: "Item com defeito" },
+                                                                                        { value: "damaged", label: "Item danificado" },
+                                                                                        { value: "different_from_description", label: "Diferente da descrição" },
+                                                                                        { value: "missing_parts", label: "Faltam partes" },
+                                                                                        { value: "arrived_late", label: "Chegou atrasado" },
+                                                                                        { value: "changed_mind", label: "Mudou de ideia" },
+                                                                                        { value: "other", label: "Outro" }
                                                                                     ]}
                                                                                 />
                                                                                 <FormDropdown
@@ -1057,7 +1093,7 @@ export default function CreateReturnPage({
                                                 <FormSection hasSeparator title="Resolução da devolução">
                                                     {mode === "view" ? (
                                                         <div className="space-y-1">
-                                                            <PaymentRow label="Data" value={formatDate(returnDate)} />
+                                                            <PaymentRow label="Data" value={formatDateTime(returnDate)} />
                                                             <PaymentRow
                                                                 label="Status da solicitação"
                                                                 value={
@@ -1086,6 +1122,9 @@ export default function CreateReturnPage({
                                                                         }
                                                                     />
                                                                     <PaymentRow label="Valor do reembolso" value={formatCurrency(refundValue)} />
+                                                                    {refundPaymentMethod && (
+                                                                        <PaymentRow label="Método de reembolso" value={refundPaymentMethod} />
+                                                                    )}
                                                                 </>
                                                             )}
 
@@ -1180,7 +1219,7 @@ export default function CreateReturnPage({
 
                                                             <FormDropdown
                                                                 label="Resolution type"
-                                                                disabled={false}
+                                                                disabled={mode === "edit" && returnRequest?.source === "marketplace"}
                                                                 value={resolutionType}
                                                                 setValue={(val) => setResolutionType(val as any)}
                                                                 options={[
@@ -1210,6 +1249,26 @@ export default function CreateReturnPage({
                                                                         disabled={refundType === "full" || refundType === "none"}
                                                                         value={refundValue}
                                                                         onChange={(val) => setRefundValue(Math.min(Number(val || 0), calculatedRefundValue))}
+                                                                    />
+                                                                    <FormDropdown
+                                                                        label="Método de reembolso"
+                                                                        disabled={false}
+                                                                        value={refundPaymentMethod}
+                                                                        setValue={(val) => setRefundPaymentMethod(val)}
+                                                                        options={
+                                                                            isMercadoPagoOrder
+                                                                                ? [
+                                                                                    { value: "Mercado Pago", label: "Mercado Pago (Automático)" },
+                                                                                    { value: "pix", label: "Pix (Manual)" },
+                                                                                    { value: "credit_card", label: "Cartão de Crédito (Manual)" },
+                                                                                    { value: "other", label: "Outro (Manual)" }
+                                                                                ]
+                                                                                : [
+                                                                                    { value: "pix", label: "Pix" },
+                                                                                    { value: "credit_card", label: "Cartão de Crédito" },
+                                                                                    { value: "other", label: "Outro" }
+                                                                                ]
+                                                                        }
                                                                     />
                                                                 </>
                                                             )}

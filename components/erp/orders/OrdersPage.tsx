@@ -37,6 +37,7 @@ import {
 } from "@/lib/icons"
 
 import { formatDate, formatTime } from "@/lib/utils"
+import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import {
     EMPTY_DATE_PERIOD,
     resolveDatePeriodBounds,
@@ -189,6 +190,7 @@ export default function OrdersPage({
     const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
+    const [printOrderId, setPrintOrderId] = useState<string | null>(null)
 
 
     const isLoading = storeLoading || entityPage.isListLoading
@@ -660,7 +662,7 @@ export default function OrdersPage({
 
     const handlePrintReceipt = useCallback(
         (order: Order) => {
-            window.open(`/print/recibo/${order.originalId}`, "_blank")
+            setPrintOrderId(order.originalId)
         },
         [],
     )
@@ -1174,6 +1176,13 @@ export default function OrdersPage({
                 </div>
             </DefaultModal>
 
+            {printOrderId && (
+                <SaleReceiptPrintModal
+                    isOpen={!!printOrderId}
+                    onClose={() => setPrintOrderId(null)}
+                    orderId={printOrderId}
+                />
+            )}
         </>
     )
 }

@@ -4,11 +4,11 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input, Checkbox } from "@/components/reusable"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { LabelPreview } from "./label-preview"
-import { PrinterIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { PrinterIcon } from "@/lib/icons"
+import { LABEL_PRESETS } from "@/lib/labels/presets"
+import { LabelPrintModal } from "@/components/erp/labels/LabelPrintModal"
+import type { LabelProduct } from "@/components/erp/labels/LabelSheet"
 
 interface Product {
   id: string
@@ -16,6 +16,7 @@ interface Product {
   sku: string | null
   gtin: string | null
   price: number
+  promotional_price: number | null
   description: string | null
 }
 
@@ -27,8 +28,7 @@ interface SelectedProduct {
 export function LabelGenerator({ products }: { products: Product[] }) {
   const [search, setSearch] = useState("")
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
-  const [layout, setLayout] = useState("25")
-  const [showPreview, setShowPreview] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
 
   const filteredProducts = products.filter(
     (p) =>
@@ -54,12 +54,31 @@ export function LabelGenerator({ products }: { products: Product[] }) {
     )
   }
 
-  const selectedProductsData = selectedProducts
+  const fillFromStock = () => {
+    setSelectedProducts((prev) =>
+      prev.map((p) => {
+        const product = products.find((pr) => pr.id === p.productId)
+        return product ? { ...p, quantity: Math.max(1, product.promotional_price ?? 1) } : p
+      }),
+    )
+  }
+
+  const labelProducts: LabelProduct[] = selectedProducts
     .map((sp) => {
       const product = products.find((p) => p.id === sp.productId)
-      return product ? { ...product, labelQuantity: sp.quantity } : null
+      if (!product) return null
+      return {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        gtin: product.gtin,
+        price: product.price,
+        promotionalPrice: product.promotional_price,
+        internalCode: product.sku,
+        labelQuantity: sp.quantity,
+      }
     })
-    .filter(Boolean) as (Product & { labelQuantity: number })[]
+    .filter(Boolean) as LabelProduct[]
 
   const totalLabels = selectedProducts.reduce((sum, p) => sum + p.quantity, 0)
 
@@ -119,7 +138,7 @@ export function LabelGenerator({ products }: { products: Product[] }) {
               <CardTitle className="text-base">Quantidade de Etiquetas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {selectedProductsData.map((product) => (
+              {labelProducts.map((product) => (
                 <div key={product.id} className="flex items-center justify-between gap-2">
                   <div className="flex-1">
                     <p className="text-sm font-medium">{product.name}</p>
@@ -160,8 +179,11 @@ export function LabelGenerator({ products }: { products: Product[] }) {
                 </div>
               ))}
 
-              <div className="pt-3 border-t">
+              <div className="pt-3 border-t flex items-center justify-between">
                 <p className="text-sm font-semibold">Total de etiquetas: {totalLabels}</p>
+                <Button variant="outline" size="sm" onClick={fillFromStock}>
+                  Preencher estoque
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -170,25 +192,18 @@ export function LabelGenerator({ products }: { products: Product[] }) {
         {selectedProducts.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Configurações de Impressão</CardTitle>
+              <CardTitle className="text-base">Modelos disponíveis</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="layout">Formato da Página A4</Label>
-                <Select value={layout} onValueChange={setLayout}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="18">18 etiquetas por página (3×6)</SelectItem>
-                    <SelectItem value="21">21 etiquetas por página (3×7)</SelectItem>
-                    <SelectItem value="25">25 etiquetas por página (5×5)</SelectItem>
-                    <SelectItem value="65">65 etiquetas por página (5×13)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button onClick={() => setShowPreview(true)} className="w-full" size="lg">
+            <CardContent>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {LABEL_PRESETS.map((p) => (
+                  <li key={p.id}>
+                    ✓ {p.name} — {p.description}
+                  </li>
+                ))}
+                <li>✓ Customizado — definir medidas manualmente</li>
+              </ul>
+              <Button onClick={() => setShowPrintModal(true)} className="w-full mt-4" size="lg">
                 <PrinterIcon className="mr-2 h-4 w-4" />
                 Visualizar e Imprimir
               </Button>
@@ -205,9 +220,12 @@ export function LabelGenerator({ products }: { products: Product[] }) {
         )}
       </div>
 
-      {/* Modal de Preview */}
-      {showPreview && (
-        <LabelPreview products={selectedProductsData} layout={layout} onClose={() => setShowPreview(false)} />
+      {showPrintModal && (
+        <LabelPrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          products={labelProducts}
+        />
       )}
     </div>
   )

@@ -1,34 +1,32 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Portal from "@/components/Portal"
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger, FormTextarea } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
-import { useNotification } from "@/hooks/use-notification"
+import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import {
     DEFAULT_RECEIPT_FOOTER_MESSAGE,
     type SaleReceiptData,
     type SaleReceiptFormat,
+    buildSaleReceiptFromOrder,
 } from "@/lib/sales/sale-receipt"
 import { applyQuotePreviewTheme } from "@/lib/quotes/quote-preview-theme"
 import SaleReceiptThermalPreview from "./SaleReceiptThermalPreview"
 import SaleReceiptA4Preview from "./SaleReceiptA4Preview"
-import { downloadPdf } from "@/lib/pdf/download"
 
 export type SaleReceiptPrintModalProps = {
     isOpen: boolean
     onClose: () => void
-    receiptData: SaleReceiptData | null
+    orderId: string
 }
 
-export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: SaleReceiptPrintModalProps) {
+export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: SaleReceiptPrintModalProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { selectedStore } = useStore()
-    const { info: notifyInfo } = useNotification()
-    const printRef = useRef<HTMLDivElement>(null)
 
     const [isVisible, setIsVisible] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
@@ -36,7 +34,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
     const [format, setFormat] = useState<SaleReceiptFormat>("thermal")
     const [footerMessage, setFooterMessage] = useState(DEFAULT_RECEIPT_FOOTER_MESSAGE)
     const [showAcknowledgment, setShowAcknowledgment] = useState(true)
-    const [hydratedData, setHydratedData] = useState<SaleReceiptData | null>(null)
+    const [data, setData] = useState<SaleReceiptData | null>(null)
+    const [loading, setLoading] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
@@ -53,75 +52,72 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
     }, [isOpen])
 
     useEffect(() => {
-        if (!isOpen || !receiptData) {
-            setHydratedData(null)
+        if (!isOpen || !orderId) {
+            setData(null)
             return
         }
 
         let cancelled = false
-        const partnerId = selectedStore?.partner_id
-        const withTheme = applyQuotePreviewTheme(receiptData)
 
-        if (!partnerId) {
-            setHydratedData(withTheme)
-            return
-        }
-
-        getPartnerReceiptHeaderAction(partnerId).then((res) => {
-            if (cancelled) return
-            if (res.success && res.data) {
-                setHydratedData(
-                    applyQuotePreviewTheme({
-                        ...receiptData,
-                        partner: res.data,
-                        partnerAvatar: receiptData.partnerAvatar || selectedStore?.image_url || undefined,
-                    }),
-                )
-            } else {
-                setHydratedData(withTheme)
+        async function load() {
+            setLoading(true)
+            const partnerId = selectedStore?.partner_id
+            if (!partnerId) {
+                setLoading(false)
+                return
             }
-        })
 
-        return () => {
-            cancelled = true
-        }
-    }, [isOpen, receiptData, selectedStore?.partner_id, selectedStore?.image_url])
+            const [orderRes, headerRes] = await Promise.all([
+                getOrderDetailsAction(orderId, partnerId),
+                getPartnerReceiptHeaderAction(partnerId),
+            ])
 
-    const data = hydratedData
+            if (cancelled) return
 
-    const handlePrint = useCallback(() => {
-        if (!data) return
-        window.print()
-    }, [data])
+            if (!orderRes.success || !orderRes.data) {
+                setLoading(false)
+                return
+            }
 
-    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+            const partnerHeader = headerRes.success && headerRes.data ? headerRes.data : {
+                fantasyName: "",
+                legalName: "",
+                addressLine: "",
+                taxIdLine: "",
+            }
 
-    const handleDownloadPdf = useCallback(async () => {
-        if (!receiptData) return
-        if (isGeneratingPdf) return
+            const partnerAvatar = selectedStore?.image_url || undefined
+            const order = orderRes.data
 
-        setIsGeneratingPdf(true)
-        notifyInfo("Gerando PDF", "Aguarde enquanto geramos o documento...")
-
-        try {
-            const queryParams = new URLSearchParams({
-                format,
-                footerMessage,
-                showAcknowledgment: String(showAcknowledgment)
+            const receiptData = buildSaleReceiptFromOrder(order, partnerHeader, {
+                partnerAvatar: partnerAvatar ? (partnerAvatar.startsWith("http") ? partnerAvatar : undefined) : undefined,
+                sellerName: order.seller_name || undefined,
+                primaryColor: order.primary_color || undefined,
+                secondaryColor: order.secondary_color || undefined,
             })
 
-            await downloadPdf(
-                `/api/pdf/recibo/${receiptData.orderNumber}?${queryParams.toString()}`,
-                `recibo-${receiptData.orderNumber}.pdf`
-            )
-            notifyInfo("Sucesso", "O PDF foi baixado com sucesso!")
-        } catch (error: any) {
-            console.error(error)
-            notifyInfo("Erro", error.message || "Não foi possível gerar o PDF. Tente novamente.")
-        } finally {
-            setIsGeneratingPdf(false)
+            setData(applyQuotePreviewTheme(receiptData))
+            setLoading(false)
         }
-    }, [receiptData, format, footerMessage, showAcknowledgment, notifyInfo, isGeneratingPdf])
+
+        load()
+        return () => { cancelled = true }
+    }, [isOpen, orderId, selectedStore?.partner_id, selectedStore?.image_url])
+
+    const handlePrint = useCallback(() => {
+        if (!orderId) return
+        const params = new URLSearchParams({
+            format,
+            footerMessage,
+            showAcknowledgment: String(showAcknowledgment),
+        })
+        window.open(`/print/recibo/${orderId}?${params.toString()}`, "_blank")
+        onClose()
+    }, [orderId, format, footerMessage, showAcknowledgment, onClose])
+
+    const handleDownloadPdf = useCallback(() => {
+        handlePrint()
+    }, [handlePrint])
 
     const formatOptions = useMemo(
         () => [
@@ -135,22 +131,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
 
     return (
         <Portal>
-            <style
-                dangerouslySetInnerHTML={{
-                    __html: `@media print {
-                        body * { visibility: hidden !important; }
-                        #sale-receipt-print-root, #sale-receipt-print-root * { visibility: visible !important; }
-                        #sale-receipt-print-root {
-                            position: absolute !important; left: 0 !important; top: 0 !important;
-                            width: 100% !important; background: white !important; padding: 0 !important; margin: 0 !important;
-                        }
-                        .sale-receipt-no-print { display: none !important; }
-                        .sale-receipt-thermal-print { width: 80mm !important; max-width: 80mm !important; box-shadow: none !important; }
-                    }`,
-                }}
-            />
-
-            <div className="sale-receipt-no-print fixed inset-0 z-[130] flex flex-col bg-black/60">
+            <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
                 <div
                     className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
                         }`}
@@ -169,9 +150,13 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                         </Button>
                     </div>
 
-                    {!data ? (
+                    {loading ? (
                         <div className="flex-1 flex items-center justify-center text-brand-inactive-text">
                             Carregando recibo...
+                        </div>
+                    ) : !data ? (
+                        <div className="flex-1 flex items-center justify-center text-brand-red font-bold">
+                            Não foi possível carregar o recibo.
                         </div>
                     ) : (
                         <Tabs
@@ -239,21 +224,21 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                                     />
 
                                     <div className="hidden lg:flex gap-3 pt-2">
-                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf} leftIcon={<PrinterIcon size={18} />}>
+                                        <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
-                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf} leftIcon={<DownloadIcon size={18} />}>
-                                            {format === "a4" ? "Salvar PDF" : "Imprimir"}
+                                        <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
+                                            {format === "a4" ? "Salvar PDF" : "Salvar PDF"}
                                         </Button>
                                     </div>
                                 </div>
 
                                 {/* Mobile footer actions */}
                                 <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={isGeneratingPdf} leftIcon={<PrinterIcon size={18} />}>
+                                    <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
-                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} isLoading={isGeneratingPdf} leftIcon={<DownloadIcon size={18} />}>
+                                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} leftIcon={<DownloadIcon size={18} />}>
                                         PDF
                                     </Button>
                                 </div>
@@ -283,27 +268,6 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, receiptData }: 
                     )}
                 </div>
             </div>
-
-            {/* Print-only layer */}
-            {data && (
-                <div id="sale-receipt-print-root" ref={printRef} className="hidden print:block">
-                    {format === "thermal" ? (
-                        <SaleReceiptThermalPreview
-                            data={data}
-                            footerMessage={footerMessage}
-                            showAcknowledgment={showAcknowledgment}
-                            printMode
-                        />
-                    ) : (
-                        <SaleReceiptA4Preview
-                            data={data}
-                            footerMessage={footerMessage}
-                            showAcknowledgment={showAcknowledgment}
-                            printMode
-                        />
-                    )}
-                </div>
-            )}
         </Portal>
     )
 }

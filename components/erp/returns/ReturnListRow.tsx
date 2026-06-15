@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatDateTime } from "@/lib/utils"
 import { ReturnIcon } from "@/lib/icons"
 import { ReturnRequest } from "./types"
 import { getReturnResolutionLabel, getReturnStatusLabel } from "@/lib/returns/types"
@@ -109,7 +109,7 @@ const ReturnListRow = React.memo(({ returnRequest, columns, onDetails, onEdit, o
       case "date":
         return (
           <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-            {formatDate(returnRequest.createdAt)}
+            {formatDateTime(returnRequest.createdAt)}
           </span>
         )
       case "refund_type":

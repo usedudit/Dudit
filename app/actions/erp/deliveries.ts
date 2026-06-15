@@ -1060,16 +1060,36 @@ export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     try {
       const { data: defaultStore } = await supabase
         .from("stores")
-        .select("id, city, state, zip_code, street, number")
+        .select("id")
         .eq("partner_id", payload.partnerId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle()
 
+      let storeAddress = null
+      if (defaultStore?.id) {
+        const { data } = await supabase
+          .from("addresses")
+          .select("city, state, zip_code, street, number")
+          .eq("store_id", defaultStore.id)
+          .maybeSingle()
+        storeAddress = data
+      }
+
+      if (!storeAddress) {
+        const { data } = await supabase
+          .from("addresses")
+          .select("city, state, zip_code, street, number")
+          .eq("partner_id", payload.partnerId)
+          .eq("is_default", true)
+          .maybeSingle()
+        storeAddress = data
+      }
+
       const originAddress = [
-        [defaultStore?.street, defaultStore?.number].filter(Boolean).join(", "),
-        [defaultStore?.city, defaultStore?.state].filter(Boolean).join(", "),
-        defaultStore?.zip_code || "",
+        [storeAddress?.street, storeAddress?.number].filter(Boolean).join(", "),
+        [storeAddress?.city, storeAddress?.state].filter(Boolean).join(", "),
+        storeAddress?.zip_code || "",
       ]
         .filter(Boolean)
         .join(" ")

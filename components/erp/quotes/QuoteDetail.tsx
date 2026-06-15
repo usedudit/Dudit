@@ -30,6 +30,7 @@ import { formatCurrency, formatDate, formatDayMonth, formatTime } from '@/lib/ut
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useStore } from '@/lib/store-context';
 import QuotePreview from './QuotePreview';
+import QuotePrintModal from './QuotePrintModal';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { ShareModal } from "@/components/marketplace/ShareModal";
 
@@ -165,6 +166,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
     const [activeTab, setActiveTab] = useState('Dados Gerais');
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
 
     const handleDownloadPdf = async () => {
         if (!quote) return;
@@ -463,6 +465,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     }, [quote?.items]);
 
     return (
+        <>
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
@@ -495,12 +498,12 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown
-                                            onPrint={() => window.open(`/print/orcamento/${quoteId}`, "_blank")}
-                                            onShare={() => setShowShareModal(true)}
-                                            onDelete={() => setShowDeleteModal(true)}
-                                            onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
-                                        />
+                                            <ActionsDropdown
+                                                onPrint={() => setShowPrintModal(true)}
+                                                onShare={() => setShowShareModal(true)}
+                                                onDelete={() => setShowDeleteModal(true)}
+                                                onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
+                                            />
 
                                         <Button onClick={() => onEditQuote && onEditQuote(quote)} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
                                             Editar orçamento
@@ -941,7 +944,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                     {/* Mobile Bottom Action Bar */}
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-lg">
                         <ActionsDropdown
-                            onPrint={() => window.open(`/print/orcamento/${quoteId}`, "_blank")}
+                            onPrint={() => setShowPrintModal(true)}
                             onShare={() => setShowShareModal(true)}
                             onDelete={() => setShowDeleteModal(true)}
                             onDuplicate={() => onDuplicateQuote && onDuplicateQuote(quote)}
@@ -1034,6 +1037,16 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                 </Tabs>
             </div>
         </FadeIn>
+
+            {showPrintModal && (
+                <QuotePrintModal
+                    isOpen={showPrintModal}
+                    onClose={() => setShowPrintModal(false)}
+                    quoteId={quoteId}
+                    partnerId={partnerId}
+                />
+            )}
+        </>
     );
 };
 

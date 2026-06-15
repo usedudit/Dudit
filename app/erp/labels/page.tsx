@@ -1,9 +1,9 @@
 import { Button } from "@/components/reusable"
 import Link from "next/link"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { LABEL_PRESETS } from "@/lib/labels/presets"
 
 export default async function LabelsPage() {
-  // Layout already guarantees auth + valid context
   await getCurrentPartnerContext()
 
   return (
@@ -35,12 +35,12 @@ export default async function LabelsPage() {
           </div>
 
           <div className="p-6 border rounded-lg hover:bg-accent">
-            <h3 className="font-semibold text-lg">Formatos Disponíveis</h3>
+            <h3 className="font-semibold text-lg">Modelos Pimaco</h3>
             <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-              <li>✓ 18 etiquetas por página A4</li>
-              <li>✓ 21 etiquetas por página A4</li>
-              <li>✓ 25 etiquetas por página A4</li>
-              <li>✓ 65 etiquetas por página A4</li>
+              {LABEL_PRESETS.map((p) => (
+                <li key={p.id}>✓ {p.name} — {p.description}</li>
+              ))}
+              <li>✓ Customizado</li>
             </ul>
           </div>
         </div>

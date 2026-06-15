@@ -17,7 +17,7 @@ export default async function GenerateLabelsPage() {
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, sku, gtin, price, description")
+    .select("id, name, sku, gtin, price, promotional_price, description")
     .eq("partner_id", partner.id)
     .eq("is_active", true)
     .order("name")

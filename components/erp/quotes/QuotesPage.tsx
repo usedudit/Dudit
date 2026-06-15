@@ -20,6 +20,7 @@ import QuoteGridCard from "./QuoteGridCard"
 import QuotePageControls from "./QuotePageControls"
 import CreateQuote from "./CreateQuote"
 import QuoteDetail from "./QuoteDetail"
+import QuotePrintModal from "./QuotePrintModal"
 import { useNotification } from "@/hooks/use-notification"
 import {
     EMPTY_DATE_PERIOD,
@@ -184,6 +185,7 @@ export default function QuotesPage({
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false)
     const [confirmations, setConfirmations] = useState({ bulkDelete: false })
+    const [printQuoteId, setPrintQuoteId] = useState<string | null>(null)
 
     const isLoading = storeLoading || isQueryLoading
     const itemsPerPage = 8
@@ -386,7 +388,7 @@ export default function QuotesPage({
     }, [])
 
     const handlePrintQuote = useCallback((quote: any) => {
-        window.open(`/print/orcamento/${quote.originalId || quote.id}`, "_blank")
+        setPrintQuoteId(quote.originalId || quote.id)
     }, [])
 
     const handleShareQuote = useCallback((quote: any) => {
@@ -820,6 +822,15 @@ export default function QuotesPage({
             </FloatingActionBar>
 
             <SavingStatusModal isOpen={isDeleting} text="Excluindo..." />
+
+            {printQuoteId && (
+                <QuotePrintModal
+                    isOpen={!!printQuoteId}
+                    onClose={() => setPrintQuoteId(null)}
+                    quoteId={printQuoteId}
+                    partnerId={partnerId}
+                />
+            )}
         </>
     )
 }

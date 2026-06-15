@@ -177,6 +177,9 @@ function normalizeReturnRow(row: any): ReturnRequestListItem {
         evidenceImages: (row.return_evidence || []).map((e: any) => e.file_url).filter(Boolean),
         observations: row.customer_details || row.customer_message || row.seller_notes || row.internal_notes || "",
         expiresAt: row.expires_at,
+        paymentProvider: row.orders?.payment_provider || undefined,
+        mpPaymentId: row.orders?.mp_payment_id || undefined,
+        refundPaymentMethod: (row.return_refunds && row.return_refunds[0]) ? row.return_refunds[0].payment_method : undefined,
         items,
     }
 }
@@ -206,13 +209,14 @@ export async function getReturnRequestsPageAction(
         id, partner_id, order_id, customer_id, customer_user_id, source, request_type, desired_resolution, approved_resolution,
         reason, customer_reason, customer_message, customer_details, seller_notes, internal_notes, status, refund_amount, store_credit_amount,
         order_number_snapshot, order_total_snapshot, customer_name_snapshot, customer_email_snapshot, expires_at, created_at, updated_at,
-        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer_id),
+        orders!order_id(order_number, customer_name, situation, delivery_status, delivery_address, buyer_id, payment_provider, mp_payment_id),
         return_items(
           id, order_item_id, product_id, variant_id, product_name_snapshot, sku_snapshot,
           unit_price_snapshot, net_item_value_snapshot, ordered_quantity, quantity, condition, reason, desired_resolution,
           products!product_id(images, video_thumbnail)
         ),
-        return_evidence(id, file_url, file_type, thumbnail_url)
+        return_evidence(id, file_url, file_type, thumbnail_url),
+        return_refunds(payment_method)
       `)
             .eq("partner_id", partnerId)
             .is("deleted_at", null)
@@ -586,8 +590,8 @@ export async function processReturnRequestAction(input: unknown) {
         const { data: request, error: requestError } = await supabase
             .from("return_requests")
             .select(`
-                id, partner_id, order_id, status, request_type, order_total_snapshot,
-                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown),
+                id, partner_id, order_id, status, request_type, order_total_snapshot, customer_id, customer_name_snapshot, customer_email_snapshot,
+                orders!order_id(total_amount, amount_paid, payment_provider, mp_payment_id, payment_breakdown, buyer_id, customer_name),
                 return_items(net_item_value_snapshot)
             `)
             .eq("id", data.requestId)
@@ -597,6 +601,55 @@ export async function processReturnRequestAction(input: unknown) {
 
         if (requestError || !request) throw new Error("Solicitacao nao encontrada")
         if (["RESOLVED", "REJECTED", "EXPIRED"].includes(request.status)) throw new Error("Solicitacao bloqueada")
+
+        // Map buyer user UUID to ERP customers table ID to avoid foreign key violations on transactions
+        const buyerId = (request as any).orders?.buyer_id || (request as any).customer_id
+        let erpCustomerId: string | null = null
+        if (buyerId) {
+            const { data: existingCustomer } = await supabase
+                .from("customers")
+                .select("id")
+                .eq("partner_id", request.partner_id)
+                .eq("marketplace_user_id", buyerId)
+                .maybeSingle()
+
+            if (existingCustomer) {
+                erpCustomerId = existingCustomer.id
+            } else {
+                const { data: directCustomer } = await supabase
+                    .from("customers")
+                    .select("id")
+                    .eq("partner_id", request.partner_id)
+                    .eq("id", buyerId)
+                    .maybeSingle()
+
+                if (directCustomer) {
+                    erpCustomerId = directCustomer.id
+                } else {
+                    try {
+                        const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
+                        const buyerName = (request as any).orders?.customer_name || (request as any).customer_name_snapshot || "Cliente"
+                        const buyerEmail = (request as any).customer_email_snapshot || null
+
+                        erpCustomerId = await ensureMarketplaceCustomer({
+                            partnerId: request.partner_id,
+                            name: buyerName,
+                            email: buyerEmail,
+                            userId: buyerId,
+                        })
+                    } catch (err) {
+                        console.error("[processReturnRequest] Error mapping marketplace customer:", err)
+                    }
+                }
+            }
+        }
+
+        // Update customer_id on return request to the resolved ERP customer (or null if none)
+        await supabase
+            .from("return_requests")
+            .update({ customer_id: erpCustomerId })
+            .eq("id", data.requestId)
+
         const maxActionAmount = (request as any).request_type === "cancellation"
             ? getOrderAmountPaid((request as any).orders || {})
             : toNumber(((request as any).return_items || []).reduce((sum: number, item: any) => sum + toNumber(item.net_item_value_snapshot), 0))
@@ -606,8 +659,12 @@ export async function processReturnRequestAction(input: unknown) {
 
         const paymentProvider = String((request as any).orders?.payment_provider || "").toLowerCase()
         const hasMercadoPago = Boolean((request as any).orders?.mp_payment_id) || paymentProvider.includes("mercado")
+        
+        // Expose Mercado Pago refund trigger based on explicit selection
+        const isMpRefund = hasMercadoPago && (data.refundPaymentMethod === "Mercado Pago" || data.refundPaymentMethod === "mercado_pago")
+
         const refundStatus = data.refundAmount > 0
-            ? (hasMercadoPago ? "PROCESSING" : data.refundStatus)
+            ? (isMpRefund ? "PROCESSING" : data.refundStatus)
             : data.refundStatus
 
         const { data: processed, error } = await supabase.rpc("process_return_request", {
@@ -660,7 +717,7 @@ export async function processReturnRequestAction(input: unknown) {
             : data.exchangeBalanceResolution === "refund"
                 ? toNumber(result?.exchange_surplus_amount)
                 : 0
-        if (hasMercadoPago && requestedRefundAmount > 0) {
+        if (isMpRefund && requestedRefundAmount > 0) {
             // Cap the MP refund to only the portion actually paid via Mercado Pago.
             // Any excess (paid via external methods) flows through the existing manual refund path.
             const mpPaidAmount = extractMercadoPagoPaidAmount((request as any).orders)

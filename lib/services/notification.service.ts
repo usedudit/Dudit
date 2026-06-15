@@ -18,7 +18,22 @@ const PAGE_SIZE = 20
 export async function createNotification(
   input: CreateNotificationInput,
 ): Promise<{ notification: NotificationRecord | null; created: boolean }> {
+  if (!input.userId) {
+    return { notification: null, created: false }
+  }
+
   const admin = getAdminClient()
+
+  const { data: userExists } = await admin
+    .from("auth.users")
+    .select("id")
+    .eq("id", input.userId)
+    .maybeSingle()
+
+  if (!userExists) {
+    console.warn(`[notifications] User ${input.userId} not found in auth.users. Skipping notification.`)
+    return { notification: null, created: false }
+  }
 
   const { data: existing } = await admin
     .from("notifications")

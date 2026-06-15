@@ -26,6 +26,7 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, getPaymentMethodsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/utils';
+import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 
@@ -319,6 +320,7 @@ const PaymentModal = ({
     // Payment Status State
     const [paymentStatus, setPaymentStatus] = useState<'input' | 'processing' | 'success' | 'error'>('input');
     const [saleId, setSaleId] = useState<string>("");
+    const [printOrderId, setPrintOrderId] = useState<string | null>(null);
     const [lastPaymentPayload, setLastPaymentPayload] = useState<any | null>(null);
     const [errorMessage, setErrorMessage] = useState("Não conseguimos concluir a venda agora.");
 
@@ -2293,12 +2295,12 @@ const PaymentModal = ({
                                         <SuccessActionCard
                                             icon={FileIcon}
                                             label="Imprimir recibo"
-                                            onClick={() => window.open(`/print/recibo/${saleId}`, "_blank")}
+                                            onClick={() => setPrintOrderId(saleId)}
                                         />
                                         <SuccessActionCard
                                             icon={PrinterIcon}
                                             label="Imprimir NFC-e"
-                                            onClick={() => window.open(`/print/recibo/${saleId}`, "_blank")}
+                                            onClick={() => setPrintOrderId(saleId)}
                                         />
                                     </div>
                                 </motion.div>
@@ -2431,6 +2433,14 @@ const PaymentModal = ({
                     )}
                 </AnimatePresence>
             </motion.div>
+
+            {printOrderId && (
+                <SaleReceiptPrintModal
+                    isOpen={!!printOrderId}
+                    onClose={() => setPrintOrderId(null)}
+                    orderId={printOrderId}
+                />
+            )}
         </div>
     );
 };

@@ -40,6 +40,7 @@ import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import BottomSheet from "@/components/BottomSheet"
+import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
     const cleanUnit = String(unit || "").trim().toLowerCase();
@@ -128,6 +129,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [deliverySummary, setDeliverySummary] = useState<any | null>(null)
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
+    const [printModalOrderId, setPrintModalOrderId] = useState<string | null>(null)
     const { error: notifyError } = useNotification()
 
     const handleBack = useCallback(() => onBack(), [onBack])
@@ -534,7 +536,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         {/* Desktop action buttons */}
                                         <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                             <ActionsDropdown
-                                                onPrint={() => window.open(`/print/recibo/${order.id || order.order_number}`, "_blank")}
+                                                onPrint={() => setPrintModalOrderId(order.id || order.order_number)}
                                                 onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                                                 onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                                                 onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
@@ -1040,7 +1042,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <ActionsDropdown
-                    onPrint={() => window.open(`/print/recibo/${order.id || order.order_number}`, "_blank")}
+                    onPrint={() => setPrintModalOrderId(order.id || order.order_number)}
                     onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                     onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
@@ -1099,6 +1101,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                 </div>
             </BottomSheet>
 
+        {printModalOrderId && (
+                <SaleReceiptPrintModal
+                    isOpen={!!printModalOrderId}
+                    onClose={() => setPrintModalOrderId(null)}
+                    orderId={printModalOrderId}
+                />
+            )}
         </>
     )
 }

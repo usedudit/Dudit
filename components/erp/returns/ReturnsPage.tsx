@@ -58,10 +58,25 @@ function mapLegacyResolution(resolution: unknown) {
 
 function mapLegacyReason(reason: unknown) {
     const raw = String(reason || "").toLowerCase()
-    if (raw === "defeito") return "defective"
-    if (raw === "arrependimento") return "changed_mind"
+    if (raw === "defeito" || raw === "item com defeito") return "defective"
+    if (raw === "arrependimento" || raw === "mudou de ideia") return "changed_mind"
     if (raw === "tamanho_incorreto") return "other"
-    return raw || "other"
+    if (raw === "item errado" || raw === "recebi item errado") return "wrong_item"
+    if (raw === "item danificado") return "damaged"
+    if (raw === "diferente da descricao" || raw === "diferente da descrição") return "different_from_description"
+    if (raw === "faltam partes") return "missing_parts"
+    if (raw === "chegou atrasado") return "arrived_late"
+    if ([
+        "wrong_item",
+        "defective",
+        "damaged",
+        "different_from_description",
+        "missing_parts",
+        "arrived_late",
+        "changed_mind",
+        "other",
+    ].includes(raw)) return raw
+    return "other"
 }
 
 export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
@@ -152,7 +167,7 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
                     nextStatus: data.status,
                     refundAmount: Number(data.refundValue || 0),
                     refundStatus: Number(data.refundValue || 0) > 0 ? "APPROVED" : "PENDING",
-                    refundPaymentMethod: data.resolutionType === "refund" ? data.refundType || null : null,
+                    refundPaymentMethod: data.resolutionType === "refund" ? data.refundPaymentMethod || null : null,
                     returnToInventory: Boolean(data.returnToInventory),
                     storeCreditAmount: data.resolutionType === "store_credit" ? Number(data.storeCreditValue || 0) : 0,
                     exchangeItems: data.resolutionType === "exchange" ? data.exchangeItems || [] : [],

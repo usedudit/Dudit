@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatDateTime } from "@/lib/utils"
 import { ReturnRequest } from "./types"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { getReturnResolutionLabel } from "@/lib/returns/types"
@@ -59,7 +59,7 @@ const ReturnGridCard = React.memo(({ returnRequest, onDetails, onEdit, onDelete,
             {totalQuantity} item(ns)
           </p>
           <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-            {formatDate(returnRequest.createdAt)}
+            {formatDateTime(returnRequest.createdAt)}
           </p>
         </div>
         <div onClick={(e) => e.stopPropagation()}>
