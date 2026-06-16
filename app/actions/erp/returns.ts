@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser, requirePartnerAccessWithPermission, requireOrderAccess } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan, requireOrderAccess } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -319,6 +319,7 @@ export async function createReturnRequestAction(input: unknown) {
     try {
         const user = await requireUser()
         const data = createReturnSchema.parse(input)
+        await requireMinimumPlan(data.partnerId, "crescer")
         const access = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")
         assertRole(access.roleId, MANAGE_ROLES)
         const supabase = createAdminClient()
@@ -581,6 +582,7 @@ export async function processReturnRequestAction(input: unknown) {
     try {
         const user = await requireUser()
         const data = processReturnSchema.parse(input)
+        await requireMinimumPlan(data.partnerId, "crescer")
         if (data.nextStatus && !RETURN_STATUS_SET.has(data.nextStatus)) throw new Error("Status invalido")
 
         const access = await requirePartnerAccessWithPermission(data.partnerId, "orders", "edit")

@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
 
 interface MetadataResponse {
@@ -52,6 +52,7 @@ export async function revalidateProductMetadata(partnerId: string) {
  */
 export async function createCategoryAction(data: { partnerId: string, name: string, parentId?: string | null }) {
   try {
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
@@ -93,6 +94,7 @@ export async function createCategoryAction(data: { partnerId: string, name: stri
  */
 export async function createBrandAction(data: { partnerId: string, name: string }) {
   try {
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 
@@ -121,6 +123,7 @@ export async function createBrandAction(data: { partnerId: string, name: string 
  */
 export async function createLocationAction(data: { partnerId: string, name: string }) {
   try {
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "products", "edit")
     const supabase = await getSupabaseServerClient()
 

@@ -1,9 +1,11 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FinancialSummary } from "@/components/erp/financial-overview/FinancialSummary"
 import { AccessDenied } from "@/components/erp/access-denied"
+import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getFinancialOverviewData } from "@/lib/data/financial-overview"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 export const dynamic = "force-dynamic"
@@ -16,6 +18,19 @@ export default async function FinancialOverviewRoute() {
   const partnerId = context.partnerId
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
+
+  const plan = await getPartnerPlan(partnerId)
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+
+  if (isFreePlan) {
+    return (
+      <PlanGatePage
+        title="Resumo Financeiro"
+        subtitle="Acompanhe suas finanças com gráficos e relatórios detalhados. Disponível nos planos Crescer e Escalar."
+        requiredPlan="crescer"
+      />
+    )
+  }
 
   const result = await getFinancialOverviewData(partnerId)
   if (!result.success) {

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import { Badge, Button, IconPlaceholder, Pagination, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { PlusIcon, ExportFileIcon, ReturnIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
@@ -24,6 +25,7 @@ type SortDirection = "asc" | "desc"
 interface ReturnsPageProps {
     partnerId: string
     roleId: string
+    planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }
 
 const ITEMS_PER_PAGE = 8
@@ -79,8 +81,9 @@ function mapLegacyReason(reason: unknown) {
     return "other"
 }
 
-export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
+export default function ReturnsPage({ partnerId, roleId, planGate }: ReturnsPageProps) {
     const { toast } = useToast()
+    const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -247,6 +250,26 @@ export default function ReturnsPage({ partnerId, roleId }: ReturnsPageProps) {
     const totalPages = Math.max(1, Math.ceil(filteredReturns.length / ITEMS_PER_PAGE))
     const paginatedReturns = filteredReturns.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
     const hasActiveFilters = debouncedSearch.length > 0 || activeTab !== "Todos"
+
+    if (planGate) {
+        return (
+            <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                        imageAlt="Recurso bloqueado"
+                        title="Trocas e Devoluções"
+                        subtitle="Gerencie trocas e devoluções de forma organizada. Disponível nos planos Crescer e Escalar."
+                        itemButton={{
+                            text: "Fazer upgrade",
+                            action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                        }}
+                    />
+                </div>
+            </FadeIn>
+        )
+    }
 
     return (
         <AnimatePresence mode="wait">

@@ -2,6 +2,8 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { TransactionsPage } from "@/components/erp/transactions"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -23,6 +25,17 @@ export default async function FinancialRecebimentosRoute() {
   const partnerId = context.partnerId
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
   if (!allowed) return <AccessDenied />
+
+  const plan = await getPartnerPlan(partnerId)
+  if (plan.slug.toLowerCase() === "free") {
+    return (
+      <PlanGatePage
+        title="Contas a Receber"
+        subtitle="Gerencie suas contas a receber e receitas do negócio. Disponível nos planos Crescer e Escalar."
+        requiredPlan="crescer"
+      />
+    )
+  }
 
   const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
     getTransactionsData(partnerId),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AlertModal, Badge, Button, Checkbox, IconPlaceholder, SavingStatusModal, Separator } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -24,6 +25,7 @@ interface PaymentMethodsSubPageProps {
     partner: any
     paymentMethods: any[]
     onBack: () => void
+    planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }
 
 type PaymentFilters = {
@@ -45,7 +47,8 @@ const LIST_COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const },
 ]
 
-export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: PaymentMethodsSubPageProps) {
+export function PaymentMethodsSubPage({ partner, paymentMethods, onBack, planGate }: PaymentMethodsSubPageProps) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 1024px)")
 
@@ -597,6 +600,39 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack }: Payme
                     </table>
                 </div>
             </div>
+        )
+    }
+
+    if (planGate) {
+        return (
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                            <div className="hidden md:flex items-start justify-between py-6">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
+                                        <span className="truncate">Formas de Pagamento</span>
+                                    </h1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                            imageAlt="Recurso bloqueado"
+                            title="Formas de Pagamento"
+                            subtitle="Configure os métodos de pagamento aceitos no seu negócio. Disponível nos planos Crescer e Escalar."
+                            itemButton={{
+                                text: "Fazer upgrade",
+                                action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                            }}
+                        />
+                    </div>
+                </div>
+            </FadeIn>
         )
     }
 

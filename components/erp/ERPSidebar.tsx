@@ -141,6 +141,10 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/servicos/cadastros": "crescer",
     "/erp/transactions/cadastros-financeiro": "crescer",
     "/erp/reports": "crescer",
+    "/erp/coupons": "crescer",
+    "/erp/promotions": "escalar",
+    "/erp/goals": "crescer",
+    "/erp/returns": "crescer",
 }
 
 function ErpPlanGatedNavItem({
@@ -219,6 +223,8 @@ export function ERPSidebar() {
     const productsResourceActive = isSystemResourceActive(businessInfo, "products")
     const servicesResourceActive = isSystemResourceActive(businessInfo, "services")
     const quotesResourceActive = isSystemResourceActive(businessInfo, "quotes")
+    const goalsResourceActive = isSystemResourceActive(businessInfo, "goals")
+    const returnsResourceActive = isSystemResourceActive(businessInfo, "returns")
     const posResourceActive = isSystemResourceActive(businessInfo, "pos")
     const deliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
     const financialResourceActive = isSystemResourceActive(businessInfo, "financial")
@@ -288,7 +294,9 @@ export function ERPSidebar() {
                 if (newItem.submenu) {
                     newItem.submenu = newItem.submenu.filter((sub) => {
                         if (item.href === "/erp/orders") {
-                            if (sub.href === "/erp/orders" || sub.href === "/erp/goals" || sub.href === "/erp/returns") return ordersResourceActive
+                            if (sub.href === "/erp/orders") return ordersResourceActive
+                            if (sub.href === "/erp/goals") return goalsResourceActive
+                            if (sub.href === "/erp/returns") return returnsResourceActive
                             if (sub.href === "/erp/quotes") return quotesResourceActive
                             if (sub.href === "/erp/pdv") return posResourceActive
                             if (sub.href.startsWith("/erp/logistics")) return deliveriesResourceActive
@@ -325,7 +333,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, showcaseResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, showcaseResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

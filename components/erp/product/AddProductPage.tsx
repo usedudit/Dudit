@@ -108,6 +108,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const { openPlanUpgrade } = usePlanUpgrade()
     const variantsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
     const metricsPlanBlocked = !hasMinimumPlan(planSlug, "escalar")
+    const metadataPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+    const videoPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = businessInfo.mode === "quick"
@@ -821,6 +823,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             generateRandomCode={handleGenerateRandomCode}
                                             onGenerateBarcode={handleGenerateBarcode}
                                             openAddItemModal={handleOpenMetadataModal}
+                                            metadataPlanBlocked={metadataPlanBlocked}
 
                                         />
                                     </FadeIn>
@@ -868,7 +871,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     video_duration: productData.video_duration || null,
                                                     video_provider_id: productData.video_provider_id || null,
                                                 }}
-                                                onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
+                                                    onVideoChange={(video) => setProductData((prev: any) => ({ ...prev, ...video }))}
+                                                    videoPlanBlocked={videoPlanBlocked}
                                             />
                                         )}
                                     </FadeIn>

@@ -4,13 +4,14 @@ import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, IconPlaceholder, Input } from "@/components/reusable"
 import { Progress } from "@/components/ui/progress"
-import { TrashIcon, UploadIcon } from "@/lib/icons"
+import { TrashIcon, UploadIcon, LockIcon } from "@/lib/icons"
 import {
     bytesToBase64,
     compressVideoIfNeeded,
     prepareVideoClientPreview,
 } from "@/lib/video/client"
 import type { VideoMetadata, VideoType } from "@/lib/video/shared"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 interface ProductVideoSectionProps {
     itemType: "product" | "service"
@@ -18,6 +19,7 @@ interface ProductVideoSectionProps {
     video: VideoMetadata
     onChange: (video: VideoMetadata) => void
     isEditing: boolean
+    videoPlanBlocked?: boolean
 }
 
 const EMPTY_VIDEO: VideoMetadata = {
@@ -68,7 +70,8 @@ function getEmbedPreviewUrl(video: VideoMetadata) {
     return null
 }
 
-export default function ProductVideoSection({ itemType, itemId, video, onChange, isEditing }: ProductVideoSectionProps) {
+export default function ProductVideoSection({ itemType, itemId, video, onChange, isEditing, videoPlanBlocked = false }: ProductVideoSectionProps) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const currentFileRef = useRef<File | null>(null)
     const objectUrlRef = useRef<string | null>(null)
     const uploadSessionRef = useRef(0)
@@ -295,6 +298,25 @@ export default function ProductVideoSection({ itemType, itemId, video, onChange,
     }
 
     const showPreviewPanel = !!uploadPlayback || !!embedUrl
+
+    if (videoPlanBlocked) {
+        return (
+            <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">
+                <div className="flex flex-col items-center py-10 text-center">
+                    <div className="w-24 h-24 mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <LockIcon className="w-10 h-10 text-amber-500" />
+                    </div>
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-2">Vídeo</h3>
+                    <p className="text-sm text-brand-inactive-text mb-6 max-w-md">
+                        Adicione vídeos aos seus {itemType === "product" ? "produtos" : "serviços"} para aumentar o engajamento. Disponível nos planos Crescer e Escalar.
+                    </p>
+                    <Button type="button" onClick={() => openPlanUpgrade("crescer")} className="bg-amber-500 hover:bg-amber-600 text-white">
+                        Fazer upgrade
+                    </Button>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="mt-6 border-t border-brand-border dark:border-dark-border pt-6">

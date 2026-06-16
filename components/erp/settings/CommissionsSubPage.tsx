@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
 import { ChevronLeftIcon, TruckIcon, Users, SaveIcon, UserIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { listEmployeeCommissionsAction, upsertEmployeeCommissionAction, type CommissionSettingsRow } from "@/app/actions/erp/commissions"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useToast } from "@/hooks/use-toast"
@@ -22,7 +23,8 @@ const deliveryOptions = [
     { value: "percentage_delivery_fee", label: "Percentual da taxa de entrega (%)" },
 ]
 
-export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; onBack: () => void }) {
+export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId: string; onBack: () => void; planGate?: { requiredPlanSlug: "crescer" | "escalar" } }) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const [loading, setLoading] = useState(true)
     const [savingAll, setSavingAll] = useState(false)
     const [savingId, setSavingId] = useState<string | null>(null)
@@ -102,6 +104,39 @@ export function CommissionsSubPage({ partnerId, onBack }: { partnerId: string; o
             return a.commissionRole === "seller" ? -1 : 1
         })
     }, [rows])
+
+    if (planGate) {
+        return (
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                            <div className="hidden md:flex items-start justify-between py-6">
+                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
+                                        <span className="truncate">Comissão</span>
+                                    </h1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                        <IconPlaceholder
+                            placeholderType="image"
+                            imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                            imageAlt="Recurso bloqueado"
+                            title="Comissão"
+                            subtitle="Defina regras de comissão para vendedores e entregadores. Disponível nos planos Crescer e Escalar."
+                            itemButton={{
+                                text: "Fazer upgrade",
+                                action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                            }}
+                        />
+                    </div>
+                </div>
+            </FadeIn>
+        )
+    }
 
     if (loading) return <FadeIn className="p-6">Carregando comissões...</FadeIn>
 

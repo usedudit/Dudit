@@ -14,10 +14,11 @@ interface ServiceMarketplaceTabProps {
     itemId: string
     video: any
     onVideoChange: (video: any) => void
+    videoPlanBlocked?: boolean
 }
 
 export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
-    serviceData, handleInputChange, isEditing, itemId, video, onVideoChange
+    serviceData, handleInputChange, isEditing, itemId, video, onVideoChange, videoPlanBlocked = false
 }) => {
     // --- Helper para simular evento nativo ---
     const manualChange = (name: string, value: any) => {
@@ -68,7 +69,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             disabled={!isEditing}
                         />
                     </div>
-                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
+                    <ProductVideoSection itemType="service" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
                 </div>
 
                 {/* --- FICHA TÉCNICA (ATRIBUTOS) --- */}

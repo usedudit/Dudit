@@ -14,7 +14,7 @@ export interface ComboboxOption {
 }
 
 interface ComboboxActionItem {
-    label: string
+    label: string | React.ReactNode
     icon?: React.ReactNode
     onClick: () => void
 }

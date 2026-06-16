@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Input, Checkbox } from "@/components/reusable"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, Combobox, Checkbox } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, SearchIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { type LabelPreset, type LabelContentConfig, DEFAULT_CONTENT_CONFIG, LABEL_PRESETS, buildCustomPreset } from "@/lib/labels/presets"
 import { LabelSheet, type LabelProduct } from "./LabelSheet"
 import { formatCurrency } from "@/lib/utils"
+import Pagination from "@/components/reusable/Pagination"
 
 interface ProductBase {
   id: string
@@ -38,6 +39,8 @@ const presetOptions = [
   { label: "Customizado — Definir medidas manualmente", value: "custom" },
 ]
 
+const SELECTED_PAGE_SIZE = 6
+
 export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModalProps) {
   const isMobile = useMediaQuery("(max-width: 1023px)")
 
@@ -46,8 +49,11 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
   const [activeTab, setActiveTab] = useState("Opções")
   const [presetId, setPresetId] = useState("pimaco-a4355")
   const [contentConfig, setContentConfig] = useState<LabelContentConfig>(DEFAULT_CONTENT_CONFIG)
-  const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<SelectedItem[]>([])
+  const [showProductPicker, setShowProductPicker] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState("")
+  const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set())
+  const [selectedPage, setSelectedPage] = useState(1)
   const [customPreset, setCustomPreset] = useState({
     labelWidth: 60,
     labelHeight: 40,
@@ -74,25 +80,46 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
     return () => clearTimeout(id)
   }, [isOpen])
 
-  const filteredProducts = useMemo(
+  const filteredPickerProducts = useMemo(
     () =>
       allProducts.filter(
         (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.sku?.toLowerCase().includes(search.toLowerCase()) ||
-          p.gtin?.toLowerCase().includes(search.toLowerCase()),
+          p.name.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+          p.sku?.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+          p.gtin?.toLowerCase().includes(pickerSearch.toLowerCase()),
       ),
-    [allProducts, search],
+    [allProducts, pickerSearch],
   )
 
-  const toggleProduct = (product: ProductBase) => {
-    setSelected((prev) => {
-      const exists = prev.find((s) => s.productId === product.id)
-      if (exists) {
-        return prev.filter((s) => s.productId !== product.id)
-      }
-      return [...prev, { productId: product.id, quantity: 1, product }]
+  const togglePickerProduct = (id: string) => {
+    setPickerSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
+  }
+
+  const confirmPickerSelection = () => {
+    setSelected((prev) => {
+      const existingIds = new Set(prev.map((s) => s.productId))
+      const newItems: SelectedItem[] = []
+      pickerSelected.forEach((id) => {
+        if (!existingIds.has(id)) {
+          const product = allProducts.find((p) => p.id === id)
+          if (product) newItems.push({ productId: id, quantity: 1, product })
+        }
+      })
+      return [...prev, ...newItems]
+    })
+    setShowProductPicker(false)
+    setPickerSearch("")
+    setPickerSelected(new Set())
+  }
+
+  const removeProduct = (productId: string) => {
+    setSelected((prev) => prev.filter((s) => s.productId !== productId))
+    setSelectedPage(1)
   }
 
   const updateQty = (productId: string, qty: number) => {
@@ -100,6 +127,12 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
       prev.map((s) => (s.productId === productId ? { ...s, quantity: Math.max(1, qty) } : s)),
     )
   }
+
+  const totalSelectedPages = Math.max(1, Math.ceil(selected.length / SELECTED_PAGE_SIZE))
+  const paginatedSelected = useMemo(
+    () => selected.slice((selectedPage - 1) * SELECTED_PAGE_SIZE, selectedPage * SELECTED_PAGE_SIZE),
+    [selected, selectedPage],
+  )
 
   const labelProducts: LabelProduct[] = useMemo(
     () =>
@@ -143,11 +176,6 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
     handlePrint()
   }, [handlePrint])
 
-  const toggleConfig = (key: keyof LabelContentConfig) => {
-    if (key === "installmentText") return
-    setContentConfig((prev) => ({ ...prev, [key]: !prev[key] }))
-  }
-
   if (!isVisible) return null
 
   return (
@@ -185,69 +213,93 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
               className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"}`}
             >
               <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-5">
-                {/* Search + product list */}
+                {/* Selected products */}
                 <div>
-                  <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">
-                    Produtos
-                  </p>
-                  <div className="relative mb-2">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por nome, SKU ou GTIN..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-full h-[40px] pl-9 pr-3 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 text-sm text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:border-brand-dark"
-                    />
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                      Produtos selecionados {selected.length > 0 && `(${selected.length})`}
+                    </p>
+                    <Button variant="outline" onClick={() => setShowProductPicker(true)}>
+                      + Adicionar
+                    </Button>
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-1 border border-brand-border dark:border-dark-border rounded-lg p-1">
-                    {filteredProducts.length === 0 ? (
-                      <p className="text-sm text-center py-3 text-brand-inactive-text">Nenhum produto</p>
-                    ) : (
-                      filteredProducts.map((p) => {
-                        const sel = selected.find((s) => s.productId === p.id)
-                        return (
-                          <div
-                            key={p.id}
-                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border/50 ${sel ? "bg-brand-green-secondary/10" : ""}`}
-                            onClick={() => toggleProduct(p)}
-                          >
-                            <Checkbox
-                              name={`sel-${p.id}`}
-                              checked={!!sel}
-                              onChange={() => toggleProduct(p)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate text-brand-dark dark:text-dark-heading">{p.name}</p>
-                              <p className="text-xs text-brand-inactive-text">SKU: {p.sku || "-"} | {formatCurrency(p.price)}</p>
-                            </div>
-                            {sel && (
-                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => updateQty(p.id, sel.quantity - 1)}
-                                  className="w-6 h-6 flex items-center justify-center rounded border border-brand-border text-sm font-medium hover:bg-brand-gray"
-                                >−</button>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={999}
-                                  value={sel.quantity}
-                                  onChange={(e) => updateQty(p.id, Number(e.target.value) || 1)}
-                                  className="w-12 text-center h-6 rounded border border-brand-border text-xs"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => updateQty(p.id, sel.quantity + 1)}
-                                  className="w-6 h-6 flex items-center justify-center rounded border border-brand-border text-sm font-medium hover:bg-brand-gray"
-                                >+</button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
+
+                  {selected.length === 0 ? (
+                    <div className="border border-dashed border-brand-border rounded-lg p-6 text-center">
+                      <p className="text-sm text-brand-inactive-text mb-3">Nenhum produto selecionado</p>
+                      <Button onClick={() => setShowProductPicker(true)}>Selecionar Produtos</Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-separate border-spacing-0">
+                          <thead>
+                            <tr className="text-xs text-brand-inactive-text">
+                              <th className="py-2 pr-2 font-medium">Produto</th>
+                              <th className="py-2 px-2 font-medium w-24">Preço</th>
+                              <th className="py-2 px-2 font-medium w-24">Qtd</th>
+                              <th className="py-2 pl-2 font-medium w-20">Ação</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedSelected.map((item) => (
+                              <tr key={item.productId} className="border-t border-brand-border/50">
+                                <td className="py-2 pr-2">
+                                  <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
+                                    {item.product.name}
+                                  </p>
+                                  <p className="text-xs text-brand-inactive-text">
+                                    SKU: {item.product.sku || "-"}
+                                  </p>
+                                </td>
+                                <td className="py-2 px-2 text-sm font-semibold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                                  {formatCurrency(item.product.price)}
+                                </td>
+                                <td className="py-2 px-2">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateQty(item.productId, item.quantity - 1)}
+                                      className="w-7 h-7 flex items-center justify-center rounded border border-brand-border text-sm font-medium hover:bg-brand-gray"
+                                    >−</button>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={999}
+                                      value={item.quantity}
+                                      onChange={(e) => updateQty(item.productId, Number(e.target.value) || 1)}
+                                      className="w-12 text-center h-7 rounded border border-brand-border text-xs"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateQty(item.productId, item.quantity + 1)}
+                                      className="w-7 h-7 flex items-center justify-center rounded border border-brand-border text-sm font-medium hover:bg-brand-gray"
+                                    >+</button>
+                                  </div>
+                                </td>
+                                <td className="py-2 pl-2">
+                                  <Button variant="outlinered" onClick={() => removeProduct(item.productId)}>
+                                    Remover
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {totalSelectedPages > 1 && (
+                        <div className="mt-3">
+                          <Pagination
+                            currentPage={selectedPage}
+                            totalPages={totalSelectedPages}
+                            onPageChange={setSelectedPage}
+                            inline
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {/* Preset */}
@@ -296,25 +348,13 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
                 <div>
                   <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Conteúdo da etiqueta</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    {[
-                      { key: "showName" as const, label: "Nome do produto" },
-                      { key: "showPrice" as const, label: "Preço" },
-                      { key: "showPromotionalPrice" as const, label: "Preço promocional" },
-                      { key: "showInstallment" as const, label: "Parcelamento" },
-                      { key: "showSku" as const, label: "SKU" },
-                      { key: "showInternalCode" as const, label: "Código interno" },
-                      { key: "showBarcode" as const, label: "Código de barras" },
-                    ].map((opt) => (
-                      <label key={opt.key} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input
-                          type="checkbox"
-                          checked={contentConfig[opt.key]}
-                          onChange={() => toggleConfig(opt.key)}
-                          className="w-4 h-4 rounded border-brand-border"
-                        />
-                        <span className="text-brand-dark dark:text-dark-heading">{opt.label}</span>
-                      </label>
-                    ))}
+                    <Checkbox name="showName" checked={contentConfig.showName} onChange={(c) => setContentConfig((prev) => ({ ...prev, showName: c }))} label="Nome do produto" />
+                    <Checkbox name="showPrice" checked={contentConfig.showPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPrice: c }))} label="Preço" />
+                    <Checkbox name="showPromotionalPrice" checked={contentConfig.showPromotionalPrice} onChange={(c) => setContentConfig((prev) => ({ ...prev, showPromotionalPrice: c }))} label="Preço promocional" />
+                    <Checkbox name="showInstallment" checked={contentConfig.showInstallment} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInstallment: c }))} label="Parcelamento" />
+                    <Checkbox name="showSku" checked={contentConfig.showSku} onChange={(c) => setContentConfig((prev) => ({ ...prev, showSku: c }))} label="SKU" />
+                    <Checkbox name="showInternalCode" checked={contentConfig.showInternalCode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showInternalCode: c }))} label="Código interno" />
+                    <Checkbox name="showBarcode" checked={contentConfig.showBarcode} onChange={(c) => setContentConfig((prev) => ({ ...prev, showBarcode: c }))} label="Código de barras" />
                   </div>
                   {contentConfig.showInstallment && (
                     <div className="mt-2">
@@ -356,36 +396,92 @@ export function LabelPrintModal({ isOpen, onClose, allProducts }: LabelPrintModa
             <div
               className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"}`}
             >
-              <TabsContent
-                value="Visualização"
-                className="m-0 p-0 h-full flex flex-col flex-1 min-h-0 focus-visible:outline-none"
-                forceMount
-              >
-                <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex flex-col items-center">
-                  {selected.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-brand-inactive-text text-sm">
-                      Selecione produtos para visualizar
-                    </div>
-                  ) : (
-                    <div
-                      className="shrink-0 bg-white shadow-md rounded-sm overflow-hidden"
-                      style={{
-                        transform: "scale(0.65)",
-                        transformOrigin: "top center",
-                        maxWidth: "100%",
-                      }}
-                    >
-                      <LabelSheet
-                        products={labelProducts}
-                        preset={preset}
-                        contentConfig={contentConfig}
-                      />
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
+              <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex flex-col items-center">
+                {selected.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-brand-inactive-text text-sm">
+                    Selecione produtos para visualizar
+                  </div>
+                ) : (
+                  <div
+                    className="shrink-0 bg-white shadow-md rounded-sm overflow-hidden"
+                    style={{
+                      transform: "scale(0.6)",
+                      transformOrigin: "top center",
+                    }}
+                  >
+                    <LabelSheet
+                      products={labelProducts}
+                      preset={preset}
+                      contentConfig={contentConfig}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </Tabs>
+
+          {/* Product Picker */}
+          {showProductPicker && (
+            <Portal>
+              <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40">
+                <div className="bg-white dark:bg-dark-background rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-brand-border dark:border-dark-border shrink-0">
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Selecionar Produtos</h3>
+                    <Button variant="filled" onClick={() => { setShowProductPicker(false); setPickerSearch(""); setPickerSelected(new Set()) }} className="w-8 h-8 p-0">
+                      <XIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="px-6 py-3 shrink-0">
+                    <div className="relative">
+                      <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-inactive-text" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome, SKU ou GTIN..."
+                        value={pickerSearch}
+                        onChange={(e) => setPickerSearch(e.target.value)}
+                        className="w-full h-10 pl-9 pr-3 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30 text-sm text-brand-dark dark:text-dark-heading placeholder:text-brand-inactive-text focus:outline-none focus:border-brand-dark"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-3">
+                    {filteredPickerProducts.length === 0 ? (
+                      <p className="text-sm text-center py-8 text-brand-inactive-text">Nenhum produto encontrado</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {filteredPickerProducts.map((p) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer"
+                            onClick={() => togglePickerProduct(p.id)}
+                          >
+                            <Checkbox name={`picker-${p.id}`} checked={pickerSelected.has(p.id)} onChange={() => togglePickerProduct(p.id)} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{p.name}</p>
+                              <p className="text-xs text-brand-inactive-text">SKU: {p.sku || "-"}</p>
+                            </div>
+                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading whitespace-nowrap">
+                              {formatCurrency(p.price)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-brand-border dark:border-dark-border shrink-0">
+                    <Button variant="outline" onClick={() => { setShowProductPicker(false); setPickerSearch(""); setPickerSelected(new Set()) }}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={confirmPickerSelection} disabled={pickerSelected.size === 0}>
+                      Adicionar ({pickerSelected.size})
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Portal>
+          )}
         </div>
       </div>
     </Portal>

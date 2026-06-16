@@ -188,6 +188,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessBusinessData = isOwnerAdminOrManager
   const canAccessResources = isOwnerOrAdmin
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+  const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+  const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+  const serviceCheckoutPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+  const deliveryPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
   React.useEffect(() => {
     if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
@@ -297,7 +301,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             {canAccessPayments && (
                               <ListItem
                                 icon={MoneyIcon}
-                                title="Formas de Pagamentos"
+                                title={paymentsPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Formas de Pagamentos
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Formas de Pagamentos"}
                                 description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
                                 onClick={() => setActivePage("payment-methods")}
                                 showChevron
@@ -315,7 +324,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             {canAccessCommissions && (
                               <ListItem
                                 icon={TagIcon}
-                                title="Comissão"
+                                title={commissionsPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Comissão
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Comissão"}
                                 description="Defina regras de comissão para vendedores e entregadores."
                                 onClick={() => setActivePage("comissao")}
                                 showChevron
@@ -374,7 +388,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             {canAccessServiceCheckout && (
                               <ListItem
                                 icon={WrenchIcon}
-                                title="Serviços — Checkout"
+                                title={serviceCheckoutPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Serviços — Checkout
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Serviços — Checkout"}
                                 description="Entrada (sinal) e opções de pagamento na vitrine."
                                 onClick={() => setActivePage("service-checkout")}
                                 showChevron
@@ -426,6 +445,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               partner={partner}
               paymentMethods={paymentMethods}
               onBack={() => setActivePage("home")}
+              planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
             />
           )}
 
@@ -438,17 +458,17 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             />
           )}
 
-          {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => setActivePage("home")} teamPlanBlocked={teamPlanBlocked} />}
           {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" onBack={() => setActivePage("home")} />}
           {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => setActivePage("home")} />}
-          {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "recibo" && <SimpleSettingsSubPage key="recibo" title="Recibo/Devolução" onBack={() => setActivePage("home")} />}
           {activePage === "vitrine" && <ShowcaseSubPage key="vitrine" partner={partner} onBack={() => setActivePage("home")} />}
           {activePage === "os" && <SimpleSettingsSubPage key="os" title="Configuração de O.S" onBack={() => setActivePage("home")} />}
           {activePage === "mensagens" && <SimpleSettingsSubPage key="mensagens" title="Modelos de Mensagens" onBack={() => setActivePage("home")} />}
-          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} />}
+          {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "service-checkout" && canAccessServiceCheckout && (
-            <ServiceCheckoutSettingsSubPage key="service-checkout" partnerId={partner.id} onBack={() => setActivePage("home")} />
+            <ServiceCheckoutSettingsSubPage key="service-checkout" partnerId={partner.id} onBack={() => setActivePage("home")} planGate={serviceCheckoutPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />
           )}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => setActivePage("home")} />}
         </AnimatePresence>

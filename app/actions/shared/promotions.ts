@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "zod"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { PromotionType, DiscountType, ApplyScope, PricingPromotion } from "@/lib/types/promotion"
@@ -101,6 +101,7 @@ export async function createCampaignAction(input: z.infer<typeof CampaignSchema>
   }
   const data = parsed.data
   await requireUser()
+  await requireMinimumPlan(data.partnerId, "escalar")
   await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
   const supabase = await getSupabaseServerClient()
 
@@ -144,6 +145,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
   }
   const data = parsed.data
   await requireUser()
+  await requireMinimumPlan(data.partnerId, "escalar")
   await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
   const supabase = await getSupabaseServerClient()
 
@@ -185,6 +187,7 @@ export async function updateCampaignAction(campaignId: string, input: z.infer<ty
 
 export async function deleteCampaignAction(partnerId: string, campaignId: string) {
   await requireUser()
+  await requireMinimumPlan(partnerId, "escalar")
   await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
   const supabase = await getSupabaseServerClient()
 

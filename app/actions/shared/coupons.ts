@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "zod"
-import { requireUser, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { revalidateCoupons } from "@/lib/utils/revalidation"
 import { validateCoupon, findBestAutomaticCoupon, validateCouponRow } from "@/lib/services/coupons"
@@ -67,6 +67,7 @@ export async function createCouponAction(input: z.infer<typeof CouponSchema>) {
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message || "Dados inválidos." }
     const data = parsed.data
     await requireUser()
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "coupons", "create")
     const supabase = await getSupabaseServerClient()
 
@@ -118,6 +119,7 @@ export async function updateCouponAction(couponId: string, input: z.infer<typeof
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message || "Dados inválidos." }
     const data = parsed.data
     await requireUser()
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "coupons", "edit")
     const supabase = await getSupabaseServerClient()
 
@@ -191,6 +193,7 @@ export async function toggleCouponStatusAction(partnerId: string, couponId: stri
 
 export async function deleteCouponAction(partnerId: string, couponId: string) {
     await requireUser()
+    await requireMinimumPlan(partnerId, "crescer")
     await requirePartnerAccessWithPermission(partnerId, "coupons", "delete")
     const supabase = await getSupabaseServerClient()
     const { error } = await supabase.from("coupons").delete().eq("id", couponId).eq("partner_id", partnerId)

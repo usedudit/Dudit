@@ -38,8 +38,8 @@ export default async function PromotionsRoute() {
 
   const isFreePlan = plan.slug.toLowerCase() === "free"
   const planGate = isFreePlan ? { 
-    requiredPlanSlug: "crescer" as const, 
-    message: "O acesso a campanhas e promoções requer o plano Crescer ou superior." 
+    requiredPlanSlug: "escalar" as const, 
+    message: "O acesso a campanhas e promoções requer o plano Escalar ou superior." 
   } : undefined
 
   return (

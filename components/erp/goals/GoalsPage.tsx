@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { AlertModal, Badge, IconPlaceholder, Pagination, Button, ThreeDotsLoader } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import GoalsPageControls from "./GoalsPageControls"
 import GoalGridCard from "./GoalGridCard"
 import GoalFormPage from "./GoalFormPage"
@@ -67,10 +68,14 @@ export default function GoalsPage(props: {
   sellers: Array<{ id: string; name: string }>
   initialRanking: RankingRow[]
   initialSummary: Summary
+  planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { openPlanUpgrade } = usePlanUpgrade()
+
+  const planGate = props.planGate
 
   // URL CRUD parameters
   const isCreate = searchParams.get("create") === "true"
@@ -319,6 +324,26 @@ export default function GoalsPage(props: {
         accounts={formAccounts || []}
         initialGoal={editingGoal}
       />
+    )
+  }
+
+  if (planGate) {
+    return (
+      <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+            imageAlt="Recurso bloqueado"
+            title="Metas de Vendas"
+            subtitle="Crie metas de vendas para sua equipe e acompanhe o desempenho com rankings e bônus. Disponível nos planos Crescer e Escalar."
+            itemButton={{
+              text: "Fazer upgrade",
+              action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+            }}
+          />
+        </div>
+      </FadeIn>
     )
   }
 

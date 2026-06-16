@@ -22,7 +22,7 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
 
 // ─── Integration Card (same style as IntegrationsPage.tsx) ───────────────────
@@ -341,6 +341,11 @@ export const IntegrationsSubPage = ({
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight">Mercado Pago</span>
                                                 {mpConnected ? (
                                                     <Badge variant="green">Conectado</Badge>
+                                                ) : !hasMinimumPlan(planSlug, "crescer") ? (
+                                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("crescer")}>
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Crescer</span>
+                                                    </div>
                                                 ) : (
                                                     <Badge variant="gray">Desconectado</Badge>
                                                 )}
@@ -454,6 +459,11 @@ export const IntegrationsSubPage = ({
                                                 </span>
                                                 {waConnection?.hasToken && waConnection?.status === "connected" ? (
                                                     <Badge variant="green">Conectado</Badge>
+                                                ) : !hasMinimumPlan(planSlug, "escalar") ? (
+                                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("escalar")}>
+                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Escalar</span>
+                                                    </div>
                                                 ) : (
                                                     <Badge variant="gray">Desconectado</Badge>
                                                 )}

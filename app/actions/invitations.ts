@@ -2,7 +2,7 @@
 
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requirePartnerAccess, requirePartnerAccessWithPermission, requireUser, getCurrentUser } from "@/lib/auth/authorization"
+import { requirePartnerAccess, requirePartnerAccessWithPermission, requireMinimumPlan, requireUser, getCurrentUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { auditLog } from "@/lib/security/audit-logger"
@@ -63,6 +63,7 @@ export async function createInvitation(input: {
     try {
         await requireRateLimit(RateLimitCategory.INVITE_CREATE)
         const user = await requireUser()
+        await requireMinimumPlan(input.partnerId, "crescer")
         const admin = createAdminClient()
 
         // Canonical guard: must be able to manage team/settings to invite.

@@ -2,7 +2,7 @@
 
 import { revalidateTag, unstable_cache } from "next/cache"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission, requireUser } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireMinimumPlan, requireUser } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 type GoalInput = {
@@ -135,6 +135,7 @@ export async function getSalesGoalsModuleAction(partnerId: string): Promise<{ su
 
 export async function upsertSalesGoalAction(input: GoalInput) {
   await requireUser()
+  await requireMinimumPlan(input.partnerId, "crescer")
   await requirePartnerAccessWithPermission(input.partnerId, "goals", input.id ? "edit" : "create")
   const supabase = await getSupabaseServerClient()
 
@@ -174,6 +175,7 @@ export async function upsertSalesGoalAction(input: GoalInput) {
 
 export async function deleteSalesGoalAction(partnerId: string, goalId: string) {
   await requireUser()
+  await requireMinimumPlan(partnerId, "crescer")
   await requirePartnerAccessWithPermission(partnerId, "goals", "delete")
   const supabase = await getSupabaseServerClient()
   const { error } = await supabase.from("sales_goals").delete().eq("partner_id", partnerId).eq("id", goalId)

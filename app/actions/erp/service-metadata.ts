@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { requirePartnerAccessWithPermission, requireMinimumPlan } from "@/lib/auth/authorization"
 import { createAdminClient } from "@/lib/supabase/server"
 
 interface ServiceMetadataResponse {
@@ -39,6 +39,7 @@ export async function getServiceMetadataAction(partnerId: string) {
  */
 export async function createServiceCategoryAction(data: { partnerId: string, name: string, parentId?: string | null }) {
   try {
+    await requireMinimumPlan(data.partnerId, "crescer")
     await requirePartnerAccessWithPermission(data.partnerId, "services", "edit")
     const supabase = await getSupabaseServerClient()
 

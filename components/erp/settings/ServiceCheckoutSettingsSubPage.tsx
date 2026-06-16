@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Button, FormDropdown, FormSection, InfoCard } from "@/components/reusable"
+import { Button, FormDropdown, FormSection, IconPlaceholder } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -29,9 +29,11 @@ const SidebarCard = ({ children, className = "", hasTopStrip = false }: { childr
 export function ServiceCheckoutSettingsSubPage({
   partnerId,
   onBack,
+  planGate,
 }: {
   partnerId: string
   onBack: () => void
+  planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }) {
   const { openPlanUpgrade } = usePlanUpgrade()
   const { success: notifySuccess, error: notifyError } = useNotification()
@@ -99,6 +101,37 @@ export function ServiceCheckoutSettingsSubPage({
     }
   }
 
+  if (planGate) {
+    return (
+      <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+          <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+            <div className="hidden md:flex items-start justify-between py-6">
+              <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
+                  <span className="truncate">Serviços — Checkout</span>
+                </h1>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+            imageAlt="Recurso bloqueado"
+            title="Serviços — Checkout"
+            subtitle="Gerencie a cobrança de entrada (sinal) no checkout de agendamentos. Disponível nos planos Crescer e Escalar."
+            itemButton={{
+              text: "Fazer upgrade",
+              action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+            }}
+          />
+        </div>
+      </FadeIn>
+    )
+  }
+
   if (loading) {
     return <FadeIn className="p-6">Carregando configurações de serviços...</FadeIn>
   }
@@ -147,25 +180,19 @@ export function ServiceCheckoutSettingsSubPage({
         {/* Content Body */}
         <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
           {!depositFeatureAllowed && (
-            <InfoCard
-              color="orange"
-              title="Recurso do plano Crescer ou Escalar"
-              message={
-                <div className="flex flex-col gap-2">
-                  <span>Atualize seu plano para permitir pagamento de entrada em agendamentos.</span>
-                  <div>
-                    <Button
-                      size="sm"
-                      onClick={() => openPlanUpgrade("crescer")}
-                      className="mt-1"
-                    >
-                      Ver planos
-                    </Button>
-                  </div>
-                </div>
-              }
-              className="mb-6"
-            />
+            <div className="flex flex-col items-center justify-center text-center min-h-[300px]">
+              <IconPlaceholder
+                placeholderType="image"
+                imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                imageAlt="Recurso bloqueado"
+                title="Entrada (sinal)"
+                subtitle="Disponível nos planos Crescer e Escalar. Faça upgrade para permitir pagamento de entrada em agendamentos."
+                itemButton={{
+                  text: "Fazer upgrade",
+                  action: () => openPlanUpgrade("crescer")
+                }}
+              />
+            </div>
           )}
 
           <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">

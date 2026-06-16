@@ -453,6 +453,7 @@ interface ProductCarouselProps {
     products: any[]
     seeMoreLink?: string
     userCoords?: { lat: number; lng: number } | null
+    isVitrineSection?: boolean
 }
 
 export const ProductCarousel: React.FC<ProductCarouselProps> = ({
@@ -460,8 +461,75 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
     subtitle,
     products,
     seeMoreLink = "#",
-    userCoords
+    userCoords,
+    isVitrineSection
 }) => {
+    if (isVitrineSection) {
+        return (
+            <section className="mx-auto mb-12 md:mb-16 max-w-[1400px] overflow-hidden">
+                <div className="flex items-end justify-between px-4 lg:px-0">
+                    <div>
+                        <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-6">{title}</h2>
+                        {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}
+                    </div>
+                    <Link
+                        href={seeMoreLink}
+                        prefetch={true}
+                        className="hidden md:flex font-bold text-brand-green hover:underline text-sm mb-1 items-center gap-1"
+                    >
+                        Exibir mais <ChevronRightIcon size={16} />
+                    </Link>
+                </div>
+
+                <div className="flex overflow-x-auto gap-4 md:gap-6 px-4 lg:px-0 scrollbar-hide pb-4 snap-x snap-mandatory">
+                    {products.map((store: any) => {
+                        const storeSlug = store.slug || store.store_name?.toLowerCase().replace(/\s+/g, "-") || store.id
+                        const storeUrl = `/${store.partnerId ? store.id : ""}/v/${store.id}`
+                        const partnerForUrl = { id: store.id, slug: store.slug, store_name: store.store_name }
+                        const partnerUrl = getPartnerUrl(partnerForUrl)
+                        const storeImage = store.store_avatar || store.store_image_url
+                        const imgUrl = storeImage
+                            ? (storeImage.includes("Placeholder.png") || storeImage.includes("dudit.com.br/static")
+                                ? getR2ImageUrl(storeImage)
+                                : storeImage)
+                            : "https://img.dudit.com.br/static/Placeholder.png"
+
+                        return (
+                            <Link
+                                key={store.id}
+                                href={partnerUrl}
+                                prefetch={false}
+                                className="w-[180px] md:w-[220px] shrink-0 snap-start block hover:no-underline"
+                            >
+                                <div className="flex flex-col items-center gap-3 p-4 rounded-[16px] border border-gray-100 bg-white hover:shadow-md transition-all h-full">
+                                    <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-gray-100 bg-brand-gray shrink-0">
+                                        <img
+                                            src={imgUrl}
+                                            alt={store.store_name || "Loja"}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                    <div className="text-center min-w-0 w-full">
+                                        <p className="text-sm md:text-[15px] font-semibold text-brand-dark truncate">
+                                            {store.store_name || "Loja"}
+                                        </p>
+                                        {(store.rating ?? 0) > 0 && (
+                                            <div className="flex items-center justify-center gap-1 mt-1">
+                                                <StarIcon size={12} className="text-brand-green fill-brand-green" />
+                                                <span className="text-xs font-bold text-brand-dark">{store.rating}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Link>
+                        )
+                    })}
+                </div>
+            </section>
+        )
+    }
+
     return (
         <section className="mx-auto mb-12 md:mb-16 max-w-[1400px] overflow-hidden">
             <div className="flex items-end justify-between px-4 lg:px-0">

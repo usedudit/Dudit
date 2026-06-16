@@ -13,6 +13,8 @@ import { createServiceCategoryAction, getServiceMetadataAction } from "@/app/act
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useNotification } from "@/hooks/use-notification"
 import { usePermissions } from "@/lib/permission-context"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -81,7 +83,10 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { selectedStore } = useStore()
     const { setHeaderOverride } = useSidebar()
-    const { businessInfo: contextBusinessInfo } = usePermissions()
+    const { businessInfo: contextBusinessInfo, planSlug } = usePermissions()
+    const { openPlanUpgrade } = usePlanUpgrade()
+    const metadataPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
+    const videoPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = isQuickMode(businessInfo)
 
@@ -537,6 +542,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             isQuickMode={isQuick}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
+                                            metadataPlanBlocked={metadataPlanBlocked}
                                         />
                                     </FadeIn>
                                 )}
@@ -570,6 +576,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                 video_provider_id: serviceData.video_provider_id || null,
                                             }}
                                             onVideoChange={(video) => setServiceData((prev: any) => ({ ...prev, ...video }))}
+                                            videoPlanBlocked={videoPlanBlocked}
                                         />
                                     </FadeIn>
                                 )}

@@ -59,7 +59,7 @@ function getAllowedInviteRoles(inviterRole: PartnerRole): PartnerRole[] {
     })
 }
 
-export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: () => void }) => {
+export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { partnerId: string; onBack: () => void; teamPlanBlocked?: boolean }) => {
     const [showInviteModal, setShowInviteModal] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -252,9 +252,11 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowInviteModal(true)}>
-                                            Convidar membro
-                                        </Button>
+                                        {!teamPlanBlocked && (
+                                            <Button leftIcon={<PlusIcon size={18} />} onClick={() => setShowInviteModal(true)}>
+                                                Convidar membro
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -292,7 +294,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                         imageAlt="Sem membros"
                                                         title="Nenhum membro encontrado"
                                                         subtitle="Você ainda não convidou ninguém para sua equipe."
-                                                        itemButton={{
+                                                        itemButton={teamPlanBlocked ? undefined : {
                                                             text: "Convidar primeiro membro",
                                                             action: () => setShowInviteModal(true)
                                                         }}
@@ -437,7 +439,7 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                                                         imageAlt="Sem convites"
                                                         title="Nenhum convite pendente"
                                                         subtitle="Todos os convites enviados já foram aceitos ou expiraram."
-                                                        itemButton={{
+                                                        itemButton={teamPlanBlocked ? undefined : {
                                                             text: "Enviar novo convite",
                                                             action: () => setShowInviteModal(true)
                                                         }}
@@ -539,14 +541,16 @@ export const TeamSubPage = ({ partnerId, onBack }: { partnerId: string; onBack: 
                     </div>
 
                     {/* Mobile Bottom Action Bar */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                        <Button
-                            onClick={() => setShowInviteModal(true)}
-                            className="flex-1 h-12"
-                        >
-                            Convidar membro
-                        </Button>
-                    </div>
+                    {!teamPlanBlocked && (
+                        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:dark-border px-4 py-3 flex gap-3">
+                            <Button
+                                onClick={() => setShowInviteModal(true)}
+                                className="flex-1 h-12"
+                            >
+                                Convidar membro
+                            </Button>
+                        </div>
+                    )}
 
                     <DefaultModal
                         isOpen={showInviteModal}

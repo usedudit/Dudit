@@ -10,6 +10,7 @@ import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { RichTextEditor } from "@/components/reusable"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 const FormCombobox = ({
     label,
@@ -26,7 +27,7 @@ const FormCombobox = ({
     options: { label: string, value: string }[],
     disabled?: boolean,
     width?: string,
-    actionItem?: { label: string, icon?: React.ReactNode, onClick: () => void }
+    actionItem?: { label: string | React.ReactNode, icon?: React.ReactNode, onClick: () => void }
 }) => (
     <div className={`flex flex-col gap-1.5 ${width}`}>
         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -66,6 +67,7 @@ interface ProductGeneralTabProps {
     locations: { label: string, value: string }[]
     unidadesMedida: Array<{ codigo: string; descricao: string }>
     openAddItemModal: (type: any) => void
+    metadataPlanBlocked?: boolean
     isEditing: boolean
     images: (string | File)[]
     onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -83,8 +85,9 @@ interface ProductGeneralTabProps {
 
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode
 }) => {
+    const { openPlanUpgrade } = usePlanUpgrade()
 
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
     const { salesPrice, profit, margin } = useMemo(() => {
@@ -278,15 +281,24 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
 
-                            <FormCombobox
-                                label="Localização"
-                                options={locations}
-                                value={productData.location_id}
-                                onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
-                                disabled={!isEditing}
-                                width="w-full"
-                                actionItem={{ label: "Criar novo local", icon: <PlusIcon size={18} />, onClick: () => openAddItemModal("location") }}
-                            />
+                                <FormCombobox
+                                    label="Localização"
+                                    options={locations}
+                                    value={productData.location_id}
+                                    onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Novo local
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar novo local",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon size={18} />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("location")
+                                    }}
+                                />
                         </div>
 
                         <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
@@ -413,7 +425,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
                                     disabled={!isEditing}
                                     width="w-full"
-                                    actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Nova categoria
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar nova categoria",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                    }}
                                 />
 
                                 <FormCombobox
@@ -423,7 +444,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
                                     disabled={!isEditing}
                                     width="w-full"
-                                    actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Nova subcategoria
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar nova subcategoria",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                    }}
                                 />
 
                                 <FormCombobox
@@ -433,7 +463,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
                                     disabled={!isEditing}
                                     width="w-full"
-                                    actionItem={{ label: "Criar nova marca", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("brand") }}
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Nova marca
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar nova marca",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
+                                    }}
                                 />
 
                                 <FormCombobox

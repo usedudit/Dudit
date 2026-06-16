@@ -47,11 +47,13 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(hasChanges)
 
     const groupedResources = React.useMemo(() => {
-        return SYSTEM_RESOURCES.reduce((acc, resource) => {
-            if (!acc[resource.module]) acc[resource.module] = []
-            acc[resource.module].push(resource)
-            return acc
-        }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
+        return SYSTEM_RESOURCES
+            .filter((r) => r.id !== "team")
+            .reduce((acc, resource) => {
+                if (!acc[resource.module]) acc[resource.module] = []
+                acc[resource.module].push(resource)
+                return acc
+            }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
     }, [])
 
     const toggleResource = (resourceId: SystemResourceId, checked: boolean) => {
@@ -130,6 +132,26 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                             <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
                                 Recursos ativados aparecem no menu. Recursos desativados somem para deixar a operação mais limpa.
                             </p>
+                        </div>
+
+                        {/* Always-on resources */}
+                        <div className="mb-8 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray/50 dark:bg-dark-surface p-4">
+                            <div className="divide-y divide-brand-border dark:divide-dark-border">
+                                <div className="flex items-center justify-between gap-4 py-3 px-0">
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-brand-dark dark:text-dark-heading">Início</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">Página inicial do sistema.</p>
+                                    </div>
+                                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body shrink-0">Sempre ativo</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4 py-3 px-0">
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-brand-dark dark:text-dark-heading">Dashboard</p>
+                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">Gráficos, métricas e relatórios rápidos.</p>
+                                    </div>
+                                    <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body shrink-0">Sempre ativo</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="space-y-10">

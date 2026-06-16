@@ -2,6 +2,8 @@ import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { TransactionsPage } from "@/components/erp/transactions"
 import { checkPartnerPermission } from "@/lib/auth/authorization"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
@@ -22,7 +24,21 @@ export default async function FinancialTransactionsRoute() {
 
   const partnerId = context.partnerId
   const { allowed } = await checkPartnerPermission(partnerId, "financial", "view")
+
+  const [plan] = await Promise.all([
+    getPartnerPlan(partnerId),
+  ])
+
   if (!allowed) return <AccessDenied />
+  if (plan.slug.toLowerCase() === "free") {
+    return (
+      <PlanGatePage
+        title="Movimentações Financeiras"
+        subtitle="Acompanhe todas as movimentações financeiras do seu negócio. Disponível nos planos Crescer e Escalar."
+        requiredPlan="crescer"
+      />
+    )
+  }
 
   const [txResult, categoriesResult, accountsResult, recurringResult, recurringTemplatesResult, paymentMethodsResult] = await Promise.all([
     getTransactionsData(partnerId),

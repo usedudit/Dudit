@@ -8,6 +8,7 @@ import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
 import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon } from "@/lib/icons"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { RichTextEditor } from "@/components/reusable"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
@@ -19,7 +20,7 @@ const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
 }: {
     label: string, value: any, onChange: (val: string) => void, options: { label: string, value: string }[],
-    disabled?: boolean, width?: string, actionItem?: { label: string, icon?: React.ReactNode, onClick: () => void }
+    disabled?: boolean, width?: string, actionItem?: { label: string | React.ReactNode, icon?: React.ReactNode, onClick: () => void }
 }) => (
     <div className={`flex flex-col gap-1.5 ${width}`}>
         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -43,6 +44,7 @@ interface ServiceGeneralTabProps {
     categories: { label: string, value: string }[]
     subCategories: { label: string, value: string }[]
     openAddItemModal: (type: any) => void
+    metadataPlanBlocked?: boolean
     isEditing: boolean
     images: (string | File)[]
     onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -58,8 +60,9 @@ interface ServiceGeneralTabProps {
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false
 }) => {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
 
     const manualChange = (name: string, value: any) => {
@@ -351,7 +354,16 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
                                     disabled={!isEditing}
                                     width="w-full"
-                                    actionItem={{ label: "Criar nova categoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("category") }}
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Nova categoria
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar nova categoria",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                    }}
                                 />
 
                                 <FormCombobox
@@ -361,7 +373,16 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
                                     disabled={!isEditing}
                                     width="w-full"
-                                    actionItem={{ label: "Criar nova subcategoria", icon: <PlusIcon className="w-4 h-4" />, onClick: () => openAddItemModal("subcategory") }}
+                                    actionItem={{
+                                        label: metadataPlanBlocked ? (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Nova subcategoria
+                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                            </span>
+                                        ) : "Criar nova subcategoria",
+                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                    }}
                                 />
                             </>
                         )}

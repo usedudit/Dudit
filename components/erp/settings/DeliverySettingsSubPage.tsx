@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, InfoCard, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, TrashIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -45,7 +45,7 @@ function checkOverlap(start1: string, end1: string, start2: string, end2: string
     return false;
 }
 
-export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: string; onBack: () => void }) {
+export function DeliverySettingsSubPage({ partnerId, onBack, planGate }: { partnerId: string; onBack: () => void; planGate?: { requiredPlanSlug: "crescer" | "escalar" } }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [loading, setLoading] = useState(true)
@@ -112,6 +112,37 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
         () => isCrescer ? "Desbloqueie cálculo por distância e horários com o plano Escalar" : null,
         [isCrescer]
     )
+
+    if (planGate) {
+        return (
+            <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+                        <div className="hidden md:flex items-start justify-between py-6">
+                            <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
+                                    <span className="truncate">Configurações de Entrega</span>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                    <IconPlaceholder
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                        imageAlt="Recurso bloqueado"
+                        title="Configurações de Entrega"
+                        subtitle="Gerencie taxas e regras de entrega. Disponível nos planos Crescer e Escalar."
+                        itemButton={{
+                            text: "Fazer upgrade",
+                            action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                        }}
+                    />
+                </div>
+            </FadeIn>
+        )
+    }
 
     if (loading) return <FadeIn className="p-6">Carregando configurações de entrega...</FadeIn>
 
@@ -191,9 +222,6 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
 
                 {/* Content Body */}
                 <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
-                    {isFree && <InfoCard color="yellow" title="Plano Começar" message="O recurso de entrega está indisponível neste plano." className="mb-6" />}
-                    {upgradeHint && <InfoCard color="blue" title="Disponível no plano Escalar" message={`${upgradeHint} - Faça upgrade em Assinatura.`} className="mb-6" />}
-
                     <div className="grid grid-cols-12 gap-y-8 lg:gap-y-0 relative">
                         {/* Main Content */}
                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
@@ -245,8 +273,9 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                     <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
                                     <Accordion
                                         title={
-                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6">
+                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 inline-flex items-center gap-2">
                                                 Distância e Entrega
+                                                {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
                                             </span>
                                         }
                                         defaultOpen={true}
@@ -442,10 +471,12 @@ export function DeliverySettingsSubPage({ partnerId, onBack }: { partnerId: stri
                                                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Cliente pode pagar ao retirar o pedido</span>
                                                     </div>
                                                     <Switch
-                                                        checked={settings.pickupPaymentPolicy === "allow_pickup_payment"}
+                                                        checked={isFree ? true : settings.pickupPaymentPolicy === "allow_pickup_payment"}
                                                         onCheckedChange={(checked) => {
+                                                            if (isFree) return
                                                             setSettings(s => ({ ...s, pickupPaymentPolicy: checked ? "allow_pickup_payment" : "require_online_payment" }))
                                                         }}
+                                                        className={isFree ? "opacity-50 pointer-events-none" : ""}
                                                     />
                                                 </div>
                                             </div>

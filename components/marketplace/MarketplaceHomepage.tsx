@@ -557,16 +557,32 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow">
                 <HeroBanner />
 
-                {sections.map((section) => (
-                    <ProductCarousel
-                        key={section.id}
-                        title={section.title}
-                        subtitle={section.subtitle}
-                        products={section.items}
-                        seeMoreLink={section.seeMoreLink}
-                        userCoords={userCoords}
-                    />
-                ))}
+                {sections.map((section) => {
+                    if (section.id === "topVitrines") {
+                        return (
+                            <section key={section.id} className="mx-auto max-w-[1400px] px-4 lg:px-0 mb-10">
+                                <ProductCarousel
+                                    title={section.title}
+                                    subtitle={section.subtitle}
+                                    products={section.items}
+                                    seeMoreLink={section.seeMoreLink}
+                                    userCoords={userCoords}
+                                    isVitrineSection={true}
+                                />
+                            </section>
+                        )
+                    }
+                    return (
+                        <ProductCarousel
+                            key={section.id}
+                            title={section.title}
+                            subtitle={section.subtitle}
+                            products={section.items}
+                            seeMoreLink={section.seeMoreLink}
+                            userCoords={userCoords}
+                        />
+                    )
+                })}
 
                 {homeAds.length > 0 && (
                     <SponsoredAdsCarousel ads={homeAds} slot="home" title="Patrocinados na sua região" />

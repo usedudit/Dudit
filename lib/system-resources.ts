@@ -14,6 +14,8 @@ export type SystemResourceId =
   | "reports"
   | "marketing"
   | "showcase"
+  | "goals"
+  | "returns"
 
 export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
@@ -38,13 +40,25 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "orders",
     label: "Pedidos",
-    description: "Pedidos e vendas do dia a dia.",
+    description: "Pedidos, vendas, metas e devoluções do dia a dia.",
     module: "sales",
   },
   {
     id: "quotes",
     label: "Orçamentos",
     description: "Criação e acompanhamento de propostas.",
+    module: "sales",
+  },
+  {
+    id: "goals",
+    label: "Metas",
+    description: "Metas de vendas e acompanhamento de resultados.",
+    module: "sales",
+  },
+  {
+    id: "returns",
+    label: "Devoluções",
+    description: "Devoluções de pedidos e estorno de valores.",
     module: "sales",
   },
   {
@@ -56,7 +70,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "products",
     label: "Produtos",
-    description: "Catálogo, estoque e cadastros de produtos.",
+    description: "Catálogo, movimentação de estoque, fornecedores e cadastros de produtos.",
     module: "catalog",
   },
   {
@@ -68,7 +82,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "services",
     label: "Serviços",
-    description: "Catálogo e cadastros de serviços.",
+    description: "Catálogo, cadastros e ordens de serviço.",
     module: "services",
   },
   {
@@ -80,21 +94,14 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "deliveries",
     label: "Entregas",
-    description: "Expedição, rotas e entregadores.",
+    description: "Expedição, rotas, entregadores e dashboard de entregas.",
     module: "operations",
     minimumPlan: "crescer",
   },
   {
     id: "financial",
     label: "Financeiro",
-    description: "Resumo financeiro, contas, caixa e movimentações.",
-    module: "management",
-    minimumPlan: "crescer",
-  },
-  {
-    id: "team",
-    label: "Equipe",
-    description: "Convites, usuários e acessos da equipe.",
+    description: "Resumo financeiro, contas a pagar/receber, caixa e cadastros financeiros.",
     module: "management",
     minimumPlan: "crescer",
   },
@@ -103,6 +110,13 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     label: "Clientes",
     description: "Cadastro e gestão de clientes do negócio.",
     module: "management",
+  },
+  {
+    id: "team",
+    label: "Equipe",
+    description: "Convites, usuários e acessos da equipe.",
+    module: "management",
+    minimumPlan: "crescer",
   },
   {
     id: "reports",
@@ -114,7 +128,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "marketing",
     label: "Marketing",
-    description: "Campanhas, cupons de desconto e assinaturas/planos recorrentes.",
+    description: "Cupons de desconto, campanhas e promoções, planos recorrentes e assinaturas.",
     module: "marketing",
   },
 ]
@@ -128,6 +142,8 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
       "products",
       "services",
       "quotes",
+      "goals",
+      "returns",
       "pos",
       "deliveries",
       "financial",
@@ -149,6 +165,8 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
   const defaults: SystemResourceId[] = [
     "orders",
     "quotes",
+    "goals",
+    "returns",
     "pos",
     "deliveries",
     "financial",
@@ -175,8 +193,16 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
     // Automatically migrate older schemas to include new resources
     const version = (businessInfo as any).resourcesVersion || 0
     if (version < 2) {
-      const newResources: SystemResourceId[] = ["customers", "reports", "marketing", "showcase"]
-      for (const r of newResources) {
+      const v2Resources: SystemResourceId[] = ["customers", "reports", "marketing", "showcase"]
+      for (const r of v2Resources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
+    if (version < 3) {
+      const v3Resources: SystemResourceId[] = ["goals", "returns"]
+      for (const r of v3Resources) {
         if (!current.includes(r)) {
           current.push(r)
         }

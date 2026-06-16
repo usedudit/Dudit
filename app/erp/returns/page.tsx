@@ -2,6 +2,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import ReturnsPage from "@/components/erp/returns/ReturnsPage"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 
@@ -18,6 +19,10 @@ export default async function ReturnsPageServer() {
     return <AccessDenied />
   }
 
+  const plan = await getPartnerPlan(partnerId)
+  const isFreePlan = plan.slug.toLowerCase() === "free"
+  const planGate = isFreePlan ? { requiredPlanSlug: "crescer" as const } : undefined
+
   return (
     <>
       <ERPPageHeader title="Trocas e Devoluções" />
@@ -25,6 +30,7 @@ export default async function ReturnsPageServer() {
         <ReturnsPage
           partnerId={partnerId}
           roleId={roleId}
+          planGate={planGate}
         />
       </FadeIn>
     </>

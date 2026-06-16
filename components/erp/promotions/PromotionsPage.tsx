@@ -64,6 +64,7 @@ import {
   CheckCircleIcon
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 
 const Div = (props: any) => React.createElement("div", props)
 const P = (props: any) => React.createElement("p", props)
@@ -149,6 +150,7 @@ export default function PromotionsPage({
   planGate?: any
 }) {
   const { toast } = useToast()
+  const { openPlanUpgrade } = usePlanUpgrade()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
   const [activeTab, setActiveTab] = useState<"list" | "simulator">("list")
@@ -550,17 +552,23 @@ export default function PromotionsPage({
               </div>
 
               {planGate && (
-                <div className="mx-4 md:mx-8 mb-4">
-                  <Div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-900/30 dark:bg-yellow-900/10 dark:text-yellow-200 flex items-start gap-3">
-                    <InfoIcon className="h-5 w-5 shrink-0 mt-0.5" />
-                    <Div>
-                      <P className="font-bold">Aviso de Limitação de Plano</P>
-                      <P>{planGate.message}</P>
-                    </Div>
-                  </Div>
+                <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                  <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Estoque.png"
+                    imageAlt="Recurso bloqueado"
+                    title="Campanhas e Promoções"
+                    subtitle="Crie campanhas de marketing e promoções para aumentar suas vendas. Disponível nos planos Crescer e Escalar."
+                    itemButton={{
+                      text: "Fazer upgrade",
+                      action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                    }}
+                  />
                 </div>
               )}
 
+              {!planGate && (
+              <>
               {/* Tabs */}
               <div className="mb-6 px-4 md:px-8 flex-none">
                 <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)}>
@@ -1062,6 +1070,8 @@ export default function PromotionsPage({
                     </Div>
                   </Div>
                 </div>
+              )}
+              </>
               )}
             </div>
           </FadeIn>

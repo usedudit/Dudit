@@ -17,6 +17,7 @@ interface ProductMarketplaceTabProps {
     itemId: string
     video: any
     onVideoChange: (video: any) => void
+    videoPlanBlocked?: boolean
 }
 
 export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
@@ -26,6 +27,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     itemId,
     video,
     onVideoChange,
+    videoPlanBlocked = false,
 }) => {
     // --- Estados da Categoria Oficial ---
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -98,7 +100,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         />
                     </div>
 
-                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} />
+                    <ProductVideoSection itemType="product" itemId={itemId} video={video} onChange={onVideoChange} isEditing={isEditing} videoPlanBlocked={videoPlanBlocked} />
                 </FormSection>
 
                 {/*
