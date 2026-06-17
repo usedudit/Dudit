@@ -26,6 +26,8 @@ interface ImportPreview {
     valor_total: number
   }
   items: ImportItemPreview[]
+  errors?: any[] | null
+  created_at?: string
 }
 
 interface ImportItemPreview {
@@ -575,8 +577,21 @@ export async function confirmImportAction(
       return { success: false, error: `Erro ao processar importação: ${rpcErr.message}` }
     }
 
+    if (!result.success) {
+      const errorMessages = result.errors?.length > 0
+        ? result.errors.map((e: any) => e.error).filter(Boolean).join("; ")
+        : "Erro desconhecido na importação"
+      return {
+        success: false,
+        error: errorMessages,
+        imported: result.imported || 0,
+        skipped: result.skipped || 0,
+        errors: result.errors?.length > 0 ? result.errors.map((e: any) => e.error) : undefined,
+      }
+    }
+
     return {
-      success: result.success,
+      success: true,
       imported: result.imported || 0,
       skipped: result.skipped || 0,
       errors: result.errors?.length > 0 ? result.errors.map((e: any) => e.error) : undefined,
@@ -616,7 +631,7 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
       return { success: false, error: "Erro ao carregar itens" }
     }
 
-    const preview: ImportPreview = {
+    const preview: ImportPreview & { errors?: any[]; created_at?: string } = {
       xml_import_id: xmlImport.id,
       status: xmlImport.status,
       supplier: {
@@ -652,6 +667,8 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
         match_confidence: item.match_confidence,
         conflicts: item.conflicts,
       })),
+      errors: xmlImport.errors,
+      created_at: xmlImport.created_at,
     }
 
     return { success: true, preview }
