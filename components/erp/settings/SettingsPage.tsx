@@ -400,10 +400,15 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
-                            {canAccessDelivery && isDeliveriesResourceActive && (
+                            {canAccessDelivery && (
                               <ListItem
                                 icon={PackageReceiveIcon}
-                                title="Logística e Entrega"
+                                title={deliveryPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Logística e Entrega
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Logística e Entrega"}
                                 description="Configure taxas de entrega, raios de atendimento e horários."
                                 onClick={() => setActivePage("delivery")}
                                 showChevron
@@ -444,7 +449,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               key="payment-methods"
               partner={partner}
               paymentMethods={paymentMethods}
-              onBack={() => setActivePage("home")}
+              handleBack={() => setActivePage("home")}
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
             />
           )}

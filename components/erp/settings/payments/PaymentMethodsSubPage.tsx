@@ -24,7 +24,7 @@ const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated"
 interface PaymentMethodsSubPageProps {
     partner: any
     paymentMethods: any[]
-    onBack: () => void
+    handleBack: () => void
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
 }
 
@@ -47,7 +47,7 @@ const LIST_COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const },
 ]
 
-export function PaymentMethodsSubPage({ partner, paymentMethods, onBack, planGate }: PaymentMethodsSubPageProps) {
+export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, planGate }: PaymentMethodsSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -607,29 +607,46 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack, planGat
         return (
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-                            <div className="hidden md:flex items-start justify-between py-6">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
-                                        <span className="truncate">Formas de Pagamento</span>
-                                    </h1>
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Formas de Pagamento</span>
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                            Gerencie os métodos de pagamento aceitos em seu negócio.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
-                        <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                            imageAlt="Recurso bloqueado"
-                            title="Formas de Pagamento"
-                            subtitle="Configure os métodos de pagamento aceitos no seu negócio. Disponível nos planos Crescer e Escalar."
-                            itemButton={{
-                                text: "Fazer upgrade",
-                                action: () => openPlanUpgrade(planGate.requiredPlanSlug)
-                            }}
-                        />
+                        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                imageAlt="Recurso bloqueado"
+                                title="Formas de Pagamento"
+                                subtitle="Configure os métodos de pagamento aceitos no seu negócio. Disponível nos planos Crescer e Escalar."
+                                itemButton={{
+                                    text: "Fazer upgrade",
+                                    action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </FadeIn>
@@ -643,12 +660,13 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, onBack, planGat
                     <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden transition-colors duration-500 ease-in-out">
                         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
+                            {/* Sticky Header */}
                             <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
                                 <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
 
                                     {/* Back button - desktop only */}
                                     <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
-                                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
                                     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import JsBarcode from "jsbarcode"
 import { type LabelPreset, type LabelContentConfig } from "@/lib/labels/presets"
 import { detectBarcodeFormat } from "@/lib/utils/barcode"
@@ -22,48 +22,31 @@ interface LabelSheetProps {
   preset: LabelPreset
   contentConfig: LabelContentConfig
   printMode?: boolean
-}
 
-function generateBarcodeDataUri(value: string): string | null {
-  try {
-    const div = document.createElement("div")
-    JsBarcode(div, value, {
-      format: detectBarcodeFormat(value),
-      width: 1.5,
-      height: 30,
-      fontSize: 10,
-      margin: 2,
-      displayValue: true,
-    })
-    const svg = div.querySelector("svg")
-    if (!svg) return null
-    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg")
-    const svgString = new XMLSerializer().serializeToString(svg)
-    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString)
-  } catch {
-    return null
-  }
 }
 
 function BarcodeCell({ value }: { value: string }) {
-  const [dataUri, setDataUri] = useState<string | null>(null)
+  const ref = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
-    setDataUri(generateBarcodeDataUri(value))
+    if (!ref.current || !value) return
+    try {
+      JsBarcode(ref.current, value, {
+        format: detectBarcodeFormat(value),
+        width: 1.2,
+        height: 24,
+        fontSize: 8,
+        margin: 1,
+        displayValue: true,
+      })
+    } catch {
+      /* ignore */
+    }
   }, [value])
 
-  if (!dataUri) {
-    return (
-      <div style={{ fontSize: "7px", fontFamily: "monospace", textAlign: "center", margin: "0.5mm 0" }}>
-        {value}
-      </div>
-    )
-  }
-
   return (
-    <div style={{ width: "100%", display: "flex", justifyContent: "center", margin: "0.5mm 0" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={dataUri} alt={value} style={{ maxWidth: "100%", height: "auto", display: "block" }} />
+    <div style={{ width: "100%", display: "flex", justifyContent: "center", margin: "0.3mm 0" }}>
+      <svg ref={ref} style={{ maxWidth: "100%", height: "auto" }} />
     </div>
   )
 }

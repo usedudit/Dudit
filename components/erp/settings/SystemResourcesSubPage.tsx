@@ -6,7 +6,7 @@ import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-import { planStarIconForTarget } from "@/components/erp/subscription/PlanUpgradeModal"
+import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { toast } from "@/hooks/use-notification"
 import { updateSystemResourcesAction } from "@/app/actions/erp/system-resources"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -28,6 +28,7 @@ interface SystemResourcesSubPageProps {
 }
 
 export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: SystemResourcesSubPageProps) {
+    const { openPlanUpgrade } = usePlanUpgrade()
     const initialResources = React.useMemo(() => resolveActiveResources(businessInfo), [businessInfo])
     const [selected, setSelected] = React.useState<SystemResourceId[]>(initialResources)
     const [saving, setSaving] = React.useState(false)
@@ -46,6 +47,9 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(hasChanges)
 
+    const sellsProducts = businessInfo.sells?.includes("products") ?? false
+    const sellsServices = businessInfo.sells?.includes("services") ?? false
+
     const groupedResources = React.useMemo(() => {
         return SYSTEM_RESOURCES
             .filter((r) => r.id !== "team")
@@ -56,7 +60,18 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
             }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
     }, [])
 
+    const isResourceLocked = (resourceId: SystemResourceId): boolean => {
+        if (resourceId === "products" && sellsProducts) return true
+        if (resourceId === "services" && sellsServices) return true
+        return false
+    }
+
     const toggleResource = (resourceId: SystemResourceId, checked: boolean) => {
+        const resource = SYSTEM_RESOURCES.find((r) => r.id === resourceId)
+        if (resource?.minimumPlan && checked && !hasMinimumPlan(planSlug, resource.minimumPlan)) {
+            openPlanUpgrade(resource.minimumPlan)
+            return
+        }
         setSelected((current) => {
             if (checked) return Array.from(new Set([...current, resourceId]))
             return current.filter((id) => id !== resourceId)
@@ -160,6 +175,7 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                                     <div className="divide-y divide-brand-border dark:divide-dark-border">
                                         {groupedResources[module].map((resource) => {
                                             const checked = selectedSet.has(resource.id)
+                                            const locked = isResourceLocked(resource.id)
                                             const requiredPlan = resource.minimumPlan
                                             const isPlanBlocked = requiredPlan ? !hasMinimumPlan(planSlug, requiredPlan) : false
                                             const star = requiredPlan ? planStarIconForTarget(requiredPlan) : null
@@ -183,7 +199,14 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                                                             {resource.description}
                                                         </p>
                                                     </div>
-                                                    <Switch checked={checked} onCheckedChange={(value: boolean) => toggleResource(resource.id, value)} />
+                                                    {locked ? (
+                                                        <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body shrink-0">Sempre ativo</span>
+                                                    ) : (
+                                                        <Switch
+                                                            checked={checked}
+                                                            onCheckedChange={(value: boolean) => toggleResource(resource.id, value)}
+                                                        />
+                                                    )}
                                                 </div>
                                             )
                                         })}

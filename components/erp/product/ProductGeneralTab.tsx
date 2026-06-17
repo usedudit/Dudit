@@ -2,8 +2,7 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, Barcode, FormSection } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils";
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection } from "@/components/reusable"
 import { PlusIcon, DiceIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
@@ -51,11 +50,6 @@ const SidebarCard = ({ children, className = "", hasTopStrip = false }: { childr
         {children}
     </div>
 )
-
-const chartData = [
-    { name: 'Feb 01', value: 200 }, { name: 'Feb 05', value: 300 }, { name: 'Feb 10', value: 450 },
-    { name: 'Feb 15', value: 250 }, { name: 'Feb 20', value: 380 }, { name: 'Feb 25', value: 500 }, { name: 'Feb 28', value: 780 },
-]
 
 interface ProductGeneralTabProps {
     productData: any
@@ -281,24 +275,24 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             <Input label="Estoque Atual" name="stock" type="number" value={productData.stock || ""} onChange={handleFieldChange} disabled={!isEditing} />
                             <Input label="Mínimo" name="minStock" type="number" value={productData.minStock || ""} onChange={handleFieldChange} disabled={!isEditing} />
 
-                                <FormCombobox
-                                    label="Localização"
-                                    options={locations}
-                                    value={productData.location_id}
-                                    onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                    actionItem={{
-                                        label: metadataPlanBlocked ? (
-                                            <span className="inline-flex items-center gap-1.5">
-                                                Novo local
-                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                            </span>
-                                        ) : "Criar novo local",
-                                        icon: metadataPlanBlocked ? undefined : <PlusIcon size={18} />,
-                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("location")
-                                    }}
-                                />
+                            <FormCombobox
+                                label="Localização"
+                                options={locations}
+                                value={productData.location_id}
+                                onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
+                                disabled={!isEditing}
+                                width="w-full"
+                                actionItem={{
+                                    label: metadataPlanBlocked ? (
+                                        <span className="inline-flex items-center gap-1.5">
+                                            Novo local
+                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                        </span>
+                                    ) : "Criar novo local",
+                                    icon: metadataPlanBlocked ? undefined : <PlusIcon size={18} />,
+                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("location")
+                                }}
+                            />
                         </div>
 
                         <div className="flex items-center gap-2 cursor-pointer w-fit mt-2">
@@ -339,7 +333,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 <div className="space-y-5">
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                                         <Input label="Peso Líquido (kg)" name="weight_net" value={productData.weight_net} onChange={handleFieldChange} disabled={!isEditing} />
-                                        {/* ... restante dos inputs ... */}
                                         <Input label="Peso Bruto (kg)" name="weight_gross" value={productData.weight_gross} onChange={handleFieldChange} disabled={!isEditing} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <Input

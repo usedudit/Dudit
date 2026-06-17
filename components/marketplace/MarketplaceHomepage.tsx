@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
-import { HeroBanner, ProductCarousel } from "./shared-components"
+import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-components"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
@@ -561,25 +561,26 @@ export default function MarketplaceHome({
                     if (section.id === "topVitrines") {
                         return (
                             <section key={section.id} className="mx-auto max-w-[1400px] px-4 lg:px-0 mb-10">
-                                <ProductCarousel
+                                <HorizontalCarousel
                                     title={section.title}
                                     subtitle={section.subtitle}
-                                    products={section.items}
-                                    seeMoreLink={section.seeMoreLink}
-                                    userCoords={userCoords}
-                                    isVitrineSection={true}
+                                    items={section.items}
+                                    renderItem={(item: any) => <VitrineCard vitrine={item} />}
+                                    onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
+                                    itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
                             </section>
                         )
                     }
                     return (
-                        <ProductCarousel
+                        <HorizontalCarousel
                             key={section.id}
                             title={section.title}
                             subtitle={section.subtitle}
-                            products={section.items}
-                            seeMoreLink={section.seeMoreLink}
-                            userCoords={userCoords}
+                            items={section.items}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} />}
+                            onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
+                            itemWidthClass="w-[190px] sm:w-[210px]"
                         />
                     )
                 })}

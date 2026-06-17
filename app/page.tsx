@@ -54,6 +54,13 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
             ? { lat: userProfile.latitude, lng: userProfile.longitude }
             : null
 
+        const isAnon = !user || !userProfile?.latitude
+        const scope = isDefaultSP && isAnon
+            ? "country"
+            : coords
+                ? "city"
+                : "state"
+
         const [sectionsResult, adsResult] = await Promise.all([
             getHomeSections({
                 city: cityName,
@@ -62,6 +69,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 citySlug,
                 coords,
                 userId: user?.id ?? null,
+                scope,
             }),
             getSponsoredAdsForSlot("home", {
                 lat: userProfile?.latitude ?? null,

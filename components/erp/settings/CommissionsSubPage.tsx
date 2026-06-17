@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
-import { ChevronLeftIcon, TruckIcon, Users, SaveIcon, UserIcon } from "@/lib/icons"
+import { ChevronLeftIcon, TruckIcon, Users, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { listEmployeeCommissionsAction, upsertEmployeeCommissionAction, type CommissionSettingsRow } from "@/app/actions/erp/commissions"
@@ -109,32 +109,49 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
         return (
             <FadeIn>
                 <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                    <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
-                        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-                            <div className="hidden md:flex items-start justify-between py-6">
-                                <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className="font-bold text-brand-dark dark:text-dark-heading text-xl md:text-3xl">
-                                        <span className="truncate">Comissão</span>
-                                    </h1>
+                    <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
+
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                            <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
+                                {/* Back button - desktop only */}
+                                <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                    </Button>
+                                </div>
+
+                                {/* Title row */}
+                                <div className="hidden md:flex items-start justify-between">
+                                    <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                        <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                            <span className="truncate">Comissões</span>
+                                        </h1>
+
+                                        <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
+                                            Defina as regras de comissionamento para sua equipe de vendas e entregas.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
-                        <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                            imageAlt="Recurso bloqueado"
-                            title="Comissão"
-                            subtitle="Defina regras de comissão para vendedores e entregadores. Disponível nos planos Crescer e Escalar."
-                            itemButton={{
-                                text: "Fazer upgrade",
-                                action: () => openPlanUpgrade(planGate.requiredPlanSlug)
-                            }}
-                        />
+                        <div className="flex flex-col items-center justify-center text-center min-h-[400px] px-4">
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                imageAlt="Recurso bloqueado"
+                                title="Comissão"
+                                subtitle="Defina regras de comissão para vendedores e entregadores. Disponível nos planos Crescer e Escalar."
+                                itemButton={{
+                                    text: "Fazer upgrade",
+                                    action: () => openPlanUpgrade(planGate.requiredPlanSlug)
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
-            </FadeIn>
+            </FadeIn >
         )
     }
 
@@ -168,7 +185,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                     </div>
                                 </div>
 
-                                {/* Primary Action - Desktop */}
+                                {/* Desktop action buttons */}
                                 <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button
                                         leftIcon={<SaveIcon size={18} />}

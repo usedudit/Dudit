@@ -554,3 +554,139 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         </section>
     );
 };
+
+export const HorizontalCarousel = ({
+    title,
+    subtitle,
+    items,
+    renderItem,
+    onSeeAll,
+    banner,
+    itemWidthClass = "w-[230px]"
+}: {
+    title: string
+    subtitle?: string
+    items: any[]
+    renderItem: (item: any) => React.ReactNode
+    onSeeAll?: () => void
+    banner?: {
+        title: string
+        subtitle?: string
+        gradient: string
+        imageUrl?: string
+        link?: string
+    }
+    itemWidthClass?: string
+}) => {
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const [showLeftArrow, setShowLeftArrow] = useState(false)
+    const [showRightArrow, setShowRightArrow] = useState(false)
+
+    const checkScroll = () => {
+        const el = scrollContainerRef.current
+        if (el) {
+            setShowLeftArrow(el.scrollLeft > 2)
+            setShowRightArrow(el.scrollLeft + el.clientWidth < el.scrollWidth - 5)
+        }
+    }
+
+    useEffect(() => {
+        const el = scrollContainerRef.current
+        if (el) {
+            checkScroll()
+            el.addEventListener("scroll", checkScroll)
+            window.addEventListener("resize", checkScroll)
+
+            const timer = setTimeout(checkScroll, 500)
+
+            return () => {
+                el.removeEventListener("scroll", checkScroll)
+                window.removeEventListener("resize", checkScroll)
+                clearTimeout(timer)
+            }
+        }
+    }, [items])
+
+    const scroll = (direction: 'left' | 'right') => {
+        const el = scrollContainerRef.current
+        if (el) {
+            const scrollAmount = el.clientWidth * 0.75
+            el.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            })
+        }
+    }
+
+    if (!items || items.length === 0) return null
+
+    return (
+        <div className="mb-10 w-full animate-fade-in">
+            <div className="flex items-end justify-between mb-6">
+                <div>
+                    <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-1">{title}</h2>
+                    {subtitle && <p className="text-brand-inactive-text text-sm md:text-base">{subtitle}</p>}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                    {onSeeAll && (
+                        <button
+                            onClick={onSeeAll}
+                            className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                        >
+                            Ver tudo
+                        </button>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                        {showLeftArrow && (
+                            <button
+                                onClick={() => scroll('left')}
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                            >
+                                <ChevronLeftIcon className="w-4 h-4 text-brand-dark" />
+                            </button>
+                        )}
+                        {showRightArrow && (
+                            <button
+                                onClick={() => scroll('right')}
+                                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white hover:bg-gray-50 transition-colors duration-200 shadow-sm cursor-pointer"
+                            >
+                                <ChevronRightIcon className="w-4 h-4 text-brand-dark" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div
+                ref={scrollContainerRef}
+                className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth pb-3 px-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {banner && (
+                    <div className="snap-start shrink-0 w-[170px] h-auto">
+                        <a
+                            href={banner.link || '#'}
+                            className={`flex flex-col items-center justify-center text-center p-4 rounded-[16px] w-full h-full min-h-[250px] bg-gradient-to-br ${banner.gradient} text-white hover:scale-[1.02] transition-all duration-300 shadow-md`}
+                        >
+                            {banner.imageUrl ? (
+                                <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover rounded-[16px]" />
+                            ) : (
+                                <div className="flex flex-col items-center gap-3">
+                                    <span className="font-extrabold text-xl leading-tight whitespace-pre-line">{banner.title}</span>
+                                    {banner.subtitle && (
+                                        <span className="text-xs font-medium opacity-90">{banner.subtitle}</span>
+                                    )}
+                                </div>
+                            )}
+                        </a>
+                    </div>
+                )}
+                {items.map((item, idx) => (
+                    <div key={idx} className={`snap-start shrink-0 ${itemWidthClass}`}>
+                        {renderItem(item)}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+};

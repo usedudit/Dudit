@@ -3,7 +3,18 @@ import "server-only"
 import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { calculateDistance } from "@/lib/services/location.service"
-import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+
+// ─── State name map (UF → full name) ───────────────────────────────────────
+
+const ESTADOS: Record<string, string> = {
+    AC: "Acre", AL: "Alagoas", AP: "Amapá", AM: "Amazonas",
+    BA: "Bahia", CE: "Ceará", DF: "Distrito Federal", ES: "Espírito Santo",
+    GO: "Goiás", MA: "Maranhão", MT: "Mato Grosso", MS: "Mato Grosso do Sul",
+    MG: "Minas Gerais", PA: "Pará", PB: "Paraíba", PR: "Paraná",
+    PE: "Pernambuco", PI: "Piauí", RJ: "Rio de Janeiro", RN: "Rio Grande do Norte",
+    RS: "Rio Grande do Sul", RO: "Rondônia", RR: "Roraima", SC: "Santa Catarina",
+    SP: "São Paulo", SE: "Sergipe", TO: "Tocantins",
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -14,6 +25,7 @@ export interface HomeSection {
     gatilho: string
     items: any[]
     seeMoreLink: string
+    _allItems?: any[]
 }
 
 export interface DiscoverCtx {
@@ -23,6 +35,7 @@ export interface DiscoverCtx {
     citySlug: string
     coords: { lat: number; lng: number } | null
     userId: string | null
+    scope: "country" | "state" | "city"
 }
 
 interface PartnerTiers {
@@ -102,6 +115,102 @@ function normalizeCitySlug(name: string): string {
         .replace(/(^-|-$)/g, "")
 }
 
+// ─── Section title/subtitle by scope ───────────────────────────────────────
+
+function sectionDisplay(
+    id: string,
+    ctx: DiscoverCtx,
+    displayScope: "city" | "state" | "country",
+): { title: string; subtitle: string } {
+    const stateName = ESTADOS[ctx.state] || ctx.state
+    const cityName = ctx.city
+
+    const MAP: Record<string, Record<string, [string, string]>> = {
+        trending: {
+            country: ["🔥 Bombando na Dudit", "Os produtos mais quentes do momento"],
+            state: [`🔥 Bombando no ${stateName}`, `Os produtos mais quentes no ${stateName}`],
+            city: [`🔥 Bombando em ${cityName}`, `Os produtos mais quentes em ${cityName}`],
+        },
+        endingSoon: {
+            country: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
+            state: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
+            city: ["⏰ Acabando hoje", "Ofertas que terminam em breve"],
+        },
+        nearby: {
+            country: ["📍 Perto de você", "SKIP"],
+            state: ["📍 Perto de você", "SKIP"],
+            city: ["📍 Até 2km de você", "Produtos pertinho da sua localização"],
+        },
+        recent: {
+            country: ["🆕 Recém anunciados", "Acabaram de chegar na Dudit"],
+            state: [`🆕 Recém anunciados no ${stateName}`, `Acabaram de chegar no ${stateName}`],
+            city: [`🆕 Recém anunciados em ${cityName}`, `Acabaram de chegar em ${cityName}`],
+        },
+        gems: {
+            country: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+            state: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+            city: ["💎 Achados da Dudit", "Oportunidades imperdíveis selecionadas para você"],
+        },
+        personalized: {
+            country: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
+            state: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
+            city: ["👀 Você pode gostar", "Baseado nos seus favoritos e compras"],
+        },
+        bestSellers: {
+            country: ["⭐ Mais vendidos", "Os produtos mais vendidos da Dudit"],
+            state: [`⭐ Mais vendidos no ${stateName}`, `Os mais vendidos no ${stateName}`],
+            city: [`⭐ Mais vendidos em ${cityName}`, `Os mais vendidos em ${cityName}`],
+        },
+        topRated: {
+            country: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
+            state: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
+            city: ["🏆 Melhor avaliados", "Os produtos com as melhores avaliações"],
+        },
+        promos: {
+            country: ["🎯 Promoções especiais", "Os melhores descontos da Dudit"],
+            state: ["🎯 Promoções especiais", "Os melhores descontos da região"],
+            city: ["🎯 Promoções especiais", "Os melhores descontos perto de você"],
+        },
+        mostViewed: {
+            country: ["💬 Mais visualizados", "O que todo mundo está de olho"],
+            state: ["💬 Mais visualizados", "O que todo mundo está de olho"],
+            city: ["💬 Mais visualizados", "O que todo mundo está de olho"],
+        },
+        services: {
+            country: ["🧰 Serviços em destaque", "Profissionais e serviços para você"],
+            state: ["🧰 Serviços em destaque", "Profissionais e serviços para você"],
+            city: ["🧰 Serviços próximos", "Profissionais e serviços perto de você"],
+        },
+        topVitrines: {
+            country: ["🛍️ Vitrines em destaque", "Lojas para você conhecer"],
+            state: [`🛍️ Vitrines do ${stateName}`, `Lojas do ${stateName} para você conhecer`],
+            city: ["🛍️ Lojas próximas", "Lojas perto de você"],
+        },
+        popular: {
+            country: ["🔥 Populares na Dudit", "O que está bombando por aqui"],
+            state: [`🔥 Populares no ${stateName}`, `O que está bombando no ${stateName}`],
+            city: [`🔥 Populares em ${cityName}`, `O que está bombando em ${cityName}`],
+        },
+    }
+
+    const entry = MAP[id]?.[displayScope] || MAP[id]?.country || ["", ""]
+    return { title: entry[0], subtitle: entry[1] }
+}
+
+// ─── Determine display scope from tier distribution ────────────────────────
+
+type WithTier = { _tier: number }
+
+function determineDisplayScope(items: WithTier[], ctx: DiscoverCtx): "city" | "state" | "country" {
+    const min = 4
+    const cityCount = items.filter(i => i._tier === 0).length
+    const stateCount = items.filter(i => i._tier === 1).length
+
+    if (ctx.scope === "city" && cityCount >= min) return "city"
+    if ((ctx.scope === "city" || ctx.scope === "state") && cityCount + stateCount >= min) return "state"
+    return "country"
+}
+
 // ─── Partner IDs by tier (city → state → country) ───────────────────────────
 
 const getPartnerIdsByTier = cache(async (
@@ -166,8 +275,6 @@ const getPartnerIdsByTier = cache(async (
 })
 
 // ─── Tier sort helper ───────────────────────────────────────────────────────
-
-type WithTier = { _tier: number }
 
 function getPartnerId(item: { partners?: any }): string | undefined {
     const raw = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -236,12 +343,6 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
 }
 
 // ─── SECTION FETCHERS ───────────────────────────────────────────────────────
-// Each receives PartnerTiers instead of partnerIds:
-//   - tiers.cityIds = partners in the user's city
-//   - tiers.stateIds = partners in the user's state
-//   - tiers.allIds   = all partners in Brazil
-// Each fetcher queries with ALL partner IDs, then tags/sorts items by tier.
-// No minimum item threshold — show what exists.
 
 // ─── 1. 🔥 Bombando na sua região ───────────────────────────────────────────
 
@@ -256,10 +357,10 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .limit(40)
+        .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][TRENDING] Supabase Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.error(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
         return null
     }
 
@@ -270,28 +371,30 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return (r.sales_last_7_days ?? 0) * 5 + (r.favorites_count ?? 0) * 2 + (r.views_last_30_days ?? 0)
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("trending", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const proof: string[] = []
-        const views = raw.views_last_30_days ?? 0
-        const salesWeek = raw.sales_last_7_days ?? 0
-        if (views >= 10) proof.push(`${views} visualizações`)
-        if (salesWeek > 0) proof.push(`${salesWeek} vendidos esta semana`)
+        if ((raw.views_last_30_days ?? 0) >= 10) proof.push(`${raw.views_last_30_days} visualizações`)
+        if ((raw.sales_last_7_days ?? 0) > 0) proof.push(`${raw.sales_last_7_days} vendidos esta semana`)
         if ((raw.favorites_count ?? 0) > 0) proof.push(`${raw.favorites_count} favoritaram`)
         return processProduct(raw, { _socialProof: proof.join(" • ") })
     })
 
     return {
         id: "trending",
-        title: "🔥 Bombando na sua região",
-        subtitle: "Produtos que estão chamando atenção perto de você",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.trending,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=trending`,
     }
 }
 
-// ─── 2. ⏰ Acabando hoje ─────────────────────────────────────────────────────
+// ─── 2. ⏰ Acabando hoje (fallback: 24h → 48h → 7 dias) ──────────────────────
 
 async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
@@ -299,20 +402,34 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     if (allIds.length === 0) return null
 
     const now = new Date()
-    const end24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
-    const { data: campaigns, error: campErr } = await supabase
-        .from("campaigns")
-        .select("id, ends_at")
-        .eq("is_active", true)
-        .in("partner_id", allIds)
-        .gte("ends_at", now.toISOString())
-        .lte("ends_at", end24h.toISOString())
-        .order("ends_at", { ascending: true })
+    const windows = [
+        { label: "24h", end: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+        { label: "48h", end: new Date(now.getTime() + 48 * 60 * 60 * 1000) },
+        { label: "7d", end: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
+    ]
 
-    if (campErr) {
-        console.error(`[DISCOVER][ENDING_SOON] Campaigns error:`, campErr)
-        return null
+    let campaigns: Record<string, any>[] | null = null
+
+    for (const w of windows) {
+        const { data, error } = await supabase
+            .from("campaigns")
+            .select("id, ends_at")
+            .eq("is_active", true)
+            .in("partner_id", allIds)
+            .gte("ends_at", now.toISOString())
+            .lte("ends_at", w.end.toISOString())
+            .order("ends_at", { ascending: true })
+
+        if (error) {
+            console.error(`[DISCOVER][ENDING_SOON] Error (${w.label}):`, error)
+            return null
+        }
+
+        if (data && data.length > 0) {
+            campaigns = data
+            break
+        }
     }
 
     if (!campaigns || campaigns.length === 0) return null
@@ -347,7 +464,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("id", [...productIds])
-        .limit(20)
+        .limit(30)
 
     if (prodErr) {
         console.error(`[DISCOVER][ENDING_SOON] Products error:`, prodErr)
@@ -357,6 +474,8 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     if (!products || products.length === 0) return null
 
     const tagged = applyTierSort(products as RawProduct[], tiers, () => 0)
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("endingSoon", ctx, displayScope)
 
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
@@ -375,124 +494,86 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     return {
         id: "endingSoon",
-        title: "⏰ Acabando hoje",
-        subtitle: "Ofertas que terminam nas próximas horas",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.endingSoon,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=ending-soon`,
     }
 }
 
-// ─── 3. 📍 Perto de você ─────────────────────────────────────────────────────
+// ─── 3. 📍 Perto de você (só com coordenadas) ───────────────────────────────
 
 async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+    if (!ctx.coords) return null
+
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
     if (allIds.length === 0) return null
 
-    // User with real coordinates → Haversine distance sort
-    if (ctx.coords) {
-        const { data, error } = await supabase
-            .from("products")
-            .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
-            .eq("is_active", true)
-            .eq("show_in_marketplace", true)
-            .in("partner_id", allIds)
-            .not("partners.latitude", "is", null)
-            .not("partners.longitude", "is", null)
-            .limit(40)
-
-        if (error) {
-            console.error(`[DISCOVER][NEARBY] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
-            return null
-        }
-
-        if (!data || data.length === 0) return null
-
-        const withDistance = (data as RawProduct[]).map(item => {
-            const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-            let distKm = Infinity
-            if (partner?.latitude && partner?.longitude) {
-                distKm = calculateDistance(ctx.coords!, { lat: partner.latitude, lng: partner.longitude })
-            }
-            return { ...item, _distKm: distKm }
-        })
-
-        withDistance.sort((a, b) => a._distKm - b._distKm)
-
-        const items = withDistance.slice(0, 20).map(item => {
-            const dist = item._distKm
-            let distText = ""
-            if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
-            else if (dist <= 10) distText = `A ${dist.toFixed(1)} km`
-            else distText = `A ${Math.round(dist)} km`
-
-            const p = processProduct(item, { _distanceText: distText })
-            if (p.partners) {
-                (p.partners as Record<string, any>).distance_km = dist
-                ;(p.partners as Record<string, any>).distance_km_formatted = distText
-            }
-            return p
-        })
-
-        return {
-            id: "nearby",
-            title: "📍 Perto de você",
-            subtitle: "Encontre produtos pertinho da sua localização",
-            gatilho: GATILHOS_MAP.nearby,
-            items,
-            seeMoreLink: `/explorar/${ctx.citySlug}?section=nearby`,
-        }
-    }
-
-    // User WITHOUT coordinates or anonymous → tier-sorted products
     const { data, error } = await supabase
         .from("products")
-        .select(`${BASE_FIELDS}, marketplace_score, ${PARTNER_JOIN}`)
+        .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .order("marketplace_score", { ascending: false, nulls: "last" })
-        .limit(40)
+        .not("partners.latitude", "is", null)
+        .not("partners.longitude", "is", null)
+        .limit(60)
 
     if (error) {
-        console.error(`[DISCOVER][NEARBY] Error (no coords):`, error)
+        console.error(`[DISCOVER][NEARBY] Error:`, error)
         return null
     }
 
     if (!data || data.length === 0) return null
 
-    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
-        return (item as any).marketplace_score ?? 0
+    const withDistance = (data as RawProduct[]).map(item => {
+        const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        let distKm = Infinity
+        if (partner?.latitude && partner?.longitude) {
+            distKm = calculateDistance(ctx.coords!, { lat: partner.latitude, lng: partner.longitude })
+        }
+        return { ...item, _distKm: distKm }
     })
 
-    const items = tagged.slice(0, 20).map(item => processProduct(item as RawProduct))
+    withDistance.sort((a, b) => a._distKm - b._distKm)
 
-    // Title varies by context:
-    //   coords → distance-based
-    //   no partners in state → showing country-wide picks
-    //   otherwise → city/state content without coords
-    let nearbyTitle: string
-    if (ctx.coords) {
-        nearbyTitle = "📍 Perto de você"
-    } else if (tiers.stateIds.size === 0) {
-        nearbyTitle = "🌎 Descobertas da Dudit"
-    } else {
-        nearbyTitle = "📍 Produtos que podem te interessar"
-    }
+    const tagged = withDistance.map(item => {
+        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
+        const pid = rawPartner?.id
+        const tier = pid && tiers.cityIds.has(pid) ? 0
+                   : pid && tiers.stateIds.has(pid) ? 1
+                   : 2
+        return { ...item, _tier: tier }
+    })
 
-    const nearbySubtitle = nearbyTitle === "📍 Perto de você"
-        ? "Encontre produtos pertinho da sua localização"
-        : nearbyTitle === "🌎 Descobertas da Dudit"
-            ? "Descobertas de todo o Brasil"
-            : "Recomendados para você"
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("nearby", ctx, displayScope)
+
+    const items = tagged.slice(0, 20).map(item => {
+        const dist = item._distKm
+        let distText = ""
+        if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
+        else if (dist <= 10) distText = `A ${dist.toFixed(1)} km`
+        else distText = `A ${Math.round(dist)} km`
+
+        const p = processProduct(item, { _distanceText: distText })
+        if (p.partners) {
+            (p.partners as Record<string, any>).distance_km = dist
+            ;(p.partners as Record<string, any>).distance_km_formatted = distText
+        }
+        return p
+    })
 
     return {
         id: "nearby",
-        title: nearbyTitle,
-        subtitle: nearbySubtitle,
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.nearby,
         items,
+        _allItems: items,
         seeMoreLink: `/explorar/${ctx.citySlug}?section=nearby`,
     }
 }
@@ -511,7 +592,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .order("created_at", { ascending: false })
-        .limit(40)
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][RECENT] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -524,6 +605,9 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         const r = item as RawProduct
         return r.created_at ? new Date(r.created_at).getTime() : 0
     })
+
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("recent", ctx, displayScope)
 
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
@@ -538,10 +622,11 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     return {
         id: "recent",
-        title: "🆕 Recém anunciados",
-        subtitle: "Acabaram de chegar na sua região",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.recent,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=recent`,
     }
 }
@@ -576,21 +661,15 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         const discountPct = hasPromo
             ? ((Number(r.price) - Number(r.promotional_price)) / Number(r.price)) * 100
             : 0
-
         const usedBonus = (r.condition?.toLowerCase() === "used" || r.condition === "usado") ? 10 : 0
         const viewsBonus = (r.views_last_30_days ?? 0) / 100
-
-        // 80-90% objective score
         const objectiveScore = discountPct * 2 + viewsBonus + usedBonus
-
-        // 10-20% deterministic variety boost (0.0–0.19 × objectiveScore)
         const discoverBoost = (hashSeed(seed, r.id) % 20) / 100
         const varietyBonus = discoverBoost * (objectiveScore || 20)
-
         return objectiveScore + varietyBonus
     })
 
-    // Diversity: max 3 items per category for a TikTok-like variety feel
+    // Diversity: max 3 per category
     const catCount = new Map<string, number>()
     const diverseItems: (RawProduct & WithTier)[] = []
     for (const item of tagged) {
@@ -601,6 +680,9 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         diverseItems.push(item)
         if (diverseItems.length >= 20) break
     }
+
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("gems", ctx, displayScope)
 
     const items = diverseItems.slice(0, 20).map(item => {
         const raw = item as RawProduct
@@ -617,15 +699,14 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     return {
         id: "gems",
-        title: "💎 Achados da Dudit",
-        subtitle: "Oportunidades imperdíveis selecionadas para você",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.gems,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=gems`,
     }
 }
-
-// ─── MEDIUM PRIORITY SECTIONS ────────────────────────────────────────────────
 
 // ─── 6. 👀 Você pode gostar (apenas logado com sinais reais) ────────────────
 
@@ -683,9 +764,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         }
     }
 
-    if (preferredCatIds.length === 0) {
-        return fetchPopular(tiers, ctx)
-    }
+    if (preferredCatIds.length === 0) return fetchPopular(tiers, ctx)
 
     const { data, error } = await supabase
         .from("products")
@@ -695,7 +774,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         .in("partner_id", allIds)
         .in("category_id", preferredCatIds)
         .order("marketplace_score", { ascending: false })
-        .limit(40)
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][PERSONALIZED] Products error:`, error)
@@ -709,17 +788,19 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         return (item as any).marketplace_score ?? 0
     })
 
-    const items = tagged
-        .filter(item => !favSet.has((item as RawProduct).id))
-        .slice(0, 20)
-        .map(item => processProduct(item as RawProduct))
+    const filtered = tagged.filter(item => !favSet.has((item as RawProduct).id))
+    const displayScope = determineDisplayScope(filtered, ctx)
+    const display = sectionDisplay("personalized", ctx, displayScope)
+
+    const items = filtered.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "personalized",
-        title: "👀 Você pode gostar",
-        subtitle: "Baseado nos seus favoritos e compras",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.personalized,
         items,
+        _allItems: filtered.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=for-you`,
     }
 }
@@ -737,9 +818,8 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .not("sales_last_30_days", "eq", 0)
-        .order("sales_last_30_days", { ascending: false })
-        .limit(40)
+        .order("sales_last_30_days", { ascending: false, nulls: "last" })
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -752,10 +832,13 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         return (item as RawProduct).sales_last_30_days ?? 0
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("bestSellers", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
-            _socialProof: raw.sales_last_30_days! > 0
+            _socialProof: (raw.sales_last_30_days ?? 0) > 0
                 ? `${raw.sales_last_30_days} vendidos no último mês`
                 : undefined,
         })
@@ -763,10 +846,11 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     return {
         id: "bestSellers",
-        title: "⭐ Mais vendidos",
-        subtitle: "Os produtos mais vendidos",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.bestSellers,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=best-sellers`,
     }
 }
@@ -784,9 +868,8 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .gt("rating", 0)
-        .order("rating", { ascending: false })
-        .limit(40)
+        .order("rating", { ascending: false, nulls: "last" })
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -799,6 +882,9 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return (item as RawProduct).rating ?? 0
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("topRated", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
@@ -809,10 +895,11 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     return {
         id: "topRated",
-        title: "🏆 Melhor avaliados",
-        subtitle: "Os queridinhos da sua região",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topRated,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=top-rated`,
     }
 }
@@ -831,7 +918,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .not("promotional_price", "is", null)
-        .limit(60)
+        .limit(80)
 
     if (error) {
         console.error(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -850,6 +937,9 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         return ((Number(r.price) - Number(r.promotional_price)) / Number(r.price)) * 100
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("promos", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const discountPct = Math.round(
@@ -863,10 +953,11 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     return {
         id: "promos",
-        title: "🎯 Promoções especiais",
-        subtitle: "Descontos imperdíveis pertinho de você",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.promos,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=promos`,
     }
 }
@@ -884,9 +975,8 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .not("views_last_30_days", "eq", 0)
-        .order("views_last_30_days", { ascending: false })
-        .limit(40)
+        .order("views_last_30_days", { ascending: false, nulls: "last" })
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -899,6 +989,9 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return (item as RawProduct).views_last_30_days ?? 0
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("mostViewed", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => {
         const raw = item as RawProduct
         return processProduct(raw, {
@@ -910,15 +1003,16 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     return {
         id: "mostViewed",
-        title: "💬 Mais visualizados",
-        subtitle: "O que todo mundo está de olho",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.mostViewed,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=most-viewed`,
     }
 }
 
-// ─── 11. 🧰 Serviços perto de você ───────────────────────────────────────────
+// ─── 11. 🧰 Serviços (com ou sem coordenadas) ───────────────────────────────
 
 async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
@@ -931,8 +1025,8 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
-        .order("rating", { ascending: false })
-        .limit(40)
+        .order("rating", { ascending: false, nulls: "last" })
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -941,7 +1035,6 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     if (!data || data.length === 0) return null
 
-    // Tag each service's partner tier
     const tagged = (data as any[]).map(item => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
@@ -950,6 +1043,11 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                    : 2
         return { ...item, _tier: tier }
     }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
+
+    const displayScope = determineDisplayScope(tagged, ctx)
+    // Without coords, never show "próximos" (city-level implies proximity)
+    const titleScope = !ctx.coords && displayScope === "city" ? "state" : displayScope
+    const display = sectionDisplay("services", ctx, titleScope)
 
     const items = tagged.slice(0, 20).map((item: any) => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -979,15 +1077,16 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     return {
         id: "services",
-        title: "🧰 Serviços perto de você",
-        subtitle: "Profissionais e serviços na sua região",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.services,
         items,
+        _allItems: items,
         seeMoreLink: `/explorar/${ctx.citySlug}?type=servicos`,
     }
 }
 
-// ─── 12. 🛍️ Conheça vendedores da Dudit (vitrines) ─────────────────────────
+// ─── 12. 🛍️ Vitrines (sempre obrigatória se houver parceiros) ─────────────
 
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
@@ -1000,7 +1099,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         .eq("is_active", true)
         .in("id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
-        .limit(20)
+        .limit(30)
 
     if (error) {
         console.error(`[DISCOVER][VITRINES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -1009,7 +1108,6 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     if (!data || data.length === 0) return null
 
-    // Tag partners by tier
     const tagged = data.map((p: Record<string, any>) => {
         const pid = p.id
         const tier = pid && tiers.cityIds.has(pid) ? 0
@@ -1018,7 +1116,10 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return { ...p, _tier: tier }
     }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
 
-    const items = tagged.slice(0, 12).map((partner: any) => ({
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("topVitrines", ctx, displayScope)
+
+    const items = tagged.slice(0, 15).map((partner: any) => ({
         id: partner.id,
         name: partner.store_name,
         store_name: partner.store_name,
@@ -1032,15 +1133,16 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     return {
         id: "topVitrines",
-        title: "🛍️ Conheça vendedores da Dudit",
-        subtitle: "Lojas para você conhecer",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.topVitrines,
         items,
+        _allItems: items,
         seeMoreLink: `/explorar/${ctx.citySlug}?section=vendors`,
     }
 }
 
-// ─── 13. Produtos populares (fallback) ──────────────────────────────────────
+// ─── 13a. Produtos populares (fallback) ─────────────────────────────────────
 
 async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
@@ -1054,7 +1156,7 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .order("marketplace_score", { ascending: false, nulls: "last" })
-        .limit(30)
+        .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
@@ -1067,15 +1169,64 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
         return (item as any).marketplace_score ?? 0
     })
 
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const display = sectionDisplay("popular", ctx, displayScope)
+
     const items = tagged.slice(0, 20).map(item => processProduct(item as RawProduct))
 
     return {
         id: "popular",
-        title: "🔥 Populares na sua região",
-        subtitle: "O que está bombando por aqui",
+        title: display.title,
+        subtitle: display.subtitle,
         gatilho: GATILHOS_MAP.popular,
         items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
         seeMoreLink: `/explorar/${ctx.citySlug}?section=popular`,
+    }
+}
+
+// ─── 13b. Último recurso: qualquer produto (sem ranking) ──────────────────────
+
+async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
+    const supabase = getAdminClient()
+    const allIds = [...tiers.allIds]
+    if (allIds.length === 0) return null
+
+    const { data, error } = await supabase
+        .from("products")
+        .select(`${BASE_FIELDS}, created_at, ${PARTNER_JOIN}`)
+        .eq("is_active", true)
+        .eq("show_in_marketplace", true)
+        .in("partner_id", allIds)
+        .limit(60)
+
+    if (error) {
+        console.error(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        return null
+    }
+
+    if (!data || data.length === 0) return null
+
+    const tagged = applyTierSort(data as RawProduct[], tiers, item => {
+        const r = item as RawProduct
+        return r.created_at ? new Date(r.created_at).getTime() : 0
+    })
+
+    const displayScope = determineDisplayScope(tagged, ctx)
+    const isCountry = displayScope === "country"
+    const title = isCountry ? "📦 Produtos na Dudit" : "📦 Produtos disponíveis"
+    const subtitle = isCountry ? "Variedade para você" : "Variedade para você"
+
+    const items = tagged.slice(0, 20).map(item => processProduct(item as RawProduct))
+
+    return {
+        id: "allProducts",
+        title,
+        subtitle,
+        gatilho: "variedade",
+        items,
+        _allItems: tagged.map(item => processProduct(item as RawProduct)),
+        seeMoreLink: `/explorar/${ctx.citySlug}`,
     }
 }
 
@@ -1091,36 +1242,33 @@ interface SectionDef {
 const HIGH_SECTIONS: SectionDef[] = [
     { id: "trending", gatilho: GATILHOS_MAP.trending, priority: "high", fetch: fetchTrending },
     { id: "endingSoon", gatilho: GATILHOS_MAP.endingSoon, priority: "high", fetch: fetchEndingSoon },
-    { id: "nearby", gatilho: GATILHOS_MAP.nearby, priority: "high", fetch: fetchNearby },
     { id: "recent", gatilho: GATILHOS_MAP.recent, priority: "high", fetch: fetchRecent },
     { id: "gems", gatilho: GATILHOS_MAP.gems, priority: "high", fetch: fetchGems },
 ]
 
 const MEDIUM_SECTIONS: SectionDef[] = [
-    { id: "personalized", gatilho: GATILHOS_MAP.personalized, priority: "medium", fetch: fetchPersonalized },
     { id: "bestSellers", gatilho: GATILHOS_MAP.bestSellers, priority: "medium", fetch: fetchBestSellers },
     { id: "topRated", gatilho: GATILHOS_MAP.topRated, priority: "medium", fetch: fetchTopRated },
     { id: "promos", gatilho: GATILHOS_MAP.promos, priority: "medium", fetch: fetchPromos },
     { id: "mostViewed", gatilho: GATILHOS_MAP.mostViewed, priority: "medium", fetch: fetchMostViewed },
     { id: "services", gatilho: GATILHOS_MAP.services, priority: "medium", fetch: fetchServices },
+    { id: "personalized", gatilho: GATILHOS_MAP.personalized, priority: "medium", fetch: fetchPersonalized },
 ]
 
 const FALLBACK_SECTIONS: SectionDef[] = [
     { id: "popular", gatilho: GATILHOS_MAP.popular, priority: "fallback", fetch: fetchPopular },
 ]
 
-// Vitrines is always attempted (runs alongside MEDIUM)
-const VITRINES_SECTION: SectionDef = {
-    id: "topVitrines", gatilho: GATILHOS_MAP.topVitrines, priority: "medium", fetch: fetchVitrines,
-}
+const PROXIMITY_SECTIONS: SectionDef[] = [
+    { id: "nearby", gatilho: GATILHOS_MAP.nearby, priority: "medium", fetch: fetchNearby },
+]
 
 // ─── MAIN ENTRY POINT ────────────────────────────────────────────────────────
 
 export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
     const t0 = performance.now()
-    console.log(`[Discover] START | city=${ctx.city} state=${ctx.state} user=${ctx.userId ? "logged" : "anon"}`)
+    console.log(`[Discover] START | scope=${ctx.scope} city=${ctx.city} state=${ctx.state} user=${ctx.userId ? "logged" : "anon"}`)
 
-    // 1. Fetch partner IDs by tier
     const tiers = await getPartnerIdsByTier(ctx.city, ctx.state, ctx.stateOnly)
 
     if (tiers.allIds.size === 0) {
@@ -1128,7 +1276,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         return []
     }
 
-    // 2. FASE 1: Fetch all 5 HIGH sections in parallel (fixed order)
+    // 1. HIGH sections in parallel (trending, endingSoon, recent, gems)
     const highResults = await Promise.allSettled(
         HIGH_SECTIONS.map(s => s.fetch(tiers, ctx)),
     )
@@ -1142,13 +1290,13 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             pool.push(result.value)
             usedGatilhos.add(result.value.gatilho)
         } else if (result.status === "rejected") {
-            console.warn(`[Discover] Section ${HIGH_SECTIONS[i].id} rejected:`, result.reason)
+            console.warn(`[Discover] HIGH ${HIGH_SECTIONS[i].id} error:`, result.reason)
         }
     }
 
-    console.log(`[Discover] Phase 1 (HIGH): ${pool.length}/5 sections`)
+    console.log(`[Discover] Phase 1 (HIGH): ${pool.length}/4`)
 
-    // 3. If pool < 5, fill gaps with MEDIUM sections in fixed order
+    // 2. Fill gaps with MEDIUM (fixed order)
     if (pool.length < 5) {
         const usedIds = new Set(pool.map(s => s.id))
         for (const def of MEDIUM_SECTIONS) {
@@ -1159,43 +1307,81 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
+                console.log(`[Discover] Filler: ${def.id} → ${result.items.length} items`)
                 pool.push(result)
                 usedGatilhos.add(result.gatilho)
                 usedIds.add(result.id)
+            } else {
+                console.log(`[Discover] Filler: ${def.id} → empty`)
             }
         }
     }
 
-    // 4. If still < 5, try FALLBACK
+    console.log(`[Discover] Phase 2 (MEDIUM fillers): ${pool.length}`)
+
+    // 3. FALLBACK if still < 5
     if (pool.length < 5) {
         for (const def of FALLBACK_SECTIONS) {
             if (pool.length >= 5) break
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
+                console.log(`[Discover] Fallback: ${def.id} → ${result.items.length} items`)
                 pool.push(result)
             }
         }
     }
 
-    // 5. Vitrines at fixed position: insert at the 6th slot (index 5)
-    //    Between HIGH (indices 0–4) and the eventual 6th dynamic section
-    const vitrinesResult = await fetchVitrines(tiers, ctx).catch(() => null)
-    if (vitrinesResult && vitrinesResult.items.length >= 1) {
-        const insertAt = Math.min(pool.length, 5)
-        pool.splice(insertAt, 0, vitrinesResult)
+    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length}`)
+
+    // 4. ULTIMATE FALLBACK — any products at all (no ranking required)
+    if (pool.length < 5) {
+        const result = await fetchAllProducts(tiers, ctx).catch(() => null)
+        if (result && result.items.length >= 1) {
+            console.log(`[Discover] Ultimate fallback: allProducts → ${result.items.length} items`)
+            pool.push(result)
+        } else {
+            console.warn(`[Discover] Ultimate fallback: allProducts empty — database may be empty`)
+        }
     }
 
-    // 6. Sixth dynamic section (only if vitrines didn't fill the 6th slot)
+    console.log(`[Discover] Phase 4 (ULTIMATE FALLBACK): ${pool.length}`)
+
+    // 5. Vitrines — ALWAYS inserted if at least 1 active partner exists
+    //    Insert at position 5 (6th slot) unless pool is smaller
+    const vitrinesResult = await fetchVitrines(tiers, ctx).catch(() => null)
+    if (vitrinesResult && vitrinesResult.items.length >= 1) {
+        console.log(`[Discover] Vitrines: ${vitrinesResult.items.length} partners`)
+        const insertAt = Math.min(pool.length, 5)
+        pool.splice(insertAt, 0, vitrinesResult)
+    } else {
+        console.log(`[Discover] Vitrines: empty (no partners or error)`)
+    }
+
+    console.log(`[Discover] Phase 5 (VITRINES): ${pool.length}`)
+
+    // 6. Proximity sections (nearby) — only with coords, only if room
+    if (pool.length < 6 && ctx.scope === "city" && ctx.coords) {
+        for (const def of PROXIMITY_SECTIONS) {
+            if (pool.length >= 6) break
+            const result = await def.fetch(tiers, ctx).catch(() => null)
+            if (result && result.items.length >= 1) {
+                console.log(`[Discover] Proximity: ${def.id} → ${result.items.length} items`)
+                pool.push(result)
+            }
+        }
+    }
+
+    console.log(`[Discover] Phase 6 (PROXIMITY): ${pool.length}`)
+
+    // 7. Sixth dynamic section (only if room)
     if (pool.length < 6) {
         let sixthSection: HomeSection | null = null
 
-        // Try personalized for logged users with real signals
         if (ctx.userId) {
             const persResult = await fetchPersonalized(tiers, ctx)
             if (persResult) sixthSection = persResult
         }
 
-        // Otherwise: seeded shuffle among remaining MEDIUM sections
         if (!sixthSection) {
             const seed = dailySeed(ctx.userId)
             const usedIds = new Set(pool.map(s => s.id))
@@ -1206,26 +1392,38 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
                 const result = await def.fetch(tiers, ctx).catch(() => null)
                 if (result && result.items.length >= 1) {
                     sixthSection = result
+                    console.log(`[Discover] Sixth: ${def.id} → ${result.items.length} items`)
                     break
                 }
             }
         }
 
-        // Dedup sixths items against existing pool
         if (sixthSection && sixthSection.items.length >= 1) {
             const seen = new Set<string>()
             for (const section of pool) {
                 for (const item of section.items) seen.add(item.id)
             }
             sixthSection.items = sixthSection.items.filter((item: any) => !seen.has(item.id))
+
+            if (sixthSection._allItems && sixthSection.items.length < Math.min(20, sixthSection._allItems.length)) {
+                const remaining = sixthSection._allItems.filter((item: any) => !seen.has(item.id))
+                const needed = Math.min(20 - sixthSection.items.length, remaining.length)
+                for (let i = 0; i < needed; i++) {
+                    sixthSection.items.push(remaining[i])
+                }
+            }
+
             if (sixthSection.items.length >= 1) {
                 pool.push(sixthSection)
             }
+        } else {
+            console.log(`[Discover] Sixth: none available`)
         }
     }
 
-    // 7. Global dedup
+    // 8. Global dedup with auto-refill — sections never drop below 1 item
     const globalSeen = new Set<string>()
+    let totalRemovedByDedup = 0
     const finalSections: HomeSection[] = []
 
     for (const section of pool) {
@@ -1234,8 +1432,27 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
             globalSeen.add(item.id)
             return true
         })
+
+        const removedCount = section.items.length - deduped.length
+
+        // Auto-refill from _allItems buffer
+        if (removedCount > 0 && section._allItems) {
+            const remaining = section._allItems.filter((item: any) => !globalSeen.has(item.id))
+            const refillCount = Math.min(20 - deduped.length, remaining.length)
+            for (let i = 0; i < refillCount; i++) {
+                const refillItem = remaining[i]
+                globalSeen.add(refillItem.id)
+                deduped.push(refillItem)
+            }
+            totalRemovedByDedup += removedCount
+        }
+
+        // Never drop a section entirely — if dedup killed everything, keep original
         if (deduped.length >= 1) {
             finalSections.push({ ...section, items: deduped.slice(0, 20) })
+        } else {
+            console.log(`[Discover] Dedup would kill section "${section.id}" — keeping it anyway`)
+            finalSections.push(section)
         }
     }
 
@@ -1243,8 +1460,9 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
     const t1 = performance.now()
     console.log(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
+    console.log(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
     if (result.length > 0) {
-        console.log(`[Discover] Sections:`, result.map(s => `${s.title} (${s.items.length} itens)`).join(" | "))
+        console.log(`[Discover] Sections:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
     }
 
     return result

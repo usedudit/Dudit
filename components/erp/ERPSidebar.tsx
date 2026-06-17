@@ -154,6 +154,9 @@ function ErpPlanGatedNavItem({
     itemClass,
     labelClass,
     onNavigate,
+    icon: Icon,
+    iconClassName,
+    isActiveGroup,
 }: {
     href: string
     label: string
@@ -161,17 +164,27 @@ function ErpPlanGatedNavItem({
     itemClass: string
     labelClass?: string
     onNavigate?: () => void
+    icon?: React.ComponentType<{ className?: string }>
+    iconClassName?: string
+    isActiveGroup?: boolean
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const minimumPlan = PLAN_GATED_MINIMUM[href]
     const required = minimumPlan && !hasMinimumPlan(planSlug, minimumPlan) ? minimumPlan : null
     const star = required ? planStarIconForTarget(required) : null
 
-    const labelRow = (
-        <span className="flex items-center gap-2 min-w-0 flex-1">
-            <span className={cn("truncate", labelClass)}>{label}</span>
-            {star ? <img src={star} alt="" className="w-4 h-4 shrink-0 object-contain" /> : null}
-        </span>
+    const content = (
+        <>
+            {Icon ? (
+                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                    <Icon className={cn("w-[20px] h-[20px]", isActiveGroup ? "text-brand-green" : "text-current", iconClassName)} />
+                </div>
+            ) : null}
+            <span className={cn("flex items-center gap-2 min-w-0 flex-1", Icon ? "" : "")}>
+                <span className={cn("truncate", labelClass)}>{label}</span>
+                {star ? <img src={star} alt="" className="w-4 h-4 shrink-0 object-contain" /> : null}
+            </span>
+        </>
     )
 
     if (required) {
@@ -184,7 +197,7 @@ function ErpPlanGatedNavItem({
                     onNavigate?.()
                 }}
             >
-                {labelRow}
+                {content}
             </button>
         )
     }
@@ -203,7 +216,7 @@ function ErpPlanGatedNavItem({
                 }, 0)
             }}
             className={itemClass}>
-            {labelRow}
+            {content}
         </Link>
     )
 }
@@ -226,15 +239,20 @@ export function ERPSidebar() {
     const goalsResourceActive = isSystemResourceActive(businessInfo, "goals")
     const returnsResourceActive = isSystemResourceActive(businessInfo, "returns")
     const posResourceActive = isSystemResourceActive(businessInfo, "pos")
+    const stockMovementsResourceActive = isSystemResourceActive(businessInfo, "stockMovements")
+    const productCadastrosResourceActive = isSystemResourceActive(businessInfo, "productCadastros")
     const deliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
     const financialResourceActive = isSystemResourceActive(businessInfo, "financial")
     const appointmentsResourceActive = isSystemResourceActive(businessInfo, "appointments")
+    const serviceCadastrosResourceActive = isSystemResourceActive(businessInfo, "serviceCadastros")
     const customersResourceActive = isSystemResourceActive(businessInfo, "customers")
     const reportsResourceActive = isSystemResourceActive(businessInfo, "reports")
     const marketingResourceActive = isSystemResourceActive(businessInfo, "marketing")
+    const couponsResourceActive = isSystemResourceActive(businessInfo, "coupons")
+    const campaignsResourceActive = isSystemResourceActive(businessInfo, "campaigns")
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
-    const salesGroupActive = ordersResourceActive || quotesResourceActive || posResourceActive || deliveriesResourceActive
-    const servicesGroupActive = servicesResourceActive || appointmentsResourceActive
+    const salesGroupActive = ordersResourceActive || quotesResourceActive || goalsResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
+    const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceCadastrosResourceActive
 
     const [isMounted, setIsMounted] = useState(false)
     const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
@@ -301,19 +319,33 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/pdv") return posResourceActive
                             if (sub.href.startsWith("/erp/logistics")) return deliveriesResourceActive
                         }
-                        if (item.href === "/erp/products") return productsResourceActive
+                        if (item.href === "/erp/products") {
+                            if (sub.href === "/erp/products") return productsResourceActive
+                            if (sub.href === "/erp/stock-movements") return stockMovementsResourceActive
+                            if (sub.href === "/erp/products/cadastros") return productCadastrosResourceActive
+                            return productsResourceActive
+                        }
                         if (item.href === "/erp/servicos") {
                             if (sub.href === "/erp/agendamentos") return appointmentsResourceActive
+                            if (sub.href === "/erp/servicos/cadastros") return serviceCadastrosResourceActive
                             return servicesResourceActive
                         }
                         if (item.href === "/erp/resumo-financeiro") return financialResourceActive
+                        if (item.label === "Marketing") {
+                            if (sub.href === "/erp/coupons") return couponsResourceActive
+                            if (sub.href === "/erp/promotions") return campaignsResourceActive
+                            return marketingResourceActive
+                        }
                         return true
                     })
                 }
 
                 // Direct link item (no submenu) - check access
                 if (newItem.href && !newItem.submenu) {
-                    return canAccess(newItem.href) ? newItem : null
+                    const directMinimumPlan = newItem.href ? PLAN_GATED_MINIMUM[newItem.href] : undefined
+                    const planGateKept = Boolean(directMinimumPlan) && !hasMinimumPlan(planSlug, directMinimumPlan!)
+                    if (canAccess(newItem.href) || planGateKept) return newItem
+                    return null
                 }
 
                 // Submenu item - filter sub-items and hide if none remain
@@ -333,7 +365,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, showcaseResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive])
 
     useEffect(() => {
         setIsMounted(true)
@@ -489,56 +521,77 @@ export function ERPSidebar() {
                                 >
                                     <div className="w-full">
                                         {item.href && canOpenDirectPage ? (
-                                            <Link
-                                                href={item.href}
-                                                prefetch={false}
-                                                onClick={(e) => {
-                                                    if (typeof window !== "undefined" && window.location.pathname === item.href) {
-                                                        e.preventDefault();
-                                                        window.dispatchEvent(new CustomEvent('erp-sidebar-reset'));
-                                                    }
-                                                    setTimeout(() => {
-                                                        setIsMobileOpen(false)
-                                                        setHoveredItem(null)
-                                                        if (hasSubmenu && !isCollapsed) {
-                                                            toggleSubmenu(item.label)
-                                                        }
-                                                    }, 0)
-                                                }}
-                                                className={cn(
-                                                    "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
-                                                    isActiveGroup ? activeClasses : inactiveClasses
-                                                )}
-                                            >
-                                                <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
-                                                    <Icon
-                                                        className={cn(
-                                                            "w-[20px] h-[20px] transition-colors",
-                                                            isActiveGroup ? "text-brand-green" : "text-current"
-                                                        )}
-                                                    />
-                                                </div>
+                                            (() => {
+                                                const directMinimumPlan = PLAN_GATED_MINIMUM[item.href]
+                                                const needsPlanGate = directMinimumPlan && !hasMinimumPlan(planSlug, directMinimumPlan)
 
-                                                <span
-                                                    className={cn(
-                                                        "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
-                                                        isCollapsed
-                                                            ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
-                                                            : "max-w-[150px] opacity-100 translate-x-0",
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </span>
+                                                if (needsPlanGate) {
+                                                    return (
+                                                        <ErpPlanGatedNavItem
+                                                            href={item.href}
+                                                            label={item.label}
+                                                            planSlug={planSlug}
+                                                            icon={Icon}
+                                                            isActiveGroup={isActiveGroup}
+                                                            itemClass={cn(
+                                                                "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                                isActiveGroup ? activeClasses : inactiveClasses
+                                                            )}
+                                                            onNavigate={() => {
+                                                                setIsMobileOpen(false)
+                                                                setHoveredItem(null)
+                                                                if (hasSubmenu && !isCollapsed) {
+                                                                    toggleSubmenu(item.label)
+                                                                }
+                                                            }}
+                                                        />
+                                                    )
+                                                }
 
-                                                {hasSubmenu && !isCollapsed && (
-                                                    <ChevronDownIcon
+                                                return (
+                                                    <Link
+                                                        href={item.href}
+                                                        prefetch={false}
+                                                        onClick={(e) => {
+                                                            if (typeof window !== "undefined" && window.location.pathname === item.href) {
+                                                                e.preventDefault();
+                                                                window.dispatchEvent(new CustomEvent('erp-sidebar-reset'));
+                                                            }
+                                                            setTimeout(() => {
+                                                                setIsMobileOpen(false)
+                                                                setHoveredItem(null)
+                                                                if (hasSubmenu && !isCollapsed) {
+                                                                    toggleSubmenu(item.label)
+                                                                }
+                                                            }, 0)
+                                                        }}
                                                         className={cn(
-                                                            "w-4 h-4 mr-2 transition-transform duration-200 opacity-60",
-                                                            isMenuExpanded ? "rotate-180" : "rotate-0",
+                                                            "flex items-center rounded-lg transition-colors duration-200 group relative min-h-[44px] w-full justify-start",
+                                                            isActiveGroup ? activeClasses : inactiveClasses
                                                         )}
-                                                    />
-                                                )}
-                                            </Link>
+                                                    >
+                                                        <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
+                                                            <Icon
+                                                                className={cn(
+                                                                    "w-[20px] h-[20px] transition-colors",
+                                                                    isActiveGroup ? "text-brand-green" : "text-current"
+                                                                )}
+                                                            />
+                                                        </div>
+
+                                                        <span
+                                                            className={cn(
+                                                                "text-[14px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out origin-left flex-1 text-left",
+                                                                isCollapsed
+                                                                    ? "max-w-0 md:opacity-0 translate-x-[-10px] md:block hidden"
+                                                                    : "max-w-[150px] opacity-100 translate-x-0",
+                                                            )}
+                                                        >
+                                                            {item.label}
+                                                        </span>
+                                                    </Link>
+                                                )
+                                            })()
                                         ) : (
                                             <button
                                                 type="button"

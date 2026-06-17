@@ -16,6 +16,11 @@ export type SystemResourceId =
   | "showcase"
   | "goals"
   | "returns"
+  | "stockMovements"
+  | "productCadastros"
+  | "serviceCadastros"
+  | "coupons"
+  | "campaigns"
 
 export type SystemResourceModule = "sales" | "catalog" | "services" | "operations" | "management" | "marketing"
 
@@ -60,6 +65,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     label: "Devoluções",
     description: "Devoluções de pedidos e estorno de valores.",
     module: "sales",
+    minimumPlan: "crescer",
   },
   {
     id: "pos",
@@ -70,8 +76,21 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "products",
     label: "Produtos",
-    description: "Catálogo, movimentação de estoque, fornecedores e cadastros de produtos.",
+    description: "Catálogo de produtos.",
     module: "catalog",
+  },
+  {
+    id: "stockMovements",
+    label: "Movimentação de Estoque",
+    description: "Controle de entrada e saída de estoque.",
+    module: "catalog",
+  },
+  {
+    id: "productCadastros",
+    label: "Cadastros de Produtos",
+    description: "Categorias, marcas, localizações e atributos.",
+    module: "catalog",
+    minimumPlan: "crescer",
   },
   {
     id: "showcase",
@@ -82,7 +101,7 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "services",
     label: "Serviços",
-    description: "Catálogo, cadastros e ordens de serviço.",
+    description: "Catálogo de serviços.",
     module: "services",
   },
   {
@@ -90,6 +109,13 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     label: "Agendamentos",
     description: "Agenda de serviços e atendimentos.",
     module: "services",
+  },
+  {
+    id: "serviceCadastros",
+    label: "Cadastros de Serviços",
+    description: "Categorias e atributos de serviços.",
+    module: "services",
+    minimumPlan: "crescer",
   },
   {
     id: "deliveries",
@@ -106,17 +132,17 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
     minimumPlan: "crescer",
   },
   {
-    id: "customers",
-    label: "Clientes",
-    description: "Cadastro e gestão de clientes do negócio.",
-    module: "management",
-  },
-  {
     id: "team",
     label: "Equipe",
     description: "Convites, usuários e acessos da equipe.",
     module: "management",
     minimumPlan: "crescer",
+  },
+  {
+    id: "customers",
+    label: "Clientes",
+    description: "Cadastro e gestão de clientes do negócio.",
+    module: "management",
   },
   {
     id: "reports",
@@ -128,8 +154,22 @@ export const SYSTEM_RESOURCES: SystemResourceDefinition[] = [
   {
     id: "marketing",
     label: "Marketing",
-    description: "Cupons de desconto, campanhas e promoções, planos recorrentes e assinaturas.",
+    description: "Planos recorrentes e assinaturas.",
     module: "marketing",
+  },
+  {
+    id: "coupons",
+    label: "Cupons de Desconto",
+    description: "Criação e gerenciamento de cupons promocionais.",
+    module: "marketing",
+    minimumPlan: "crescer",
+  },
+  {
+    id: "campaigns",
+    label: "Campanhas e Promoções",
+    description: "Campanhas promocionais e descontos sazonais.",
+    module: "marketing",
+    minimumPlan: "escalar",
   },
 ]
 
@@ -145,14 +185,19 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
       "goals",
       "returns",
       "pos",
+      "stockMovements",
+      "productCadastros",
+      "showcase",
+      "appointments",
+      "serviceCadastros",
       "deliveries",
       "financial",
       "team",
-      "appointments",
       "customers",
       "reports",
       "marketing",
-      "showcase",
+      "coupons",
+      "campaigns",
     ]
   }
   const allowed = new Set<SystemResourceId>(SYSTEM_RESOURCE_IDS)
@@ -168,20 +213,25 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
     "goals",
     "returns",
     "pos",
+    "stockMovements",
+    "productCadastros",
+    "showcase",
+    "appointments",
+    "serviceCadastros",
     "deliveries",
     "financial",
     "team",
     "customers",
     "reports",
     "marketing",
-    "showcase",
+    "coupons",
+    "campaigns",
   ]
   if (sells.includes("products")) {
     defaults.push("products")
   }
   if (sells.includes("services")) {
     defaults.push("services")
-    defaults.push("appointments")
   }
   return defaults
 }
@@ -189,8 +239,7 @@ export function defaultActiveResourcesForBusinessInfo(businessInfo: { sells?: st
 export function resolveActiveResources(businessInfo: { sells?: string[]; activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
   if (Array.isArray(businessInfo.activeResources)) {
     const current = normalizeActiveResources(businessInfo.activeResources)
-    
-    // Automatically migrate older schemas to include new resources
+
     const version = (businessInfo as any).resourcesVersion || 0
     if (version < 2) {
       const v2Resources: SystemResourceId[] = ["customers", "reports", "marketing", "showcase"]
@@ -203,6 +252,14 @@ export function resolveActiveResources(businessInfo: { sells?: string[]; activeR
     if (version < 3) {
       const v3Resources: SystemResourceId[] = ["goals", "returns"]
       for (const r of v3Resources) {
+        if (!current.includes(r)) {
+          current.push(r)
+        }
+      }
+    }
+    if (version < 4) {
+      const v4Resources: SystemResourceId[] = ["stockMovements", "productCadastros", "serviceCadastros", "coupons", "campaigns"]
+      for (const r of v4Resources) {
         if (!current.includes(r)) {
           current.push(r)
         }

@@ -274,7 +274,7 @@ export const ShowcaseSubPage = ({
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
                     <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
@@ -287,22 +287,24 @@ export const ShowcaseSubPage = ({
                                 </Button>
                             </div>
 
-                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                            {/* Title row */}
+                            <div className="hidden md:flex items-start justify-between">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                         <span className="hidden md:inline truncate">Minha Vitrine</span>
                                     </h1>
-                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+
+                                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100 mt-1"}`}>
                                         Personalize a logo, banner, galeria e status de exibição da sua vitrine
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Desktop action buttons */}
-                            <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
-                                    {isLoading ? "Salvando..." : "Salvar"}
-                                </Button>
+                                {/* Desktop action buttons */}
+                                <div className={`hidden md:flex transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <Button onClick={handleSubmit} disabled={isLoading} leftIcon={<SaveIcon size={18} />}>
+                                        {isLoading ? "Salvando..." : "Salvar"}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
