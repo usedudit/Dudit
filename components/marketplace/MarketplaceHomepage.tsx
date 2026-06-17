@@ -557,33 +557,34 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow">
                 <HeroBanner />
 
-                {sections.map((section) => {
-                    if (section.id === "topVitrines") {
-                        return (
-                            <section key={section.id} className="mx-auto max-w-[1400px] px-4 lg:px-0 mb-10">
+                <div className="mx-auto max-w-[1400px] px-4 lg:px-0 space-y-10">
+                    {sections.map((section) => {
+                        if (section.id === "topVitrines") {
+                            return (
                                 <HorizontalCarousel
+                                    key={section.id}
                                     title={section.title}
                                     subtitle={section.subtitle}
                                     items={section.items}
-                                    renderItem={(item: any) => <VitrineCard vitrine={item} />}
+                                    renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
                                     onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
-                            </section>
+                            )
+                        }
+                        return (
+                            <HorizontalCarousel
+                                key={section.id}
+                                title={section.title}
+                                subtitle={section.subtitle}
+                                items={section.items}
+                                renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} className="w-full" />}
+                                onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
+                                itemWidthClass="w-[190px] sm:w-[210px]"
+                            />
                         )
-                    }
-                    return (
-                        <HorizontalCarousel
-                            key={section.id}
-                            title={section.title}
-                            subtitle={section.subtitle}
-                            items={section.items}
-                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} />}
-                            onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
-                            itemWidthClass="w-[190px] sm:w-[210px]"
-                        />
-                    )
-                })}
+                    })}
+                </div>
 
                 {homeAds.length > 0 && (
                     <SponsoredAdsCarousel ads={homeAds} slot="home" title="Patrocinados na sua região" />

@@ -11,6 +11,7 @@ export interface LabelProduct {
   name: string
   sku: string | null
   gtin: string | null
+  barcodeValue: string
   price: number
   promotionalPrice: number | null
   internalCode: string | null
@@ -22,7 +23,6 @@ interface LabelSheetProps {
   preset: LabelPreset
   contentConfig: LabelContentConfig
   printMode?: boolean
-
 }
 
 function BarcodeCell({ value }: { value: string }) {
@@ -55,7 +55,6 @@ export function LabelSheet({ products, preset, contentConfig, printMode = false 
   const allLabels = products.flatMap((product) =>
     Array.from({ length: product.labelQuantity }, (_, index) => ({
       ...product,
-      barcodeValue: product.gtin || product.sku || `PROD-${product.id.substring(0, 8)}`,
       key: `${product.id}-${index}`,
     })),
   )

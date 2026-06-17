@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { LABEL_PRESETS, buildCustomPreset, type LabelPreset, type LabelContentConfig, DEFAULT_CONTENT_CONFIG } from "@/lib/labels/presets"
 import { LabelSheet, type LabelProduct } from "@/components/erp/labels/LabelSheet"
+import { generateEAN13 } from "@/lib/utils/barcode"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { redirect } from "next/navigation"
 
@@ -21,7 +22,7 @@ interface PrintData {
     spacingY: number
   }
   contentConfig: LabelContentConfig
-  products: { id: string; quantity: number }[]
+  products: { id: string; quantity: number; barcodeValue?: string }[]
 }
 
 interface PageProps {
@@ -81,6 +82,7 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
         name: db.name,
         sku: db.sku,
         gtin: db.gtin,
+        barcodeValue: p.barcodeValue || db.gtin || generateEAN13(),
         price: db.price,
         promotionalPrice: db.promotional_price,
         internalCode: db.sku,

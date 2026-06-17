@@ -349,7 +349,10 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
 async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP trending reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -361,24 +364,41 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     if (error) {
         console.error(`[DISCOVER][TRENDING] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP trending reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP trending reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         const r = item as RawProduct
-        return (r.sales_last_7_days ?? 0) * 5 + (r.favorites_count ?? 0) * 2 + (r.views_last_30_days ?? 0)
+        return (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
     })
 
-    const displayScope = determineDisplayScope(tagged, ctx)
+    // Only items with real engagement signals
+    const withSignals = tagged.filter(item => {
+        const r = item as RawProduct
+        return (r.views_last_30_days ?? 0) > 0
+            || (r.favorites_count ?? 0) > 0
+            || (r.sales_last_30_days ?? 0) > 0
+    })
+
+    if (withSignals.length === 0) {
+        console.log(`[Discover] SKIP trending reason=no_signals`)
+        return null
+    }
+
+    const displayScope = determineDisplayScope(withSignals, ctx)
     const display = sectionDisplay("trending", ctx, displayScope)
 
-    const items = tagged.slice(0, 20).map(item => {
+    const items = withSignals.slice(0, 20).map(item => {
         const raw = item as RawProduct
         const proof: string[] = []
         if ((raw.views_last_30_days ?? 0) >= 10) proof.push(`${raw.views_last_30_days} visualizações`)
-        if ((raw.sales_last_7_days ?? 0) > 0) proof.push(`${raw.sales_last_7_days} vendidos esta semana`)
+        if ((raw.sales_last_30_days ?? 0) > 0) proof.push(`${raw.sales_last_30_days} vendidos no mês`)
         if ((raw.favorites_count ?? 0) > 0) proof.push(`${raw.favorites_count} favoritaram`)
         return processProduct(raw, { _socialProof: proof.join(" • ") })
     })
@@ -399,7 +419,10 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_partners`)
+        return null
+    }
 
     const now = new Date()
 
@@ -423,6 +446,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
         if (error) {
             console.error(`[DISCOVER][ENDING_SOON] Error (${w.label}):`, error)
+            console.log(`[Discover] SKIP endingSoon reason=error`)
             return null
         }
 
@@ -432,7 +456,10 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         }
     }
 
-    if (!campaigns || campaigns.length === 0) return null
+    if (!campaigns || campaigns.length === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_campaigns_in_24h_48h_7d`)
+        return null
+    }
 
     const campaignIds = campaigns.map((c: Record<string, any>) => c.id)
     const endsAtMap = new Map(campaigns.map((c: Record<string, any>) => [c.id, c.ends_at]))
@@ -446,17 +473,24 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     if (promoErr) {
         console.error(`[DISCOVER][ENDING_SOON] Promotions error:`, promoErr)
+        console.log(`[Discover] SKIP endingSoon reason=promotions_error`)
         return null
     }
 
-    if (!promotions || promotions.length === 0) return null
+    if (!promotions || promotions.length === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_promotions`)
+        return null
+    }
 
     const productIds = new Set<string>()
     for (const promo of promotions) {
         const pp = promo.promotion_products as Array<{ product_id: string }> | undefined
         if (pp) for (const p of pp) if (p.product_id) productIds.add(p.product_id)
     }
-    if (productIds.size === 0) return null
+    if (productIds.size === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_products_in_promotions`)
+        return null
+    }
 
     const { data: products, error: prodErr } = await supabase
         .from("products")
@@ -468,10 +502,14 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     if (prodErr) {
         console.error(`[DISCOVER][ENDING_SOON] Products error:`, prodErr)
+        console.log(`[Discover] SKIP endingSoon reason=products_error`)
         return null
     }
 
-    if (!products || products.length === 0) return null
+    if (!products || products.length === 0) {
+        console.log(`[Discover] SKIP endingSoon reason=no_products_found`)
+        return null
+    }
 
     const tagged = applyTierSort(products as RawProduct[], tiers, () => 0)
     const displayScope = determineDisplayScope(tagged, ctx)
@@ -503,14 +541,20 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     }
 }
 
-// ─── 3. 📍 Perto de você (só com coordenadas) ───────────────────────────────
+// ─── 3. 📍 Perto de você (adaptativo: ≤2km → ≤10km → mesma cidade) ────────
 
 async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    if (!ctx.coords) return null
+    if (!ctx.coords) {
+        console.log(`[Discover] SKIP nearby reason=no_coords`)
+        return null
+    }
 
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP nearby reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -524,10 +568,14 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     if (error) {
         console.error(`[DISCOVER][NEARBY] Error:`, error)
+        console.log(`[Discover] SKIP nearby reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP nearby reason=no_products`)
+        return null
+    }
 
     const withDistance = (data as RawProduct[]).map(item => {
         const partner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -535,24 +583,46 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         if (partner?.latitude && partner?.longitude) {
             distKm = calculateDistance(ctx.coords!, { lat: partner.latitude, lng: partner.longitude })
         }
-        return { ...item, _distKm: distKm }
-    })
-
-    withDistance.sort((a, b) => a._distKm - b._distKm)
-
-    const tagged = withDistance.map(item => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
         const pid = rawPartner?.id
         const tier = pid && tiers.cityIds.has(pid) ? 0
                    : pid && tiers.stateIds.has(pid) ? 1
                    : 2
-        return { ...item, _tier: tier }
+        return { ...item, _distKm: distKm, _tier: tier }
     })
 
-    const displayScope = determineDisplayScope(tagged, ctx)
-    const display = sectionDisplay("nearby", ctx, displayScope)
+    withDistance.sort((a, b) => a._distKm - b._distKm)
 
-    const items = tagged.slice(0, 20).map(item => {
+    // Try bands in order: 2km → 10km → same city
+    const minItems = 4
+    const band2km = withDistance.filter(i => i._distKm <= 2)
+    const band10km = withDistance.filter(i => i._distKm > 2 && i._distKm <= 10)
+    const bandCity = withDistance.filter(i => i._tier === 0)
+
+    type NearbyBand = { id: string; title: string; subtitle: string; pool: typeof withDistance }
+    const options: NearbyBand[] = [
+        { id: "nearby2km", title: "📍 Até 2km de você", subtitle: "Produtos pertinho da sua localização", pool: band2km },
+        { id: "nearby10km", title: "📍 Até 10km de você", subtitle: "Produtos na sua região", pool: band10km },
+        { id: "nearbyCity", title: `📍 Em ${ctx.city}`, subtitle: `Produtos disponíveis em ${ctx.city}`, pool: bandCity },
+    ]
+
+    let chosen: NearbyBand | null = null
+    for (const opt of options) {
+        if (opt.pool.length >= minItems) {
+            chosen = opt
+            console.log(`[DISCOVER][NEARBY] Band "${opt.id}" → ${opt.pool.length} items`)
+            break
+        }
+    }
+
+    if (!chosen) {
+        console.log(`[DISCOVER][NEARBY] No band with >=${minItems} items — skipping`)
+        return null
+    }
+
+    const displayScope = determineDisplayScope(chosen.pool, ctx)
+
+    const items = chosen.pool.slice(0, 20).map(item => {
         const dist = item._distKm
         let distText = ""
         if (dist < 1) distText = `A ${Math.round(dist * 1000)}m`
@@ -568,9 +638,9 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
     })
 
     return {
-        id: "nearby",
-        title: display.title,
-        subtitle: display.subtitle,
+        id: chosen.id,
+        title: chosen.title,
+        subtitle: chosen.subtitle,
         gatilho: GATILHOS_MAP.nearby,
         items,
         _allItems: items,
@@ -583,7 +653,10 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP recent reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -596,10 +669,14 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     if (error) {
         console.error(`[DISCOVER][RECENT] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP recent reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP recent reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         const r = item as RawProduct
@@ -636,7 +713,10 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP gems reason=no_partners`)
+        return null
+    }
 
     const seed = dailySeed(ctx.userId)
 
@@ -650,10 +730,14 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 
     if (error) {
         console.error(`[DISCOVER][GEMS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP gems reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP gems reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         const r = item as RawProduct
@@ -711,11 +795,17 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
 // ─── 6. 👀 Você pode gostar (apenas logado com sinais reais) ────────────────
 
 async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
-    if (!ctx.userId) return null
+    if (!ctx.userId) {
+        console.log(`[Discover] SKIP personalized reason=not_logged_in`)
+        return null
+    }
 
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP personalized reason=no_partners`)
+        return null
+    }
 
     const [favRes, orderRes] = await Promise.all([
         supabase.from("favorites").select("item_id", { count: "exact", head: true })
@@ -726,7 +816,10 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 
     const hasFavs = (favRes.count ?? 0) > 0
     const hasOrders = (orderRes.count ?? 0) > 0
-    if (!hasFavs && !hasOrders) return null
+    if (!hasFavs && !hasOrders) {
+        console.log(`[Discover] SKIP personalized reason=no_signals`)
+        return null
+    }
 
     const { data: userFavs, error: favErr } = await supabase
         .from("favorites")
@@ -738,6 +831,7 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 
     if (favErr) {
         console.error(`[DISCOVER][PERSONALIZED] Favorites error:`, favErr)
+        console.log(`[Discover] SKIP personalized reason=favorites_error`)
         return null
     }
 
@@ -764,7 +858,10 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
         }
     }
 
-    if (preferredCatIds.length === 0) return fetchPopular(tiers, ctx)
+    if (preferredCatIds.length === 0) {
+        console.log(`[Discover] SKIP personalized reason=no_preferred_categories → fallback to popular`)
+        return fetchPopular(tiers, ctx)
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -778,10 +875,14 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 
     if (error) {
         console.error(`[DISCOVER][PERSONALIZED] Products error:`, error)
+        console.log(`[Discover] SKIP personalized reason=products_error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP personalized reason=no_products`)
+        return null
+    }
 
     const favSet = new Set(favProductIds)
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
@@ -810,23 +911,31 @@ async function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise
 async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP bestSellers reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, sales_last_30_days, ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
+        .gt("sales_last_30_days", 0)
         .in("partner_id", allIds)
         .order("sales_last_30_days", { ascending: false, nulls: "last" })
         .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][BEST_SELLERS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP bestSellers reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP bestSellers reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as RawProduct).sales_last_30_days ?? 0
@@ -860,23 +969,31 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP topRated reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
         .eq("is_active", true)
         .eq("show_in_marketplace", true)
+        .gt("rating", 0)
         .in("partner_id", allIds)
         .order("rating", { ascending: false, nulls: "last" })
         .limit(60)
 
     if (error) {
         console.error(`[DISCOVER][TOP_RATED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP topRated reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP topRated reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as RawProduct).rating ?? 0
@@ -909,7 +1026,10 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP promos reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -922,6 +1042,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 
     if (error) {
         console.error(`[DISCOVER][PROMOS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP promos reason=error`)
         return null
     }
 
@@ -929,7 +1050,10 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         (item: any) => item.promotional_price && Number(item.promotional_price) < Number(item.price),
     )
 
-    if (discounted.length === 0) return null
+    if (discounted.length === 0) {
+        console.log(`[Discover] SKIP promos reason=no_discounts`)
+        return null
+    }
 
     const tagged = applyTierSort(discounted as RawProduct[], tiers, item => {
         const r = item as RawProduct
@@ -967,7 +1091,10 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
 async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP mostViewed reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -980,10 +1107,14 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 
     if (error) {
         console.error(`[DISCOVER][MOST_VIEWED] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP mostViewed reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP mostViewed reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as RawProduct).views_last_30_days ?? 0
@@ -1017,7 +1148,10 @@ async function fetchMostViewed(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
 async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP services reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("services")
@@ -1030,10 +1164,14 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     if (error) {
         console.error(`[DISCOVER][SERVICES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP services reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP services reason=no_products`)
+        return null
+    }
 
     const tagged = (data as any[]).map(item => {
         const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
@@ -1091,7 +1229,10 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP topVitrines reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("partners")
@@ -1103,10 +1244,14 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     if (error) {
         console.error(`[DISCOVER][VITRINES] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP topVitrines reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP topVitrines reason=no_partners_data`)
+        return null
+    }
 
     const tagged = data.map((p: Record<string, any>) => {
         const pid = p.id
@@ -1147,7 +1292,10 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP popular reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -1160,10 +1308,14 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
 
     if (error) {
         console.error(`[DISCOVER][POPULAR] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP popular reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP popular reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as any).marketplace_score ?? 0
@@ -1190,7 +1342,10 @@ async function fetchPopular(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Home
 async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSection | null> {
     const supabase = getAdminClient()
     const allIds = [...tiers.allIds]
-    if (allIds.length === 0) return null
+    if (allIds.length === 0) {
+        console.log(`[Discover] SKIP allProducts reason=no_partners`)
+        return null
+    }
 
     const { data, error } = await supabase
         .from("products")
@@ -1202,10 +1357,14 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     if (error) {
         console.error(`[DISCOVER][ALL_PRODUCTS] Error:`, error, `city=${ctx.city} state=${ctx.state}`)
+        console.log(`[Discover] SKIP allProducts reason=error`)
         return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!data || data.length === 0) {
+        console.log(`[Discover] SKIP allProducts reason=no_products`)
+        return null
+    }
 
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         const r = item as RawProduct
@@ -1253,6 +1412,7 @@ const MEDIUM_SECTIONS: SectionDef[] = [
     { id: "mostViewed", gatilho: GATILHOS_MAP.mostViewed, priority: "medium", fetch: fetchMostViewed },
     { id: "services", gatilho: GATILHOS_MAP.services, priority: "medium", fetch: fetchServices },
     { id: "personalized", gatilho: GATILHOS_MAP.personalized, priority: "medium", fetch: fetchPersonalized },
+    { id: "topVitrines", gatilho: GATILHOS_MAP.topVitrines, priority: "medium", fetch: fetchVitrines },
 ]
 
 const FALLBACK_SECTIONS: SectionDef[] = [
@@ -1260,6 +1420,7 @@ const FALLBACK_SECTIONS: SectionDef[] = [
 ]
 
 const PROXIMITY_SECTIONS: SectionDef[] = [
+    // Adaptive single section: ≤2km → ≤10km → same city (decided internally)
     { id: "nearby", gatilho: GATILHOS_MAP.nearby, priority: "medium", fetch: fetchNearby },
 ]
 
@@ -1296,10 +1457,13 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
 
     console.log(`[Discover] Phase 1 (HIGH): ${pool.length}/4`)
 
-    // 2. Fill gaps with MEDIUM (fixed order)
+    // 2. Fill gaps with MEDIUM (seeded shuffle for daily rotation)
     if (pool.length < 5) {
         const usedIds = new Set(pool.map(s => s.id))
-        for (const def of MEDIUM_SECTIONS) {
+        const seed = dailySeed(ctx.userId)
+        const shuffled = seededShuffle(MEDIUM_SECTIONS, `${seed}-medium`)
+
+        for (const def of shuffled) {
             if (pool.length >= 5) break
             if (usedIds.has(def.id)) continue
             if (def.id === "personalized") continue
@@ -1317,7 +1481,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 2 (MEDIUM fillers): ${pool.length}`)
+    console.log(`[Discover] Phase 2 (MEDIUM): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
 
     // 3. FALLBACK if still < 5
     if (pool.length < 5) {
@@ -1331,7 +1495,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length}`)
+    console.log(`[Discover] Phase 3 (FALLBACK): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
 
     // 4. ULTIMATE FALLBACK — any products at all (no ranking required)
     if (pool.length < 5) {
@@ -1344,36 +1508,24 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    console.log(`[Discover] Phase 4 (ULTIMATE FALLBACK): ${pool.length}`)
+    console.log(`[Discover] Phase 4 (ULTIMATE): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
 
-    // 5. Vitrines — ALWAYS inserted if at least 1 active partner exists
-    //    Insert at position 5 (6th slot) unless pool is smaller
-    const vitrinesResult = await fetchVitrines(tiers, ctx).catch(() => null)
-    if (vitrinesResult && vitrinesResult.items.length >= 1) {
-        console.log(`[Discover] Vitrines: ${vitrinesResult.items.length} partners`)
-        const insertAt = Math.min(pool.length, 5)
-        pool.splice(insertAt, 0, vitrinesResult)
-    } else {
-        console.log(`[Discover] Vitrines: empty (no partners or error)`)
-    }
-
-    console.log(`[Discover] Phase 5 (VITRINES): ${pool.length}`)
-
-    // 6. Proximity sections (nearby) — only with coords, only if room
+    // 5. Proximity (nearby) — only with coords, only if room
+    //    Vitrines are NOT reserved — they participate in the seeded MEDIUM rotation
     if (pool.length < 6 && ctx.scope === "city" && ctx.coords) {
         for (const def of PROXIMITY_SECTIONS) {
             if (pool.length >= 6) break
             const result = await def.fetch(tiers, ctx).catch(() => null)
             if (result && result.items.length >= 1) {
-                console.log(`[Discover] Proximity: ${def.id} → ${result.items.length} items`)
+                console.log(`[Discover] Proximity: ${result.id} → ${result.items.length} items`)
                 pool.push(result)
             }
         }
     }
 
-    console.log(`[Discover] Phase 6 (PROXIMITY): ${pool.length}`)
+    console.log(`[Discover] Phase 5 (PROXIMITY): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
 
-    // 7. Sixth dynamic section (only if room)
+    // 6. Sixth dynamic section (only if room)
     if (pool.length < 6) {
         let sixthSection: HomeSection | null = null
 
@@ -1421,21 +1573,25 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
         }
     }
 
-    // 8. Global dedup with auto-refill — sections never drop below 1 item
+    console.log(`[Discover] Phase 6 (SIXTH): ${pool.length} | ids=[${pool.map(s=>s.id).join(",")}]`)
+
+    // 7. Global dedup with auto-refill — sections never drop below 1 item
     const globalSeen = new Set<string>()
     let totalRemovedByDedup = 0
     const finalSections: HomeSection[] = []
 
     for (const section of pool) {
+        const beforeCount = section.items.length
         const deduped = section.items.filter((item: any) => {
             if (globalSeen.has(item.id)) return false
             globalSeen.add(item.id)
             return true
         })
 
-        const removedCount = section.items.length - deduped.length
+        const removedCount = beforeCount - deduped.length
 
         // Auto-refill from _allItems buffer
+        let refilled = 0
         if (removedCount > 0 && section._allItems) {
             const remaining = section._allItems.filter((item: any) => !globalSeen.has(item.id))
             const refillCount = Math.min(20 - deduped.length, remaining.length)
@@ -1443,15 +1599,20 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
                 const refillItem = remaining[i]
                 globalSeen.add(refillItem.id)
                 deduped.push(refillItem)
+                refilled++
             }
             totalRemovedByDedup += removedCount
+        }
+
+        if (removedCount > 0) {
+            console.log(`[Discover] DEDUP ${section.id}: before=${beforeCount} removed=${removedCount} refilled=${refilled} after=${deduped.length}`)
         }
 
         // Never drop a section entirely — if dedup killed everything, keep original
         if (deduped.length >= 1) {
             finalSections.push({ ...section, items: deduped.slice(0, 20) })
         } else {
-            console.log(`[Discover] Dedup would kill section "${section.id}" — keeping it anyway`)
+            console.log(`[Discover] DEDUP would kill section "${section.id}" — keeping it anyway`)
             finalSections.push(section)
         }
     }
@@ -1462,7 +1623,7 @@ export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> 
     console.log(`[Discover] END | ${result.length} sections | ${(t1 - t0).toFixed(0)}ms`)
     console.log(`[Discover] DIAG: partners=${tiers.allIds.size} | pool_before_dedup=${pool.length} | dedup_removed=${totalRemovedByDedup}`)
     if (result.length > 0) {
-        console.log(`[Discover] Sections:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
+        console.log(`[Discover] SECTIONS:`, result.map(s => `${s.id}=${s.title} (${s.items.length})`).join(" | "))
     }
 
     return result

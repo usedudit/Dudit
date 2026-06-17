@@ -61,11 +61,18 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 ? "city"
                 : "state"
 
+        // Country scope: override display values to "Brasil"
+        const ctxCity = scope === "country" ? "Brasil" : cityName
+        const ctxState = scope === "country" ? "BR" : state
+        const ctxStateOnly = scope === "country" ? false : isDefaultSP
+
+        console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
+
         const [sectionsResult, adsResult] = await Promise.all([
             getHomeSections({
-                city: cityName,
-                state,
-                stateOnly: isDefaultSP,
+                city: ctxCity,
+                state: ctxState,
+                stateOnly: ctxStateOnly,
                 citySlug,
                 coords,
                 userId: user?.id ?? null,
@@ -75,8 +82,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
                 lat: userProfile?.latitude ?? null,
                 lng: userProfile?.longitude ?? null,
                 citySlug,
-                city: cityName,
-                state,
+                city: ctxCity,
+                state: ctxState,
             }),
         ])
 
