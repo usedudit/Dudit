@@ -17,7 +17,7 @@ export default async function XmlImportPage() {
       <FadeIn className="p-4">
         <XmlImportPageContent
           partnerId={context.partnerId}
-          recentImports={imports.success ? imports.imports || [] : []}
+          initialImports={imports.success ? imports.imports || [] : []}
         />
       </FadeIn>
     </>
