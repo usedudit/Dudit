@@ -460,7 +460,7 @@ export async function uploadXMLAction(
           matched_product_id: match.productId,
           matched_product_name: match.productName,
           match_method: match.method,
-          conflicts: match.conflicts ? JSON.stringify(match.conflicts) : null,
+          conflicts: match.conflicts || null,
         })
         .select("id")
         .single()
@@ -665,7 +665,7 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
         matched_product_name: item.matched_product_name || null,
         match_method: item.match_method,
         match_confidence: item.match_confidence,
-        conflicts: item.conflicts,
+        conflicts: typeof item.conflicts === "string" ? JSON.parse(item.conflicts) : item.conflicts,
       })),
       errors: xmlImport.errors,
       created_at: xmlImport.created_at,

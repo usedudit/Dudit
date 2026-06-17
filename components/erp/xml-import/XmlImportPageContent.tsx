@@ -696,7 +696,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                                 <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
                               </div>
                               {item.match_method && <p className="text-xs text-brand-green mt-1">Match por {item.match_method}</p>}
-                              {item.conflicts?.map((c: any, i: number) => (
+                              {(Array.isArray(item.conflicts) ? item.conflicts : []).map((c: any, i: number) => (
                                 <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
                                   <span className="font-bold text-brand-dark">{c.campo}:</span>
                                   <span className="text-yellow-600 line-through">{c.valor_atual}</span>
