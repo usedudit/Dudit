@@ -805,7 +805,7 @@ export default function ProductsPage({
                                         <DropdownItem onClick={() => setIsCameraOpen(true)}>
                                             <CameraIcon size={16} /> Escanear Câmera
                                         </DropdownItem>
-                                        <DropdownItem onClick={() => setModals((p) => ({ ...p, import: true }))}>
+                                        <DropdownItem onClick={() => router.push("/erp/xml-import")}>
                                             <UploadIcon size={16} /> Importar XML
                                         </DropdownItem>
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
@@ -833,7 +833,7 @@ export default function ProductsPage({
                                     search={search}
                                     onSearchChange={setSearch}
                                     onOpenFilter={() => setModals((p) => ({ ...p, filter: true }))}
-                                    onOpenImport={() => setModals((p) => ({ ...p, import: true }))}
+                                    onOpenImport={() => router.push("/erp/xml-import")}
                                     onOpenExport={handleExport}
                                     onAddProduct={handleAddFirstProduct}
                                     filters={filters}
