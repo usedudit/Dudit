@@ -567,7 +567,6 @@ export default function MarketplaceHome({
                                     subtitle={section.subtitle}
                                     items={section.items}
                                     renderItem={(item: any) => <VitrineCard vitrine={item} className="w-full" />}
-                                    onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
                             )
@@ -579,7 +578,6 @@ export default function MarketplaceHome({
                                 subtitle={section.subtitle}
                                 items={section.items}
                                 renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} className="w-full" />}
-                                onSeeAll={section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined}
                                 itemWidthClass="w-[190px] sm:w-[210px]"
                             />
                         )

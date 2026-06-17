@@ -45,6 +45,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
     let sections: HomeSection[] = []
     let homeAds: SponsoredAd[] = []
+    let displayCityName: string | null = cityName
 
     if (cityName && citySlug) {
         const state = citySlug.split("-").pop()?.toUpperCase() || ""
@@ -65,6 +66,8 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
         const ctxCity = scope === "country" ? "Brasil" : cityName
         const ctxState = scope === "country" ? "BR" : state
         const ctxStateOnly = scope === "country" ? false : isDefaultSP
+
+        displayCityName = ctxCity
 
         console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
 
@@ -101,7 +104,7 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
             userProfile={userProfile}
             cartCount={cartCount}
             selectedCitySlug={citySlug}
-            selectedCityName={cityName}
+            selectedCityName={displayCityName}
             hideHeaderAndFooter={true}
             homeAds={homeAds}
         />
@@ -160,7 +163,7 @@ export default async function HomePage() {
         isDefaultStateSP = true
     }
 
-    const userProfile = dbProfile
+    let userProfile = dbProfile
         ? {
             full_name: dbProfile.full_name,
             latitude: dbProfile.latitude,
@@ -179,6 +182,11 @@ export default async function HomePage() {
             city: cityName,
             state: citySlug.split("-").pop()?.toUpperCase(),
         } : null)
+
+    // Country scope (anonymous, no cookie): override header to show "Brasil"
+    if (isDefaultStateSP && !user && userProfile) {
+        userProfile = { ...userProfile, address: "Brasil", city: "Brasil", state: "BR" }
+    }
 
     const cartCount = sessionData?.cartCount || 0
 

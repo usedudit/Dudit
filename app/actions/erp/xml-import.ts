@@ -566,7 +566,7 @@ export async function confirmImportAction(
       p_xml_import_id: xmlImportId,
       p_partner_id: partnerId,
       p_store_id: storeId,
-      p_items: JSON.stringify(decisions),
+      p_items: decisions,
       p_created_by: user.id,
     })
 
