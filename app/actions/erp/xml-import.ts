@@ -299,6 +299,20 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n]
 }
 
+function friendlyError(msg: string): string {
+  if (!msg) return "Erro desconhecido"
+  const m = msg.toLowerCase()
+  if (m.includes("duplicate key") && m.includes("uq_xml_imports_access_key")) return "Esta NF-e já foi importada anteriormente"
+  if (m.includes("duplicate key") && m.includes("uq_")) return "Registro duplicado"
+  if (m.includes("foreign key constraint") || m.includes("violates foreign key")) return "Referência inválida: o registro relacionado não existe"
+  if (m.includes("null value in column") || m.includes("not-null constraint")) return "Campo obrigatório não preenchido"
+  if (m.includes("value too long") || m.includes("exceeds maximum length")) return "Valor muito longo para um dos campos"
+  if (m.includes("invalid input syntax")) return "Formato inválido para um dos campos"
+  if (m.includes("permission denied") || m.includes("42501")) return "Você não tem permissão para executar esta ação"
+  if (m.includes("could not find")) return "Registro não encontrado"
+  return msg
+}
+
 export async function uploadXMLAction(
   xmlContent: string,
   partnerId: string,
@@ -398,7 +412,7 @@ export async function uploadXMLAction(
         .single()
 
       if (createErr) {
-        return { success: false, error: `Erro ao criar fornecedor: ${createErr.message}` }
+        return { success: false, error: friendlyError(createErr.message) }
       }
 
       supplierId = newSupplier.id
@@ -428,7 +442,7 @@ export async function uploadXMLAction(
       .single()
 
     if (importErr) {
-      return { success: false, error: `Erro ao registrar importação: ${importErr.message}` }
+      return { success: false, error: friendlyError(importErr.message) }
     }
 
     // 7. Processar matching para cada produto e criar xml_import_items
@@ -523,7 +537,7 @@ export async function uploadXMLAction(
     return { success: true, preview, validation: { docsMatch } }
   } catch (error: any) {
     console.error("Erro no upload XML:", error)
-    return { success: false, error: error.message || "Erro interno" }
+    return { success: false, error: friendlyError(error.message) }
   }
 }
 
@@ -574,7 +588,7 @@ export async function confirmImportAction(
 
     if (rpcErr) {
       console.error("Erro RPC execute_xml_import:", rpcErr)
-      return { success: false, error: `Erro ao processar importação: ${rpcErr.message}` }
+      return { success: false, error: friendlyError(rpcErr.message) }
     }
 
     if (!result.success) {
@@ -598,7 +612,7 @@ export async function confirmImportAction(
     }
   } catch (error: any) {
     console.error("Erro ao confirmar importação:", error)
-    return { success: false, error: error.message || "Erro interno" }
+    return { success: false, error: friendlyError(error.message) }
   }
 }
 
@@ -673,7 +687,7 @@ export async function getImportPreviewAction(xmlImportId: string, partnerId: str
 
     return { success: true, preview }
   } catch (error: any) {
-    return { success: false, error: error.message || "Erro interno" }
+    return { success: false, error: friendlyError(error.message) }
   }
 }
 
@@ -702,6 +716,6 @@ export async function listImportsAction(
 
     return { success: true, imports: data }
   } catch (error: any) {
-    return { success: false, error: error.message || "Erro interno" }
+    return { success: false, error: friendlyError(error.message) }
   }
 }

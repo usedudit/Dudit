@@ -1236,7 +1236,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const { data, error } = await supabase
         .from("partners")
-        .select(`id, store_name, store_image_url, rating, slug, addresses!inner(city, state)`)
+        .select(`id, store_name, store_image_url, rating, addresses!inner(city, state)`)
         .eq("is_active", true)
         .in("id", allIds)
         .order("rating", { ascending: false, nulls: "last" })

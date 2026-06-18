@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection } from "@/components/reusable"
+import { Button, Checkbox, Input, IconPlaceholder, Badge, Spinner, SelectionBanner, ThreeDotsLoader, InfoCard, FormSection, ActionsDropdown } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -14,8 +14,8 @@ import { useStore } from "@/lib/store-context"
 import { uploadXMLAction, confirmImportAction, getImportPreviewAction, listImportsAction } from "@/app/actions/erp/xml-import"
 import {
   UploadIcon, FileTextIcon, CheckCircleIcon, AlertTriangleIcon,
-  SearchIcon, PlusIcon, FileIcon, ClockIcon, GridIcon, ListIcon, CheckIcon,
-  PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon
+  SearchIcon, PlusIcon, FileIcon, ClockIcon, GridIcon, ListIcon,
+  PackageIcon, ArrowRightIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon
 } from "@/lib/icons"
 
 type TabType = "all" | "pending" | "completed" | "failed"
@@ -54,14 +54,14 @@ const COLUMNS = [
   { id: "supplier" as const, label: "Fornecedor", align: "left" as const, width: "200px" },
   { id: "items" as const, label: "Itens", align: "center" as const, width: "100px" },
   { id: "status" as const, label: "Status", align: "center" as const, width: "130px" },
-  { id: "date" as const, label: "Data", align: "right" as const, width: "150px" },
+  { id: "date" as const, label: "Data", align: "right" as const, width: "170px" },
   { id: "actions" as const, label: "Ações", align: "center" as const, width: "80px" },
 ]
 
 export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPageContentProps) {
   const { selectedStore } = useStore()
   const storeId = selectedStore?.id || ""
-  const { error: notifyError } = useNotification()
+  const { success: notifySuccess, error: notifyError } = useNotification()
   const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
   const router = useRouter()
 
@@ -76,6 +76,7 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [viewingImportId, setViewingImportId] = useState<string | null>(null)
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null)
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
 
   const tableContainerRef = useRef<HTMLDivElement>(null)
   const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -97,41 +98,26 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
     return () => window.removeEventListener("resize", checkScroll)
   }, [checkScroll, effectiveViewMode, imports])
 
-  if (pendingUploadId) {
-    return (
-      <ImportPreviewView
-        importId={pendingUploadId}
-        partnerId={partnerId}
-        storeId={storeId}
-        onBack={() => setPendingUploadId(null)}
-        onComplete={() => {
-          setPendingUploadId(null)
-          listImportsAction(partnerId, 50).then((res) => {
-            if (res.success && res.imports) setImports(res.imports as ImportItem[])
-          })
-          router.refresh()
-        }}
-      />
-    )
-  }
+  const showPreview = !!viewingImportId || !!pendingUploadId
+  const previewImportId = pendingUploadId || viewingImportId || ""
 
-  if (viewingImportId) {
-    return (
-      <ImportPreviewView
-        importId={viewingImportId}
-        partnerId={partnerId}
-        storeId={storeId}
-        onBack={() => setViewingImportId(null)}
-        onComplete={() => {
-          setViewingImportId(null)
-          listImportsAction(partnerId, 50).then((res) => {
-            if (res.success && res.imports) setImports(res.imports as ImportItem[])
-          })
-          router.refresh()
-        }}
-      />
-    )
-  }
+  const handleBackFromPreview = useCallback(() => {
+    setPendingUploadId(null)
+    setViewingImportId(null)
+  }, [])
+
+  const handleComplete = useCallback(() => {
+    setPendingUploadId(null)
+    setViewingImportId(null)
+    listImportsAction(partnerId, 50).then((res) => {
+      if (res.success && res.imports) setImports(res.imports as ImportItem[])
+    })
+    router.refresh()
+  }, [partnerId, router])
+
+  const isPreviewView = !!previewImportId
+  const listViewKey = "list-view"
+  const previewKey = pendingUploadId ? "pending-preview" : `view-${viewingImportId}`
 
   const filtered = useMemo(() => {
     let result = imports.filter((imp) => {
@@ -149,36 +135,158 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
           imp.access_key?.toLowerCase().includes(s)
       )
     }
+    if (sortConfig) {
+      result = [...result].sort((a, b) => {
+        const keyMap: Record<string, keyof ImportItem> = {
+          invoice: "invoice_number",
+          supplier: "supplier_name",
+          items: "items_count",
+          status: "status",
+          date: "created_at",
+        }
+        const field = keyMap[sortConfig.key]
+        if (!field) return 0
+        let valA = a[field]
+        let valB = b[field]
+        if (sortConfig.key === "items") {
+          valA = a.items_count ?? 0
+          valB = b.items_count ?? 0
+        }
+        if (sortConfig.key === "date") {
+          valA = a.created_at || ""
+          valB = b.created_at || ""
+        }
+        if (valA === valB) return 0
+        const comparison = (valA ?? "") < (valB ?? "") ? -1 : 1
+        return sortConfig.direction === "asc" ? comparison : -comparison
+      })
+    }
     return result
-  }, [imports, activeTab, search])
+  }, [imports, activeTab, search, sortConfig])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
   const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
   const hasActiveFilters = activeTab !== "all" || search !== ""
 
-  const handleTabChange = (tab: TabType) => { setActiveTab(tab); setPage(1) }
+  const handleSort = useCallback((key: string) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev?.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }))
+  }, [])
 
-  const handleSelect = (id: string) => {
+  const handleTabChange = useCallback((tab: TabType) => { setActiveTab(tab); setPage(1) }, [])
+  const handleSelect = useCallback((id: string) => {
     setSelection((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
-  }
-
-  const handleSelectAll = () => {
+  }, [])
+  const handleSelectAll = useCallback(() => {
     if (selection.size === paginated.length) setSelection(new Set())
     else setSelection(new Set(paginated.map((i) => i.id)))
-  }
-
-  const handleClearFilters = () => { setSearch(""); setActiveTab("all") }
-
-  const handleOpenDetail = (imp: ImportItem) => {
-    setViewingImportId(imp.id)
-  }
+  }, [selection.size, paginated])
+  const handleClearFilters = useCallback(() => { setSearch(""); setActiveTab("all") }, [])
+  const handleOpenDetail = useCallback((imp: ImportItem) => setViewingImportId(imp.id), [])
+  const handleUploadModalSuccess = useCallback((importId: string) => {
+    setShowUploadModal(false)
+    setPendingUploadId(importId)
+  }, [])
 
   return (
-    <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+    <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+      {!isPreviewView && (
+        <ListContent
+          key={listViewKey}
+          imports={imports}
+          search={search}
+          setSearch={setSearch}
+          page={page}
+          setPage={setPage}
+          activeTab={activeTab}
+          handleTabChange={handleTabChange}
+          filtered={filtered}
+          totalPages={totalPages}
+          paginated={paginated}
+          hasActiveFilters={hasActiveFilters}
+          effectiveViewMode={effectiveViewMode}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          selection={selection}
+          handleSelect={handleSelect}
+          handleSelectAll={handleSelectAll}
+          handleClearFilters={handleClearFilters}
+          handleOpenDetail={handleOpenDetail}
+          showUploadModal={showUploadModal}
+          setShowUploadModal={setShowUploadModal}
+          handleUploadModalSuccess={handleUploadModalSuccess}
+          partnerId={partnerId}
+          storeId={storeId}
+          sortConfig={sortConfig}
+          handleSort={handleSort}
+        />
+      )}
+      {isPreviewView && (
+        <ImportPreviewView
+          key={previewKey}
+          importId={previewImportId}
+          partnerId={partnerId}
+          storeId={storeId}
+          onBack={handleBackFromPreview}
+          onComplete={handleComplete}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── List Content (extracted to ensure consistent hooks) ────────────────
+
+function ListContent({
+  imports, search, setSearch, page, setPage, activeTab, handleTabChange,
+  filtered, totalPages, paginated, hasActiveFilters, effectiveViewMode,
+  viewMode, setViewMode, selection, handleSelect, handleSelectAll,
+  handleClearFilters, handleOpenDetail, showUploadModal, setShowUploadModal,
+  handleUploadModalSuccess, partnerId, storeId, sortConfig, handleSort,
+}: {
+  imports: ImportItem[]; search: string; setSearch: (v: string) => void;
+  page: number; setPage: (v: number) => void;
+  activeTab: TabType; handleTabChange: (t: TabType) => void;
+  filtered: ImportItem[]; totalPages: number; paginated: ImportItem[];
+  hasActiveFilters: boolean; effectiveViewMode: "list" | "grid";
+  viewMode: "list" | "grid"; setViewMode: (v: "list" | "grid") => void;
+  selection: Set<string>; handleSelect: (id: string) => void;
+  handleSelectAll: () => void; handleClearFilters: () => void;
+  handleOpenDetail: (imp: ImportItem) => void;
+  showUploadModal: boolean; setShowUploadModal: (v: boolean) => void;
+  handleUploadModalSuccess: (importId: string) => void;
+  partnerId: string; storeId: string;
+  sortConfig: { key: string; direction: "asc" | "desc" } | null;
+  handleSort: (key: string) => void;
+}) {
+  const [scrollState, setScrollState] = useState({ left: false, right: false })
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+
+  const checkScroll = useCallback(() => {
+    if (!tableContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current
+    setScrollState((prev) => {
+      const nextLeft = scrollLeft > 0
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 2
+      if (prev.left === nextLeft && prev.right === nextRight) return prev
+      return { left: nextLeft, right: nextRight }
+    })
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    window.addEventListener("resize", checkScroll)
+    return () => window.removeEventListener("resize", checkScroll)
+  }, [checkScroll, effectiveViewMode, imports])
+
+  return (
+    <FadeIn className="flex flex-col h-full transition-colors duration-300">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -215,7 +323,8 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
           <div className="md:hidden flex items-center gap-2 w-full">
             <div className="flex-1 min-w-0">
-              <Input name="search" placeholder="Buscar..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              <Input name="search" placeholder="Buscar..." value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                 className="h-[42px] w-full" variant="full-rounded"
                 prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />} label=""
               />
@@ -228,7 +337,8 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
           <div className="hidden md:flex items-center w-full gap-4">
             <div className="flex items-center gap-3 shrink-0">
               <div className="w-80">
-                <Input name="search" placeholder="Buscar notas..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                <Input name="search" placeholder="Buscar notas..." value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                   className="h-[42px]" variant="full-rounded"
                   prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />} label=""
                 />
@@ -263,56 +373,75 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
                 />
               </FadeIn>
             ) : (
-              <AnimatePresence mode="wait">
-                <FadeIn key={activeTab + effectiveViewMode} className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                  <SelectionBanner
-                    selectedCount={selection.size} totalCount={filtered.length}
-                    onSelectAll={() => setSelection(new Set(filtered.map((i) => i.id)))}
-                    onClearSelection={() => setSelection(new Set())}
-                    itemName="importações" singularItemName="importação"
-                  />
+              <FadeIn key={activeTab + effectiveViewMode} className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                <SelectionBanner
+                  selectedCount={selection.size} totalCount={filtered.length}
+                  onSelectAll={() => handleSelectAll()}
+                  onClearSelection={() => handleSelectAll()}
+                  itemName="importações" singularItemName="importação"
+                />
 
-                  {effectiveViewMode === "grid" ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
-                      {paginated.map((imp) => (
-                        <ImportGridCard key={imp.id} item={imp} selected={selection.has(imp.id)}
-                          onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="w-full overflow-hidden rounded-xl relative">
-                      <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                      <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-                      <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                        <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
-                          <thead>
-                            <tr className="bg-brand-gray dark:bg-dark-border/50">
-                              <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                <div className="flex items-center">
-                                  <Checkbox checked={selection.size === paginated.length && paginated.length > 0} onChange={() => handleSelectAll()} className="bg-white dark:bg-dark-background" />
-                                </div>
-                              </th>
-                              {COLUMNS.map((col, idx) => (
+                {effectiveViewMode === "grid" ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                    {paginated.map((imp) => (
+                      <ImportGridCard key={imp.id} item={imp} selected={selection.has(imp.id)}
+                        onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="w-full overflow-hidden rounded-xl relative">
+                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                      <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                        <thead>
+                          <tr className="bg-brand-gray dark:bg-dark-border/50">
+                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                              <div className="flex items-center">
+                                <Checkbox checked={selection.size === paginated.length && paginated.length > 0} onChange={handleSelectAll} className="bg-white dark:bg-dark-background" />
+                              </div>
+                            </th>
+                            {COLUMNS.map((col, idx) => {
+                              const isSorted = sortConfig?.key === col.id
+                              const justifyClass = col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"
+                              return (
                                 <th key={col.id}
-                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""}`}
+                                  onClick={col.id === "actions" ? undefined : () => handleSort(col.id)}
+                                  className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${idx === COLUMNS.length - 1 ? "rounded-r-lg" : ""} ${col.id !== "actions" ? "cursor-pointer select-none group" : ""}`}
                                   style={{ width: col.width }}>
-                                  <span>{col.label}</span>
+                                  <div className={`relative flex items-center gap-1.5 ${justifyClass}`}>
+                                    <span className={col.id === "actions" ? "sr-only" : ""}>{col.label}</span>
+                                    {col.id !== "actions" && (
+                                      <div className="flex items-center">
+                                        <ArrowUpDownIcon
+                                          size={14}
+                                          className={`transition-all duration-200 ${
+                                            isSorted
+                                              ? "text-brand-dark dark:text-dark-heading opacity-100 block"
+                                              : "text-brand-inactive-text hidden group-hover:block opacity-40"
+                                          } ${
+                                            isSorted && sortConfig?.direction === "desc" ? "rotate-180" : ""
+                                          }`}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
                                 </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {paginated.map((imp) => (
-                              <ImportListRow key={imp.id} item={imp} selected={selection.has(imp.id)}
-                                onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                              )
+                            })}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginated.map((imp) => (
+                            <ImportListRow key={imp.id} item={imp} selected={selection.has(imp.id)}
+                              onSelect={() => handleSelect(imp.id)} onClick={() => handleOpenDetail(imp)} />
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </FadeIn>
-              </AnimatePresence>
+                  </div>
+                )}
+              </FadeIn>
             )}
           </AnimatePresence>
         </div>
@@ -324,8 +453,7 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
 
       <DefaultModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} title="Importar XML" maxWidth="2xl">
         <XmlUploadForm partnerId={partnerId} storeId={storeId}
-          onSuccess={(importId) => { setShowUploadModal(false); setPendingUploadId(importId) }}
-          onCancel={() => setShowUploadModal(false)} />
+          onSuccess={handleUploadModalSuccess} onCancel={() => setShowUploadModal(false)} />
       </DefaultModal>
     </FadeIn>
   )
@@ -335,7 +463,12 @@ export function XmlImportPageContent({ partnerId, initialImports }: XmlImportPag
 
 function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void }) {
   const meta = STATUS_META[item.status] || { label: item.status, variant: "gray" as const }
-  const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
+  const dateStr = item.created_at
+    ? new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : "-"
+  const timeStr = item.created_at
+    ? new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : ""
 
   return (
     <tr className="border-b border-brand-border dark:border-dark-border transition-colors cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-background/50" onClick={() => onClick()}>
@@ -367,19 +500,16 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
         <div className="flex justify-center"><Badge variant={meta.variant}>{meta.label}</Badge></div>
       </td>
       <td className="py-3 px-2 text-right">
-        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{dateStr}</span>
+        <div className="flex flex-col">
+          <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading leading-tight">{dateStr}</span>
+          {timeStr && <span className="text-[11px] text-brand-inactive-text dark:text-dark-body leading-tight mt-0.5">{timeStr}</span>}
+        </div>
       </td>
       <td className="py-3 px-2" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center">
-          {(item.status === "preview" || item.status === "pending") && (
-            <Button variant="ghost" size="sm" onClick={() => onClick()}>Revisar</Button>
-          )}
-          {item.status === "failed" && (
-            <Button variant="ghost" size="sm" onClick={() => onClick()}>Ver erro</Button>
-          )}
-          {item.status === "completed" && (
-            <Button variant="ghost" size="sm" onClick={() => onClick()}>Detalhes</Button>
-          )}
+        <div className="flex justify-center action-btn">
+          <ActionsDropdown
+            onView={() => onClick()}
+          />
         </div>
       </td>
     </tr>
@@ -390,7 +520,6 @@ function ImportListRow({ item, selected, onSelect, onClick }: { item: ImportItem
 
 function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportItem; selected: boolean; onSelect: () => void; onClick: () => void }) {
   const meta = STATUS_META[item.status] || { label: item.status, variant: "gray" as const }
-  const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : "-"
 
   return (
     <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative" onClick={() => onClick()}>
@@ -403,8 +532,13 @@ function ImportGridCard({ item, selected, onSelect, onClick }: { item: ImportIte
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <h3 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate shrink-0">NF-e {item.invoice_number || "—"}</h3>
             </div>
-            <div onClick={(e) => e.stopPropagation()}>
-              <Checkbox checked={selected} onChange={() => onSelect()} />
+            <div className="flex items-center gap-1">
+              <div onClick={(e) => e.stopPropagation()}>
+                <ActionsDropdown onView={() => onClick()} />
+              </div>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={selected} onChange={() => onSelect()} />
+              </div>
             </div>
           </div>
           <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.supplier_name || "Fornecedor"}</span>
@@ -471,12 +605,7 @@ function XmlUploadForm({ partnerId, storeId, onSuccess, onCancel }: { partnerId:
           </>
         )}
       </div>
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg px-4 py-3 flex items-start gap-3">
-          <AlertTriangleIcon className="w-5 h-5 text-brand-red shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-        </div>
-      )}
+      {error && <InfoCard color="red" message={error} />}
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button onClick={handleSubmit} disabled={!file || isUploading}>
@@ -487,7 +616,7 @@ function XmlUploadForm({ partnerId, storeId, onSuccess, onCancel }: { partnerId:
   )
 }
 
-// ─── Import Preview View (Detail page pattern) ──────────────────────────────
+// ─── SidebarCard ────────────────────────────────────────────────────────────
 
 const SidebarCard = ({ children, hasTopStrip = true }: { children: React.ReactNode; hasTopStrip?: boolean }) => (
   <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
@@ -495,6 +624,8 @@ const SidebarCard = ({ children, hasTopStrip = true }: { children: React.ReactNo
     {children}
   </div>
 )
+
+// ─── Import Preview View ────────────────────────────────────────────────────
 
 function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }: {
   importId: string; partnerId: string; storeId: string; onBack: () => void; onComplete: () => void
@@ -512,7 +643,9 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     getImportPreviewAction(importId, partnerId).then((res) => {
+      if (cancelled) return
       if (res.success && res.preview) {
         setPreview(res.preview)
         const initial: Record<string, any> = {}
@@ -525,7 +658,8 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
         setDecisions(initial)
       }
       setLoading(false)
-    })
+    }).catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [importId, partnerId])
 
   const getDecision = (itemId: string) => decisions[itemId] || { decision: "keep_product", stock_action: "add", cost_action: "update" }
@@ -547,7 +681,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
   }
 
   if (loading) {
-    return <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8"><ThreeDotsLoader /></div>
+    return <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full"><ThreeDotsLoader /></div>
   }
 
   if (!preview) {
@@ -563,14 +697,30 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
   const isPreview = preview.status === "preview" || preview.status === "pending"
   const isCompleted = preview.status === "completed"
 
-  const formatDate = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }) : "—"
-  const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
+  const safeDate = (d: string) => {
+    if (!d) return "—"
+    try {
+      const dt = new Date(d)
+      if (isNaN(dt.getTime())) return d
+      return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+    } catch { return d }
+  }
+
+  const safeDateTime = (d: string) => {
+    if (!d) return "—"
+    try {
+      const dt = new Date(d)
+      if (isNaN(dt.getTime())) return d
+      return dt.toLocaleString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    } catch { return d }
+  }
+
+  const safeConflicts = (c: any) => Array.isArray(c) ? c : []
 
   return (
     <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
 
-        {/* Sticky Header */}
         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
           <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
             <div className="absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500" style={{ transform: isScrolled ? "scale(0.9)" : "scale(1)" }}>
@@ -607,14 +757,11 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
           </div>
         </div>
 
-        {/* Scrollable content */}
         <div className="max-w-[1300px] mx-auto p-4 md:p-8 pt-6">
           <div className="grid grid-cols-12 gap-y-8 xl:gap-y-0">
 
-            {/* LEFT COLUMN */}
             <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
 
-              {/* Invoice / Supplier Info Card */}
               <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                 <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
                   <div className="flex items-center justify-between">
@@ -654,16 +801,14 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                 </div>
               </div>
 
-              {/* Error info for failed imports */}
               {isFailed && preview.errors?.length > 0 && (
                 <div className="mb-8 space-y-2">
                   {preview.errors.map((e: any, i: number) => (
-                    <InfoCard key={i} color="red" title={`Erro no item ${i + 1}`} message={e.error || e} />
+                    <InfoCard key={i} color="red" title={`Erro no item ${i + 1}`} message={typeof e === "string" ? e : e.error || ""} />
                   ))}
                 </div>
               )}
 
-              {/* Items using FormSection */}
               <FormSection title="Produtos">
                 {preview.items.map((item: any) => {
                   const d = getDecision(item.id)
@@ -671,6 +816,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                   const isSimilar = item.match_status === "similar"
                   const isMatched = item.match_status === "matched"
                   const isSkipped = item.match_status === "skipped"
+                  const conflicts = safeConflicts(item.conflicts)
 
                   return (
                     <div key={item.id} className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
@@ -696,7 +842,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                                 <span className="text-xs text-brand-inactive-text">Un: {item.raw_unit}</span>
                               </div>
                               {item.match_method && <p className="text-xs text-brand-green mt-1">Match por {item.match_method}</p>}
-                              {(Array.isArray(item.conflicts) ? item.conflicts : []).map((c: any, i: number) => (
+                              {conflicts.map((c: any, i: number) => (
                                 <div key={i} className="flex items-center gap-1.5 mt-1 text-xs">
                                   <span className="font-bold text-brand-dark">{c.campo}:</span>
                                   <span className="text-yellow-600 line-through">{c.valor_atual}</span>
@@ -772,13 +918,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
               </FormSection>
             </div>
 
-            {/* RIGHT COLUMN - Sidebar */}
             <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
               {isFailed && preview.errors?.length > 0 && (
                 <InfoCard color="red" title="Erro na importação" message={
                   <ul className="list-disc pl-4 text-sm space-y-1">
                     {preview.errors.map((e: any, i: number) => (
-                      <li key={i}>{e.error || e}</li>
+                      <li key={i}>{typeof e === "string" ? e : e.error || ""}</li>
                     ))}
                   </ul>
                 } />
@@ -803,13 +948,13 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
                   {preview.invoice.data_emissao && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-brand-inactive-text dark:text-dark-body">Data de Emissão</span>
-                      <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDate(preview.invoice.data_emissao)}</span>
+                      <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDate(preview.invoice.data_emissao)}</span>
                     </div>
                   )}
                   {preview.created_at && (
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-brand-inactive-text dark:text-dark-body">Importado em</span>
-                      <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(preview.created_at)}</span>
+                      <span className="font-bold text-brand-dark dark:text-dark-heading">{safeDateTime(preview.created_at)}</span>
                     </div>
                   )}
                   {preview.invoice.chave && (
@@ -825,7 +970,6 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete }:
         </div>
       </div>
 
-      {/* Mobile action bar */}
       {isPreview && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
           <Button variant="outline" className="flex-1 h-12" onClick={onBack}>
